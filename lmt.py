@@ -8,11 +8,6 @@ import argparse
 import cPickle as pickle
 import MySQLdb
 
-LMT_HOST = os.environ.get('PYLMT_HOST')
-LMT_USER = os.environ.get('PYLMT_USER')
-LMT_PASSWORD = os.environ.get('PYLMT_PASSWORD')
-LMT_DB = os.environ.get('PYLMT_DB')
-
 _LMT_TIMESTEP = 5.0
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
@@ -68,32 +63,53 @@ INNER JOIN OST_INFO on OST_INFO.OST_ID = last_ostids.ostid
 INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
 """
 
-def get_ost_data( t_start, t_stop, mode='mysql' ):
-    """
-    Wrapper for backend-specific data dumpers that retrieve all counter data
-    between two timestamps
-    """
-    if mode == 'pickle':
-        return _ost_data_from_pickle( t_start, t_stop )
-    else:
-        return _ost_data_from_mysql( t_start, t_stop )
+class LMTDB(object):
+    def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, pickles=None):
+        self.pickles = pickles
+        if pickles is None:
+            if dbhost is None:
+                dbhost = os.environ.get('PYLMT_HOST')
+            if dbuser is None:
+                dbuser = os.environ.get('PYLMT_USER')
+            if dbpassword is None:
+                dbpassword = os.environ.get('PYLMT_PASSWORD')
+            if dbname is None:
+                dbname = os.environ.get('PYLMT_DB')
+            self.db = MySQLdb.connect( 
+                host=dbhost, 
+                user=dbuser, 
+                passwd=dbpassword, 
+                db=dbname)
+        else:
+            self.db = None
+    def __enter__(self):
+        return self
+    def __die__(self):
+        if self.db:
+            self.db.close()
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.db:
+            self.db.close()
 
-def _ost_data_from_mysql( t_start, t_stop ):
-    """
-    Generator function that connects to MySQL, runs a query, and buffers output
-    """
-    if LMT_PASSWORD:
-        db = MySQLdb.connect( host=LMT_HOST, user=LMT_USER, passwd=LMT_PASSWORD, db=LMT_DB)
-    else:
-        db = MySQLdb.connect( host=LMT_HOST, user=LMT_USER, db=LMT_DB)
+    def get_ost_data( self, t_start, t_stop ):
+        """
+        Wrapper for backend-specific data dumpers that retrieve all counter data
+        between two timestamps
+        """
+        if self.pickles is not None:
+            return self._ost_data_from_pickle( t_start, t_stop )
+        else:
+            return self._ost_data_from_mysql( t_start, t_stop )
 
-    query_str = _QUERY_OST_DATA % ( 
-        t_start.strftime( _DATE_FMT ), 
-        t_stop.strftime( _DATE_FMT ) 
-    )
-
-    try:
-        cursor = db.cursor()
+    def _ost_data_from_mysql( self, t_start, t_stop ):
+        """
+        Generator function that connects to MySQL, runs a query, and buffers output
+        """
+        query_str = _QUERY_OST_DATA % ( 
+            t_start.strftime( _DATE_FMT ), 
+            t_stop.strftime( _DATE_FMT ) 
+        )
+        cursor = self.db.cursor()
         cursor.execute( query_str )
 
         while True:
@@ -102,33 +118,27 @@ def _ost_data_from_mysql( t_start, t_stop ):
                 break
             for row in rows:
                 yield row
-    except:
-        db.close()
-        raise
 
-    db.close()
+    def _ost_data_from_pickle( self, t_start, t_stop ):
+        """
+        Generator function that reads the output of a previous MySQL query from a
+        pickle file
+        """
+        pickle_file = "ost_data.%d-%d.pickle" % (
+            int(time.mktime( t_start.timetuple() )),
+            int(time.mktime( t_stop.timetuple() )) )
+        with open( pickle_file, 'r' ) as fp:
+            from_pickle = pickle.load( fp )
 
+        for row in from_pickle:
+            yield row
 
-def _ost_data_from_pickle( t_start, t_stop ):
-    """
-    Generator function that reads the output of a previous MySQL query from a
-    pickle file
-    """
-    pickle_file = "ost_data.%d-%d.pickle" % (
-        int(time.mktime( t_start.timetuple() )),
-        int(time.mktime( t_stop.timetuple() )) )
-    with open( pickle_file, 'r' ) as fp:
-        from_pickle = pickle.load( fp )
-
-    for row in from_pickle:
-        yield row
-
-def _ost_data_to_pickle( t_start, t_stop, mode='mysql' ):
+def _pickle_ost_data( lmtdb, t_start, t_stop ):
     """
     Retrieve and pickle a set of OST data
     """
     to_pickle = []
-    for row in get_ost_data( t_start, t_stop, mode ):
+    for row in lmtdb.get_ost_data( t_start, t_stop ):
         to_pickle.append( row )
     pickle_file = "ost_data.%d-%d.pickle" % (
         int(time.mktime( t_start.timetuple() )),
@@ -138,12 +148,6 @@ def _ost_data_to_pickle( t_start, t_stop, mode='mysql' ):
 
 def _get_index_from_time( t ):
     return (t.hour * 3600 + t.minute * 60 + t.second) / int(_LMT_TIMESTEP)
-
-def _fix_broken_first_ost( ostname, t_start, t_stop ):
-    """
-    If the record corresponding to t_start is preceded by a missing record, we must go
-    back in time further to 
-    """
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -166,12 +170,13 @@ if __name__ == '__main__':
         sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT );
         raise
 
-    mode='mysql'
     if args.read_pickle:
-        mode='pickle'
+        lmtdb = LMTDB( pickles=True )
+    else:
+        lmtdb = LMTDB()
 
     if args.write_pickle:
-        _ost_data_to_pickle( t_start, t_stop )
+        lmtdb._ost_data_to_pickle( t_start, t_stop )
     else:
-        for tup_out in get_ost_data( t_start, t_stop, mode=mode ):
+        for tup_out in lmtdb.get_ost_data( t_start, t_stop ):
             print _get_index_from_time( tup_out[0] ), '|'.join( [ str(x) for x in tup_out ] )
