@@ -55,28 +55,11 @@ if __name__ == '__main__':
     ost_ct = 248
     ts_ct = 86400/int(tokio.LMT_TIMESTEP)
     h5f = tokio.hdf5.connect( 'testfile.hdf5' )
-    h5f.init_datasets( ost_ct, ts_ct )
-
-    ### initialize hdf5 timestamps for the whole HDF5 file
-    t0_day = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
-    t0_epoch = time.mktime( t0_day.timetuple() ) # truncate t_start
-    ### version 1 format - create a full dataset of timestamps
-    ts_map = np.empty( shape=(ts_ct,), dtype='i8' )
-    for t in range( ts_ct ):
-        ts_map[t] = t0_epoch + t*tokio.LMT_TIMESTEP
-    h5f['FSStepsGroup/FSStepsDataSet'][:] = ts_map[:]
-    del ts_map
-    h5f['FSStepsGroup/FSStepsDataSet'].attrs['day'] = t_start.strftime("%Y-%m-%d")
-    h5f['FSStepsGroup/FSStepsDataSet'].attrs['fs'] = 'snx11168'
-    h5f['FSStepsGroup/FSStepsDataSet'].attrs['host'] = 'cori'
-    h5f['FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = (t0_day + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-    ### version 2 format - just store the first timestamp and the timestep
-    h5f.attrs['first_timestamp'] = int(t0_epoch)
-    h5f.attrs['timestep'] = tokio.LMT_TIMESTEP
+    h5f.init_datasets( ost_ct, ts_ct, host='cori', filesystem='snx11168' )
+    h5f.init_timestamps( t_start, t_stop )
 
     ### populate read/write bytes data
     ost_names = []
-#   prev_data = lmtdb.get_last_ost_data_before( t_start )
     prev_data = {}
 
     ### figure out how to map indices to timestamps
@@ -87,10 +70,10 @@ if __name__ == '__main__':
         t0 = h5f['FSStepsGroup/FSStepsDataSet'][0]
         dt = h5f['FSStepsGroup/FSStepsDataSet'][1] - h5f['FSStepsGroup/FSStepsDataSet'][0]
 
-    buf_wrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
-    buf_rrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
-    buf_w = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
-    buf_r = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
+    buf_wrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' ) #v1
+    buf_rrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' ) #v1
+    buf_w = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' ) #v2
+    buf_r = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' ) #v2
     for tup_out in lmtdb.get_ost_data( t_start, t_stop ):
         timestamp = tup_out[0]
         ost_name = tup_out[1]
@@ -107,8 +90,8 @@ if __name__ == '__main__':
 
         if ost_name in prev_data:
             assert( ts_idx >= 0)
-            buf_r[ost_idx, ts_idx] = read_bytes - prev_data[ost_name]['read_bytes']
-            buf_w[ost_idx, ts_idx] = write_bytes - prev_data[ost_name]['write_bytes']
+            buf_r[ts_idx, ost_idx] = read_bytes
+            buf_w[ts_idx, ost_idx] = write_bytes
             buf_rrate[ost_idx, ts_idx] = (read_bytes - prev_data[ost_name]['read_bytes']) / tokio.LMT_TIMESTEP
             buf_wrate[ost_idx, ts_idx] = (write_bytes - prev_data[ost_name]['write_bytes']) / tokio.LMT_TIMESTEP
 
