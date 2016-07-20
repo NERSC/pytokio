@@ -15,6 +15,7 @@ import datetime
 import time
 import h5py
 import numpy as np
+import json
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -50,46 +51,53 @@ if __name__ == '__main__':
     if args.write_pickle:
         lmtdb.pickle_ost_data( t_start, t_stop )
 
-    tbench0 = time.time()
     ### initialize hdf5 file
     ost_ct = 248
     ts_ct = 86400/int(tokio.LMT_TIMESTEP)
     h5f = tokio.hdf5.connect( 'testfile.hdf5' )
     h5f.init_datasets( ost_ct, ts_ct )
-    tokio._debug_print("HDF5 datasets initalized in %f sec" % (time.time() - tbench0))
 
-    tbench0 = time.time()
-    ### initialize hdf5 timestamps in given range.  must track the actual
-    ### indices observed because there may be timestamps that are entirely
-    ### missing from the LMT DB
+    ### initialize hdf5 timestamps for the whole HDF5 file
+    t0_day = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
+    t0_epoch = time.mktime( t0_day.timetuple() ) # truncate t_start
+    ### version 1 format - create a full dataset of timestamps
     ts_map = np.empty( shape=(ts_ct,), dtype='i8' )
-    min_ts_idx = None
-    max_ts_idx = None
-    for tup_out in lmtdb.get_timestamp_map( t_start, t_stop ):
-        ts_idx = tokio.hdf5.get_index_from_time( datetime.datetime.fromtimestamp( tup_out[0] ) )
-        ts_map[ ts_idx  ] = tup_out[0]
-        if min_ts_idx is None or ts_idx < min_ts_idx:
-            min_ts_idx = ts_idx
-        if max_ts_idx is None or ts_idx > max_ts_idx:
-            max_ts_idx = ts_idx
-    h5f['FSStepsGroup/FSStepsDataSet'][min_ts_idx:max_ts_idx] = ts_map[min_ts_idx:max_ts_idx]
-    tokio._debug_print("HDF5 timestamps initalized in %f sec" % (time.time() - tbench0))
+    for t in range( ts_ct ):
+        ts_map[t] = t0_epoch + t*tokio.LMT_TIMESTEP
+    h5f['FSStepsGroup/FSStepsDataSet'][:] = ts_map[:]
+    del ts_map
+    h5f['FSStepsGroup/FSStepsDataSet'].attrs['day'] = t_start.strftime("%Y-%m-%d")
+    h5f['FSStepsGroup/FSStepsDataSet'].attrs['fs'] = 'snx11168'
+    h5f['FSStepsGroup/FSStepsDataSet'].attrs['host'] = 'cori'
+    h5f['FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = (t0_day + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    ### version 2 format - just store the first timestamp and the timestep
+    h5f.attrs['first_timestamp'] = int(t0_epoch)
+    h5f.attrs['timestep'] = tokio.LMT_TIMESTEP
 
-    tbench0 = time.time()
     ### populate read/write bytes data
     ost_names = []
+#   prev_data = lmtdb.get_last_ost_data_before( t_start )
     prev_data = {}
 
-    buf_wrate = np.empty( shape=(ost_ct, ts_ct), dtype='f8' )
-    buf_rrate = np.empty( shape=(ost_ct, ts_ct), dtype='f8' )
-    buf_w = np.empty( shape=(ost_ct, ts_ct), dtype='f4' )
-    buf_r = np.empty( shape=(ost_ct, ts_ct), dtype='f4' )
+    ### figure out how to map indices to timestamps
+    if 'first_timestamp' in h5f.attrs and 'timestep' in h5f.attrs:  # ver 2
+        t0 = h5f.attrs['first_timestamp']
+        dt = h5f.attrs['timestep']
+    else:                                                           # ver 1
+        t0 = h5f['FSStepsGroup/FSStepsDataSet'][0]
+        dt = h5f['FSStepsGroup/FSStepsDataSet'][1] - h5f['FSStepsGroup/FSStepsDataSet'][0]
+
+    buf_wrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
+    buf_rrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
+    buf_w = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
+    buf_r = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' )
     for tup_out in lmtdb.get_ost_data( t_start, t_stop ):
-        timestamp = datetime.datetime.fromtimestamp( tup_out[0] )
+        timestamp = tup_out[0]
         ost_name = tup_out[1]
         read_bytes = tup_out[2]
         write_bytes = tup_out[3]
-        ts_idx = tokio.hdf5.get_index_from_time(timestamp)
+
+        ts_idx = ( timestamp - t0 ) / dt
 
         if ost_name not in ost_names:
             ost_idx = len(ost_names)
@@ -98,21 +106,20 @@ if __name__ == '__main__':
             ost_idx = ost_names.index( ost_name )
 
         if ost_name in prev_data:
-            buf_r[ost_idx, ts_idx] = read_bytes - prev_data[ost_name]['read']
-            buf_w[ost_idx, ts_idx] = write_bytes - prev_data[ost_name]['write']
-            buf_rrate[ost_idx, ts_idx] = (read_bytes - prev_data[ost_name]['read']) / tokio.LMT_TIMESTEP
-            buf_wrate[ost_idx, ts_idx] = (write_bytes - prev_data[ost_name]['write']) / tokio.LMT_TIMESTEP
+            assert( ts_idx >= 0)
+            buf_r[ost_idx, ts_idx] = read_bytes - prev_data[ost_name]['read_bytes']
+            buf_w[ost_idx, ts_idx] = write_bytes - prev_data[ost_name]['write_bytes']
+            buf_rrate[ost_idx, ts_idx] = (read_bytes - prev_data[ost_name]['read_bytes']) / tokio.LMT_TIMESTEP
+            buf_wrate[ost_idx, ts_idx] = (write_bytes - prev_data[ost_name]['write_bytes']) / tokio.LMT_TIMESTEP
 
         if ost_name not in prev_data:
             prev_data[ost_name] = { }
-        prev_data[ost_name]['read'] = read_bytes
-        prev_data[ost_name]['write'] = write_bytes
+        prev_data[ost_name]['read_bytes'] = read_bytes
+        prev_data[ost_name]['write_bytes'] = write_bytes
     h5f['ost_bytes_read'][:, :] = buf_r
     h5f['ost_bytes_written'][:, :] = buf_w
     h5f['OSTReadGroup/OSTBulkReadDataSet'][:, :] = buf_rrate
     h5f['OSTWriteGroup/OSTBulkWriteDataSet'][:, :] = buf_wrate
-
-    tokio._debug_print("Data populated in  %f sec" % (time.time() - tbench0))
 
     h5f.close()
     lmtdb.close()

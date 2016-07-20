@@ -28,7 +28,7 @@ WHERE
     TIMESTAMP_INFO.`TIMESTAMP` >= ADDTIME('%s', '%.1f')
 AND TIMESTAMP_INFO.`TIMESTAMP` < ADDTIME('%s', '%1.f')
 ORDER BY ts, ostname;
-""" % ( '%s', -1.5 * _LMT_TIMESTEP, '%s', _LMT_TIMESTEP / 2.0 )
+""" % ( '%s', -1.5 * _LMT_TIMESTEP, '%s', 0.5 * _LMT_TIMESTEP )
 
 ### Find the most recent timestamp for each OST before a given time range.  This
 ### is to calculate the first row of diffs for a time range.  There is an
@@ -132,6 +132,22 @@ class LMTDB(object):
             t_stop.strftime( _DATE_FMT ) 
         )
         return self._query_mysql( query_str )
+
+#   def get_last_ost_data_before( self, t ):
+#       """
+#       Get the last datum reported by each OST before the given timestamp t.
+#       The SQL query returns questionable results though...
+#       """
+#       query_str = _QUERY_FIRST_OST_DATA % ( t.strftime( _DATE_FMT ), t.strftime( _DATE_FMT ) )
+#       ret = {}
+#       for tup in self._query_mysql( query_str ):
+#           assert( tup[0] not in ret )
+#           ret[ tup[0] ] = {
+#               'timestamp': tup[1],
+#               'read_bytes' : tup[2],
+#               'write_bytes' : tup[3]
+#           }
+#       return ret
 
 
     def _ost_data_from_mysql( self, t_start, t_stop ):
