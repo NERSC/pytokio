@@ -4,8 +4,8 @@ import os
 import sys
 import time
 import datetime
-import cPickle as pickle
 import MySQLdb
+import numpy as np
 import tokio
 
 _LMT_TIMESTEP = 5.0
@@ -25,10 +25,10 @@ FROM
 INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = OST_DATA.TS_ID
 INNER JOIN OST_INFO ON OST_INFO.OST_ID = OST_DATA.OST_ID
 WHERE
-    TIMESTAMP_INFO.`TIMESTAMP` >= ADDTIME('%s', '%.1f')
-AND TIMESTAMP_INFO.`TIMESTAMP` < ADDTIME('%s', '%1.f')
+    TIMESTAMP_INFO.`TIMESTAMP` >= '%s'
+AND TIMESTAMP_INFO.`TIMESTAMP` < '%s'
 ORDER BY ts, ostname;
-""" % ( '%s', -1.5 * _LMT_TIMESTEP, '%s', 0.5 * _LMT_TIMESTEP )
+"""
 
 ### Find the most recent timestamp for each OST before a given time range.  This
 ### is to calculate the first row of diffs for a time range.  There is an
@@ -37,8 +37,8 @@ ORDER BY ts, ostname;
 ### every OST will be represented in the output of this query.
 _QUERY_FIRST_OST_DATA = """
 SELECT
-    OST_INFO.OST_NAME,
     UNIX_TIMESTAMP(TIMESTAMP_INFO.`TIMESTAMP`),
+    OST_INFO.OST_NAME,
     OST_DATA.READ_BYTES,
     OST_DATA.WRITE_BYTES
 FROM
@@ -50,10 +50,10 @@ FROM
             OST_DATA
         INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = OST_DATA.TS_ID
         WHERE
-            TIMESTAMP_INFO.`TIMESTAMP` < '%s'
-        AND TIMESTAMP_INFO.`TIMESTAMP` > ADDTIME(
-            '%s',
-            '-24:00:00.0'
+            TIMESTAMP_INFO.`TIMESTAMP` < '{datetime}'
+        AND TIMESTAMP_INFO.`TIMESTAMP` > SUBTIME(
+            '{datetime}',
+            '{lookbehind}'
         )
         GROUP BY
             OST_DATA.OST_ID
@@ -79,30 +79,38 @@ def connect(*args, **kwargs):
     return LMTDB( *args, **kwargs )
 
 class LMTDB(object):
-    def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, pickles=None):
-        self.pickles = pickles
-        if pickles is None:
-            if dbhost is None:
-                dbhost = os.environ.get('PYLMT_HOST')
-            if dbuser is None:
-                dbuser = os.environ.get('PYLMT_USER')
-            if dbpassword is None:
-                dbpassword = os.environ.get('PYLMT_PASSWORD')
-            if dbname is None:
-                dbname = os.environ.get('PYLMT_DB')
-            self.db = MySQLdb.connect( 
-                host=dbhost, 
-                user=dbuser, 
-                passwd=dbpassword, 
-                db=dbname)
-        else:
-            self.db = None
+    def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None):
+        if dbhost is None:
+            dbhost = os.environ.get('PYLMT_HOST')
+        if dbuser is None:
+            dbuser = os.environ.get('PYLMT_USER')
+        if dbpassword is None:
+            dbpassword = os.environ.get('PYLMT_PASSWORD')
+        if dbname is None:
+            dbname = os.environ.get('PYLMT_DB')
+
+        ### establish db connection
+        self.db = MySQLdb.connect( 
+            host=dbhost,
+            user=dbuser,
+            passwd=dbpassword,
+            db=dbname)
+
+        ### the list of OST names is an immutable property of a database, so
+        ### fetch and cache it here
+        self.ost_names = []
+        for row in self._query_mysql('SELECT DISTINCT OST_NAME from OST_INFO;'):
+            self.ost_names.append(row[0])
+        self.ost_names = tuple(self.ost_names)
+
     def __enter__(self):
         return self
+
     def __die__(self):
         if self.db:
             self.db.close()
             sys.stderr.write('closing DB connection\n')
+
     def __exit__(self, exc_type, exc_value, traceback):
         if self.db:
             self.db.close()
@@ -113,48 +121,97 @@ class LMTDB(object):
             self.db.close()
             sys.stderr.write('closing DB connection\n')
 
-    def get_ost_data( self, t_start, t_stop ):
-        """
-        Wrapper for backend-specific data dumpers that retrieve all counter data
-        between two timestamps
-        """
-        if self.pickles is not None:
-            return self._ost_data_from_pickle( t_start, t_stop )
-        else:
-            return self._ost_data_from_mysql( t_start, t_stop )
 
-    def get_timestamp_map( self, t_start, t_stop ):
+    def get_rw_data( self, t_start, t_stop, timestep ):
         """
-        Get the timestamps associated with a t_start/t_stop from LMT
+        Wrapper function for _get_rw_data that breaks a single large query into
+        smaller queries over smaller time ranges.  This is an optimization to
+        avoid the O(N*M) scaling of the JOINs in the underlying SQL query.
         """
-        query_str = _QUERY_TIMESTAMP_MAPPING % (
+        _TIME_CHUNK = datetime.timedelta(hours=1)
+        t0 = t_start
+
+        buf_r = None
+        buf_w = None
+        while t0 < t_stop:
+            tf = t0 + _TIME_CHUNK
+            if tf > t_stop:
+                tf = t_stop
+            ( tmp_r, tmp_w ) = self._get_rw_data( t0, tf, timestep )
+            tokio._debug_print( "Retrieved %.2f GiB read, %.2f GiB written" % (
+                 (tmp_r[-1,:].sum() - tmp_r[0,:].sum())/2**30,
+                 (tmp_w[-1,:].sum() - tmp_w[0,:].sum())/2**30) )
+
+            ### first chunk of output
+            if buf_r is None:
+                buf_r = tmp_r
+                buf_w = tmp_w
+            ### subsequent chunks get concatenated
+            else:
+                assert( tmp_r.shape[1] == buf_r.shape[1] )
+                assert( tmp_w.shape[1] == buf_w.shape[1] )
+                print buf_r.shape, tmp_r.shape
+                buf_r = np.concatenate(( buf_r, tmp_r ), axis=0)
+                buf_w = np.concatenate(( buf_w, tmp_w ), axis=0)
+            t0 += _TIME_CHUNK
+
+        tokio._debug_print( "Finished because t0(=%s) !< t_stop(=%s)" % (
+                t0.strftime( _DATE_FMT ), 
+                tf.strftime( _DATE_FMT ) ))
+        return ( buf_r, buf_w )
+
+    def _get_rw_data( self, t_start, t_stop, binning_timestep ):
+        """
+        Return a tuple of three objects:
+            1. a tuple of N strings that encode ost names
+            2. a M*N matrix of int64s that encode the total read bytes for N STs
+               over M timesteps
+            3. a M*N matrix of int64s that encode the total write bytes for N
+               STs over M timesteps
+
+        timestep governs the M dimension and is a required input parameter
+        because we don't want to guess what the timestep of the underlying LMT
+        data might be (because it can be variable!).  Time will be binned
+        appropriately if binning_timestep > lmt_timestep.
+
+        the number of OSTs (the N dimension) is derived from the database.
+        """
+        tokio._debug_print( "Retrieving %s >= t > %s" % (
+            t_start.strftime( _DATE_FMT ),
+            t_stop.strftime( _DATE_FMT ) ) )
+        query_str = _QUERY_OST_DATA % ( 
             t_start.strftime( _DATE_FMT ), 
             t_stop.strftime( _DATE_FMT ) 
         )
-        return self._query_mysql( query_str )
+        rows = self._query_mysql( query_str )
 
-#   def get_last_ost_data_before( self, t ):
-#       """
-#       Get the last datum reported by each OST before the given timestamp t.
-#       The SQL query returns questionable results though...
-#       """
-#       query_str = _QUERY_FIRST_OST_DATA % ( t.strftime( _DATE_FMT ), t.strftime( _DATE_FMT ) )
-#       ret = {}
-#       for tup in self._query_mysql( query_str ):
-#           assert( tup[0] not in ret )
-#           ret[ tup[0] ] = {
-#               'timestamp': tup[1],
-#               'read_bytes' : tup[2],
-#               'write_bytes' : tup[3]
-#           }
-#       return ret
+        ### Get the number of timesteps (# rows)
+        ts_ct = int((t_stop - t_start).total_seconds() / binning_timestep)
+        t0 = int(time.mktime(t_start.timetuple()))
+
+        ### Get the number of OSTs and their names (# cols)
+        ost_ct = len(self.ost_names)
+
+        ### Initialize everything to -0.0; we use the signed zero to distinguish
+        ### the absence of data from a measurement of zero
+        buf_r = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
+        buf_w = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
+
+        if len(rows) > 0:
+            for row in rows:
+                icol = int((row[0] - t0) / binning_timestep)
+                irow = self.ost_names.index( row[1] )
+                buf_r[icol,irow] = row[2]
+                buf_w[icol,irow] = row[3]
+
+        return ( buf_r, buf_w )
 
 
-    def _ost_data_from_mysql( self, t_start, t_stop ):
+    def gen_rw_data( self, t_start, t_stop ):
         """
-        Get read/write bytes data from LMT between [ t_start, t_stop ).  Split
-        the time range into 1-hour chunks to avoid issuing massive JOINs to
-        the LMT server and bogging down.
+        Return a generator that gets the read/write bytes data from LMT between
+        [ t_start, t_stop ).  Split the time range into 1-hour chunks to avoid
+        issuing massive JOINs to the LMT server and bogging down.
         """
         _TIME_CHUNK = datetime.timedelta(hours=1)
 
@@ -168,20 +225,95 @@ class LMTDB(object):
                 tf.strftime( _DATE_FMT ) 
             )
             tokio._debug_print( "Retrieving %s >= t > %s" % (
-                t0.strftime( _DATE_FMT ),
-                tf.strftime( _DATE_FMT ) ) )
+                t0.strftime(_DATE_FMT),
+                tf.strftime(_DATE_FMT)))
             t0 += _TIME_CHUNK
-            for ret_tup in self._query_mysql( query_str ):
+            for ret_tup in self._gen_query_mysql( query_str ):
                 yield ret_tup
-        tokio._debug_print( "Finished because t0(=%s) !< t_stop(=%s)" % (
-                t0.strftime( _DATE_FMT ), 
-                tf.strftime( _DATE_FMT ) 
-            ))
+        tokio._debug_print( 
+            "Finished because t0(=%s) !< t_stop(=%s)" % (
+            t0.strftime( _DATE_FMT ), 
+            tf.strftime( _DATE_FMT )))
+
+
+    def get_timestamp_map( self, t_start, t_stop ):
+        """
+        Get the timestamps associated with a t_start/t_stop from LMT
+        """
+        query_str = _QUERY_TIMESTAMP_MAPPING % (
+            t_start.strftime( _DATE_FMT ), 
+            t_stop.strftime( _DATE_FMT ) 
+        )
+        return self._gen_query_mysql( query_str )
+
+
+    def get_last_rw_data_before( self, t, lookbehind=None ):
+        """
+        Get the last datum reported by each OST before the given timestamp t.
+        Useful for calculating the change in bytes for the very first row
+        returned by a query.
+
+        Input:
+            1. t is a datetime.datetime before which we want to find data
+            2. lookbehind is a datetime.timedelta is how far back we're willing
+               to look for valid data for each OST.  The larger this is, the
+               slower the query
+        Output is a tuple of:
+            1. buf_r - a matrix of size (1, N) with the last read byte value for
+               each of N OSTs
+            2. buf_w - a matrix of size (1, N) with the last write byte value
+               for each of N OSTs
+            3. buf_t - a matrix of size (1, N) with the timestamp from which
+               each buf_r and buf_w row datum was found
+        """
+        if lookbehind is None:
+            lookbehind = datetime.timedelta(hours=1)
+
+        lookbehind_str = "%d %02d:%02d:%02d" % (
+            lookbehind.days,
+            lookbehind.seconds / 3600, 
+            lookbehind.seconds % 3600 / 60, 
+            lookbehind.seconds % 60 )
+
+        ost_ct = len(self.ost_names)
+        buf_r = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='f8' )
+        buf_w = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='f8' )
+        buf_t = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='i8' )
+
+        query_str = _QUERY_FIRST_OST_DATA.format( datetime=t.strftime( _DATE_FMT ), lookbehind=lookbehind_str )
+        for tup in self._query_mysql( query_str ):
+            try:
+                tidx = self.ost_names.index( tup[1] )
+            except ValueError:
+                raise ValueError("unknown OST [%s] not present in %s" % (tup[1], self.ost_names))
+            buf_r[0, tidx] = tup[2]
+            buf_w[0, tidx] = tup[3]
+            buf_t[0, tidx] = tup[0]
+
+        return ( buf_r, buf_w, buf_t )
 
 
     def _query_mysql( self, query_str ):
         """
-        Generator function that connects to MySQL, runs a query, and buffers output
+        Connects to MySQL, run a query, and yield the full output tuple.  No
+        buffering or other witchcraft.
+        """
+        cursor = self.db.cursor()
+        t0 = time.time()
+        cursor.execute( query_str )
+        tokio._debug_print("Executed query in %f sec" % ( time.time() - t0 ))
+
+        t0 = time.time()
+        rows = cursor.fetchall()
+        tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
+        return rows
+
+
+
+    def _gen_query_mysql( self, query_str ):
+        """
+        Generator function that connects to MySQL, runs a query, and yields
+        output rows.
         """
         cursor = self.db.cursor()
         t0 = time.time()
@@ -190,19 +322,19 @@ class LMTDB(object):
 
         ### Iterate over chunks of output
         while True:
-            tbench0 = time.time()
+            t0 = time.time()
             rows = cursor.fetchmany(_MYSQL_FETCHMANY_LIMIT)
             if rows == ():
                 break
             for row in rows:
                 yield row
-            tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - tbench0))
+            tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
 
 
-    def _query_mysql_fetchmany( self, query_str ):
+    def _gen_query_mysql_fetchmany( self, query_str ):
         """
-        Generator function that connects to MySQL, runs a query, and buffers
-        output.  Returns multiple rows at once.
+        Generator function that connects to MySQL, runs a query, and yields
+        multiple output rows at once.
         """
         t0 = time.time()
         cursor = self.db.cursor()
@@ -216,37 +348,6 @@ class LMTDB(object):
             if rows == ():
                 break
             yield rows
-
-
-    def _ost_data_from_pickle( self, t_start, t_stop, pickle_file=None ):
-        """
-        Generator function that reads the output of a previous MySQL query from a
-        pickle file
-        """
-        if not pickle_file:
-            pickle_file = "ost_data.%d-%d.pickle" % (
-                int(time.mktime( t_start.timetuple() )),
-                int(time.mktime( t_stop.timetuple() )) )
-
-        with open( pickle_file, 'r' ) as fp:
-            from_pickle = pickle.load( fp )
-
-        for row in from_pickle:
-            yield row
-
-    def _pickle_ost_data( self, t_start, t_stop, pickle_file=None ):
-        """
-        Retrieve and pickle a set of OST data
-        """
-        to_pickle = []
-        for row in self.get_ost_data( t_start, t_stop ):
-            to_pickle.append( row )
-        if not pickle_file:
-            pickle_file = "ost_data.%d-%d.pickle" % (
-                int(time.mktime( t_start.timetuple() )),
-                int(time.mktime( t_stop.timetuple() )) )
-        with open( pickle_file, 'w' ) as fp:
-            pickle.dump( to_pickle, fp )
 
 if __name__ == '__main__':
     pass

@@ -13,96 +13,75 @@ import tokio.lmt
 import argparse
 import datetime
 import time
-import h5py
 import numpy as np
-import json
+import sys
+import os
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
+_LMT_TIMESTEP = 5
+_FILENAME = 'testfile.hdf5'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument( 'tstart', type=str, help="lower bound of time to scan, in YYY-mm-dd HH:MM:SS format" )
-    parser.add_argument( 'tstop', type=str, help="upper bound of time to scan, in YYY-mm-dd HH:MM:SS format" )
-    parser.add_argument( '--read-pickle',  action='store_true', help="attempt to read from pickle instead of MySQL" )
-    parser.add_argument( '--write-pickle', action='store_true', help="write output to pickle" )
-    parser.add_argument( '--debug', action='store_true', help="produce debug messages" )
+    parser.add_argument('tstart',
+                        type=str,
+                        help="lower bound of time to scan, in YYY-mm-dd HH:MM:SS format")
+    parser.add_argument('tstop',
+                        type=str,
+                        help="upper bound of time to scan, in YYY-mm-dd HH:MM:SS format")
+    parser.add_argument('--debug',
+                        action='store_true',
+                        help="produce debug messages")
     args = parser.parse_args()
-    if not ( args.tstart and args.tstop ):
+    if not (args.tstart and args.tstop):
         parser.print_help()
-        sys.exit(1)
-    if args.read_pickle and args.write_pickle:
-        sys.stderr.write("--read-pickle and --write-pickle are mutually exclusive\n" )
         sys.exit(1)
     if args.debug:
         tokio.DEBUG = True
 
     try:
-        t_start = datetime.datetime.strptime( args.tstart, _DATE_FMT )
-        t_stop = datetime.datetime.strptime( args.tstop, _DATE_FMT )
+        t_start = datetime.datetime.strptime(args.tstart, _DATE_FMT)
+        t_stop = datetime.datetime.strptime(args.tstop, _DATE_FMT)
     except ValueError:
-        sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT );
+        sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT)
         raise
 
-    if args.read_pickle:
-        lmtdb = tokio.lmt.connect( pickles=True )
-    else:
-        lmtdb = tokio.lmt.connect()
+    lmtdb = tokio.lmt.connect()
 
-    if args.write_pickle:
-        lmtdb.pickle_ost_data( t_start, t_stop )
+    ### initialize hdf5 file - always init to a full day, then populate later
+    ost_ct = len(lmtdb.ost_names)
+    init_start = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
+    init_stop = t_start + datetime.timedelta(days=1)
+    ts_ct = int((init_stop - init_start).total_seconds() / _LMT_TIMESTEP)
 
-    ### initialize hdf5 file
-    ost_ct = 248
-    ts_ct = 86400/int(tokio.LMT_TIMESTEP)
-    h5f = tokio.hdf5.connect( 'testfile.hdf5' )
-    h5f.init_datasets( ost_ct, ts_ct, host='cori', filesystem='snx11168' )
-    h5f.init_timestamps( t_start, t_stop )
+    if os.path.isfile( _FILENAME ):
+        os.unlink( _FILENAME )
+    h5f = tokio.hdf5.connect(_FILENAME)
+    h5f.init_datasets(ost_ct, ts_ct, host='cori', filesystem='snx11168')
+    h5f.init_timestamps(init_start, init_stop)
 
-    ### populate read/write bytes data
-    ost_names = []
-    prev_data = {}
+    ### now populate the slice of time input by user
+    idx_0 = h5f.get_index( t_start )
+    idx_f = h5f.get_index( t_stop )
+    ts_ct = int((t_stop - t_start).total_seconds() / _LMT_TIMESTEP)
 
-    ### figure out how to map indices to timestamps
-    if 'first_timestamp' in h5f.attrs and 'timestep' in h5f.attrs:  # ver 2
-        t0 = h5f.attrs['first_timestamp']
-        dt = h5f.attrs['timestep']
-    else:                                                           # ver 1
-        t0 = h5f['FSStepsGroup/FSStepsDataSet'][0]
-        dt = h5f['FSStepsGroup/FSStepsDataSet'][1] - h5f['FSStepsGroup/FSStepsDataSet'][0]
+    ### add +1 row to hold the data immediately before our time range
+    buf_r = np.full(shape=(ts_ct+1, ost_ct), fill_value=-0.0, dtype='f8')
+    buf_w = np.full(shape=(ts_ct+1, ost_ct), fill_value=-0.0, dtype='f8')
 
-    buf_wrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' ) #v1
-    buf_rrate = np.full( shape=(ost_ct, ts_ct), fill_value=-0.0, dtype='f8' ) #v1
-    buf_w = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' ) #v2
-    buf_r = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' ) #v2
-    for tup_out in lmtdb.get_ost_data( t_start, t_stop ):
-        timestamp = tup_out[0]
-        ost_name = tup_out[1]
-        read_bytes = tup_out[2]
-        write_bytes = tup_out[3]
+    ### populate all but the first row with the data from our time range of
+    ### interest
+    buf_r[1:,:], buf_w[1:,:] = lmtdb.get_rw_data(t_start, t_stop, _LMT_TIMESTEP)
+    ### populate the first row with the data immediately prior to our time
+    ### range of interest
+    buf_r[0,:],  buf_w[0,:], prev_t = lmtdb.get_last_rw_data_before( t_start )
 
-        ts_idx = ( timestamp - t0 ) / dt
-
-        if ost_name not in ost_names:
-            ost_idx = len(ost_names)
-            ost_names.append( tup_out[1] )
-        else:
-            ost_idx = ost_names.index( ost_name )
-
-        if ost_name in prev_data:
-            assert( ts_idx >= 0)
-            buf_r[ts_idx, ost_idx] = read_bytes
-            buf_w[ts_idx, ost_idx] = write_bytes
-            buf_rrate[ost_idx, ts_idx] = (read_bytes - prev_data[ost_name]['read_bytes']) / tokio.LMT_TIMESTEP
-            buf_wrate[ost_idx, ts_idx] = (write_bytes - prev_data[ost_name]['write_bytes']) / tokio.LMT_TIMESTEP
-
-        if ost_name not in prev_data:
-            prev_data[ost_name] = { }
-        prev_data[ost_name]['read_bytes'] = read_bytes
-        prev_data[ost_name]['write_bytes'] = write_bytes
-    h5f['ost_bytes_read'][:, :] = buf_r
-    h5f['ost_bytes_written'][:, :] = buf_w
-    h5f['OSTReadGroup/OSTBulkReadDataSet'][:, :] = buf_rrate
-    h5f['OSTWriteGroup/OSTBulkWriteDataSet'][:, :] = buf_wrate
+    ### write the raw data for the time range of interest
+    h5f['ost_bytes_read'][idx_0:idx_f, :] = buf_r[1:,:]
+    h5f['ost_bytes_written'][idx_0:idx_f, :] = buf_w[1:,:]
+    ### subtract every row from the row before it
+    h5f['OSTReadGroup/OSTBulkReadDataSet'][:, idx_0:idx_f] = (buf_r[1:,:] - buf_r[:-1,:]).T / float(_LMT_TIMESTEP)
+    h5f['OSTWriteGroup/OSTBulkWriteDataSet'][:, idx_0:idx_f] = (buf_w[1:,:] - buf_w[:-1,:]).T / float(_LMT_TIMESTEP)
 
     h5f.close()
     lmtdb.close()
