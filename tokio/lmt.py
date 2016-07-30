@@ -162,19 +162,14 @@ class LMTDB(object):
 
     def _get_rw_data( self, t_start, t_stop, binning_timestep ):
         """
-        Return a tuple of three objects:
-            1. a tuple of N strings that encode ost names
-            2. a M*N matrix of int64s that encode the total read bytes for N STs
+        Return a tuple of two objects:
+            1. a M*N matrix of int64s that encode the total read bytes for N STs
                over M timesteps
-            3. a M*N matrix of int64s that encode the total write bytes for N
+            2. a M*N matrix of int64s that encode the total write bytes for N
                STs over M timesteps
 
-        timestep governs the M dimension and is a required input parameter
-        because we don't want to guess what the timestep of the underlying LMT
-        data might be (because it can be variable!).  Time will be binned
-        appropriately if binning_timestep > lmt_timestep.
-
-        the number of OSTs (the N dimension) is derived from the database.
+        Time will be binned appropriately if binning_timestep > lmt_timestep.
+        The number of OSTs (the N dimension) is derived from the database.
         """
         tokio._debug_print( "Retrieving %s >= t > %s" % (
             t_start.strftime( _DATE_FMT ),
