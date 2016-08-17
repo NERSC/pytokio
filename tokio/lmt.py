@@ -87,9 +87,27 @@ class LMTDB(object):
         ### the list of OST names is an immutable property of a database, so
         ### fetch and cache it here
         self.ost_names = []
-        for row in self._query_mysql('SELECT DISTINCT OST_NAME from OST_INFO;'):
+        for row in self._query_mysql('SELECT DISTINCT OST_NAME FROM OST_INFO ORDER BY OST_NAME;'):
             self.ost_names.append(row[0])
         self.ost_names = tuple(self.ost_names)
+
+        ### do the same for OSSes
+        self.oss_names = []
+        for row in self._query_mysql('SELECT DISTINCT HOSTNAME FROM OSS_INFO ORDER BY HOSTNAME;'):
+            self.oss_names.append(row[0])
+        self.oss_names = tuple(self.oss_names)
+
+        ### do the same for MDSes
+        self.mds_names = []
+        for row in self._query_mysql('SELECT DISTINCT MDS_NAME FROM MDS_INFO ORDER BY MDS_NAME;'):
+            self.mds_names.append(row[0])
+        self.mds_names = tuple(self.mds_names)
+
+        ### do the same for MDS operations
+        self.mds_op_names = []
+        for row in self._query_mysql('SELECT DISTINCT OPERATION_NAME FROM OPERATION_INFO ORDER BY OPERATION_ID;'):
+            self.mds_op_names.append(row[0])
+        self.mds_op_names = tuple(self.mds_op_names)
 
     ### TODO: revisit the following methods and either implement them
     ### universally or drop them
