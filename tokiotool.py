@@ -57,7 +57,13 @@ if __name__ == '__main__':
     if os.path.isfile( _FILENAME ):
         os.unlink( _FILENAME )
     h5f = tokio.hdf5.connect(_FILENAME)
-    h5f.init_datasets(ost_ct, ts_ct, host='cori', filesystem='snx11168')
+    h5f.init_datasets(
+        lmtdb.oss_names,
+        lmtdb.ost_names,
+        lmtdb.mds_op_names,
+        ts_ct,
+        host='cori',
+        filesystem='snx11168')
     h5f.init_timestamps(init_start, init_stop)
 
     ### now populate the slice of time input by user
