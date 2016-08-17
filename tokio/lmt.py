@@ -63,18 +63,6 @@ INNER JOIN OST_INFO on OST_INFO.OST_ID = last_ostids.ostid
 INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
 """
 
-_QUERY_TIMESTAMP_MAPPING = """
-SELECT
-    UNIX_TIMESTAMP(`TIMESTAMP`)
-FROM
-    TIMESTAMP_INFO
-WHERE
-    `TIMESTAMP` >= '%s'
-AND `TIMESTAMP` < '%s'
-ORDER BY
-    TS_ID
-"""
-
 def connect(*args, **kwargs):
     return LMTDB( *args, **kwargs )
 
@@ -103,6 +91,8 @@ class LMTDB(object):
             self.ost_names.append(row[0])
         self.ost_names = tuple(self.ost_names)
 
+    ### TODO: revisit the following methods and either implement them
+    ### universally or drop them
     def __enter__(self):
         return self
 
@@ -160,6 +150,7 @@ class LMTDB(object):
                 tf.strftime( _DATE_FMT ) ))
         return ( buf_r, buf_w )
 
+
     def _get_rw_data( self, t_start, t_stop, binning_timestep ):
         """
         Return a tuple of two objects:
@@ -200,46 +191,6 @@ class LMTDB(object):
                 buf_w[icol,irow] = row[3]
 
         return ( buf_r, buf_w )
-
-
-    def gen_rw_data( self, t_start, t_stop ):
-        """
-        Return a generator that gets the read/write bytes data from LMT between
-        [ t_start, t_stop ).  Split the time range into 1-hour chunks to avoid
-        issuing massive JOINs to the LMT server and bogging down.
-        """
-        _TIME_CHUNK = datetime.timedelta(hours=1)
-
-        t0 = t_start
-        while t0 < t_stop:
-            tf = t0 + _TIME_CHUNK
-            if tf > t_stop:
-                tf = t_stop
-            query_str = _QUERY_OST_DATA % ( 
-                t0.strftime( _DATE_FMT ), 
-                tf.strftime( _DATE_FMT ) 
-            )
-            tokio._debug_print( "Retrieving %s >= t > %s" % (
-                t0.strftime(_DATE_FMT),
-                tf.strftime(_DATE_FMT)))
-            t0 += _TIME_CHUNK
-            for ret_tup in self._gen_query_mysql( query_str ):
-                yield ret_tup
-        tokio._debug_print( 
-            "Finished because t0(=%s) !< t_stop(=%s)" % (
-            t0.strftime( _DATE_FMT ), 
-            tf.strftime( _DATE_FMT )))
-
-
-    def get_timestamp_map( self, t_start, t_stop ):
-        """
-        Get the timestamps associated with a t_start/t_stop from LMT
-        """
-        query_str = _QUERY_TIMESTAMP_MAPPING % (
-            t_start.strftime( _DATE_FMT ), 
-            t_stop.strftime( _DATE_FMT ) 
-        )
-        return self._gen_query_mysql( query_str )
 
 
     def get_last_rw_data_before( self, t, lookbehind=None ):
@@ -303,46 +254,6 @@ class LMTDB(object):
         tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
         return rows
 
-
-
-    def _gen_query_mysql( self, query_str ):
-        """
-        Generator function that connects to MySQL, runs a query, and yields
-        output rows.
-        """
-        cursor = self.db.cursor()
-        t0 = time.time()
-        cursor.execute( query_str )
-        tokio._debug_print("Executed query in %f sec" % ( time.time() - t0 ))
-
-        ### Iterate over chunks of output
-        while True:
-            t0 = time.time()
-            rows = cursor.fetchmany(_MYSQL_FETCHMANY_LIMIT)
-            if rows == ():
-                break
-            for row in rows:
-                yield row
-            tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
-
-
-    def _gen_query_mysql_fetchmany( self, query_str ):
-        """
-        Generator function that connects to MySQL, runs a query, and yields
-        multiple output rows at once.
-        """
-        t0 = time.time()
-        cursor = self.db.cursor()
-        cursor.execute( query_str ) ### this is what takes a long time
-        tokio._debug_print("Executed query in %f sec" % ( time.time() - t0 ))
-
-        while True:
-            t0 = time.time()
-            rows = cursor.fetchmany(_MYSQL_FETCHMANY_LIMIT)
-            tokio._debug_print("fetchmany took %f sec" % ( time.time() - t0 ))
-            if rows == ():
-                break
-            yield rows
 
 if __name__ == '__main__':
     pass
