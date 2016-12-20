@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import sys
-from lmt import LMTDB
 
 DEBUG = False
 LMT_TIMESTEP = 5
@@ -28,3 +27,17 @@ def warning( string ):
     interface later on.
     """
     sys.stderr.write( string + "\n" )
+
+### LMTDB requires MySQLdb
+try:
+    from lmt import LMTDB
+except ImportError:
+    pass
+
+### HDF5 requires h5py
+try:
+    from hdf5 import HDF5
+except ImportError:
+    pass
+
+

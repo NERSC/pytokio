@@ -8,8 +8,6 @@ import MySQLdb
 import numpy as np
 import tokio
 
-_LMT_TIMESTEP = 5.0
-
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 
 _MYSQL_FETCHMANY_LIMIT = 10000
