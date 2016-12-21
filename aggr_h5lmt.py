@@ -13,7 +13,7 @@ _BYTES_TO_GIB = 2.0**(-30.0)
 def print_datum( datum=None ):
     """Take a json bag and print out relevant fields"""
     if datum is None:
-        print "%28s %12s %12s %5s %5s %5s %5s %5s" % ( "date/time", "gibs read", "gibs writ", "ossav", "ossmx", "mdsav", "mdsmx", "mssng" )
+        return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ( "date/time", "gibs read", "gibs writ", "ossav", "ossmx", "mdsav", "mdsmx", "mssng" )
     else:
         print_str = "%19s-%8s " % (datum['t0'].strftime("%Y-%m-%d %H:%M:%S"), datum['tf'].strftime("%H:%M:%S"))
         print_str += "%(gibs_read)12.2f " % datum
@@ -23,7 +23,7 @@ def print_datum( datum=None ):
         print_str += "%(ave_mds_cpu)5.1f " % datum
         print_str += "%(max_mds_cpu)5.1f" % datum
         print_str += "%(frac_missing)5.1f" % datum
-        print print_str
+        return print_str + "\n"
 
 def print_data_summary( data ):
     totals = {
@@ -60,13 +60,16 @@ def print_data_summary( data ):
     totals['ave_gibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
     totals['frac_missing'] = 100.0 * totals['tot_missing'] / (totals['tot_missing'] + totals['tot_present'])
 
-    print "Total read:  %(tot_gibs_read)14.2f GiB" % totals
-    print "Total write: %(tot_gibs_write)14.2f GiB" % totals
-    print "Average OSS CPU: %(oss_ave)6.2f%%" % totals
-    print "Max OSS CPU:     %(oss_max)6.2f%%" % totals
-    print "Average MDS CPU: %(mds_ave)6.2f%%" % totals
-    print "Max MDS CPU:     %(mds_max)6.2f%%" % totals
-    print "Missing Data:    %(frac_missing)6.2f%%" % totals
+    print_str = ""
+    print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
+    print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
+    print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
+    print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
+    print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
+    print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
+    print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
+
+    return print_str
 
 def bin_h5lmt(h5lmt_file):
     f = tokio.HDF5(h5lmt_file)
@@ -116,14 +119,14 @@ if __name__ == '__main__':
     parser.add_argument('--bins', dest='bins', type=int, default=24, help="number of bins per day")
     args = parser.parse_args()
 
-    print_datum(None)
+    sys.stdout.write(print_datum(None))
     all_binned_data = []
     for h5lmt_file in args.h5lmt:
         bin_data = bin_h5lmt(h5lmt_file)
 
         for bin_datum in bin_data:
-            print_datum(bin_datum)
+            sys.stdout.write(print_datum(bin_datum))
         all_binned_data = all_binned_data + bin_data
 
     if args.summary:
-        print_data_summary(all_binned_data)
+        sys.stdout.write(print_data_summary(all_binned_data))
