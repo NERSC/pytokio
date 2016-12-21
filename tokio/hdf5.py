@@ -17,8 +17,10 @@ def connect( *args, **kwargs ):
 class HDF5(h5py.File):
     def __init__( self, *args, **kwargs ):
         self.first_timestamp = None
-        self.timestep = None
         super(HDF5,self).__init__( *args, **kwargs )
+        self.timestep = self['/'].attrs.get('timestep')
+        if self.timestep is None:
+            self.timestep = tokio.LMT_TIMESTEP
 
     def init_datasets( self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown' ):
         """
