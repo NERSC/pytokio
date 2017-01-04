@@ -39,11 +39,12 @@ def print_data_summary( data ):
     }
 
     for datum in data:
+        points_in_bin = (datum['if'] - datum['i0'])
         totals['tot_bytes_read'] += datum['bytes_read']
         totals['tot_bytes_write'] += datum['bytes_write']
-        totals['oss_ave'] += datum['ave_oss_cpu'] * (datum['if'] - datum['i0'])
-        totals['mds_ave'] += datum['ave_mds_cpu'] * (datum['if'] - datum['i0'])
-        totals['n'] += (datum['if'] - datum['i0'])
+        totals['oss_ave'] += datum['ave_oss_cpu'] * points_in_bin
+        totals['mds_ave'] += datum['ave_mds_cpu'] * points_in_bin
+        totals['n'] += points_in_bin 
         totals['oss_max'] = datum['max_oss_cpu'] if datum['max_oss_cpu'] > totals['oss_max'] else totals['oss_max']
         totals['mds_max'] = datum['max_mds_cpu'] if datum['max_mds_cpu'] > totals['mds_max'] else totals['mds_max']
         totals['tot_missing'] += datum['tot_missing']
@@ -92,9 +93,9 @@ def bin_h5lmt(h5lmt_file):
             "if": i_f,
             "bytes_read": f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f].sum() * f.timestep,
             "bytes_write": f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f].sum() * f.timestep,
-            "ave_oss_cpu": f['OSSCPUGroup/OSSCPUDataSet'][:, i_0:i_f].sum() / f['OSSCPUGroup/OSSCPUDataSet'][:,:].shape[1],
+            "ave_oss_cpu": f['OSSCPUGroup/OSSCPUDataSet'][:, i_0:i_f].mean(),
             "max_oss_cpu": f['OSSCPUGroup/OSSCPUDataSet'][:, i_0:i_f].max(),
-            "ave_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].sum() / f['MDSCPUGroup/MDSCPUDataSet'][:].shape[0],
+            "ave_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].mean(),
             "max_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].max(),
             "tot_missing": f['FSMissingGroup/FSMissingDataSet'][:,i_0:i_f].sum(),
         }
