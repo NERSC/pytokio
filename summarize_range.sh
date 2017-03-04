@@ -12,6 +12,8 @@
 #  systems.
 #
 
+PYTOKIO_HOME="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
+
 if [ -z "$3" ]; then
     fs_files="edison_snx11025.h5lmt edison_snx11035.h5lmt edison_snx11036.h5lmt cori_snx11168.h5lmt"
 elif [ "$3" == "scratch1" ]; then
@@ -27,7 +29,7 @@ else
     exit 1
 fi
 
-./aggr_h5lmt.py \
+$PYTOKIO_HOME/aggr_h5lmt.py \
     --start "$1" \
     --end "$2" \
     --summary \
