@@ -6,6 +6,7 @@ import sys
 import os
 import argparse
 import tokio
+import tokio.tools
 import warnings
 
 _BYTES_TO_GIB = 2.0**(-30.0)
@@ -77,6 +78,9 @@ def bin_h5lmt(h5lmt_file):
     if 'version' in f['/'].attrs and f['/'].attrs['version'] > 1:
         raise Exception("TOKIOfile version > 1 not supported")
 
+    return bin_h5lmt_like_object(f, f.timestep)
+
+def bin_h5lmt_like_object(f, timestep):
     if (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) % args.bins > 0:
         warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" % (args.bins, (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1)) )
     dt_per_bin = int((f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) / args.bins)
@@ -91,8 +95,8 @@ def bin_h5lmt(h5lmt_file):
         bin_datum = {
             "i0": i_0,
             "if": i_f,
-            "bytes_read": f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f].sum() * f.timestep,
-            "bytes_write": f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f].sum() * f.timestep,
+            "bytes_read": f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f].sum() * timestep,
+            "bytes_write": f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f].sum() * timestep,
             "ave_oss_cpu": f['OSSCPUGroup/OSSCPUDataSet'][:, i_0:i_f].mean(),
             "max_oss_cpu": f['OSSCPUGroup/OSSCPUDataSet'][:, i_0:i_f].max(),
             "ave_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].mean(),
@@ -118,16 +122,41 @@ if __name__ == '__main__':
     parser.add_argument('--summary', dest='summary', action='store_true', help='print a summary of all output')
     parser.add_argument('--bytes', dest='bytes', action='store_true', help='print bytes, not GiB')
     parser.add_argument('--bins', dest='bins', type=int, default=24, help="number of bins per day")
+    parser.add_argument('--start', dest='start', type=str, help="date/time to start in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument('--end', dest='end', type=str, help="date/time to end in YYYY-MM-DD HH:MM:SS format")
     args = parser.parse_args()
 
     sys.stdout.write(print_datum(None))
     all_binned_data = []
-    for h5lmt_file in args.h5lmt:
-        bin_data = bin_h5lmt(h5lmt_file)
 
-        for bin_datum in bin_data:
-            sys.stdout.write(print_datum(bin_datum))
-        all_binned_data = all_binned_data + bin_data
+    if args.start is not None and args.end is not None:
+        tstart = datetime.datetime.strptime(args.start, "%Y-%m-%d %H:%M:%S")
+        tstop = datetime.datetime.strptime(args.end, "%Y-%m-%d %H:%M:%S")
 
-    if args.summary:
-        sys.stdout.write(print_data_summary(all_binned_data))
+        for h5lmt_file in args.h5lmt:
+            h5lmt_like_object = {}
+            for dataset_string in ["OSTReadGroup/OSTBulkReadDataSet",
+                                   "OSTWriteGroup/OSTBulkWriteDataSet",
+                                   "MDSCPUGroup/MDSCPUDataSet",
+                                   "OSSCPUGroup/OSSCPUDataSet",
+                                   "FSMissingGroup/FSMissingDataSet",
+                                   "FSStepsGroup/FSStepsDataSet"]:
+                h5lmt_like_object[dataset_string] = tokio.tools.get_group_data_from_time_range(
+                                                      h5lmt_file, dataset_string, tstart, tstop)
+            bin_data = bin_h5lmt_like_object(h5lmt_like_object, 5) ### hard-code 5 second timestep here
+            for bin_datum in bin_data:
+                sys.stdout.write(print_datum(bin_datum))
+            all_binned_data = all_binned_data + bin_data
+    
+            if args.summary:
+                sys.stdout.write(print_data_summary(all_binned_data))
+    else:
+        for h5lmt_file in args.h5lmt:
+            bin_data = bin_h5lmt(h5lmt_file)
+
+            for bin_datum in bin_data:
+                sys.stdout.write(print_datum(bin_datum))
+            all_binned_data = all_binned_data + bin_data
+
+        if args.summary:
+            sys.stdout.write(print_data_summary(all_binned_data))
