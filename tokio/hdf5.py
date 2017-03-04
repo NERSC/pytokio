@@ -16,8 +16,15 @@ def connect( *args, **kwargs ):
 
 class HDF5(h5py.File):
     def __init__( self, *args, **kwargs ):
-        self.first_timestamp = None
         super(HDF5,self).__init__( *args, **kwargs )
+
+        if 'FSStepsGroup/FSStepsDataSet' in self:
+            self.first_timestamp = datetime.datetime.fromtimestamp( self['FSStepsGroup/FSStepsDataSet'][0] )
+            self.last_timestamp = datetime.datetime.fromtimestamp( self['FSStepsGroup/FSStepsDataSet'][-1] )
+        else:
+            self.first_timestamp = None
+            self.last_timestamp = None
+
         self.timestep = self['/'].attrs.get('timestep')
         if self.timestep is None:
             self.timestep = tokio.LMT_TIMESTEP
@@ -146,6 +153,7 @@ class HDF5(h5py.File):
         self.attrs['first_timestamp'] = self.first_timestamp
         self.timestep = timestep
         self.attrs['timestep'] = self.timestep
+        self.last_timestamp = self.first_timestamp + self.timestep * ts_ct
 
 
     def get_ost_data( self, t_start, t_stop ):
