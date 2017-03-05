@@ -26,7 +26,7 @@ def print_datum( datum=None ):
         print_str += "%(frac_missing)5.1f" % datum
         return print_str + "\n"
 
-def print_data_summary( data ):
+def summarize_data( data ):
     totals = {
         'n': 0,
         'tot_bytes_read': 0,
@@ -62,6 +62,10 @@ def print_data_summary( data ):
     totals['ave_gibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
     totals['frac_missing'] = 100.0 * totals['tot_missing'] / (totals['tot_missing'] + totals['tot_present'])
 
+    return totals
+
+def print_data_summary( data ):
+    totals = summarize_data(data)
     print_str = ""
     print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
     print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
@@ -80,13 +84,13 @@ def bin_h5lmt(h5lmt_file):
 
     return bin_h5lmt_like_object(f, f.timestep)
 
-def bin_h5lmt_like_object(f, timestep):
-    if (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) % args.bins > 0:
-        warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" % (args.bins, (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1)) )
-    dt_per_bin = int((f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) / args.bins)
+def bin_h5lmt_like_object(f, timestep, num_bins):
+    if (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) % num_bins > 0:
+        warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" % (num_bins, (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1)) )
+    dt_per_bin = int((f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) / num_bins)
 
     bin_data = []
-    for bin in range(args.bins):
+    for bin in range(num_bins):
         i_0 = bin * dt_per_bin
         i_f = (bin+1) * dt_per_bin
         t_0 = datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i_0])
@@ -143,7 +147,7 @@ if __name__ == '__main__':
                                    "FSStepsGroup/FSStepsDataSet"]:
                 h5lmt_like_object[dataset_string] = tokio.tools.get_group_data_from_time_range(
                                                       h5lmt_file, dataset_string, tstart, tstop)
-            bin_data = bin_h5lmt_like_object(h5lmt_like_object, 5) ### hard-code 5 second timestep here
+            bin_data = bin_h5lmt_like_object(h5lmt_like_object, tokio.LMT_TIMESTEP, args.bins) ### hard-code 5 second timestep here :(
             for bin_datum in bin_data:
                 sys.stdout.write(print_datum(bin_datum))
             all_binned_data = all_binned_data + bin_data
