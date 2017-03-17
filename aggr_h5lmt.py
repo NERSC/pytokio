@@ -37,6 +37,7 @@ def summarize_data( data ):
         'mds_max': 0.0,
         'tot_missing': 0,
         'tot_present': 0,
+        'tot_zeros': 0,
     }
 
     for datum in data:
@@ -50,6 +51,7 @@ def summarize_data( data ):
         totals['mds_max'] = datum['max_mds_cpu'] if datum['max_mds_cpu'] > totals['mds_max'] else totals['mds_max']
         totals['tot_missing'] += datum['tot_missing']
         totals['tot_present'] += datum['tot_present']
+        totals['tot_zeros'] += datum['tot_zeros']
 
     ### derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
@@ -61,6 +63,7 @@ def summarize_data( data ):
     totals['ave_gibs_read_per_dt'] = totals['tot_gibs_read'] / totals['n']
     totals['ave_gibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
     totals['frac_missing'] = 100.0 * totals['tot_missing'] / (totals['tot_missing'] + totals['tot_present'])
+    totals['frac_zeros'] = 100.0 * totals['tot_zeros'] / (totals['tot_missing'] + totals['tot_present'])
 
     return totals
 
@@ -106,6 +109,10 @@ def bin_h5lmt_like_object(f, timestep, num_bins):
             "ave_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].mean(),
             "max_mds_cpu": f['MDSCPUGroup/MDSCPUDataSet'][i_0:i_f].max(),
             "tot_missing": f['FSMissingGroup/FSMissingDataSet'][:,i_0:i_f].sum(),
+            ### tot_zeros is a bit crazy --count up # elements that reported
+            ### read, write, AND CPU load as zero since these are likely missing
+            ### UDP packets, not true zero activity
+            "tot_zeros": ((f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f] == 0.0) & (f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f] == 0.0)).sum(),
         }
 
         ### derived values
@@ -115,6 +122,7 @@ def bin_h5lmt_like_object(f, timestep, num_bins):
         bin_datum['gibs_writ'] = bin_datum['bytes_write'] * _BYTES_TO_GIB
         bin_datum['tot_present'] = f['FSMissingGroup/FSMissingDataSet'][:,i_0:i_f].shape[0] * (i_f - i_0) - bin_datum['tot_missing']
         bin_datum['frac_missing'] = 100.0 * bin_datum['tot_missing'] / (bin_datum['tot_missing'] + bin_datum['tot_present'])
+        bin_datum['frac_zeros'] = 100.0 * bin_datum['tot_zeros'] / (bin_datum['tot_missing'] + bin_datum['tot_present'])
         bin_data.append(bin_datum)
 
     return bin_data
