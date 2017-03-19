@@ -112,7 +112,7 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
                 result['OpNames'] = op_names
             ost_names = list(f['OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'])
             if 'OSTNames' in result:
-                if ost_names != result['OSTNames']
+                if ost_names != result['OSTNames']:
                     raise Exception("Inconsistent OSTNames found across different H5LMT files")
                 else:
                     result['OSTNames'] = ost_names
