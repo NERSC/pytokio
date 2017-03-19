@@ -104,18 +104,21 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     result = {}
     for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
         with tokio.HDF5(h5file, mode='r') as f:
+            ### copy over MDS op names
             op_names = list(f['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
             if 'OpNames' in result:
                 if op_names != result['OpNames']:
                     raise Exception("Inconsistent OpNames found across different H5LMT files")
             else:
                 result['OpNames'] = op_names
+
+            ### copy over OST names
             ost_names = list(f['OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'])
             if 'OSTNames' in result:
                 if ost_names != result['OSTNames']:
                     raise Exception("Inconsistent OSTNames found across different H5LMT files")
-                else:
-                    result['OSTNames'] = ost_names
+            else:
+                result['OSTNames'] = ost_names
 
     return result
 
