@@ -126,8 +126,8 @@ def bin_h5lmt_like_object(f, timestep, num_bins=24):
         }
 
         mds_dset = f['MDSOpsGroup/MDSOpsDataSet']
-        if '__hack_data' in f:
-            ops = f['__hack_data']['OpNames']
+        if '__metadata' in f:
+            ops = f['__metadata']['OpNames']
         else:
             ops = list(mds_dset.attrs['OpNames'])
         for op in INTERESTING_MDS_OPS:

@@ -93,7 +93,7 @@ def _test_get_files_and_indices(file_name, datetime_start, datetime_end):
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[1]]), \
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[2]])
 
-def get_hack_data_from_time_range(file_name, datetime_start, datetime_end):
+def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     """
     Because pytokio returns data in a numpy array, certain metadata gets lost.
     This is particularly bothersome for MDSOpsDataSet, where the 'OpNames'
@@ -110,6 +110,12 @@ def get_hack_data_from_time_range(file_name, datetime_start, datetime_end):
                     raise Exception("Inconsistent OpNames found across different H5LMT files")
             else:
                 result['OpNames'] = op_names
+            ost_names = list(f['OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'])
+            if 'OSTNames' in result:
+                if ost_names != result['OSTNames']
+                    raise Exception("Inconsistent OSTNames found across different H5LMT files")
+                else:
+                    result['OSTNames'] = ost_names
 
     return result
 
