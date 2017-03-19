@@ -93,6 +93,26 @@ def _test_get_files_and_indices(file_name, datetime_start, datetime_end):
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[1]]), \
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[2]])
 
+def get_hack_data_from_time_range(file_name, datetime_start, datetime_end):
+    """
+    Because pytokio returns data in a numpy array, certain metadata gets lost.
+    This is particularly bothersome for MDSOpsDataSet, where the 'OpNames'
+    attribute is required to understand what each column in the np.array
+    correspond to.  This routine returns a dict with a few specific metadata
+    attributes in it which can be stored by the calling application.
+    """
+    result = {}
+    for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
+        with tokio.HDF5(h5file, mode='r') as f:
+            op_names = list(f['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
+            if 'OpNames' in result:
+                if op_names != result['OpNames']:
+                    raise Exception("Inconsistent OpNames found across different H5LMT files")
+            else:
+                result['OpNames'] = op_names
+
+    return result
+
 def get_group_data_from_time_range(file_name, group_name, datetime_start, datetime_end):
     """
     Not a very concise function name, but takes a filename, an HDF5 group name,

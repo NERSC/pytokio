@@ -8,8 +8,10 @@ import argparse
 import tokio
 import tokio.tools
 import warnings
+import json
 
 _BYTES_TO_GIB = 2.0**(-30.0)
+INTERESTING_MDS_OPS = [ 'open', 'close', 'getattr', 'unlink', 'setattr', 'getxattr', 'rmdir', 'rename', 'mkdir' ]
 
 def print_datum( datum=None ):
     """Take a json bag and print out relevant fields"""
@@ -52,6 +54,11 @@ def summarize_data( data ):
         totals['tot_missing'] += datum['tot_missing']
         totals['tot_present'] += datum['tot_present']
         totals['tot_zeros'] += datum['tot_zeros']
+        for op in INTERESTING_MDS_OPS:
+            key = 'ops_%ss' % op
+            if key not in totals:
+                totals[key] = 0
+            totals[key] += datum[key]
 
     ### derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
@@ -67,16 +74,19 @@ def summarize_data( data ):
 
     return totals
 
-def print_data_summary( data ):
+def print_data_summary( data, use_json=False ):
     totals = summarize_data(data)
-    print_str = ""
-    print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
-    print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
-    print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
-    print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
-    print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
-    print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
-    print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
+    if use_json:
+        return json.dumps(totals, indent=4, sort_keys=True)
+    else:
+        print_str = ""
+        print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
+        print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
+        print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
+        print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
+        print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
+        print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
+        print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
 
     return print_str
 
@@ -87,7 +97,7 @@ def bin_h5lmt(h5lmt_file):
 
     return bin_h5lmt_like_object(f, f.timestep)
 
-def bin_h5lmt_like_object(f, timestep, num_bins):
+def bin_h5lmt_like_object(f, timestep, num_bins=24):
     if (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) % num_bins > 0:
         warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" % (num_bins, (f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1)) )
     dt_per_bin = int((f['FSStepsGroup/FSStepsDataSet'].shape[0] - 1) / num_bins)
@@ -115,6 +125,14 @@ def bin_h5lmt_like_object(f, timestep, num_bins):
             "tot_zeros": ((f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f] == 0.0) & (f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f] == 0.0)).sum(),
         }
 
+        mds_dset = f['MDSOpsGroup/MDSOpsDataSet']
+        if '__hack_data' in f:
+            ops = f['__hack_data']['OpNames']
+        else:
+            ops = list(mds_dset.attrs['OpNames'])
+        for op in INTERESTING_MDS_OPS:
+            bin_datum['ops_%ss' % op] = mds_dset[ops.index(op),i_0:i_f].sum() * timestep
+
         ### derived values
         bin_datum['t0'] = datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][bin_datum['i0']])
         bin_datum['tf'] = datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][bin_datum['if']])
@@ -136,6 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('--bins', dest='bins', type=int, default=24, help="number of bins per day")
     parser.add_argument('--start', dest='start', type=str, help="date/time to start in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument('--end', dest='end', type=str, help="date/time to end in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument('--json', dest='json', action='store_true', help='return json output')
     args = parser.parse_args()
 
     sys.stdout.write(print_datum(None))
@@ -161,7 +180,7 @@ if __name__ == '__main__':
             all_binned_data = all_binned_data + bin_data
     
             if args.summary:
-                sys.stdout.write(print_data_summary(all_binned_data))
+                sys.stdout.write(print_data_summary(all_binned_data, args.json))
     else:
         for h5lmt_file in args.h5lmt:
             bin_data = bin_h5lmt(h5lmt_file)
@@ -171,4 +190,4 @@ if __name__ == '__main__':
             all_binned_data = all_binned_data + bin_data
 
         if args.summary:
-            sys.stdout.write(print_data_summary(all_binned_data))
+            sys.stdout.write(print_data_summary(all_binned_data, args.json))
