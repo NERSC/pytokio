@@ -5,49 +5,75 @@ import copy
 import StringIO
 import pycurl
 import time
-import datetime
 import tokio
+import datetime
 import numpy as np
 
 import argparse
 import os
 
-_ES_TIMESTEP = 10.0
+### the query syntax broke between ElasticSearch versions 4 and 5
+ES_VERSION = 5
 
-_DATE_FMT = "%Y-%m-%d %H:%M:%S"
+_ES_TIMESTEP = 5.0
 
 _ES_FETCHMANY_LIMIT = 10000
 
 _API_ENDPOINT = 'http://%s/%s/_search'
 
-_QUERY_OST_DATA = {
-    "size": _ES_FETCHMANY_LIMIT,
-    "query": {
-        "filtered": {
-            "query": {
-                "query_string": {
-                    "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
-                    "analyze_wildcard": True
-                }
-            },
-            "filter": {
-                "bool": {
-                    "must": {
-                        "range": {
-                            "@timestamp": {
-#                               "gte": "1465300800000",
-#                               "lt":  "1465304400000",
-                                "format": "epoch_millis"
+if ES_VERSION < 5:
+    _QUERY_OST_DATA = {
+        "size": _ES_FETCHMANY_LIMIT,
+        "query": {
+            "filtered": {
+                "query": {
+                    "query_string": {
+                        "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
+                        "analyze_wildcard": True
+                    }
+                },
+                "filter": {
+                    "bool": {
+                        "must": {
+                            "range": {
+                                "@timestamp": {
+    #                               "gte": "1465300800000",
+    #                               "lt":  "1465304400000",
+                                    "format": "epoch_millis"
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-    },
-    "fields": [ "@timestamp", "hostname", "plugin_instance", "write", "read" ]
-}
-
+        },
+        "fields": [ "@timestamp", "hostname", "plugin_instance", "write", "read" ]
+    }
+else:
+#   query_time_range = query['query']['bool']['filter']['range']['@timestamp']
+    _QUERY_OST_DATA = {
+        "size": _ES_FETCHMANY_LIMIT,
+        "query": {
+            "bool": {
+                "must": {
+                    "query_string": {
+                        "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
+                        "analyze_wildcard": True
+                    }
+                },
+                "filter": {
+                    "range": {
+                        "@timestamp": {
+#                           "gte": "1465300800000",
+#                           "lt":  "1465304400000",
+                            "format": "epoch_millis"
+                        }
+                    }
+                }
+            }
+        },
+        "_source": [ "@timestamp", "hostname", "plugin_instance", "write", "read" ]
+    }
 def connect(*args, **kwargs):
     return ESDB( *args, **kwargs )
 
@@ -106,18 +132,23 @@ class ESDB(object):
         ### range to query
         query = copy.deepcopy( _QUERY_OST_DATA )
         query['size'] = 0
-        query_time_range = query['query']['filtered']['filter']['bool']['must']['range']['@timestamp']
+        if ES_VERSION < 5:
+            query_time_range = query['query']['filtered']['filter']['bool']['must']['range']['@timestamp']
+        else:
+            query_time_range = query['query']['bool']['filter']['range']['@timestamp']
+
         query_time_range['gte'] = long(time.mktime( t_start.timetuple() ) * 1000.0)
         query_time_range['lt'] = long(time.mktime( t_stop.timetuple() ) * 1000.0)
         response, error = self._query_es( query )
 
+        if error:
+            tokio.error("initial size query returned unexpected results")
+            tokio.error(json.dumps(response, indent=4))
+            return None, None
+
         ### assume hits are equally distributed over time, then divide our
         ### inputted time range into a sensible set of time ranges
         expected_hits = response['hits']['total'] 
-        if error:
-            tokio.error("initial size query returned unexpected results")
-            tokio.error(json.dumps( response))
-            return None, None
 
         total_time_range = t_stop - t_start
         num_subqueries = int(expected_hits / _ES_FETCHMANY_LIMIT) + 1
@@ -183,21 +214,24 @@ class ESDB(object):
             ### for each hit in the response, insert these into a numpy matrix
             # do that here
 
-            sum_bytes_read = sum([x['fields']['read'][0] for x in response['hits']['hits']])
-            sum_bytes_written = sum([ x['fields']['write'][0] for x in response['hits']['hits']])
-
-            ### assume that collectd only reports a single scalar for both read/write
-            assert len(response['hits']['hits'][0]['fields']['write']) == 1
-            assert len(response['hits']['hits'][0]['fields']['read']) == 1
+            if ES_VERSION < 5:
+                sum_bytes_read = sum([x['fields']['read'][0] for x in response['hits']['hits']])
+                sum_bytes_written = sum([ x['fields']['write'][0] for x in response['hits']['hits']])
+                ### assume that collectd only reports a single scalar for both read/write
+                assert len(response['hits']['hits'][0]['fields']['write']) == 1
+                assert len(response['hits']['hits'][0]['fields']['read']) == 1
+            else:
+                sum_bytes_read = sum([x['_source']['read'] for x in response['hits']['hits']])
+                sum_bytes_written = sum([ x['_source']['write'] for x in response['hits']['hits']])
 
             print "%s - %s yields %d results; %.1f GiB read, %.1f GiB written" % (
                 subq_t_start,
                 subq_t_stop,
                 response['hits']['total'],
-                sum_bytes_read * _ES_TIMESTEP / 2**30,
-                sum_bytes_written * _ES_TIMESTEP / 2**30)
-            tot_read += sum_bytes_read * _ES_TIMESTEP
-            tot_written += sum_bytes_written * _ES_TIMESTEP
+                sum_bytes_read * timestep / 2**30,
+                sum_bytes_written * timestep / 2**30)
+            tot_read += sum_bytes_read * timestep
+            tot_written += sum_bytes_written * timestep
             i += 1
 
         print "TOTAL READ:    %.1f GiB" % (tot_read / 2.0**30)
@@ -226,7 +260,10 @@ class ESDB(object):
         """
         query = copy.deepcopy( _QUERY_OST_DATA )
         query['size'] = size
-        query_time_range = query['query']['filtered']['filter']['bool']['must']['range']['@timestamp']
+        if ES_VERSION < 5:
+            query_time_range = query['query']['filtered']['filter']['bool']['must']['range']['@timestamp']
+        else:
+            query_time_range = query['query']['bool']['filter']['range']['@timestamp']
         query_time_range['gte'] = long(time.mktime( t_start.timetuple() ) * 1000.0)
         query_time_range['lt'] = long(time.mktime( t_stop.timetuple() ) * 1000.0)
 
@@ -328,30 +365,4 @@ def _is_response_incomplete( response ):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('tstart',
-                        type=str,
-                        help="lower bound of time to scan, in YYYY-mm-dd HH:MM:SS format")
-    parser.add_argument('tstop',
-                        type=str,
-                        help="upper bound of time to scan, in YYYY-mm-dd HH:MM:SS format")
-    parser.add_argument('--debug',
-                        action='store_true',
-                        help="produce debug messages")
-    args = parser.parse_args()
-    if not (args.tstart and args.tstop):
-        parser.print_help()
-        sys.exit(1)
-    if args.debug:
-        tokio.DEBUG = True
-
-    try:
-        t_start = datetime.datetime.strptime(args.tstart, _DATE_FMT)
-        t_stop = datetime.datetime.strptime(args.tstop, _DATE_FMT)
-    except ValueError:
-        sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT)
-        raise
-
-    esdb = connect()
-
-    esdb.get_rw_data( t_start, t_stop, _ES_TIMESTEP )
+    pass
