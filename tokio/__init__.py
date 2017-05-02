@@ -1,9 +1,12 @@
 #!/usr/bin/env python
+"""
+TODO: add support for external configuration
+"""
 
 import sys
 
 DEBUG = False
-LMT_TIMESTEP = 5
+LMT_TIMESTEP = 5.0
 
 def _debug_print( string ):
     """
@@ -30,14 +33,12 @@ def warning( string ):
 
 ### LMTDB requires MySQLdb
 try:
-    from lmt import LMTDB
+    from connectors.lmt import LMTDB
 except ImportError:
     pass
 
 ### HDF5 requires h5py
 try:
-    from hdf5 import HDF5
+    from connectors.hdf5 import HDF5
 except ImportError:
     pass
-
-

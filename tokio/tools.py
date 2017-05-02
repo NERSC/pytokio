@@ -7,7 +7,6 @@ incorporated into the formal TOKIO package API.
 """
 
 import tokio
-import tokio.hdf5
 
 import os
 import datetime
