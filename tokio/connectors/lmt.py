@@ -6,7 +6,7 @@ import time
 import datetime
 import MySQLdb
 import numpy as np
-import tokio
+from ..debug import debug_print as _debug_print
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -144,7 +144,7 @@ class LMTDB(object):
             if tf > t_stop:
                 tf = t_stop
             ( tmp_r, tmp_w ) = self._get_rw_data( t0, tf, timestep )
-            tokio._debug_print( "Retrieved %.2f GiB read, %.2f GiB written" % (
+            _debug_print( "Retrieved %.2f GiB read, %.2f GiB written" % (
                  (tmp_r[-1,:].sum() - tmp_r[0,:].sum())/2**30,
                  (tmp_w[-1,:].sum() - tmp_w[0,:].sum())/2**30) )
 
@@ -161,7 +161,7 @@ class LMTDB(object):
                 buf_w = np.concatenate(( buf_w, tmp_w ), axis=0)
             t0 += _TIME_CHUNK
 
-        tokio._debug_print( "Finished because t0(=%s) !< t_stop(=%s)" % (
+        _debug_print( "Finished because t0(=%s) !< t_stop(=%s)" % (
                 t0.strftime( _DATE_FMT ), 
                 tf.strftime( _DATE_FMT ) ))
         return ( buf_r, buf_w )
@@ -178,7 +178,7 @@ class LMTDB(object):
         Time will be binned appropriately if binning_timestep > lmt_timestep.
         The number of OSTs (the N dimension) is derived from the database.
         """
-        tokio._debug_print( "Retrieving %s >= t > %s" % (
+        _debug_print( "Retrieving %s >= t > %s" % (
             t_start.strftime( _DATE_FMT ),
             t_stop.strftime( _DATE_FMT ) ) )
         query_str = _QUERY_OST_DATA % ( 
@@ -263,13 +263,12 @@ class LMTDB(object):
         cursor = self.db.cursor()
         t0 = time.time()
         cursor.execute( query_str )
-        tokio._debug_print("Executed query in %f sec" % ( time.time() - t0 ))
+        _debug_print("Executed query in %f sec" % ( time.time() - t0 ))
 
         t0 = time.time()
         rows = cursor.fetchall()
-        tokio._debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
+        _debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
         return rows
-
 
 if __name__ == '__main__':
     pass

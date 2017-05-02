@@ -1,29 +1,25 @@
 #!/usr/bin/env python
-"""
-Miscellaneous tools that are functionally handy for dealing with files and data
-sources used by the TOKIO framework.  This particular package is not intended to
-have a stable API; as different functions prove themselves here, they will be
-incorporated into the formal TOKIO package API.
-"""
-
-import tokio
 
 import os
 import datetime
 
-import h5py
 import numpy as np
+
+from .. import connectors
+from ..debug import debug_print as _debug_print
 
 ### for repack_h5lmt
 import subprocess
 import tempfile
 
+### TODO: clean this up
 try:
     import pandas
     _HAVE_PANDAS = True
 except ImportError:
     _HAVE_PANDAS = False
 
+### TODO: clean this up too
 H5LMT_BASE = os.environ.get("H5LMT_BASE")
 if H5LMT_BASE is None:
     ### default location at NERSC
@@ -69,7 +65,7 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
 
     h5lmt_files = enumerate_h5lmts(file_name, datetime_start, datetime_end )
     for h5lmt_file in h5lmt_files:
-        hdf5 = tokio.HDF5(h5lmt_file, mode="r")
+        hdf5 = connectors.HDF5(h5lmt_file, mode="r")
         if hdf5.first_timestamp is None or hdf5.last_timestamp is None:
             raise Exception("uninitialized tokio.hdf5 object")
 
@@ -93,7 +89,7 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
 def _test_get_files_and_indices(file_name, datetime_start, datetime_end):
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     for i in files_and_indices:
-        with tokio.HDF5(i[0], mode='r') as f:
+        with connectors.HDF5(i[0], mode='r') as f:
             print i[0], \
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[1]]), \
                 datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[2]])
@@ -108,7 +104,7 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     """
     result = {}
     for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
-        with tokio.HDF5(h5file, mode='r') as f:
+        with connectors.HDF5(h5file, mode='r') as f:
             ### copy over MDS op names
             op_names = list(f['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
             if 'OpNames' in result:
@@ -137,7 +133,7 @@ def get_group_data_from_time_range(file_name, group_name, datetime_start, dateti
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     result = None
     for (h5file, i_0, i_f) in files_and_indices:
-        with tokio.HDF5(h5file, mode='r') as f:
+        with connectors.HDF5(h5file, mode='r') as f:
             version = f['/'].attrs.get('version', 1)
             if len(f[group_name].shape) == 1:
                 dataset_slice = f[group_name][i_0:i_f]
@@ -164,7 +160,7 @@ def get_group_data_from_time_range(file_name, group_name, datetime_start, dateti
                 result = dataset_slice
             else:
                 result = np.concatenate([result, dataset_slice], axis=axis)
-            tokio._debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
+            _debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
 
     return result
 
@@ -198,7 +194,7 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     version = None
     col_header = None
     for (h5file, i_0, i_f) in files_and_indices:
-        with tokio.HDF5(h5file, mode='r') as f:
+        with connectors.HDF5(h5file, mode='r') as f:
             ### try to figure out the h5lmt schema version
             version = f['/'].attrs.get('version', 1)
 
@@ -232,7 +228,7 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
             else:
                 x = np.concatenate([x, x_slice])
                 result = np.concatenate([result, dataset_slice])
-            tokio._debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
+            _debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
 
     result = pandas.DataFrame(data=result, 
                               index=[ datetime.datetime.fromtimestamp(xx) for xx in x ],

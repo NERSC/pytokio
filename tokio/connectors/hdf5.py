@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import tokio
+from ..config import LMT_TIMESTEP
+from ..debug import debug_print as _debug_print
 import time
 import datetime
 import h5py
@@ -27,7 +28,7 @@ class HDF5(h5py.File):
 
         self.timestep = self['/'].attrs.get('timestep')
         if self.timestep is None:
-            self.timestep = tokio.LMT_TIMESTEP
+            self.timestep = LMT_TIMESTEP
 
     def init_datasets( self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown' ):
         """
@@ -100,7 +101,7 @@ class HDF5(h5py.File):
                     name=hard_name,
                     **dset_params)
                 self[dset_name] = h5py.SoftLink(hard_name)
-                tokio._debug_print( "creating softlink %s -> %s" % ( dset_name, hard_name ) )
+                _debug_print( "creating softlink %s -> %s" % ( dset_name, hard_name ) )
 
         ### version 1 format - metadata
         self['/FSStepsGroup/FSStepsDataSet'].attrs['fs'] = filesystem
@@ -125,7 +126,7 @@ class HDF5(h5py.File):
         self.attrs['host'] = host
         self.attrs['filesystem'] = filesystem
 
-    def init_timestamps( self, t_start, t_stop, timestep=tokio.LMT_TIMESTEP, fs=None, host=None ):
+    def init_timestamps( self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None ):
         """
         Initialize timestamps for the whole HDF5 file.  Version 1 populates an
         entire dataset with equally spaced epoch timestamps, while version 2
@@ -194,14 +195,14 @@ class HDF5(h5py.File):
             elif 'FSStepsGroup/FSStepsDataSet' in self and len(self['FSStepsGroup/FSStepsDataSet']) > 1:
                 self.timestep = self['FSStepsGroup/FSStepsDataSet'][1] - self['FSStepsGroup/FSStepsDataSet'][0]
             else:
-                self.timestep = tokio.LMT_TIMESTEP
+                self.timestep = LMT_TIMESTEP
             
         if 'first_timestamp' in self.attrs: 
             t0 = datetime.datetime.fromtimestamp( self.attrs['first_timestamp'] )
         else:
             t0 = datetime.datetime.fromtimestamp( self['FSStepsGroup/FSStepsDataSet'][0] )
 
-        return int((t - t0).total_seconds()) / self.timestep
+        return int((t - t0).total_seconds()) / int(self.timestep)
 
 if __name__ == '__main__':
     pass
