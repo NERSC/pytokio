@@ -1,11 +1,13 @@
 TOKIO - Total Knowledge of I/O
 ================================================================================
 
-This is the TOKIO Python library, which is used to connect to different sources
-of I/O telemetry data and provide a (mostly) normalized interface to them.
+This a reference implementation of the TOKIO framework composed as a Python
+package.
 
 Nomenclature
 --------------------------------------------------------------------------------
 
 - `connectors` establish stateful interfaces
 - `grabbers` are stateless queries
+- `tools` are tools that derive higher-level metrics or interface different
+  connectors or grabbers

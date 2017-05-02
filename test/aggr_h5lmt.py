@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 
-import datetime
-import h5py
 import sys
-import os
+import json
+import datetime
 import argparse
+import warnings
 import tokio
 import tokio.tools
-import warnings
-import json
 
 _BYTES_TO_GIB = 2.0**(-30.0)
 INTERESTING_MDS_OPS = [ 'open', 'close', 'getattr', 'unlink', 'setattr', 'getxattr', 'rmdir', 'rename', 'mkdir' ]
