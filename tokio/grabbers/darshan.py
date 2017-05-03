@@ -121,12 +121,80 @@ def _parse_perf_counters(line):
     # agg_perf_by_open_lastio: 22076.374336
     # agg_perf_by_slowest: 28670.996545
     """
- 
+
+    if line.startswith('# total_bytes:') or line.startswith('# agg_perf_by'):
+        key, value = line[2:].split(':')
+    elif line.startswith('# unique files:') or line.startswith('# shared files:'):
+        key_suffix, key, value = line[2:].split(':')
+        key += '_%s' % key_suffix.replace(' ', '_')
+    else:
+        return None, None
+
+    return key.strip(), value.strip()
+
 def _darshan_parser( log_file, counter_parser=_parse_base_counters):
     """
     Call darshan-parser --base on log_file and walk its output, identifying
     different sections and invoking the appropriate line parser function
     """
+
+    def is_valid_counter( counter ):
+        """
+        if counter is not None, this line is valid (return True)
+        if counter is None but we can identify a module section, return it
+        if counter is None but we cannot identify a module section, return False
+        """
+        if counter is None:
+            match = module_rex.search(line)
+            if match is not None:
+                module_section = match.group(1)
+                module_section = module_section.replace('-','') # because of "MPI-IO" and "MPIIO"
+                module_section = module_section.replace('/','') # because of "BG/Q" and "BGQ"
+                return False, module_section
+            else:
+                return False, None
+        else:
+            return True, None
+
+    def insert_record(section, module, file_name, rank, counter, value, counter_prefix=None):
+        """
+        Embed a counter=value pair deep within the darshan_data structure based
+        on a bunch of nested keys.
+        """
+        ### force the local shadow of 'module' to lowercase
+        module = module.lower()
+
+        ### assert that the counter actually belongs to the current module
+        if counter_prefix is not None:
+            if counter.startswith(counter_prefix):
+                ### strip off the counter_prefix from the counter name
+                counter = counter[len(counter_prefix):]
+            else:
+                raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
+
+        ### otherwise insert the record--this logic should be made more flexible
+        if section not in darshan_data:
+            darshan_data[section] = {}
+        if module not in darshan_data[section]:
+            darshan_data[section][module] = {}
+        if file_name not in darshan_data[section][module]:
+            darshan_data[section][module][file_name] = {}
+        if rank is None:
+            insert_base = darshan_data[section][module][file_name]
+        else:
+            if rank not in darshan_data[section][module][file_name]:
+                darshan_data[section][module][file_name][rank] = {}
+            insert_base = darshan_data[section][module][file_name][rank]
+
+        if counter in insert_base:
+            raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
+        else:
+            if '.' in value:
+                value = float(value)
+            else:
+                value = long(value)
+            insert_base[counter] = value
+
     darshan_data = {}
     section = None
     module_section = None
@@ -183,78 +251,42 @@ def _darshan_parser( log_file, counter_parser=_parse_base_counters):
             key, val = _parse_mounts(line)
             if key is not None:
                 darshan_data[section][key] = val
-        elif section == 'counters' and counter_parser == _parse_base_counters:
-            module, rank, record_id, counter, value, file_name, mount_pt, fs_type = _parse_base_counters(line)
 
-            ### try to identify new module section
-            if module is None:
-                match = module_rex.search(line)
-                if match is not None:
-                    module_section = match.group(1)
-                    module_section = module_section.replace('-','') # because of "MPI-IO" and "MPIIO"
-                    module_section = module_section.replace('/','') # because of "BG/Q" and "BGQ"
+        elif section == 'counters':
+            if counter_parser == _parse_base_counters:
+                module, rank, record_id, counter, value, file_name, mount_pt, fs_type = counter_parser(line)
+                if module_section is not None:
+                    ### if it is none, is_valid_counter check below will bail
+                    counter_prefix = module_section + "_"
+            elif counter_parser == _parse_total_counters:
+                counter, value = counter_parser(line)
+                file_name = '_total'
+                rank = None
+                if module_section is not None:
+                    counter_prefix = 'total_%s_' % module_section
+            elif counter_parser == _parse_perf_counters:
+                counter, value = counter_parser(line)
+                file_name = '_perf'
+                rank = None
+                counter_prefix = None
+            else:
                 continue
 
-            if counter.startswith('%s_' % module_section):
-                module = module_section.lower()
-                counter = counter[len(module)+1:]
-            else:
-                raise Exception("found counter %s in module section %s" % (counter, module_section))
-
-            ### otherwise insert the record -- this logic should be made more flexible
-            if module not in darshan_data[section]:
-                darshan_data[section][module] = {}
-            if file_name not in darshan_data[section][module]:
-                darshan_data[section][module][file_name] = {}
-            if rank not in darshan_data[section][module][file_name]:
-                darshan_data[section][module][file_name][rank] = {}
-
-            if counter in darshan_data[section][module][file_name][rank]:
-                raise Exception("Duplicate counter %s found in %s->%s->%s->%s" % (counter, section, module, file_name, rank))
-            else:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = long(value)
-                darshan_data[section][module][file_name][rank][counter] = value
-        elif section == 'counters' and counter_parser == _parse_total_counters:
-            counter, value = _parse_total_counters(line)
-
-            ### try to identify new module section
-            if counter is None:
-                match = module_rex.search(line)
-                if match is not None:
-                    module_section = match.group(1)
-                    module_section = module_section.replace('-','') # because of "MPI-IO" and "MPIIO"
-                    module_section = module_section.replace('/','') # because of "BG/Q" and "BGQ"
+            ### if no valid counter found, is this the start of a new module?
+            valid, new_module_section = is_valid_counter(counter)
+            if new_module_section is not None:
+                module_section = new_module_section
+            if valid is False:
                 continue
 
-            args = counter.split('_', 2)
-            if args[0] != 'total':
-                raise Exception("total counter %s did not start with total_" % counter)
-            elif args[1] == module_section:
-                module = module_section.lower()
-                counter = args[2]
-            else:
-                raise Exception("found counter %s in module section %s" % (counter, module_section))
-
-            ### otherwise insert the record -- this logic should be made more flexible
-            if module not in darshan_data[section]:
-                darshan_data[section][module] = {}
-            ### if darshan ever intercepts I/O to a file called _total, this
-            ### will be degenerate with parse_base_counters
-            if '_total' not in darshan_data[section][module]:
-                darshan_data[section][module]['_total'] = {}
-
-            if counter in darshan_data[section][module]['_total']:
-                raise Exception("Duplicate counter %s found in %s->%s->%s" % (counter, section, module, '_total'))
-            else:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = long(value)
-                darshan_data[section][module]['_total'][counter] = value
-
+            ### reminder: section is already defined as the global parser state
+            insert_record(section=section,
+                          module=module_section,
+                          file_name=file_name,
+                          rank=rank,
+                          counter=counter,
+                          value=value,
+                          counter_prefix=counter_prefix)
 
     return darshan_data
 
