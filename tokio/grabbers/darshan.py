@@ -33,9 +33,9 @@ def _parse_header(line):
         return 'start_time', long(line.split()[2])
     elif line.startswith("# start_time_asci:"):
         return 'start_time_string', line.split(None, 2)[-1].strip()
-    elif line.endswith("# end_time:"):
+    elif line.startswith("# end_time:"):
         return 'end_time', long(line.split()[2])
-    elif line.endswith("# end_time_asci:"):
+    elif line.startswith("# end_time_asci:"):
         return 'end_time_string', line.split(None, 2)[-1].strip()
     elif line.startswith("# nprocs:"):
         return "nprocs", int(line.split()[-1])
