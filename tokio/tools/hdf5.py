@@ -6,18 +6,12 @@ import datetime
 import numpy as np
 
 from .. import connectors
+from .. import dataframe
 from ..debug import debug_print as _debug_print
 
 ### for repack_h5lmt
 import subprocess
 import tempfile
-
-### TODO: clean this up
-try:
-    import pandas
-    _HAVE_PANDAS = True
-except ImportError:
-    _HAVE_PANDAS = False
 
 ### TODO: clean this up too
 H5LMT_BASE = os.environ.get("H5LMT_BASE")
@@ -77,7 +71,12 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
 
         if hdf5.last_timestamp >= datetime_end:
             ### this is the last day's hdf5
-            i_f = hdf5.get_index(datetime_end) + 1 ### +1 because datetime_end is inclusive 
+            i_f = hdf5.get_index(datetime_end) - 1 # -1 because datetime_end should be exclusive
+            ### if the last timestamp is on the first datapoint of a new day,
+            ### just drop the whole day to maintain exclusivity of the last
+            ### timestamp
+            if i_f < 0:
+                continue
         else:
             i_f = -1
 
@@ -85,14 +84,6 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
         output.append((h5lmt_file, i_0, i_f))
 
     return output
-
-def _test_get_files_and_indices(file_name, datetime_start, datetime_end):
-    files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
-    for i in files_and_indices:
-        with connectors.HDF5(i[0], mode='r') as f:
-            print i[0], \
-                datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[1]]), \
-                datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][i[2]])
 
 def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     """
@@ -169,11 +160,6 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     A little extra smarts to convert a group name into something a little more
     semantically useful than a numpy array
     """
-    if not _HAVE_PANDAS:
-        raise Exception("pandas is not available")
-
-    _TIMESTAMPS_DATASET_V1 = 'FSStepsGroup/FSStepsDataSet'
-    _TIMESTAMPS_DATASET = 'FSStepsGroup/FSStepsDataSet'
 
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     if len(files_and_indices) is None:
