@@ -2,6 +2,7 @@
 
 from ..config import LMT_TIMESTEP
 from ..debug import debug_print as _debug_print
+from .. import dataframe
 import time
 import datetime
 import h5py
@@ -203,7 +204,7 @@ class HDF5(h5py.File):
                 self.timestep = self['FSStepsGroup/FSStepsDataSet'][1] - self['FSStepsGroup/FSStepsDataSet'][0]
             else:
                 self.timestep = LMT_TIMESTEP
-            
+
         if 'first_timestamp' in self.attrs: 
             t0 = datetime.datetime.fromtimestamp( self.attrs['first_timestamp'] )
         else:
@@ -211,5 +212,48 @@ class HDF5(h5py.File):
 
         return int((t - t0).total_seconds()) / int(self.timestep)
 
+    def to_dataframe(self, group_name=None):
+        ### convenience
+        _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'
+        if group_name is None:
+            group_name = _INDEX_DATASET_NAME
+        ### normalize to absolute path
+        if not group_name.startswith('/'):
+            group_name = '/' + group_name
+
+        if group_name in ('/OSTReadGroup/OSTBulkReadDataSet',
+                          '/OSTWriteGroup/OSTBulkWriteDataSet'):
+            col_header_key = 'OSTNames'
+        elif group_name == '/MDSOpsGroup/MDSOpsDataSet':
+            col_header_key = 'OpNames'
+        elif group_name == '/OSSCPUGroup/OSSCPUDataSet':
+            col_header_key = 'OSSNames'
+        else:
+            col_header_key = None
+
+        if col_header_key is not None:
+            col_header = self[group_name].attrs[col_header_key]
+        elif group_name == '/FSMissingGroup/FSMissingDataSet' \
+        and '/OSSCPUGroup/OSSCPUDataSet' in self:
+            ### because FSMissingDataSet lacks the appropriate metadata in v1...
+            col_header = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
+        else:
+            col_header = None
+
+        index = self[_INDEX_DATASET_NAME][:]
+        if group_name == _INDEX_DATASET_NAME:
+            values = None
+        else:
+            num_dims = len(self[group_name].shape)
+            if num_dims == 1:
+                values = self[group_name][:]
+            elif num_dims == 2:
+                values = self[group_name][:,:].T
+            elif num_dims > 2:
+                raise Exception("Can only convert 1d or 2d datasets to dataframe")
+
+        return dataframe.DataFrame(data=values,
+                                   index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
+                                   columns=col_header)
 if __name__ == '__main__':
     pass

@@ -5,7 +5,7 @@ import numpy as np
 
 import tokio.connectors
 
-SAMPLE_INPUT = os.path.join(os.getcwd(), 'inputs', 'edison_snx11025.h5lmt')
+SAMPLE_INPUT = os.path.join(os.getcwd(), 'inputs', 'sample.hdf5')
 
 DATASETS_1D = [ 'FSStepsGroup/FSStepsDataSet', 'MDSCPUGroup/MDSCPUDataSet' ]
 DATASETS_2D = [ 'FSMissingGroup/FSMissingDataSet',
@@ -20,15 +20,20 @@ POSITIVE_2D = [ 'MDSOpsGroup/MDSOpsDataSet',
 
 f = tokio.connectors.HDF5(SAMPLE_INPUT)
 
+### make sure group_name=None works
+assert len(f.to_dataframe().index) > 0
+
 for dataset in DATASETS_1D:
     assert dataset in f
     assert len(f[dataset].shape) == 1
     assert f[dataset][:].sum() > 0
+    assert len(f.to_dataframe(dataset).index) > 0
 
 for dataset in DATASETS_2D:
     assert dataset in f
     assert len(f[dataset].shape) == 2
     assert f[dataset][:,:].sum() > 0
+    assert len(f.to_dataframe(dataset).columns) > 0
 
 ### test dataset-dependent correctness
 
