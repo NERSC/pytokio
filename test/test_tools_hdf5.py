@@ -38,7 +38,6 @@ def check_get_files_and_indices(start_offset, duration):
 
             assert (derived_start == start_time) \
                 or (count > 0 and istart == 0)
-            print file_name, 'asked for end time ', end_time, 'got end time', derived_end
             assert (derived_end == end_time - datetime.timedelta(seconds=dt)) \
                 or (count < (len(files_and_indices)-1) and iend == -1) 
 
@@ -51,10 +50,7 @@ def check_get_dataframe_from_time_range(dataset_name, start_offset, duration):
 
     result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_INPUT, dataset_name, start_time, end_time)
 
-    print 'zero', result.index[0], '|', start_time
     assert result.index[0] == start_time
-    print 'negative one', result.index[-1], '|', end_time
-    print result
     assert result.index[-1] == end_time - datetime.timedelta(seconds=dt)
 
 def test():

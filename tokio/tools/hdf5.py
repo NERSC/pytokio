@@ -174,7 +174,12 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
             if result is None:
                 result = df_slice
             else:
-                result.append(df_slice)
+                ### append a copy--I think this is memory-inefficient
+                # result = result.append(df_slice)
+
+                ### append in place--maybe more efficient than .append??
+                result = result.reindex(result.index.union(df_slice.index))
+                result.loc[df_slice.index] = df_slice
 
     return result.sort_index()
 
