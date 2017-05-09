@@ -165,62 +165,18 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     if len(files_and_indices) is None:
         raise Exception("no relevant hdf5 files found")
 
-    if group_name in ('OSTReadGroup/OSTBulkReadDataSet', 'OSTWriteGroup/OSTBulkWriteDataSet'):
-        col_header_key = 'OSTNames'
-    elif group_name == 'MDSOpsGroup/MDSOpsDataSet':
-        col_header_key = 'OpNames'
-    elif group_name == 'OSSCPUGroup/OSSCPUDataSet':
-        col_header_key = 'OSSNames'
-    elif group_name == 'MDSCPUGroup/MDSCPUDataSet':
-        col_header_key = None
-    else:
-        raise Exception("Unknown group " + group_name)
-
     result = None
-    version = None
-    col_header = None
-    for (h5file, i_0, i_f) in files_and_indices:
+    for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
         with connectors.HDF5(h5file, mode='r') as f:
-            ### try to figure out the h5lmt schema version
-            version = f['/'].attrs.get('version', 1)
-
-            ### try to figure out the column names
-            if col_header_key is not None:
-                col_header_slice = f[group_name].attrs[col_header_key]
-                if col_header is None:
-                    col_header = col_header_slice
-                else:
-                    assert np.array_equal(col_header, col_header_slice)
-
-            ### try to shape the data
-            if len(f[group_name].shape) == 1:
-                x_slice = f[_TIMESTAMPS_DATASET_V1][i_0:i_f]
-                dataset_slice = f[group_name][i_0:i_f]
-            elif len(f[group_name].shape) == 2:
-                if version == 1:
-                    x_slice = f[_TIMESTAMPS_DATASET_V1][i_0:i_f]
-                    dataset_slice = f[group_name][:,i_0:i_f].T
-                else:
-                    x_slice = f[_TIMESTAMPS_DATASET][i_0:i_f]
-                    dataset_slice = f[group_name][i_0:i_f,:]
-            elif len(f[group_name].shape) == 3:
-                raise Exception("Can only convert 1d or 2d datasets into dataframe")
-            else:
-                raise Exception("Dimensions of %s in %s are greater than 3" % (group_name, h5file))
+            df_slice = f.to_dataframe(group_name)
+            df_slice = df_slice[(df_slice.index >= datetime_start) & (df_slice.index < datetime_end)]
 
             if result is None:
-                x = x_slice
-                result = dataset_slice
+                result = df_slice
             else:
-                x = np.concatenate([x, x_slice])
-                result = np.concatenate([result, dataset_slice])
-            _debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
+                result.append(df_slice)
 
-    result = pandas.DataFrame(data=result, 
-                              index=[ datetime.datetime.fromtimestamp(xx) for xx in x ],
-                              columns=col_header)
-
-    return result
+    return result.sort_index()
 
 
 def repack_h5lmt( src, dest, datasets ):
