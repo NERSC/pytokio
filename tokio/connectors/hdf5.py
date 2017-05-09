@@ -212,28 +212,28 @@ class HDF5(h5py.File):
 
         return int((t - t0).total_seconds()) / int(self.timestep)
 
-    def to_dataframe(self, group_name=None):
+    def to_dataframe(self, dataset_name=None):
         ### convenience
         _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'
-        if group_name is None:
-            group_name = _INDEX_DATASET_NAME
+        if dataset_name is None:
+            dataset_name = _INDEX_DATASET_NAME
         ### normalize to absolute path
-        if not group_name.startswith('/'):
-            group_name = '/' + group_name
+        if not dataset_name.startswith('/'):
+            dataset_name = '/' + dataset_name
 
-        if group_name in ('/OSTReadGroup/OSTBulkReadDataSet',
+        if dataset_name in ('/OSTReadGroup/OSTBulkReadDataSet',
                           '/OSTWriteGroup/OSTBulkWriteDataSet'):
             col_header_key = 'OSTNames'
-        elif group_name == '/MDSOpsGroup/MDSOpsDataSet':
+        elif dataset_name == '/MDSOpsGroup/MDSOpsDataSet':
             col_header_key = 'OpNames'
-        elif group_name == '/OSSCPUGroup/OSSCPUDataSet':
+        elif dataset_name == '/OSSCPUGroup/OSSCPUDataSet':
             col_header_key = 'OSSNames'
         else:
             col_header_key = None
 
         if col_header_key is not None:
-            col_header = self[group_name].attrs[col_header_key]
-        elif group_name == '/FSMissingGroup/FSMissingDataSet' \
+            col_header = self[dataset_name].attrs[col_header_key]
+        elif dataset_name == '/FSMissingGroup/FSMissingDataSet' \
         and '/OSSCPUGroup/OSSCPUDataSet' in self:
             ### because FSMissingDataSet lacks the appropriate metadata in v1...
             col_header = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
@@ -241,14 +241,14 @@ class HDF5(h5py.File):
             col_header = None
 
         index = self[_INDEX_DATASET_NAME][:]
-        if group_name == _INDEX_DATASET_NAME:
+        if dataset_name == _INDEX_DATASET_NAME:
             values = None
         else:
-            num_dims = len(self[group_name].shape)
+            num_dims = len(self[dataset_name].shape)
             if num_dims == 1:
-                values = self[group_name][:]
+                values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[group_name][:,:].T
+                values = self[dataset_name][:,:].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
