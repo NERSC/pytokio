@@ -7,6 +7,8 @@ import datetime
 import h5py
 import numpy as np
 
+_NATIVE_VERSION = 1
+
 def connect( *args, **kwargs ):
     """
     Generate a special tokio.HDF5 object which is derived from h5py's File
@@ -29,6 +31,11 @@ class HDF5(h5py.File):
         self.timestep = self['/'].attrs.get('timestep')
         if self.timestep is None:
             self.timestep = LMT_TIMESTEP
+
+        if self['/'].attrs.get('version') is None:
+            self.version = _NATIVE_VERSION
+        else:
+            self.version = self.attrs.get('version')
 
     def init_datasets( self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown' ):
         """
