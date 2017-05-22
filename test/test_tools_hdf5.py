@@ -16,11 +16,17 @@ with tokio.connectors.hdf5.HDF5(os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE
     t00 = fp['FSStepsGroup/FSStepsDataSet'][0]
     dt = int(fp['FSStepsGroup/FSStepsDataSet'][1] - t00)
 
-### tuple of (offset relative to start of first day, duration)
+### tuple of (offset relative to start of first day, duration) -- make sure
+### these always touch exactly two calendar days
 TIME_OFFSETS = [
-    (datetime.timedelta(hours=3, minutes=25, seconds=45), datetime.timedelta(days=1, hours=2, minutes=35, seconds=15)),
-    (datetime.timedelta(hours=3, minutes=25, seconds=45), datetime.timedelta(days=0, hours=20, minutes=34, seconds=15)),
-    (datetime.timedelta(hours=0, minutes=0, seconds=0),   datetime.timedelta(days=1, hours=0, minutes=0, seconds=dt)),
+    ### > 24 hours, but still two calendar days
+    (datetime.timedelta(hours=3,  minutes=25, seconds=45), datetime.timedelta(days=1, hours=2,  minutes=35, seconds=15)),
+    ### < 24 hours landing exactly on the first record of the second calendar day
+    (datetime.timedelta(hours=3,  minutes=25, seconds=45), datetime.timedelta(days=0, hours=20, minutes=34, seconds=15)),
+    ### > 24 hours, starting on the first record of the first day
+    (datetime.timedelta(hours=0,  minutes=0,  seconds=0),  datetime.timedelta(days=1, hours=0,  minutes=0,  seconds=dt)),
+    ### << 24 hours but straddling two days
+    (datetime.timedelta(hours=21, minutes=35, seconds=25), datetime.timedelta(days=0, hours=12, minutes=0,  seconds=0)),
 ]
 
 def check_get_files_and_indices(start_offset, duration):
