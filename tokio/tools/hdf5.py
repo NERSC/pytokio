@@ -34,7 +34,7 @@ def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """
     today = datetime_start
     h5lmt_files = []
-    while today <= datetime_end:
+    while today.date() <= datetime_end.date():
         h5lmt_file = os.path.join( H5LMT_BASE, today.strftime("%Y-%m-%d"), file_name )
         if os.path.isfile( h5lmt_file ):
             h5lmt_files.append( h5lmt_file )
