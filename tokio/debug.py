@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import sys
+
 DEBUG = False
 
 def debug_print( string ):
