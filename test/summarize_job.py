@@ -259,9 +259,7 @@ if __name__ == "__main__":
                                                       datetime_end),
             'read'
         )
-        for key, value in module_results.iteritems():
-            assert key not in results
-            results[key] = value
+        merge_dicts(results, module_results, prefix='lmt_')
 
         ### write rates
         module_results = summarize_byterate_df(
