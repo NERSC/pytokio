@@ -21,7 +21,7 @@ class CraySDBProc(dict):
         super(CraySDBProc, self).__init__(self)
         self.cache_file = cache_file
         self.key_order = []
-        self.load_cache()
+        self.load_xtdb2proc_table()
 
     def __repr__(self):
         """
@@ -58,19 +58,21 @@ class CraySDBProc(dict):
 #       else:
 #           return val
 
-    def load_cache(self):
+    def load_xtdb2proc_table(self):
         """
         Load an xtdb2proc output file for a system
         """
         if self.cache_file is None:
+            ### load directly from the Cray service database
             sdb = subprocess.check_output(['xtdb2proc', '-f', '-'])
 #           sdb = subprocess.Popen(['xtdb2proc', '-f', '-'], stdout=subprocess.PIPE).communicate()[0]
-            self._load_cache(sdb.splitlines())
+            self._parse_xtdb2proc_table(sdb.splitlines())
         else:
+            ### load a cached copy of the service database xtdb2proc table
             with open(self.cache_file, 'r') as fp:
-                self._load_cache(fp)
+                self._parse_xtdb2proc_table(fp)
 
-    def _load_cache(self, iterable):
+    def _parse_xtdb2proc_table(self, iterable):
         """
         Load a serialized SDB cache passed in as an iterable
         """
