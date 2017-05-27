@@ -20,6 +20,7 @@ class CraySDBProc(dict):
     def __init__(self, cache_file=None):
         super(CraySDBProc, self).__init__(self)
         self.cache_file = cache_file
+        self.key_order = []
         self.load_cache()
 
 #   def __getitem__(self, key):
@@ -50,6 +51,7 @@ class CraySDBProc(dict):
         """
         Load a serialized SDB cache passed in as an iterable
         """
+        check_keys = True
         for line in iterable:
             if line.startswith('#'):
                 continue
@@ -58,12 +60,7 @@ class CraySDBProc(dict):
             fields = line.split(',')
             record = {}
             for field in fields:
-                try:
-                    key, val = field.split('=', 1)
-                except:
-                    print line
-                    print field
-                    raise
+                key, val = field.split('=', 1)
                 ### remove extra quotes
                 val = val.strip().strip('\'"')
                 ### replace "null" with Python None values
@@ -76,17 +73,42 @@ class CraySDBProc(dict):
                     except ValueError:
                         pass
                 record[key] = val
+                if check_keys:
+                    self.key_order.append(key)
+            check_keys = False
             key = int(record['processor_id'])
             assert 'processor_id' in record
             assert key not in self
             self.__setitem__(key, record)
 
-    def save_cache(self):
+
+    def save_cache(self, output_file=None):
         """
         Serialize the object in a form compatible with the output of xtdb2proc
         """
-        raise NotImplementedError
-    
+        if output_file is None:
+            self._save_cache(sys.stdout)
+        else:
+            with open(output_file, 'w') as fp:
+                self._save_cache(fp)
+
+    def _save_cache(self, output):
+        for _, record in self.iteritems():
+            line = []
+            for key in self.key_order:
+                try:
+                    val = record[key]
+                except KeyError:
+                    sys.stderr.write("key does not appear in all records\n")
+                    raise
+                if isinstance(val, basestring):
+                    line.append("%s='%s'" % (key, val))
+                elif val is None:
+                    line.append("%s=null" % key)
+                else:
+                    line.append("%s=%s" % (key, val))
+            output.write(','.join(line) + "\n")
+
 #   def load_xtprocadmin_file(xtprocadmin_file):
 #       """
 #       Load a cached xtprocadmin output file for a system
