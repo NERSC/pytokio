@@ -23,6 +23,29 @@ class CraySDBProc(dict):
         self.key_order = []
         self.load_cache()
 
+    def __repr__(self):
+        """
+        Return the object in the same format as the xtdb2proc output so that
+        this object can be circularly serialized and deserialized
+        """
+        repr_result = ""
+        for _, record in self.iteritems():
+            line = []
+            for key in self.key_order:
+                try:
+                    val = record[key]
+                except KeyError:
+                    sys.stderr.write("key does not appear in all records\n")
+                    raise
+                if isinstance(val, basestring):
+                    line.append("%s='%s'" % (key, val))
+                elif val is None:
+                    line.append("%s=null" % key)
+                else:
+                    line.append("%s=%s" % (key, val))
+            repr_result += ','.join(line) + "\n"
+        return repr_result
+
 #   def __getitem__(self, key):
 #       """
 #       Lazy load the data but otherwise behave as a dict
@@ -93,21 +116,7 @@ class CraySDBProc(dict):
                 self._save_cache(fp)
 
     def _save_cache(self, output):
-        for _, record in self.iteritems():
-            line = []
-            for key in self.key_order:
-                try:
-                    val = record[key]
-                except KeyError:
-                    sys.stderr.write("key does not appear in all records\n")
-                    raise
-                if isinstance(val, basestring):
-                    line.append("%s='%s'" % (key, val))
-                elif val is None:
-                    line.append("%s=null" % key)
-                else:
-                    line.append("%s=%s" % (key, val))
-            output.write(','.join(line) + "\n")
+        output.write(str(self))
 
 #   def load_xtprocadmin_file(xtprocadmin_file):
 #       """

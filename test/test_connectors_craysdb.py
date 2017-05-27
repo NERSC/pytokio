@@ -9,6 +9,7 @@ SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
 
 def verify_craysdbproc(craysdbproc):
     assert len(craysdbproc) > 0
+    print "Found %d entries" % len(craysdbproc)
     for nidnum, record in craysdbproc.iteritems():
         assert len(record) > 0
         assert nidnum == record['processor_id']
