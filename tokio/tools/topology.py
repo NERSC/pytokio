@@ -2,18 +2,24 @@
 
 import math
 from ..grabbers import slurm
-from ..grabbers import crayxc
+from ..connectors import craysdb
 
-def get_job_diameter( jobid, xcproc=None ):
+def get_job_diameter( jobid, cache_file=None ):
     """
     An extremely crude way to reduce a job's node allocation into a scalar
     metric
     """
     jobnodes = slurm.get_job_nodes(jobid)
 
+    proc_table = craysdb.CraySDBProc(cache_file=cache_file)
+
     node_positions = []
     for jobnode in jobnodes:
-        node_positions.append(crayxc.get_position(jobnode, xcproc))
+        nid_num = int(jobnode.lstrip('nid'))
+        node_x = proc_table[nid_num]['x_coord']
+        node_y = proc_table[nid_num]['y_coord']
+        node_z = proc_table[nid_num]['z_coord']
+        node_positions.append((node_x, node_y, node_z))
 
     center = [ 0.0, 0.0, 0.0 ] # three dimensional topology
     for node_position in node_positions: 
