@@ -227,7 +227,8 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--ost", help="add information about OST fullness/failover", action="store_true")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
     parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
-    parser.add_argument("-f", "--filesystem", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
+    parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
+    parser.add_argument("--craysdb-cache", type=str, default=None, help="file containing the output of xtdb2proc")
     parser.add_argument("files", nargs='*', help="darshan logs to process")
     args = parser.parse_args()
 
@@ -237,19 +238,47 @@ if __name__ == "__main__":
     for darshan_log_file in args.files:
         results = {}
 
+        ########################################################################
+        ### Darshan Data #######################################################
+        ########################################################################
+
         ### extract the performance data from the darshan log
         darshan_perf_data = tokio.grabbers.darshan.darshan_parser_perf(darshan_log_file)
         darshan_base_data = tokio.grabbers.darshan.darshan_parser_base(darshan_log_file)
 
-        ### define start/end time from darshan log.  TODO: make this optional
+        ### define start/end time from darshan log.  TODO: make this optional by
+        ### checking for a --start-time and --end-time command line option.  See
+        ### how we did this for the --file-system argument below
         datetime_start = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))
         datetime_end = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['end_time']))
-        print "%s - %s" % (datetime_start, datetime_end)
+
+        ### get the summary of the Darshan log
+        module_results = summarize_darshan(darshan_perf_data=darshan_perf_data,
+            darshan_base_data=darshan_base_data)
+        merge_dicts(results, module_results, prefix='darshan_')
+
+
+        ########################################################################
+        ### LMT Data ###########################################################
+        ########################################################################
 
         ### figure out the H5LMT file corresponding to this run
-        h5lmt_file = FS_NAME_TO_H5LMT.get(args.filesystem)
+        if args.file_system is None:
+            file_system = None
+            ### attempt to divine file system from Darshan log
+            if results['darshan_biggest_write_fs_bytes'] > results['darshan_biggest_read_fs_bytes']:
+                fs_key = 'darshan_biggest_write_fs'
+            else:
+                fs_key = 'darshan_biggest_read_fs'
+            for fs_path, fs_name in FS_PATH.iteritems():
+                if re.search(fs_path, results[fs_key]) is not None:
+                    file_system = fs_name
+                    break
+        else:
+            file_system = args.file_system
+        h5lmt_file = FS_NAME_TO_H5LMT.get(file_system)
         if h5lmt_file is None:
-            raise Exception("Unknown file system %s" % args.filesystem)
+            raise Exception("Unknown file system %s" % file_system)
 
         ### read rates
         module_results = summarize_byterate_df(
@@ -299,20 +328,27 @@ if __name__ == "__main__":
                                                       datetime_end))
         merge_dicts(results, module_results, prefix='lmt_')
 
-        ### get the summary of the Darshan log
-        module_results = summarize_darshan(darshan_perf_data=darshan_perf_data,
-            darshan_base_data=darshan_base_data)
-        merge_dicts(results, module_results, prefix='darshan_')
+        ########################################################################
+        ### Topology Data ######################################################
+        ########################################################################
 
         ### get the diameter of the job (Cray XC)
         if args.diameter:
-            module_results = job_diameter.get_job_diameter(darshan_perf_data['jobid'])
-            merge_dicts(results, module_results, prefix='crayxc_')
+            module_results = tokio.tools.topology.get_job_diameter(darshan_perf_data['header']['jobid'], cache_file=args.craysdb_cache)
+            merge_dicts(results, module_results, prefix='craysdb_')
+
+        ########################################################################
+        ### Concurrent Jobs Data ###############################################
+        ########################################################################
 
         ### get the concurrently running jobs (NERSC)
         if args.concurrentjobs:
             ### TODO: fix the API for this
             results['job_concurrent_jobs'] = nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
+
+        ########################################################################
+        ### Lustre Health Data #################################################
+        ########################################################################
 
         ### get Lustre server status (Sonexion)
         if args.ost:
