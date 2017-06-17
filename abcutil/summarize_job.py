@@ -234,12 +234,11 @@ def serialize_datetime(obj):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--diameter", help="include diameter (Cray XC only); requires access to sacct", action="store_true")
-    parser.add_argument("-o", "--ost", help="add information about OST fullness/failover", action="store_true")
+    parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-o", "--ost", nargs='?', const="", type=str, help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
     parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
-    parser.add_argument("--craysdb-cache", type=str, default=None, help="file containing the output of xtdb2proc")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
@@ -375,10 +374,14 @@ if __name__ == "__main__":
         ########################################################################
 
         ### get the diameter of the job (Cray XC)
-        if args.diameter:
+        if args.craysdb is not None:
             if '_jobid' not in results:
                 raise Exception('cannot get_job_diameter without a jobid')
-            module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=args.craysdb_cache)
+            if args.craysdb == "":
+                cache_file = None
+            else:
+                cache_file = args.craysdb
+            module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=cache_file)
             merge_dicts(results, module_results, prefix='craysdb_')
 
         ########################################################################
@@ -395,7 +398,7 @@ if __name__ == "__main__":
         ########################################################################
 
         ### get Lustre server status (Sonexion)
-        if args.ost:
+        if args.ost is not None:
             ### Divine the sonexion name from the file system map
             snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
 
