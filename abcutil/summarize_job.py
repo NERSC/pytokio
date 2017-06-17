@@ -166,7 +166,6 @@ def summarize_darshan(darshan_base_data=None,
 
 ### the following have to be synthesized
 #   'lmt_bytes_covered'
-#   'file_system'
 
 def summarize_byterate_df(df, rw, timestep=None):
     """
@@ -221,6 +220,18 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
             assert new_key not in dict1
         dict1[new_key] = value
 
+def serialize_datetime(obj):
+    """
+    Special serializer function that converts datetime into something that can
+    be encoded in json
+    """
+
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        serial = obj.isoformat()
+        return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
+    raise TypeError ("Type %s not serializable" % type(obj))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--diameter", help="include diameter (Cray XC only); requires access to sacct", action="store_true")
@@ -229,33 +240,64 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--craysdb-cache", type=str, default=None, help="file containing the output of xtdb2proc")
-    parser.add_argument("files", nargs='*', help="darshan logs to process")
+    parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
+    parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
     args = parser.parse_args()
 
     sorted_keys = None
     csv_rows = []
     json_rows = []
-    for darshan_log_file in args.files:
+    records_to_process = 0
+
+    ### if --start-time is specified, --end-time MUST be specified, and files
+    ### CANNOT be specified
+    if (args.start_time is not None and args.end_time is None) \
+    or (args.start_time is None and args.end_time is not None):
+        raise Exception("--start-time and --end-time must be specified together")
+    elif args.start_time is not None:
+        ### if files are specified, --start-time becomes ambiguous
+        if len(args.files) > 1:
+            raise Exception("--start-time and files cannot be specified together")
+        records_to_process = 1
+        results = {
+            '_datetime_start': datetime.datetime.strptime(args.start_time, "%Y-%m-%d %H:%M:%S"),
+            '_datetime_end': datetime.datetime.strptime(args.end_time, "%Y-%m-%d %H:%M:%S"),
+        }
+    else:
+        records_to_process = len(args.files)
+        ### let Darshan log define datetime_start and datetime_end
         results = {}
 
+    ### if --jobid is specified, override whatever is in the Darshan log
+    if args.jobid is not None:
+        if len(args.files) > 1:
+            raise Exception("behavior of --jobid when files > 1 is undefined")
+        results['_jobid'] = args.jobid
+
+    for i in range(records_to_process):
         ########################################################################
         ### Darshan Data #######################################################
         ########################################################################
 
-        ### extract the performance data from the darshan log
-        darshan_perf_data = tokio.grabbers.darshan.darshan_parser_perf(darshan_log_file)
-        darshan_base_data = tokio.grabbers.darshan.darshan_parser_base(darshan_log_file)
+        if i < len(args.files):
+            darshan_log_file = args.files[i]
+            ### extract the performance data from the darshan log
+            darshan_perf_data = tokio.grabbers.darshan.darshan_parser_perf(darshan_log_file)
+            darshan_base_data = tokio.grabbers.darshan.darshan_parser_base(darshan_log_file)
 
-        ### define start/end time from darshan log.  TODO: make this optional by
-        ### checking for a --start-time and --end-time command line option.  See
-        ### how we did this for the --file-system argument below
-        datetime_start = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))
-        datetime_end = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['end_time']))
+            ### define start/end time from darshan log
+            results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))
+            results['_datetime_end'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['end_time']))
 
-        ### get the summary of the Darshan log
-        module_results = summarize_darshan(darshan_perf_data=darshan_perf_data,
-            darshan_base_data=darshan_base_data)
-        merge_dicts(results, module_results, prefix='darshan_')
+            if '_jobid' not in results:
+                results['_jobid'] = darshan_perf_data['header']['jobid']
+
+            ### get the summary of the Darshan log
+            module_results = summarize_darshan(darshan_perf_data=darshan_perf_data,
+                darshan_base_data=darshan_base_data)
+            merge_dicts(results, module_results, prefix='darshan_')
 
 
         ########################################################################
@@ -264,7 +306,7 @@ if __name__ == "__main__":
 
         ### figure out the H5LMT file corresponding to this run
         if args.file_system is None:
-            file_system = None
+            results['_file_system'] = None
             ### attempt to divine file system from Darshan log
             if results['darshan_biggest_write_fs_bytes'] > results['darshan_biggest_read_fs_bytes']:
                 fs_key = 'darshan_biggest_write_fs'
@@ -272,20 +314,20 @@ if __name__ == "__main__":
                 fs_key = 'darshan_biggest_read_fs'
             for fs_path, fs_name in FS_PATH.iteritems():
                 if re.search(fs_path, results[fs_key]) is not None:
-                    file_system = fs_name
+                    results['_file_system'] = fs_name
                     break
         else:
-            file_system = args.file_system
-        h5lmt_file = FS_NAME_TO_H5LMT.get(file_system)
+            results['_file_system'] = args.file_system
+        h5lmt_file = FS_NAME_TO_H5LMT.get(results['_file_system'])
         if h5lmt_file is None:
-            raise Exception("Unknown file system %s" % file_system)
+            raise Exception("Unknown file system %s" % results['_file_system'])
 
         ### read rates
         module_results = summarize_byterate_df(
             tokio.tools.get_dataframe_from_time_range(h5lmt_file,
                                                       '/OSTReadGroup/OSTBulkReadDataSet',
-                                                      datetime_start,
-                                                      datetime_end),
+                                                      results['_datetime_start'],
+                                                      results['_datetime_end']),
             'read'
         )
         merge_dicts(results, module_results, prefix='lmt_')
@@ -294,8 +336,8 @@ if __name__ == "__main__":
         module_results = summarize_byterate_df(
             tokio.tools.get_dataframe_from_time_range(h5lmt_file,
                                                       '/OSTWriteGroup/OSTBulkWriteDataSet',
-                                                      datetime_start,
-                                                      datetime_end),
+                                                      results['_datetime_start'],
+                                                      results['_datetime_end']),
             'written'
         )
         merge_dicts(results, module_results, prefix='lmt_')
@@ -304,8 +346,8 @@ if __name__ == "__main__":
         module_results = summarize_cpu_df(
             tokio.tools.get_dataframe_from_time_range(h5lmt_file,
                                                       '/OSSCPUGroup/OSSCPUDataSet',
-                                                      datetime_start,
-                                                      datetime_end),
+                                                      results['_datetime_start'],
+                                                      results['_datetime_end']),
             'oss'
         )
         merge_dicts(results, module_results, prefix='lmt_')
@@ -314,8 +356,8 @@ if __name__ == "__main__":
         module_results = summarize_cpu_df(
             tokio.tools.get_dataframe_from_time_range(h5lmt_file,
                                                       '/MDSCPUGroup/MDSCPUDataSet',
-                                                      datetime_start,
-                                                      datetime_end),
+                                                      results['_datetime_start'],
+                                                      results['_datetime_end']),
             'mds'
         )
         merge_dicts(results, module_results, prefix='lmt_')
@@ -324,8 +366,8 @@ if __name__ == "__main__":
         module_results = summarize_missing_df(
             tokio.tools.get_dataframe_from_time_range(h5lmt_file,
                                                       '/FSMissingGroup/FSMissingDataSet',
-                                                      datetime_start,
-                                                      datetime_end))
+                                                      results['_datetime_start'],
+                                                      results['_datetime_end']))
         merge_dicts(results, module_results, prefix='lmt_')
 
         ########################################################################
@@ -334,7 +376,9 @@ if __name__ == "__main__":
 
         ### get the diameter of the job (Cray XC)
         if args.diameter:
-            module_results = tokio.tools.topology.get_job_diameter(darshan_perf_data['header']['jobid'], cache_file=args.craysdb_cache)
+            if '_jobid' not in results:
+                raise Exception('cannot get_job_diameter without a jobid')
+            module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=args.craysdb_cache)
             merge_dicts(results, module_results, prefix='craysdb_')
 
         ########################################################################
@@ -342,9 +386,9 @@ if __name__ == "__main__":
         ########################################################################
 
         ### get the concurrently running jobs (NERSC)
-        if args.concurrentjobs:
-            ### TODO: fix the API for this
-            results['job_concurrent_jobs'] = nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
+#       ### TODO: fix the API for this
+#       if args.concurrentjobs:
+#           results['job_concurrent_jobs'] = nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
 
         ########################################################################
         ### Lustre Health Data #################################################
@@ -353,37 +397,37 @@ if __name__ == "__main__":
         ### get Lustre server status (Sonexion)
         if args.ost:
             ### Divine the sonexion name from the file system map
-            snx_name = FS_NAME_TO_H5LMT[darshan_perf_data['file_system']].split('_')[-1].split('.')[0]
+            snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
 
             ### get the OST fullness summary
-            module_results = ost_fullness.get_fullness_at_datetime(snx_name,
-                datetime.datetime.fromtimestamp(long(darshan_perf_data['start_time'])))
+            module_results = tokio.tools.lustatus.get_fullness_at_datetime(snx_name,
+                results['_datetime_start'])
             merge_dicts(results, module_results, prefix='fshealth_')
 
             ### get the OST failure status
-            module_results = ost_fullness.get_failures_at_datetime(snx_name,
-                datetime.datetime.fromtimestamp(long(darshan_perf_data['start_time'])))
+            module_results = tokio.tools.lustatus.get_failures_at_datetime(snx_name,
+                results['_datetime_start'])
 
             # Note that get_failures_at_datetime will clobber the
             # ost_timestamp_* keys from get_fullness_at_datetime above;
             # these aren't used for correlation analysis and should be
             # pretty close anyway.
-            merge_dicts(results, module_data, False, prefix='fshealth_')
+            merge_dicts(results, module_results, False, prefix='fshealth_')
 
             # a measure, in sec, expressing how far before the job our OST fullness data was measured
-            results['ost_fullness_lead_secs'] = results['darshan_start_time'] - results['ost_target_timestamp']
+            results['fshealth_ost_fullness_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_target_timestamp'])).total_seconds()
 
-            ### ost_bad_pct becomes the percent of OSTs in file system which are
+            ### ost_overloaded_pct becomes the percent of OSTs in file system which are
             ### in an abnormal state
-            results["ost_bad_pct"] = 100.0 * float(results["ost_bad_ost_count"]) / float(results["ost_count"])
+            results["fshealth_ost_overloaded_pct"] = 100.0 * float(results["fshealth_ost_overloaded_ost_count"]) / float(results["fshealth_ost_count"])
             
             # a measure, in sec, expressing how far before the job our OST failure data was measured
-            results['ost_failures_lead_secs'] = results['darshan_start_time'] - results['ost_target_timestamp']
+            results['fshealth_ost_failures_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_target_timestamp'])).total_seconds()
 
             ### drop some keys, used for debugging, that are clobbered by
             ### combining get_failures_at_datetime and get_fullness_at_datetime
             ### anyway
-            for key in "ost_next_timestamp", "ost_requested_timestamp", "ost_target_timestamp":
+            for key in "fshealth_ost_next_timestamp", "fshealth_ost_requested_timestamp", "fshealth_ost_target_timestamp":
                 results.pop(key)
 
         if sorted_keys is None:
@@ -396,9 +440,10 @@ if __name__ == "__main__":
 
         csv_rows.append(sorted_values)
         json_rows.append(results)
+        results = {}
 
     if args.json:
-        print json.dumps(json_rows, indent=4, sort_keys=True)
+        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
     else:
         for csv_row in csv_rows:
             print ','.join(str(x) for x in csv_row)

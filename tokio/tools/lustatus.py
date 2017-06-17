@@ -27,13 +27,14 @@ def get_summary_at_datetime(file_system, datetime_target, metric):
            being run)
         3. return summary statistics about the OST fullness or OST failures
     """
-    file_system_to_h5lmt = { # this should be in pytokio...
+    file_system_to_h5lmt = { # TODO: fix hard-coded mappings
         "snx11025": "edison_snx11025.h5lmt",
         "snx11035": "edison_snx11035.h5lmt",
         "snx11036": "edison_snx11035.h5lmt",
         "snx11168": "cori_snx11168.h5lmt",
     }
     h5lmt_file = file_system_to_h5lmt[file_system]
+    ### TODO: this is terrible; need to not hard-code these names and paths
     if metric == "fullness":
         file_basename = "osts.txt"
     elif metric == "failures":
@@ -127,10 +128,10 @@ def summarize_maps_data(fs_data):
         avg_overload_factor = 1.0
 
     return {
-        'ost_bad_oss_count': num_abnormal_ip,
-        'ost_bad_ost_count': num_abnormal_osts,
-        'ost_avg_bad_ost_per_oss': avg_overload,
-        'ost_avg_bad_overload_factor': avg_overload_factor,
+        'ost_overloaded_oss_count': num_abnormal_ip,
+        'ost_overloaded_ost_count': num_abnormal_osts,
+        'ost_avg_overloaded_ost_per_oss': avg_overload,
+        'ost_avg_overloaded_overload_factor': avg_overload_factor,
     }
 
 
@@ -157,10 +158,10 @@ def summarize_df_data(fs_data):
          }
     """
     results = { 
-        'ost_min_kib': None,
-        'ost_max_kib': 0,
-        'ost_avg_kib': 0,
-        'ost_avg_pct': 0,
+        'ost_least_full_kib': None,
+        'ost_most_full_kib': 0,
+        'ost_avg_full_kib': 0,
+        'ost_avg_full_pct': 0,
         'ost_count': 0,
     }
 
@@ -169,25 +170,25 @@ def summarize_df_data(fs_data):
         if not ost_name.lower().startswith('ost'):
             continue
         results['ost_count'] += 1
-        results['ost_avg_kib'] += ost_data['used_kib']
-        results['ost_avg_pct'] += ost_data['total_kib']
-        if results['ost_min_kib'] is None:
-            results['ost_min_kib'] = ost_data['used_kib']
-            results['ost_min_name'] = ost_name
-            results['ost_min_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
-        elif results['ost_min_kib'] > ost_data['used_kib']:
-            results['ost_min_kib'] = ost_data['used_kib']
-            results['ost_min_name'] = ost_name
-            results['ost_min_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
-        if results['ost_max_kib'] < ost_data['used_kib']:
-            results['ost_max_kib'] = ost_data['used_kib']
-            results['ost_max_name'] = ost_name
-            results['ost_max_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
+        results['ost_avg_full_kib'] += ost_data['used_kib']
+        results['ost_avg_full_pct'] += ost_data['total_kib']
+        if results['ost_least_full_kib'] is None:
+            results['ost_least_full_kib'] = ost_data['used_kib']
+            results['ost_least_full_name'] = ost_name
+            results['ost_least_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
+        elif results['ost_least_full_kib'] > ost_data['used_kib']:
+            results['ost_least_full_kib'] = ost_data['used_kib']
+            results['ost_least_full_name'] = ost_name
+            results['ost_least_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
+        if results['ost_most_full_kib'] < ost_data['used_kib']:
+            results['ost_most_full_kib'] = ost_data['used_kib']
+            results['ost_most_full_name'] = ost_name
+            results['ost_most_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
 
     ### if there are no osts, this will break
-    results['ost_avg_kib'] = int(float(results['ost_avg_kib']) / float(results['ost_count']))
-    results['ost_avg_pct'] = 100.0 * float(results['ost_avg_kib']) / float(results['ost_avg_pct']) * float(results['ost_count'])
-    results['ost_min_id'] = fs_data[results['ost_min_name']]['target_index']
-    results['ost_max_id'] = fs_data[results['ost_max_name']]['target_index']
+    results['ost_avg_full_kib'] = int(float(results['ost_avg_full_kib']) / float(results['ost_count']))
+    results['ost_avg_full_pct'] = 100.0 * float(results['ost_avg_full_kib']) / float(results['ost_avg_full_pct']) * float(results['ost_count'])
+    results['ost_least_full_id'] = fs_data[results['ost_least_full_name']]['target_index']
+    results['ost_most_full_id'] = fs_data[results['ost_most_full_name']]['target_index']
 
     return results
