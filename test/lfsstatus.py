@@ -3,7 +3,7 @@
 import argparse
 import datetime
 import json
-import tokio.tools.lustatus as lustatus
+import tokio.tools.lfsstatus as lfsstatus
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -15,6 +15,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.failure:
-        print json.dumps(lustatus.get_failures_at_datetime(args.filesystem, datetime.datetime.strptime(args.datetime, "%Y-%m-%d %H:%M:%S")), indent=4, sort_keys=True)
+        print json.dumps(lfsstatus.get_failures_at_datetime(args.filesystem, datetime.datetime.strptime(args.datetime, "%Y-%m-%d %H:%M:%S")), indent=4, sort_keys=True)
     else:
-        print json.dumps(lustatus.get_fullness_at_datetime(args.filesystem, datetime.datetime.strptime(args.datetime, "%Y-%m-%d %H:%M:%S")), indent=4, sort_keys=True)
+        print json.dumps(lfsstatus.get_fullness_at_datetime(args.filesystem, datetime.datetime.strptime(args.datetime, "%Y-%m-%d %H:%M:%S")), indent=4, sort_keys=True)

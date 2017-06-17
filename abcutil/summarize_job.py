@@ -404,7 +404,7 @@ if __name__ == "__main__":
             snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
 
             ### get the OST fullness summary
-            module_results = tokio.tools.lustatus.get_fullness_at_datetime(snx_name,
+            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
                 results['_datetime_start'])
             merge_dicts(results, module_results, prefix='fshealth_')
 
@@ -413,7 +413,7 @@ if __name__ == "__main__":
             # ost_timestamp_* keys from get_fullness_at_datetime above;
             # these aren't used for correlation analysis and should be
             # pretty close anyway.
-            module_results = tokio.tools.lustatus.get_failures_at_datetime(snx_name,
+            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
                 results['_datetime_start'])
             merge_dicts(results, module_results, False, prefix='fshealth_')
 
