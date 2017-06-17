@@ -10,4 +10,4 @@ incorporated into the formal TOKIO package API.
 from hdf5 import *
 
 import topology
-import lustatus
+import lfsstatus
