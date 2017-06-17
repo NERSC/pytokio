@@ -10,13 +10,13 @@ import datetime
 from ..connectors import nersc_lfsstate
 import hdf5
 
-def get_fullness_at_datetime(file_system, datetime_target):
-    return get_summary_at_datetime(file_system, datetime_target, "fullness")
+def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
+    return get_summary_at_datetime(file_system, datetime_target, "fullness", cache_file)
 
-def get_failures_at_datetime(file_system, datetime_target ):
-    return get_summary_at_datetime(file_system, datetime_target, "failures")
+def get_failures_at_datetime(file_system, datetime_target, cache_file=None):
+    return get_summary_at_datetime(file_system, datetime_target, "failures", cache_file)
 
-def get_summary_at_datetime(file_system, datetime_target, metric):
+def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
     """
     Given a file system name (e.g., snx11168), a datetime object, and either
     "fullness" or "failures":
@@ -41,16 +41,19 @@ def get_summary_at_datetime(file_system, datetime_target, metric):
     else:
         raise Exception("unknown metric " + metric)
 
-    ### We assume a 1 day lookbehind.  Very wasteful, but we index on dates in
-    ### local time using GMT-based unix times so we often need to look back to
-    ### the previous day's index.  The lookahead can be much more conservative
-    ### since it only needs to compensate for sampling intervals (15 min in
-    ### practice at NERSC)
-    ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
-        datetime_target - datetime.timedelta(days=1),
-        datetime_target + datetime.timedelta(hours=1))
-    for index, df_file in enumerate(ost_health_files):
-        ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
+    if cache_file is None:
+        ### We assume a 1 day lookbehind.  Very wasteful, but we index on dates in
+        ### local time using GMT-based unix times so we often need to look back to
+        ### the previous day's index.  The lookahead can be much more conservative
+        ### since it only needs to compensate for sampling intervals (15 min in
+        ### practice at NERSC)
+        ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
+            datetime_target - datetime.timedelta(days=1),
+            datetime_target + datetime.timedelta(hours=1))
+        for index, df_file in enumerate(ost_health_files):
+            ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
+    else:
+        ost_health_files = [ cache_file ]
 
     ### we can get away with the following because NERSCLFSOSTFullness,
     ### NERSCLFSOSTMap, and NERSCLFSOSTMap.get_failovers all have the same

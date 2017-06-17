@@ -236,13 +236,15 @@ def serialize_datetime(obj):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
-    parser.add_argument("-o", "--ost", nargs='?', const="", type=str, help="add information about OST fullness/failover")
+    parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
     parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
+    parser.add_argument("--ost-fullness", type=str, default=None, help="path to an ost fullness file (lfs df)")
+    parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
     args = parser.parse_args()
 
@@ -399,13 +401,15 @@ if __name__ == "__main__":
         ########################################################################
 
         ### get Lustre server status (Sonexion)
-        if args.ost is not None:
+        if args.ost:
             ### Divine the sonexion name from the file system map
             snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
 
             ### get the OST fullness summary
-            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
-                results['_datetime_start'])
+            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(
+                snx_name,
+                results['_datetime_start'],
+                cache_file=args.ost_fullness)
             merge_dicts(results, module_results, prefix='fshealth_')
 
             ### get the OST failure status
@@ -413,8 +417,10 @@ if __name__ == "__main__":
             # ost_timestamp_* keys from get_fullness_at_datetime above;
             # these aren't used for correlation analysis and should be
             # pretty close anyway.
-            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
-                results['_datetime_start'])
+            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(
+                snx_name,
+                results['_datetime_start'],
+                cache_file=args.ost_map)
             merge_dicts(results, module_results, False, prefix='fshealth_')
 
             # a measure, in sec, expressing how far before the job our OST fullness data was measured
