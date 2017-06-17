@@ -59,7 +59,7 @@ def test_ostfullness_from_cache():
     ostfullness = tokio.connectors.nersc_lfsstate.NERSCLFSOSTFullness( SAMPLE_OSTFULLNESS_FILE )
 
     ### verify that the results are sensible
-#   verify_ostfullness(ostfullness)
+    verify_ostfullness(ostfullness)
 
 def test_ostfullness_serializer():
     ### read from a cache file
@@ -77,7 +77,7 @@ def test_ostfullness_serializer():
     cache_file.close()
 
     ### verify the integrity of what we serialized
-#   verify_ostfullness(ostmap)
+    verify_ostfullness(ostfullness)
 
 def verify_ostfullness(ostfullness):
     """
