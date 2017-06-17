@@ -7,8 +7,7 @@ fullness at that time
 import os
 import datetime
 
-from . import hdf5
-from ..grabbers import nersc_lustate
+from ..connectors import nersc_lfsstate
 import hdf5
 
 def get_fullness_at_datetime(file_system, datetime_target):
@@ -47,19 +46,32 @@ def get_summary_at_datetime(file_system, datetime_target, metric):
     ### the previous day's index.  The lookahead can be much more conservative
     ### since it only needs to compensate for sampling intervals (15 min in
     ### practice at NERSC)
-    df_files = hdf5.enumerate_h5lmts(h5lmt_file, 
+    ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
         datetime_target - datetime.timedelta(days=1),
         datetime_target + datetime.timedelta(hours=1))
-    for index, df_file in enumerate(df_files):
-        df_files[index] = df_files[index].replace(h5lmt_file, file_basename)
+    for index, df_file in enumerate(ost_health_files):
+        ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
 
+    ### we can get away with the following because NERSCLFSOSTFullness,
+    ### NERSCLFSOSTMap, and NERSCLFSOSTMap.get_failovers all have the same
+    ### structure
     if metric == "fullness":
-        parsed_timeseries_data = nersc_lustate.parse_dfs(df_files)
+        ost_health = None
+        for df_file in ost_health_files:
+            if ost_health is None:
+                ost_health = nersc_lfsstate.NERSCLFSOSTFullness(cache_file=df_file)
+            else:
+                ost_health.update(nersc_lfsstate.NERSCLFSOSTFullness(cache_file=df_file))
     elif metric == "failures":
-        ost_map = nersc_lustate.parse_maps(df_files)
-        parsed_timeseries_data = nersc_lustate.get_failovers(ost_map)
+        ost_map = None
+        for map_file in ost_health_files:
+            if ost_map is None:
+                ost_map = nersc_lfsstate.NERSCLFSOSTMap(cache_file=map_file)
+            else:
+                ost_map.update(nersc_lfsstate.NERSCLFSOSTMap(cache_file=map_file))
+        ost_health = ost_map.get_failovers()
 
-    timestamps = sorted([ int(x) for x in parsed_timeseries_data.keys() ])
+    timestamps = sorted([ int(x) for x in ost_health.keys() ])
 
     ### unoptimized walk through to find our timestamp of interest.  gynmastics
     ### with fromtimestamp(0) required to convert a datetime (expressed in local
@@ -77,7 +89,7 @@ def get_summary_at_datetime(file_system, datetime_target, metric):
     if target_index is None:
         raise Exception("No timestamp of interest not found")
 
-    fs_data = parsed_timeseries_data[timestamps[target_index]][file_system]
+    fs_data = ost_health[timestamps[target_index]][file_system]
 
     if metric == "fullness":
         results = summarize_df_data(fs_data)
@@ -91,7 +103,7 @@ def get_summary_at_datetime(file_system, datetime_target, metric):
         results['ost_next_timestamp'] = timestamps[target_index] + 1
 
     results.update({
-        'ost_target_timestamp': timestamps[target_index],
+        'ost_actual_timestamp': timestamps[target_index],
         'ost_requested_timestamp': target_timestamp,
     })
     return results
@@ -192,3 +204,5 @@ def summarize_df_data(fs_data):
     results['ost_most_full_id'] = fs_data[results['ost_most_full_name']]['target_index']
 
     return results
+
+

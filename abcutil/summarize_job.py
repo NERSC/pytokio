@@ -217,7 +217,8 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
         else:
             new_key = key
         if assertion:
-            assert new_key not in dict1
+            if new_key in dict1:
+                raise Exception("duplicate key %s found" % new_key)
         dict1[new_key] = value
 
 def serialize_datetime(obj):
@@ -408,30 +409,29 @@ if __name__ == "__main__":
             merge_dicts(results, module_results, prefix='fshealth_')
 
             ### get the OST failure status
-            module_results = tokio.tools.lustatus.get_failures_at_datetime(snx_name,
-                results['_datetime_start'])
-
             # Note that get_failures_at_datetime will clobber the
             # ost_timestamp_* keys from get_fullness_at_datetime above;
             # these aren't used for correlation analysis and should be
             # pretty close anyway.
+            module_results = tokio.tools.lustatus.get_failures_at_datetime(snx_name,
+                results['_datetime_start'])
             merge_dicts(results, module_results, False, prefix='fshealth_')
 
             # a measure, in sec, expressing how far before the job our OST fullness data was measured
-            results['fshealth_ost_fullness_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_target_timestamp'])).total_seconds()
+            results['fshealth_ost_fullness_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_actual_timestamp'])).total_seconds()
 
             ### ost_overloaded_pct becomes the percent of OSTs in file system which are
             ### in an abnormal state
             results["fshealth_ost_overloaded_pct"] = 100.0 * float(results["fshealth_ost_overloaded_ost_count"]) / float(results["fshealth_ost_count"])
             
             # a measure, in sec, expressing how far before the job our OST failure data was measured
-            results['fshealth_ost_failures_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_target_timestamp'])).total_seconds()
+            results['fshealth_ost_failures_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_actual_timestamp'])).total_seconds()
 
             ### drop some keys, used for debugging, that are clobbered by
             ### combining get_failures_at_datetime and get_fullness_at_datetime
             ### anyway
-            for key in "fshealth_ost_next_timestamp", "fshealth_ost_requested_timestamp", "fshealth_ost_target_timestamp":
-                results.pop(key)
+#           for key in "fshealth_ost_next_timestamp", "fshealth_ost_requested_timestamp", "fshealth_ost_actual_timestamp":
+#               results.pop(key)
 
         if sorted_keys is None:
             sorted_keys = sorted(results.keys())

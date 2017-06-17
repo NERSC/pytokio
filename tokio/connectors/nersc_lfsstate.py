@@ -111,6 +111,52 @@ class NERSCLFSOSTMap(dict):
     def _save_cache(self, output):
         output.write(str(self))
 
+    def get_failovers(self):
+        """
+        Given a NERSCLFSOSTMap, figure out OSTs that are probably failed over and,
+        for each time stamp and file system, return a list of abnormal OSSes and the
+        expected number of OSTs per OSS.
+        """
+        resulting_data = {}
+        for timestamp, fs_data in self.iteritems():
+            per_timestamp_data = {}
+            for file_system, ost_data in fs_data.iteritems():
+                ost_counts = {} # key = ip address, val = ost count
+                for ost_name, ost_values in ost_data.iteritems():
+                    if ost_values['role'] != 'osc': # don't care about mdc, mgc
+                        continue
+                    ip_addr = ost_values['target_ip']
+                    ost_counts[ip_addr] = ost_counts.get(ip_addr, 0) + 1
+
+                ### get mode of OSTs per OSS to infer what "normal" OST/OSS ratio is
+                histogram = {}
+                for ip_addr, ost_count in ost_counts.iteritems():
+                    if ost_count not in histogram:
+                        histogram[ost_count] = 1
+                    else:
+                        histogram[ost_count] += 1
+                mode = max(histogram, key=histogram.get)
+
+                ### build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }
+                abnormal_ips = {}
+                for ost_name, ost_values in ost_data.iteritems():
+                    if ost_values['role'] != 'osc': # don't care about mdc, mgc
+                        continue
+                    ip_addr = ost_values['target_ip']  
+                    if ost_counts[ip_addr] != mode:
+                        if ip_addr in abnormal_ips:
+                            abnormal_ips[ip_addr].append(ost_name)
+                        else:
+                            abnormal_ips[ip_addr] = [ ost_name ]
+
+                per_timestamp_data[file_system] = {
+                    'mode': mode,
+                    'abnormal_ips': abnormal_ips,
+                }
+            resulting_data[timestamp] = per_timestamp_data
+        
+        return resulting_data
+
 class NERSCLFSOSTFullness(dict):
     """
     Parser for ost-fullness.txt.  Generates a dict of form
