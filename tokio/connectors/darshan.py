@@ -43,9 +43,8 @@ def _parse_header(line):
         return "walltime", int(line.split()[-1])
     elif line.startswith("# metadata:"):
         return "metadata", line.split(None, 2)[-1].strip()
-
-    return None, None
-
+    return None,None
+        
 
 def _parse_mounts(line):
     """
@@ -132,13 +131,13 @@ def _parse_perf_counters(line):
 
     return key.strip(), value.strip()
 
-def _darshan_parser( log_file, counter_parser=_parse_base_counters):
+def _darshan_parser(log_file, counter_parser=_parse_base_counters):
     """
     Call darshan-parser --base on log_file and walk its output, identifying
     different sections and invoking the appropriate line parser function
     """
 
-    def is_valid_counter( counter ):
+    def is_valid_counter(counter):
         """
         if counter is not None, this line is valid (return True)
         if counter is None but we can identify a module section, return it
@@ -199,9 +198,10 @@ def _darshan_parser( log_file, counter_parser=_parse_base_counters):
     section = None
     module_section = None
 
-    ### this regex must match every possible module name
+    # This regex must match every possible module name
     module_rex = re.compile('^# ([A-Z\-0-9/]+) module data\s*$')
 
+    # TODO  rewrite this block
     if counter_parser == _parse_base_counters:
         counter_flag = '--base'
     elif counter_parser == _parse_total_counters:
@@ -215,26 +215,32 @@ def _darshan_parser( log_file, counter_parser=_parse_base_counters):
         p = subprocess.Popen(['darshan-parser', log_file], stdout=subprocess.PIPE)
     else:
         p = subprocess.Popen(['darshan-parser', counter_flag, log_file], stdout=subprocess.PIPE)
+        
+
     for line in p.stdout:
-        ### is this the start of a new section?
+        # Is this the start of a new section?
+        # Why do we look at section, refactorize failed 
         if section is None and line.startswith("# darshan log version:"):
             section = "header"
             if section not in darshan_data:
                 darshan_data[section] = {}
             else:
                 raise Exception("duplicate %s sections found" % section)
+                
         elif section == "header" and line.startswith("# mounted file systems"):
             section = "mounts"
             if section not in darshan_data:
                 darshan_data[section] = {}
             else:
                 raise Exception("duplicate %s sections found" % section)
-        elif section == "mounts" and line.startswith("# **********************"):
+                
+        elif section == "mounts" and line.startswith("# **********************"):  # understand the utility of these stars
             section = "counters"
             if section not in darshan_data:
                 darshan_data[section] = {}
             else:
                 raise Exception("duplicate %s sections found" % section)
+                
 
         ### otherwise use the appropriate parser for this section
         if section == "header":
@@ -290,11 +296,11 @@ def _darshan_parser( log_file, counter_parser=_parse_base_counters):
 
     return darshan_data
 
-def darshan_parser_base( log_file ):
+def darshan_parser_base(log_file):
     return _darshan_parser(log_file, _parse_base_counters)
 
-def darshan_parser_total( log_file ):
+def darshan_parser_total(log_file):
     return _darshan_parser(log_file, _parse_total_counters)
 
-def darshan_parser_perf( log_file ):
+def darshan_parser_perf(log_file):
     return _darshan_parser(log_file, _parse_perf_counters)

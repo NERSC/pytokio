@@ -2,7 +2,7 @@
 
 from ..config import LMT_TIMESTEP
 from ..debug import debug_print as _debug_print
-from .. import dataframe
+import dataframe
 import time
 import datetime
 import h5py
@@ -10,6 +10,7 @@ import numpy as np
 
 _NATIVE_VERSION = 1
 
+# Is it useful ?
 def connect( *args, **kwargs ):
     """
     Generate a special tokio.HDF5 object which is derived from h5py's File
@@ -17,14 +18,13 @@ def connect( *args, **kwargs ):
     """
     return HDF5( *args, **kwargs )
 
-
 class HDF5(h5py.File):
-    def __init__( self, *args, **kwargs ):
+    def __init__(self, *args, **kwargs):
         super(HDF5,self).__init__( *args, **kwargs )
 
         if 'FSStepsGroup/FSStepsDataSet' in self:
-            self.first_timestamp = datetime.datetime.fromtimestamp( self['FSStepsGroup/FSStepsDataSet'][0] )
-            self.last_timestamp = datetime.datetime.fromtimestamp( self['FSStepsGroup/FSStepsDataSet'][-1] )
+            self.first_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
+            self.last_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][-1])
         else:
             self.first_timestamp = None
             self.last_timestamp = None
@@ -38,10 +38,10 @@ class HDF5(h5py.File):
         else:
             self.version = self.attrs.get('version')
 
-    def init_datasets( self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown' ):
+    def init_datasets(self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown'):
         """
         Create datasets if they do not exist, and set the appropriate attributes
-        """
+       """
         ### Notes:
         ### 1. We do square chunking here because there are times when we
         ###    want to both iterate over time (rows), such as when collecting
@@ -101,17 +101,15 @@ class HDF5(h5py.File):
             },
         }
 
-        ### version 1 format - datasets
+        # Version 1 format - datasets
         for dset_name, dset_params in _V1_SCHEMA.iteritems():
             if dset_name not in self:
                 hard_name = '/version1/' + dset_name
-                self.create_dataset(
-                    name=hard_name,
-                    **dset_params)
+                self.create_dataset(name=hard_name,**dset_params)
                 self[dset_name] = h5py.SoftLink(hard_name)
                 _debug_print( "creating softlink %s -> %s" % ( dset_name, hard_name ) )
 
-        ### version 1 format - metadata
+        # Version 1 format - metadata
         self['/FSStepsGroup/FSStepsDataSet'].attrs['fs'] = filesystem
         self['/FSStepsGroup/FSStepsDataSet'].attrs['host'] = host
         self['/FSStepsGroup/FSStepsDataSet'].attrs['day'] = ""
@@ -121,33 +119,28 @@ class HDF5(h5py.File):
         self['/OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'] = ost_names
         self['/OSTWriteGroup/OSTBulkWriteDataSet'].attrs['OSTNames'] = ost_names
 
-        ### version 2 format
-        for x in [ 'ost_bytes_read', 'ost_bytes_written' ]:
+        # Version 2 format
+        for x in ['ost_bytes_read', 'ost_bytes_written']:
             if x not in self:
-                self.create_dataset(
-                    name=x,
-                    shape=(num_timesteps, num_osts),
-                    chunks=True,
-                    compression="gzip",
-                    dtype='f8'
-                )
+                self.create_dataset(name=x, shape=(num_timesteps, num_osts),
+                                    chunks=True, compression="gzip", dtype='f8')
         self.attrs['host'] = host
         self.attrs['filesystem'] = filesystem
 
-    def init_timestamps( self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None ):
+    def init_timestamps(self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None):
         """
         Initialize timestamps for the whole HDF5 file.  Version 1 populates an
         entire dataset with equally spaced epoch timestamps, while version 2
         only sets a global timestamp for the first row of each dataset and a
         timestep thereafter.
         """
+
         t0_day = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
         t0_epoch = time.mktime( t0_day.timetuple() ) # truncate t_start
-
         ts_ct = int( (t_stop - t_start).total_seconds() / timestep )
 
-        ### version 1 format - create a full dataset of timestamps
-        ts_map = np.empty( shape=(ts_ct+1,), dtype='i8' )
+        # Version 1 format - create a full dataset of timestamps
+        ts_map = np.empty(shape=(ts_ct+1,), dtype='i8')
         for t in range( ts_ct ):
             ts_map[t] = t0_epoch + t * timestep
         ts_map[ts_ct] = t0_epoch + ts_ct * timestep # for the final extraneous v1 point...
@@ -165,7 +158,7 @@ class HDF5(h5py.File):
         self.last_timestamp = self.first_timestamp + self.timestep * ts_ct
 
 
-    def get_ost_data( self, t_start, t_stop ):
+    def get_ost_data(self, t_start, t_stop):
         """
         Return a generator that produces tuples of (timestamp, read_bytes,
         write_bytes) between t_start (inclusive) and t_stop (exclusive)
@@ -213,7 +206,7 @@ class HDF5(h5py.File):
         return int((t - t0).total_seconds()) / int(self.timestep)
 
     def to_dataframe(self, dataset_name=None):
-        ### convenience
+        ### convenience:may put in lower case
         _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'
         if dataset_name is None:
             dataset_name = _INDEX_DATASET_NAME

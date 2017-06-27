@@ -24,6 +24,8 @@ def test_darshan_summary():
     assert subprocess.check_call([ BINARY, '--json', SAMPLE_DARSHAN_LOG ], stdout=open(os.devnull, 'w')) == 0
 
 #def test_darshan_summary_with_craysdb():
+:x
+:r
 #    """
 #    requires either an SDB cache file or access to xtdb2proc
 #    requires access to NERSC jobs db (to map jobid to node list)

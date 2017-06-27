@@ -17,6 +17,7 @@ class CraySDBProc(dict):
 
     This may someday become a base class for table-specific classes.
     """
+
     def __init__(self, cache_file=None):
         super(CraySDBProc, self).__init__(self)
         self.cache_file = cache_file
@@ -25,9 +26,10 @@ class CraySDBProc(dict):
 
     def __repr__(self):
         """
-        Return the object in the same format as the xtdb2proc output so that
+        Returns the object in the same format as the xtdb2proc output so that
         this object can be circularly serialized and deserialized
         """
+
         repr_result = ""
         for _, record in self.iteritems():
             line = []
@@ -37,9 +39,13 @@ class CraySDBProc(dict):
                 except KeyError:
                     sys.stderr.write("key does not appear in all records\n")
                     raise
-                if isinstance(val, basestring):
+                # We don't need to know the difference between basestring 
+                # and other because when we parse it, we don't make the 
+                # the difference
+                # Need to know some examples of CrayDb and their values
+                if val is None:
                     line.append("%s='%s'" % (key, val))
-                elif val is None:
+                elif isinstance(val, basestring):
                     line.append("%s=null" % key)
                 else:
                     line.append("%s=%s" % (key, val))
@@ -63,12 +69,12 @@ class CraySDBProc(dict):
         Load an xtdb2proc output file for a system
         """
         if self.cache_file is None:
-            ### load directly from the Cray service database
+            # Load directly from the Cray service database
             sdb = subprocess.check_output(['xtdb2proc', '-f', '-'])
-#           sdb = subprocess.Popen(['xtdb2proc', '-f', '-'], stdout=subprocess.PIPE).communicate()[0]
+            # sdb = subprocess.Popen(['xtdb2proc', '-f', '-'], stdout=subprocess.PIPE).communicate()[0]
             self._parse_xtdb2proc_table(sdb.splitlines())
         else:
-            ### load a cached copy of the service database xtdb2proc table
+            # Load a cached copy of the service database xtdb2proc table
             with open(self.cache_file, 'r') as fp:
                 self._parse_xtdb2proc_table(fp)
 
@@ -78,21 +84,19 @@ class CraySDBProc(dict):
         """
         check_keys = True
         for line in iterable:
-            if line.startswith('#'):
-                continue
-            elif line.strip() == "":
+            if line.startswith('#') or line.strip() == "":
                 continue
             fields = line.split(',')
             record = {}
             for field in fields:
                 key, val = field.split('=', 1)
-                ### remove extra quotes
+                # Remove extra quotes
                 val = val.strip().strip('\'"')
-                ### replace "null" with Python None values
+                # Replace "null" with Python None values
                 if val == "null":
                     val = None
                 else:
-                    ### coerce ints into ints
+                    # Coerce ints into ints
                     try:
                         val = int(val)
                     except ValueError:

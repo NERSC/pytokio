@@ -17,7 +17,7 @@ import re
 import tokio
 import tokio.debug
 import tokio.tools
-import tokio.grabbers.darshan
+import tokio.connectors.darshan
 
 ### maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 FS_NAME_TO_H5LMT = {
@@ -286,8 +286,8 @@ if __name__ == "__main__":
         if i < len(args.files):
             darshan_log_file = args.files[i]
             ### extract the performance data from the darshan log
-            darshan_perf_data = tokio.grabbers.darshan.darshan_parser_perf(darshan_log_file)
-            darshan_base_data = tokio.grabbers.darshan.darshan_parser_base(darshan_log_file)
+            darshan_perf_data = tokio.connectors.darshan.darshan_parser_perf(darshan_log_file)
+            darshan_base_data = tokio.connectors.darshan.darshan_parser_base(darshan_log_file)
 
             ### define start/end time from darshan log
             results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))

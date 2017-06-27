@@ -143,7 +143,7 @@ class LMTDB(object):
             tf = t0 + _TIME_CHUNK
             if tf > t_stop:
                 tf = t_stop
-            ( tmp_r, tmp_w ) = self._get_rw_data( t0, tf, timestep )
+            (tmp_r, tmp_w) = self._get_rw_data( t0, tf, timestep )
             _debug_print( "Retrieved %.2f GiB read, %.2f GiB written" % (
                  (tmp_r[-1,:].sum() - tmp_r[0,:].sum())/2**30,
                  (tmp_w[-1,:].sum() - tmp_w[0,:].sum())/2**30) )
@@ -164,7 +164,7 @@ class LMTDB(object):
         _debug_print( "Finished because t0(=%s) !< t_stop(=%s)" % (
                 t0.strftime( _DATE_FMT ), 
                 tf.strftime( _DATE_FMT ) ))
-        return ( buf_r, buf_w )
+        return (buf_r, buf_w)
 
 
     def _get_rw_data( self, t_start, t_stop, binning_timestep ):
@@ -185,7 +185,7 @@ class LMTDB(object):
             t_start.strftime( _DATE_FMT ), 
             t_stop.strftime( _DATE_FMT ) 
         )
-        rows = self._query_mysql( query_str )
+        rows = self._query_mysql(query_str)
 
         ### Get the number of timesteps (# rows)
         ts_ct = int((t_stop - t_start).total_seconds() / binning_timestep)
@@ -196,17 +196,16 @@ class LMTDB(object):
 
         ### Initialize everything to -0.0; we use the signed zero to distinguish
         ### the absence of data from a measurement of zero
-        buf_r = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
-        buf_w = np.full( shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
+        buf_r = np.full(shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
+        buf_w = np.full(shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8' )
 
-        if len(rows) > 0:
-            for row in rows:
-                icol = int((row[0] - t0) / binning_timestep)
-                irow = self.ost_names.index( row[1] )
-                buf_r[icol,irow] = row[2]
-                buf_w[icol,irow] = row[3]
+        for row in rows:
+            icol = int((row[0] - t0) / binning_timestep)
+            irow = self.ost_names.index( row[1] )
+            buf_r[icol,irow] = row[2]
+            buf_w[icol,irow] = row[3]
 
-        return ( buf_r, buf_w )
+        return (buf_r, buf_w)
 
 
     def get_last_rw_data_before( self, t, lookbehind=None ):
@@ -238,12 +237,12 @@ class LMTDB(object):
             lookbehind.seconds % 60 )
 
         ost_ct = len(self.ost_names)
-        buf_r = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='f8' )
-        buf_w = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='f8' )
-        buf_t = np.full( shape=(1, ost_ct), fill_value=-0.0, dtype='i8' )
+        buf_r = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='f8')
+        buf_w = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='f8')
+        buf_t = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='i8')
 
-        query_str = _QUERY_FIRST_OST_DATA.format( datetime=t.strftime( _DATE_FMT ), lookbehind=lookbehind_str )
-        for tup in self._query_mysql( query_str ):
+        query_str = _QUERY_FIRST_OST_DATA.format(datetime=t.strftime(_DATE_FMT), lookbehind=lookbehind_str)
+        for tup in self._query_mysql(query_str):
             try:
                 tidx = self.ost_names.index( tup[1] )
             except ValueError:
@@ -252,17 +251,17 @@ class LMTDB(object):
             buf_w[0, tidx] = tup[3]
             buf_t[0, tidx] = tup[0]
 
-        return ( buf_r, buf_w, buf_t )
+        return (buf_r, buf_w, buf_t)
 
 
-    def _query_mysql( self, query_str ):
+    def _query_mysql(self, query_str):
         """
         Connects to MySQL, run a query, and yield the full output tuple.  No
         buffering or other witchcraft.
         """
         cursor = self.db.cursor()
         t0 = time.time()
-        cursor.execute( query_str )
+        cursor.execute(query_str)
         _debug_print("Executed query in %f sec" % ( time.time() - t0 ))
 
         t0 = time.time()

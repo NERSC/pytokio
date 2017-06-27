@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import connectors.hdf5
+import hdf5
 import pandas
 
 class DataFrame(pandas.DataFrame):
@@ -11,4 +11,4 @@ class DataFrame(pandas.DataFrame):
         """
         Understand pyTOKIO's special flavor of HDF5 for timeseries data
         """
-        return connectors.hdf5.HDF5(hdf5_file).to_dataframe(group_name)
+        return hdf5.HDF5(hdf5_file).to_dataframe(group_name)

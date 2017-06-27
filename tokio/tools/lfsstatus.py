@@ -6,9 +6,14 @@ fullness at that time
 
 import os
 import datetime
-
 from ..connectors import nersc_lfsstate
 import hdf5
+cfg = ConfigParser.ConfigParser()
+cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
+FILE_BASENAME_FULLNESS = eval(cfg.get('tokio', FILE_BASENAME_FULLNESS))
+FILE_BASENAME_FAILURES = eval(cfg.get('tokio', FILE_BASENAME_FAILURES))
+FS_TO_H5LMT = eval(cfg.get('tokio', FS_TO_H5LMT))
+
 
 def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
     return get_summary_at_datetime(file_system, datetime_target, "fullness", cache_file)
@@ -26,38 +31,34 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
            being run)
         3. return summary statistics about the OST fullness or OST failures
     """
-    file_system_to_h5lmt = { # TODO: fix hard-coded mappings
-        "snx11025": "edison_snx11025.h5lmt",
-        "snx11035": "edison_snx11035.h5lmt",
-        "snx11036": "edison_snx11035.h5lmt",
-        "snx11168": "cori_snx11168.h5lmt",
-    }
+    file_system_to_h5lmt = FS_TO_H5LMT
     h5lmt_file = file_system_to_h5lmt[file_system]
     ### TODO: this is terrible; need to not hard-code these names and paths
     if metric == "fullness":
-        file_basename = "osts.txt"
+        file_basename = FILE_BASENAME_FULLNESS
     elif metric == "failures":
-        file_basename = "ost-map.txt"
+        file_basename = FILE_BASENAME_FAILURES
     else:
         raise Exception("unknown metric " + metric)
 
     if cache_file is None:
-        ### We assume a 1 day lookbehind.  Very wasteful, but we index on dates in
-        ### local time using GMT-based unix times so we often need to look back to
-        ### the previous day's index.  The lookahead can be much more conservative
-        ### since it only needs to compensate for sampling intervals (15 min in
-        ### practice at NERSC)
+        # We assume a 1 day lookbehind.  Very wasteful, but we index on dates in
+        # local time using GMT-based unix times so we often need to look back to
+        # the previous day's index.  The lookahead can be much more conservative
+        # since it only needs to compensate for sampling intervals (15 min in
+        # practice at NERSC)
         ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
-            datetime_target - datetime.timedelta(days=1),
-            datetime_target + datetime.timedelta(hours=1))
+                                                 datetime_target - datetime.timedelta(days=1),
+                                                 datetime_target + datetime.timedelta(hours=1))
         for index, df_file in enumerate(ost_health_files):
             ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
     else:
-        ost_health_files = [ cache_file ]
+        ost_health_files = [cache_file]
 
-    ### we can get away with the following because NERSCLFSOSTFullness,
-    ### NERSCLFSOSTMap, and NERSCLFSOSTMap.get_failovers all have the same
-    ### structure
+    # TODO : Remove this comment after the package is deleted
+    # We can get away with the following because NERSCLFSOSTFullness,
+    # NERSCLFSOSTMap, and NERSCLFSOSTMap.get_failovers all have the same
+    # structure
     if metric == "fullness":
         ost_health = None
         for df_file in ost_health_files:
@@ -74,11 +75,11 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
                 ost_map.update(nersc_lfsstate.NERSCLFSOSTMap(cache_file=map_file))
         ost_health = ost_map.get_failovers()
 
-    timestamps = sorted([ int(x) for x in ost_health.keys() ])
+    timestamps = sorted([int(x) for x in ost_health.keys()])
 
-    ### unoptimized walk through to find our timestamp of interest.  gynmastics
-    ### with fromtimestamp(0) required to convert a datetime (expressed in local
-    ### time) into a UTC-based epoch
+    # Unoptimized walk through to find our timestamp of interest.  gynmastics
+    # with fromtimestamp(0) required to convert a datetime (expressed in local
+    # time) into a UTC-based epoch
     target_timestamp = int((datetime_target - datetime.datetime.fromtimestamp(0)).total_seconds())
     target_index = None
     for index, timestamp in enumerate(timestamps):
@@ -88,9 +89,8 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
             else:
                 target_index = index - 1
                 break
-                
     if target_index is None:
-        raise Exception("No timestamp of interest not found")
+        raise Exception("no timestamp of interest not found")
 
     fs_data = ost_health[timestamps[target_index]][file_system]
 
@@ -99,12 +99,11 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
     if metric == "failures":
         results = summarize_maps_data(fs_data)
 
-    ### in case you want to interpolate--hope is that we have enough data points
-    ### where OST volumes will not change significantly enough to require
-    ### interpolation
+    # In case you want to interpolate--hope is that we have enough data points
+    # where OST volumes will not change significantly enough to require
+    # interpolation
     if target_index < (len(timestamps) - 1):
         results['ost_next_timestamp'] = timestamps[target_index] + 1
-
     results.update({
         'ost_actual_timestamp': timestamps[target_index],
         'ost_requested_timestamp': target_timestamp,
@@ -113,7 +112,7 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
 
 def summarize_maps_data(fs_data):
     """
-    Given an fs_data dict, generate a dict of summary statistics.  Expects
+    Given an fs_data dict, generate a dict of summary statistics. Expects
     fs_data dict of the form generated by parse_lustre_txt.get_failovers:
         {
             "abnormal_ips": {
@@ -133,7 +132,7 @@ def summarize_maps_data(fs_data):
     """
     num_abnormal_ip = len(fs_data['abnormal_ips'].keys())
     num_abnormal_osts = 0
-    if num_abnormal_ip > 0:
+    if num_abnormal_ip:
         for _, ost_list in fs_data['abnormal_ips'].iteritems():
             num_abnormal_osts += len(ost_list)
         avg_overload = float(num_abnormal_osts) / float(num_abnormal_ip)
@@ -181,29 +180,32 @@ def summarize_df_data(fs_data):
     }
 
     for ost_name, ost_data in fs_data.iteritems():
-        ### only care about OSTs, not MDTs or MGTs
+        # Only care about OSTs, not MDTs or MGTs
         if not ost_name.lower().startswith('ost'):
             continue
         results['ost_count'] += 1
         results['ost_avg_full_kib'] += ost_data['used_kib']
         results['ost_avg_full_pct'] += ost_data['total_kib']
-        if results['ost_least_full_kib'] is None:
+        if results['ost_least_full_kib'] is None \
+        or results['ost_least_full_kib'] > ost_data['used_kib']:
             results['ost_least_full_kib'] = ost_data['used_kib']
             results['ost_least_full_name'] = ost_name
             results['ost_least_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
-        elif results['ost_least_full_kib'] > ost_data['used_kib']:
-            results['ost_least_full_kib'] = ost_data['used_kib']
-            results['ost_least_full_name'] = ost_name
-            results['ost_least_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
+        
         if results['ost_most_full_kib'] < ost_data['used_kib']:
             results['ost_most_full_kib'] = ost_data['used_kib']
             results['ost_most_full_name'] = ost_name
             results['ost_most_full_pct'] = 100.0 * ost_data['used_kib'] / ost_data['total_kib']
-
-    ### if there are no osts, this will break
-    results['ost_avg_full_kib'] = int(float(results['ost_avg_full_kib']) / float(results['ost_count']))
-    results['ost_avg_full_pct'] = 100.0 * float(results['ost_avg_full_kib']) / float(results['ost_avg_full_pct']) * float(results['ost_count'])
+                  
+            
+    # If there are no osts, this will break
+    try:
+        results['ost_avg_full_kib'] = int(float(results['ost_avg_full_kib']) \
+                                          / float(results['ost_count']))
+        results['ost_avg_full_pct'] = 100.0 * float(results['ost_avg_full_kib']) / float(results['ost_avg_full_pct']) * float(results['ost_count'])
+    except ZeroDivisionError:
+        pass
+    
     results['ost_least_full_id'] = fs_data[results['ost_least_full_name']]['target_index']
     results['ost_most_full_id'] = fs_data[results['ost_most_full_name']]['target_index']
-
     return results
