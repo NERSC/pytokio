@@ -8,11 +8,12 @@ import os
 import datetime
 from ..connectors import nersc_lfsstate
 import hdf5
+import ConfigParser
 cfg = ConfigParser.ConfigParser()
 cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
-FILE_BASENAME_FULLNESS = eval(cfg.get('tokio', FILE_BASENAME_FULLNESS))
-FILE_BASENAME_FAILURES = eval(cfg.get('tokio', FILE_BASENAME_FAILURES))
-FS_TO_H5LMT = eval(cfg.get('tokio', FS_TO_H5LMT))
+FILE_BASENAME_FULLNESS = eval(cfg.get('tokio', 'FILE_BASENAME_FULLNESS'))
+FILE_BASENAME_FAILURES = eval(cfg.get('tokio', 'FILE_BASENAME_FAILURES'))
+FS_TO_H5LMT = eval(cfg.get('tokio', 'FS_TO_H5LMT'))
 
 
 def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
