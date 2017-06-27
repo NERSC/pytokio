@@ -5,7 +5,12 @@ setup(
     description= 'Total Knowledge of I/O',
     version='0.0.1',
     author='Glenn K. Lockwood',
-    author_email = 'glock@nersc.gov', 
+    author_email = 'glock@nersc.gov',
+    install_requires=['matplotlib==2.0.0',
+                      'pandas==0.18.1',
+                      'numpy==1.11.1',
+                      'scipy==0.17.1',                     
+                  ],
     license='None',
     packages=find_packages(exclude=['abcutil', 'examples', 'tests']),
     classifiers=[
