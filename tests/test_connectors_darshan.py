@@ -3,7 +3,7 @@
 import os
 import tokio.connectors.darshan
 
-SAMPLE_INPUT = os.path.join(os.getcwd(), 'inputs', 'sample.darshan')
+SAMPLE_INPUT = os.path.join('inputs', 'sample.darshan')
 
 def aux_darshan(darshan_data):
     assert darshan_data is not None
@@ -22,7 +22,8 @@ def aux_darshan(darshan_data):
  
 
 def test_base():
-    darshan_data = tokio.connectors.darshan.darshan_parser_base(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.DARSHAN(SAMPLE_INPUT)
+    darshan_data = darshan.darshan_parser_base()
     aux_darshan(darshan_data)
     # Examine the first POSIX file record contains counters
     posix_record = darshan_data['counters']['posix'].itervalues().next()
@@ -33,7 +34,9 @@ def test_base():
     assert 'stdio' in darshan_data['counters']
 
 def test_total():
-    darshan_data = tokio.connectors.darshan.darshan_parser_total(SAMPLE_INPUT)
+    
+    darshan = tokio.connectors.darshan.DARSHAN(SAMPLE_INPUT)
+    darshan_data = darshan.darshan_parser_total()
     aux_darshan(darshan_data)
     # Ensure that the total counters were extracted
     assert '_total' in darshan_data['counters']['posix']
@@ -46,7 +49,8 @@ def test_total():
 
 
 def test_perf():
-    darshan_data = tokio.connectors.darshan.darshan_parser_perf(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.DARSHAN(SAMPLE_INPUT)
+    darshan_data = darshan.darshan_parser_perf()
     aux_darshan(darshan_data)
     # Ensure that the perf counters were extracted
     assert '_perf' in darshan_data['counters']['posix']

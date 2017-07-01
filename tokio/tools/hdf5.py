@@ -12,9 +12,10 @@ import ConfigParser
 
 cfg = ConfigParser.ConfigParser()
 cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
-HTML_BASE = eval(cfg.get('tokio', 'HTML_BASE'))
-if HTML_BASE is None:
-    HTML_BASE = eval(cfg.get('tokio', 'HTML_BASE_NERSC'))
+H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE'))
+if H5LMT_BASE is None:
+    H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE_NERSC'))
+
 
 def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """
@@ -36,7 +37,6 @@ def enumerate_h5lmts(file_name, datetime_start, datetime_end):
         datatime_end = datetime.datetime.day()
     day = datetime_start
     h5lmt_files = []
-    
     while day.date() <= datetime_end.date():
         h5lmt_file = os.path.join(H5LMT_BASE, day.strftime("%Y-%m-%d"), file_name)
         if os.path.isfile(h5lmt_file):

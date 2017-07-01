@@ -45,5 +45,5 @@ def test_craysdbproc_serializer():
     craysdbproc = tokio.connectors.craysdb.CraySDBProc(cache_file.name)
     cache_file.close()
     verify_craysdbproc(craysdbproc)
-
+test_craysdbproc_serializer()
 

@@ -122,6 +122,7 @@ class CraySDBProc(dict):
                 self._save_cache(fp)
 
     def _save_cache(self, output):
+        #print(str(self))
         output.write(str(self))
 
 #   def load_xtprocadmin_file(xtprocadmin_file):

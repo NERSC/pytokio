@@ -22,7 +22,7 @@ SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47'
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43' 
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
 
-BINARY = os.path.join('..', 'abcutil', 'summarize_job.py')
+BINARY = os.path.join('..', 'bin', 'summarize_job.py')
 
 def test_darshan_summary():
     assert not subprocess.check_call([BINARY, '--json', SAMPLE_DARSHAN_LOG],

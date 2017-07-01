@@ -58,7 +58,7 @@ def get_task_startstop(jobid):
         else:
             jobid, taskid = jobid_raw.split('.',1)
 
-        tasks[taskid] = ( start, stop )
+        tasks[taskid] = (start, stop)
     return tasks
 
 def expand_nodelist(node_string):
@@ -74,5 +74,5 @@ def expand_nodelist(node_string):
     return node_names
 
 if __name__ == "__main__":
-    print get_job_nodes(sys.argv[1])
+    print(get_job_nodes(sys.argv[1]))
     print get_job_startstop(sys.argv[1])
