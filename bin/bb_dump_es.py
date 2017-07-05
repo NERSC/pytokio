@@ -18,7 +18,7 @@ except:
 import elasticsearch
 import elasticsearch.helpers
 
-### maximum number of documents to serialize into a single output file
+# Maximum number of documents to serialize into a single output file
 MAX_DOC_BUNDLE = 50000
 
 DEFAULT_PAGE_SIZE = 10000
@@ -85,7 +85,7 @@ def serialize_bundle_pickle(bundle, output_file):
 def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE_SIZE, _source=_SOURCE_FIELDS, serialize_bundle=serialize_bundle_json ):
     t_begin = datetime.datetime.now()
 
-    ### Get first set of results and a scroll id
+    # Get first set of results and a scroll id
     result = esdb.search(
         index=index,
         body=query,
@@ -100,7 +100,7 @@ def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE
     num_bundles = 0
     total_retrieved = 0
     bundled_pages = []
-    ### Keep scrolling until we have all the data
+    # Keep scrolling until we have all the data
     while len(result['hits']['hits']) > 0:
         t_iterate = datetime.datetime.now()
         sid = result['_scroll_id']
@@ -111,7 +111,7 @@ def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE
                                                           result['hits']['total'] - total_retrieved,
                                                           result['hits']['total'])
 
-        ### If this page will overflow the bundle, flush the bundle first
+        # If this page will overflow the bundle, flush the bundle first
         if (len(bundled_pages) + docs_retrieved) > MAX_DOC_BUNDLE:
             output_file = "%s.%08d.json.gz" % (_ES_INDEX.replace('-*', ''), num_bundles)
             serialize_bundle(bundled_pages, output_file)
@@ -121,14 +121,14 @@ def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE
 
         bundled_pages += result['hits']['hits']
 
-        ### Fetch a new page
+        # Fetch a new page
         t0 = datetime.datetime.now()
         result = esdb.scroll(scroll_id=sid, scroll='1m')
         tf = datetime.datetime.now()
         print "  Fetching data took %.2f seconds" % (tf - t0).total_seconds()
         print "Total cycle took %.2f seconds" % (tf - t_iterate).total_seconds()
 
-    ### flush the last bundle if it's not empty
+    # Flush the last bundle if it's not empty
     if len(bundled_pages) > 0:
         output_file = "%s.%08d.json.gz" % (_ES_INDEX.replace('-*', ''), num_bundles)
         serialize_bundle(bundled_pages, output_file)
@@ -140,7 +140,7 @@ def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE
                                                                      total_retrieved/t_wall)
                                                                      
 if __name__ == '__main__':
-    ### Parse CLI options
+    # Parse CLI options
     parser = argparse.ArgumentParser( add_help=False)
     parser.add_argument('tstart',
                         type=str,
@@ -164,7 +164,7 @@ if __name__ == '__main__':
     if args.debug:
         tokio.DEBUG = True
 
-    ### Convert CLI options into datetime
+    # Convert CLI options into datetime
     try:
         t_start = datetime.datetime.strptime(args.tstart, _DATE_FMT)
         t_stop = datetime.datetime.strptime(args.tstop, _DATE_FMT)
@@ -174,26 +174,26 @@ if __name__ == '__main__':
 
     query = copy.deepcopy( _QUERY_OST_DATA )
 
-    ### Create the appropriate timeseries filter if it doesn't exist
+    # Create the appropriate timeseries filter if it doesn't exist
     this_node = query
     for node_name in 'query', 'bool', 'filter', 'range', '@timestamp':
         if node_name not in this_node:
             this_node[node_name] = {}
         this_node = this_node[node_name]
-    ### Update the timeseries filter
+    # Update the timeseries filter
     this_node['gte'] = t_start.strftime("%s")
     this_node['lt'] = t_stop.strftime("%s")
     this_node['format'] = "epoch_second"
 
-    ### Print query
+    # Print query
     print json.dumps(query,indent=4)
 
-    ### Try to connect
+    # Try to connect
     esdb = elasticsearch.Elasticsearch([{
         'host': args.host,
         'port': args.port, }])
 
-    ### Run query
+    # Run query
     if args.pickle:
         query_and_page(esdb, query, serialize_bundle=serialize_bundle_pickle)
     else:

@@ -37,6 +37,7 @@ def _identify_fs_from_path(path, mounts):
     """
     Scan a list of mount points and try to identify the one that matches the
     given path
+
     """
     max_match = 0
     matching_mount = None
@@ -126,6 +127,7 @@ def summarize_darshan(darshan_base_data=None,
     """
     Take the results of extract_darshan_* and return only the counters of
     interest.
+    
     """
     # We assume that mpiio activity is a superset of posix, but posix activity
     # is never a superset of mpiio
@@ -155,6 +157,7 @@ def summarize_byterate_df(df, rw, timestep=None):
     """
     Calculate some interesting statistics from a dataframe containing byte rate
     data.
+    
     """
     assert rw in ['read', 'written']
     if timestep is None:
@@ -173,6 +176,7 @@ def summarize_cpu_df(df, servertype):
     """
     Calculate some interesting statistics from a dataframe containing CPU load
     data.
+    
     """
     assert servertype in ['oss', 'mds']
     results = {}
@@ -184,6 +188,7 @@ def summarize_cpu_df(df, servertype):
 def summarize_missing_df(df):
     """
     frac_missing
+    
     """
     results = {
         'frac_missing': float((df != 0.0).sum().sum()) / float((df.shape[0]*df.shape[1]))
@@ -195,6 +200,7 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
     Take two dictionaries and merge their keys.  Optionally raise an exception
     if a duplicate key is found, and optionally merge the new dict into the old
     after adding a prefix to every key.
+    
     """
     for key, value in dict2.iteritems():
         if prefix is not None:
@@ -218,8 +224,8 @@ def serialize_datetime(obj):
     """
     Special serializer function that converts datetime into something that can
     be encoded in json
+    
     """
-
     if isinstance(obj, (datetime.datetime, datetime.date)):
         serial = obj.isoformat()
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
@@ -236,8 +242,9 @@ def retrieve_darshan_data(results, files):
     if i < len(files):
         darshan_log_file = files[i]
         # Extract the performance data from the darshan log
-        darshan_perf_data = tokio.connectors.darshan.darshan_parser_perf(darshan_log_file)
-        darshan_base_data = tokio.connectors.darshan.darshan_parser_base(darshan_log_file)
+        d = tokio.connectors.darshan.DARSHAN(darshan_log_file)
+        darshan_perf_data = d.darshan_parser_perf()
+        darshan_base_data = d.darshan_parser_base()
 
         # Define start/end time from darshan log
         results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))

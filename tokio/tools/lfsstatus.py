@@ -31,6 +31,7 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
            that overlaps it, as it may contain the effects of the benchmark
            being run)
         3. return summary statistics about the OST fullness or OST failures
+
     """
     file_system_to_h5lmt = FS_TO_H5LMT
     h5lmt_file = file_system_to_h5lmt[file_system]
@@ -130,6 +131,7 @@ def summarize_maps_data(fs_data):
             }, 
             "mode": 1
         }
+
     """
     num_abnormal_ip = len(fs_data['abnormal_ips'].keys())
     num_abnormal_osts = 0
@@ -171,6 +173,7 @@ def summarize_df_data(fs_data):
              }, 
              ...
          }
+
     """
     results = { 
         'ost_least_full_kib': None,

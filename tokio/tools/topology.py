@@ -7,6 +7,7 @@ def get_job_diameter(jobid, cache_file=None):
     """
     An extremely crude way to reduce a job's node allocation into a scalar
     metric
+
     """
     jobnodes = slurm.get_job_nodes(jobid)
     proc_table = craysdb.CraySDBProc(cache_file=cache_file)
@@ -18,7 +19,8 @@ def get_job_diameter(jobid, cache_file=None):
         node_z = proc_table[nid_num]['z_coord']
         node_positions.append((node_x, node_y, node_z))
 
-    center = [ 0.0, 0.0, 0.0 ] # three dimensional topology
+    # Three dimensional topology
+    center = [0.0, 0.0, 0.0] 
     for node_position in node_positions: 
         center[0] += node_position[0]
         center[1] += node_position[1]

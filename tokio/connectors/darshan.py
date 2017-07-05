@@ -28,7 +28,7 @@ class DARSHAN(dict):
     
     def save_cache(self, output_file=None):
         """
-        Serialize the object in a form compatible with the output of xtdb2proc
+        Save the dictionnary in a json file
         """
         if output_file is None:
             self._save_cache(sys.stdout)

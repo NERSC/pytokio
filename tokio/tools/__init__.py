@@ -8,6 +8,5 @@ incorporated into the formal TOKIO package API.
 
 ### Subpackages to include in the tokio.tools.* namespace
 from hdf5 import *
-
 import topology
 import lfsstatus

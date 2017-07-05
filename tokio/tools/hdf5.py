@@ -29,8 +29,8 @@ def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     # :type datetime_end: datetime.datetime or None
     # :return: fully qualified paths to existing H5LMT files
     # :rtype: list(str)
-    """
-   
+    
+    """   
     if datetime_start is None:
         raise Exception('A start time must be provided')
     if datetime_end is None: 
@@ -49,8 +49,8 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
     """
     Given the name of an HDF5 file and a start/end date+time, returns a list of
     tuples containing
+    
     """
-
     if datetime_end is None:
         datetime_end_local = datetime_start
     else:
@@ -89,8 +89,8 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     This is particularly bothersome for MDSOpsDataSet, where the 'OpNames'
     attribute is required to understand what each column in the np.array
     correspond to.  
+    
     """
-
     result = {}
     for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
         with connectors.hdf5.HDF5(h5file, mode='r') as f:
@@ -116,8 +116,8 @@ def get_group_data_from_time_range(file_name, group_name, datetime_start, dateti
     Returns a numpy array containing all the data from the given group 
     across all of the files of the given filename during the time 
     range specified.
-    """
     
+    """    
     files_and_indices = get_files_and_indices(file_name, 
                                               datetime_start, 
                                               datetime_end)
@@ -160,8 +160,8 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     """
     Returns the same content as get_group_data_from_time_range 
     into a dataframe
+    
     """
-
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     if not files_and_indices:
         raise Exception("no relevant hdf5 files found")
@@ -214,5 +214,3 @@ def repack_h5lmt(src, dest, datasets):
         if ret_tmp: ret = ret_tmp
     return ret
 
-if __name__ == '__main__':
-    pass

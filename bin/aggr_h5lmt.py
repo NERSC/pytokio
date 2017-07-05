@@ -11,11 +11,12 @@ import tokio.tools
 _BYTES_TO_GIB = 2.0**(-30.0)
 INTERESTING_MDS_OPS = [ 'open', 'close', 'getattr', 'unlink', 'setattr', 'getxattr', 'rmdir', 'rename', 'mkdir' ]
 
-def print_datum( datum=None ):
-    """Take a json bag and print out relevant fields"""
-    if datum is None:
-        return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ( "date/time", "gibs read", "gibs writ", "ossav", "ossmx", "mdsav", "mdsmx", "mssng" )
-    else:
+def print_datum(datum=None):
+    """
+    Take a json bag and print out relevant fields
+
+    """
+    if isinstance(datum, dict):
         print_str = "%19s-%8s " % (datum['t0'].strftime("%Y-%m-%d %H:%M:%S"), datum['tf'].strftime("%H:%M:%S"))
         print_str += "%(gibs_read)12.2f " % datum
         print_str += "%(gibs_writ)12.2f " % datum
@@ -26,7 +27,13 @@ def print_datum( datum=None ):
         print_str += "%(frac_missing)5.1f" % datum
         return print_str + "\n"
 
-def summarize_data( data ):
+    return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ("date/time", "gibs read",
+                                                     "gibs writ", "ossav", 
+                                                     "ossmx", "mdsav", 
+                                                     "mdsmx", "mssng" )
+
+
+def summarize_data(data):
     totals = {
         'n': 0,
         'tot_bytes_read': 0,
@@ -58,7 +65,7 @@ def summarize_data( data ):
                 totals[key] = 0
             totals[key] += datum[key]
 
-    ### derived values
+    # Derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
     totals['ave_bytes_write_per_dt'] = totals['tot_bytes_write'] / totals['n']
     totals['oss_ave'] = totals['oss_ave'] / totals['n']
@@ -72,20 +79,19 @@ def summarize_data( data ):
 
     return totals
 
-def print_data_summary( data, use_json=False ):
+def print_data_summary(data, use_json=False):
     totals = summarize_data(data)
     if use_json:
         return json.dumps(totals, indent=4, sort_keys=True)
-    else:
-        print_str = ""
-        print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
-        print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
-        print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
-        print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
-        print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
-        print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
-        print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
-
+    
+    print_str = ""
+    print_str += "Total read:  %(tot_gibs_read)14.2f GiB\n" % totals
+    print_str += "Total write: %(tot_gibs_write)14.2f GiB\n" % totals
+    print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
+    print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
+    print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
+    print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
+    print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
     return print_str
 
 def bin_h5lmt(h5lmt_file):
@@ -120,8 +126,8 @@ def bin_h5lmt_like_object(f, timestep, num_bins=24):
             ### tot_zeros is a bit crazy --count up # elements that reported
             ### read, write, AND CPU load as zero since these are likely missing
             ### UDP packets, not true zero activity
-            "tot_zeros": ((f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f] == 0.0) & (f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f] == 0.0)).sum(),
-        }
+            "tot_zeros": ((f['OSTReadGroup/OSTBulkReadDataSet'][:, i_0:i_f] == 0.0) 
+                          & (f['OSTWriteGroup/OSTBulkWriteDataSet'][:, i_0:i_f] == 0.0)).sum()}
 
         mds_dset = f['MDSOpsGroup/MDSOpsDataSet']
         if '__metadata' in f:
@@ -131,7 +137,7 @@ def bin_h5lmt_like_object(f, timestep, num_bins=24):
         for op in INTERESTING_MDS_OPS:
             bin_datum['ops_%ss' % op] = mds_dset[ops.index(op),i_0:i_f].sum() * timestep
 
-        ### derived values
+        # Derived values
         bin_datum['t0'] = datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][bin_datum['i0']])
         bin_datum['tf'] = datetime.datetime.fromtimestamp(f['FSStepsGroup/FSStepsDataSet'][bin_datum['if']])
         bin_datum['gibs_read'] = bin_datum['bytes_read'] * _BYTES_TO_GIB
