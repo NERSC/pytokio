@@ -22,7 +22,7 @@ class DARSHAN(dict):
         
     def load(self):
         if self.cache_file is None and self.log_file is None:
-            raise Exception("parameters should be provided. At least log_file or cache_file")
+            raise Exception("parameters should be provided (at least log_file or cache_file)")
         if self.cache_file:
             self.__setitem__(json.load(cache_file))
     
@@ -34,139 +34,21 @@ class DARSHAN(dict):
             self._save_cache(sys.stdout)
         else:
             with open(output_file, 'w') as fp:
-                fp.write(json.dumps(self))
+                self.save_cache(json.dumps(self))
+
+    def _save_cache(self, output):
+        output.write(str(self))
         
      #=================================================#
     
     def darshan_parser_base(self):
-        return self._darshan_parser("BASE")
+        return self._darshan_parser("BASE")["BASE"]
 
     def darshan_parser_total(self):
-        return self._darshan_parser("TOTAL")
+        return self._darshan_parser("TOTAL")["TOTAL"]
 
     def darshan_parser_perf(self):
-        return self._darshan_parser("PERF")
-
-    def _parse_header(self,line):
-        """
-        Parse the header lines which look something like
-        
-        # darshan log version: 3.10
-        # compression method: ZLIB
-        # exe: /home/user/bin/myjob.exe --whatever
-        # uid: 69615
-        """
-	if line.startswith("# darshan log version:"):
-            return 'version', line.split()[-1]
-   	elif line.startswith("# compression method:"):
-            return "compression", line.split()[-1]
-    	elif line.startswith("# exe:"):
-            return "exe", line.split()[2:]
-    	elif line.startswith("# uid:"):
-            return "uid", int(line.split()[-1])
-        elif line.startswith("# jobid:"):
-            return 'jobid', line.split()[-1]
-        elif line.startswith("# start_time:"):
-            return 'start_time', long(line.split()[2])
-        elif line.startswith("# start_time_asci:"):
-            return 'start_time_string', line.split(None, 2)[-1].strip()
-        elif line.startswith("# end_time:"):
-            return 'end_time', long(line.split()[2])
-        elif line.startswith("# end_time_asci:"):
-            return 'end_time_string', line.split(None, 2)[-1].strip()
-        elif line.startswith("# nprocs:"):
-            return "nprocs", int(line.split()[-1])
-        elif line.startswith("# run time:"):
-            return "walltime", int(line.split()[-1])
-        elif line.startswith("# metadata:"):
-            return "metadata", line.split(None, 2)[-1].strip()
-        return None,None
-        
-
-    def _parse_mounts(self, line):
-        """
-        Parse the mount table lines which should look something like
-
-        # mount entry:  /.shared/base/default/etc/dat.conf      dvs
-        # mount entry:  /usr/lib64/libibverbs.so.1.0.0  dvs
-        # mount entry:  /usr/lib64/libibumad.so.3.0.2   dvs
-        # mount entry:  /usr/lib64/librdmacm.so.1.0.0   dvs
-        """
-        if line.startswith("# mount entry:\t"):
-            key, val = line.split('\t')[1:3]
-            return key, val.strip()
-        return None, None
-
-    def _parse_base_counters(self, line):
-        """
-        Parse the line containing an actual counter's data.  It is a tab-delimited
-        line of the form
-        
-        module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_counters(line)
-        """
-        if not line.startswith("#"):
-            args = line.split('\t')
-            if len(args) == 8:
-                return tuple(args)
-        return None, None, None, None, None, None, None, None
-
-    def _parse_total_counters(self, line):
-        """
-        Parse the line containing an actual counter's data as output from
-    darshan-parser --total.  It should be a line of the form
-
-        total_MPIIO_F_READ_END_TIMESTAMP: 0.000000
-        total_MPIIO_F_WRITE_END_TIMESTAMP: 98.847931
-        total_MPIIO_F_CLOSE_TIMESTAMP: 99.596245
-        """
-        if not line.startswith("#"):
-            args = line.split(':')
-            if len(args) == 2:
-                return args[0].strip(), args[1].strip()
-        return None, None
-
-    def _parse_perf_counters(self, line):
-        """
-        Parse the line containing a counter's data as an output from darshan-parser
-        --perf.  These lines can be of several forms:
-
-        # performance
-        # -----------
-        # total_bytes: 2199023259968
-        #
-        # I/O timing for unique files (seconds):
-        # ...........................
-        # unique files: slowest_rank_io_time: 0.000000
-        # unique files: slowest_rank_meta_only_time: 0.000000
-        # unique files: slowest rank: 0
-        #
-        # I/O timing for shared files (seconds):
-        # (multiple estimates shown; time_by_slowest is generally the most accurate)
-        # ...........................
-        # shared files: time_by_cumul_io_only: 39.992327
-        # shared files: time_by_cumul_meta_only: 0.016496
-        # shared files: time_by_open: 95.743623
-        # shared files: time_by_open_lastio: 94.995309
-        # shared files: time_by_slowest: 73.145417
-        #
-        # Aggregate performance, including both shared and unique files (MiB/s):
-        # (multiple estimates shown; agg_perf_by_slowest is generally the most accurate)
-        # ...........................
-        # agg_perf_by_cumul: 52438.859493
-        # agg_perf_by_open: 21903.829658
-        # agg_perf_by_open_lastio: 22076.374336
-        # agg_perf_by_slowest: 28670.996545
-        """
-        
-        if line.startswith('# total_bytes:') or line.startswith('# agg_perf_by'):
-            key, value = line[2:].split(':')
-        elif line.startswith('# unique files:') or line.startswith('# shared files:'):
-            key_suffix, key, value = line[2:].split(':')
-            key += '_%s' % key_suffix.replace(' ', '_')
-        else:
-            return None, None
-
-        return key.strip(), value.strip()
+        return self._darshan_parser("PERF")["PERF"]
 
     def _darshan_parser(self, counter_flag="BASE"):
         """
@@ -202,42 +84,43 @@ class DARSHAN(dict):
                 return True, None
             
         def insert_record(section, module, file_name, rank, counter, value, counter_prefix=None):
-                """
-                Embed a counter=value pair deep within the darshan_data structure based
-                on a bunch of nested keys.
-                """
-                # Force the local shadow of 'module' to lowercase
-                module = module.lower()
-                # Assert that the counter actually belongs to the current module
-                if counter_prefix is not None:
-                    if counter.startswith(counter_prefix):
-                # Strip off the counter_prefix from the counter name
-                        counter = counter[len(counter_prefix):]
-                    else:
-                        raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
+            """
+            Embed a counter=value pair deep within the darshan_data structure based
+            on a bunch of nested keys.
+            
+            """
+            # Force the local shadow of 'module' to lowercase
+            module = module.lower()
+            # Assert that the counter actually belongs to the current module
+            if counter_prefix is not None:
+                if counter.startswith(counter_prefix):
+                    # Strip off the counter_prefix from the counter name
+                    counter = counter[len(counter_prefix):]
+                else:
+                    raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
                     
-                    # Otherwise insert the record--this logic should be made more flexible
-                if section not in darshan_data:
-                    darshan_data[section] = {}
-                if module not in darshan_data[section]:
-                    darshan_data[section][module] = {}
-                if file_name not in darshan_data[section][module]:
-                    darshan_data[section][module][file_name] = {}
-                if rank is None:
-                    insert_base = darshan_data[section][module][file_name]
-                else:
-                    if rank not in darshan_data[section][module][file_name]:
-                        darshan_data[section][module][file_name][rank] = {}
-                    insert_base = darshan_data[section][module][file_name][rank]
+            # Otherwise insert the record--this logic should be made more flexible
+            if section not in darshan_data:
+                darshan_data[section] = {}
+            if module not in darshan_data[section]:
+                darshan_data[section][module] = {}
+            if file_name not in darshan_data[section][module]:
+                darshan_data[section][module][file_name] = {}
+            if rank is None:
+                insert_base = darshan_data[section][module][file_name]
+            else:
+                if rank not in darshan_data[section][module][file_name]:
+                    darshan_data[section][module][file_name][rank] = {}
+                insert_base = darshan_data[section][module][file_name][rank]
 
-                if counter in insert_base:
-                    raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
+            if counter in insert_base:
+                raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
+            else:
+                if '.' in value:
+                    value = float(value)
                 else:
-                    if '.' in value:
-                        value = float(value)
-                    else:
-                        value = long(value)
-                    insert_base[counter] = value
+                    value = long(value)
+                insert_base[counter] = value
    
         darshan_data = {}
         section = None
@@ -319,7 +202,7 @@ class DARSHAN(dict):
                 module_section = new_module_section
             if valid is False:
                     continue
-                    # Reminder: section is already defined as the global parser state
+            # Reminder: section is already defined as the global parser state
             insert_record(section=section,
                           module=module_section,
                           file_name=file_name,
@@ -327,5 +210,104 @@ class DARSHAN(dict):
                           counter=counter,
                           value=value,
                           counter_prefix=counter_prefix)
-            
-        return darshan_data
+        self.__setitem__(counter_flag, darshan_data)
+        return self
+
+    def _parse_header(self, line):
+        """
+        Parse the header lines which look something like
+        
+        # darshan log version: 3.10
+        # compression method: ZLIB
+        # exe: /home/user/bin/myjob.exe --whatever
+        # uid: 69615
+        """
+	if line.startswith("# darshan log version:"):
+            return 'version', line.split()[-1]
+   	elif line.startswith("# compression method:"):
+            return "compression", line.split()[-1]
+    	elif line.startswith("# exe:"):
+            return "exe", line.split()[2:]
+    	elif line.startswith("# uid:"):
+            return "uid", int(line.split()[-1])
+        elif line.startswith("# jobid:"):
+            return 'jobid', line.split()[-1]
+        elif line.startswith("# start_time:"):
+            return 'start_time', long(line.split()[2])
+        elif line.startswith("# start_time_asci:"):
+            return 'start_time_string', line.split(None, 2)[-1].strip()
+        elif line.startswith("# end_time:"):
+            return 'end_time', long(line.split()[2])
+        elif line.startswith("# end_time_asci:"):
+            return 'end_time_string', line.split(None, 2)[-1].strip()
+        elif line.startswith("# nprocs:"):
+            return "nprocs", int(line.split()[-1])
+        elif line.startswith("# run time:"):
+            return "walltime", int(line.split()[-1])
+        elif line.startswith("# metadata:"):
+            return "metadata", line.split(None, 2)[-1].strip()
+        return None,None
+        
+
+    def _parse_mounts(self, line):
+        """
+        Parse the mount table lines which should look something like
+
+        # mount entry:  /usr/lib64/libibverbs.so.1.0.0  dvs
+
+        """
+        if line.startswith("# mount entry:\t"):
+            key, val = line.split('\t')[1:3]
+            return key, val.strip()
+        return None, None
+
+    def _parse_base_counters(self, line):
+        """
+        Parse the line containing an actual counter's data.  It is a tab-delimited
+        line of the form
+        
+        module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_counters(line)
+        """
+        if not line.startswith("#"):
+            args = line.split('\t')
+            if len(args) == 8:
+                return tuple(args)
+        return None, None, None, None, None, None, None, None
+
+    def _parse_total_counters(self, line):
+        """
+        Parse the line containing an actual counter's data as output from
+    darshan-parser --total.  It should be a line of the form
+    
+        total_MPIIO_F_READ_END_TIMESTAMP: 0.000000
+
+        """
+        if not line.startswith("#"):
+            args = line.split(':')
+            if len(args) == 2:
+                return args[0].strip(), args[1].strip()
+        return None, None
+
+    def _parse_perf_counters(self, line):
+        """
+        Parse the line containing a counter's data as an output from darshan-parser
+        --perf.  These lines can be of several forms:
+
+        - # total_bytes: 2199023259968
+        - # unique files: slowest_rank_io_time: 0.000000
+        - # shared files: time_by_cumul_io_only: 39.992327
+        - # agg_perf_by_slowest: 28670.996545
+
+        """        
+        if line.startswith('# total_bytes:') or line.startswith('# agg_perf_by'):
+            key, value = line[2:].split(':')
+        elif line.startswith('# unique files:') or line.startswith('# shared files:'):
+            key_suffix, key, value = line[2:].split(':')
+            key += '_%s' % key_suffix.replace(' ', '_')
+        else:
+            return None, None
+
+        return key.strip(), value.strip()
+
+
+        
