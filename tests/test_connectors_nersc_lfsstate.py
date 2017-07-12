@@ -55,34 +55,34 @@ def verify_ostfullness(keyvalues):
 
 def test_ostmap_from_cache():
     # Read from a cache file
-    ostmap = tokio.connectors.nersc_lfsstate.NERSCLFSOSTMap(SAMPLE_OSTMAP_FILE)
+    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
     verify_ost(ostmap, type='ostmap')
 
 def test_ostfullness_from_cache():
     # Read from a cache file
-    ostfullness = tokio.connectors.nersc_lfsstate.NERSCLFSOSTFullness(SAMPLE_OSTFULLNESS_FILE)
+    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     verify_ost(ostfullness, type='ostfullness')
 
 def test_ostmap_serializer():
     # Read from a cache file
-    ostmap = tokio.connectors.nersc_lfsstate.NERSCLFSOSTMap(SAMPLE_OSTMAP_FILE)
+    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
     # Serialize the object, then re-read it and verify it
     cache_file = tempfile.NamedTemporaryFile(delete=False)
     print "Caching to %s" % cache_file.name
     ostmap.save_cache(cache_file.name)
     # Open a second file handle to this cached file to load it
-    ostmap = tokio.connectors.nersc_lfsstate.NERSCLFSOSTMap(cache_file.name)
+    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(cache_file.name)
     cache_file.close()
     verify_ost(ostmap, type='ostmap')
 
 def test_ostfullness_serializer():
     # Read from a cache file
-    ostfullness = tokio.connectors.nersc_lfsstate.NERSCLFSOSTFullness(SAMPLE_OSTFULLNESS_FILE)
+    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     # Serialize the object, then re-read it and verify it
     cache_file = tempfile.NamedTemporaryFile(delete=False)
     print "Caching to %s" % cache_file.name
     ostfullness.save_cache(cache_file.name)
     # Open a second file handle to this cached file to load it
-    ostfullness = tokio.connectors.nersc_lfsstate.NERSCLFSOSTFullness(cache_file.name)
+    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(cache_file.name)
     cache_file.close()
     verify_ost(ostfullness, type='ostfullness')

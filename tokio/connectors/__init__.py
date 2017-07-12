@@ -2,13 +2,13 @@
 
 ### LMTDB requires MySQLdb
 try:
-    from lmt import LMTDB
+    from lmt import LmtDb
 except ImportError:
     pass
 
 ### HDF5 requires h5py
 try:
-    from hdf5 import HDF5
+    from hdf5 import Hdf5
 except ImportError:
     raise
     pass

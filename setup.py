@@ -12,7 +12,7 @@ setup(
                       'scipy==0.17.1',                     
                   ],
     license='None',
-    packages=find_packages(exclude=['abcutil', 'examples', 'tests']),
+    packages=find_packages(exclude=['bin', 'examples', 'tests']),
     classifiers=[
         'Programming Language :: Python :: 2.7',
     ],

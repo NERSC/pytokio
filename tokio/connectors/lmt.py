@@ -62,7 +62,7 @@ INNER JOIN OST_INFO on OST_INFO.OST_ID = last_ostids.ostid
 INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
 """
 
-class LMTDB(object):
+class LmtDb(object):
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None):
         # Get database parameters 
         if dbhost is None:

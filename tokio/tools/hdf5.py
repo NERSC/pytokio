@@ -19,7 +19,7 @@ if H5LMT_BASE is None:
 
 def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """
-    Given a starting datetime and (optionnally) an ending datetime, return all
+    Given a starting datetime and (optionally) an ending datetime, return all
     H5LMT files that contain data inside of that date range (inclusive).
 
     # :param str file_name: The basename of the H5LMT files you want to find (e.g., cori_snx11168.h5lmt)
@@ -47,7 +47,7 @@ def enumerate_h5lmts(file_name, datetime_start, datetime_end):
 
 def get_files_and_indices(file_name, datetime_start, datetime_end):
     """
-    Given the name of an HDF5 file and a start/end date+time, returns a list of
+    Given the name of an Hdf5 file and a start/end date+time, returns a list of
     tuples containing
     
     """
@@ -59,7 +59,7 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
     output = []
 
     for h5lmt_file in h5lmt_files:
-        hdf5 = connectors.hdf5.HDF5(h5lmt_file, mode="r")
+        hdf5 = connectors.hdf5.Hdf5(h5lmt_file, mode="r")
         if hdf5.first_timestamp is None or hdf5.last_timestamp is None:
             raise Exception("uninitialized tokio.hdf5 object")
         i_0 = 0
@@ -93,7 +93,7 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     """
     result = {}
     for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
-        with connectors.hdf5.HDF5(h5file, mode='r') as f:
+        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
             # Copy over MDS op names
             op_names = list(f['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
             if 'OpNames' in result:
@@ -124,11 +124,11 @@ def get_group_data_from_time_range(file_name, group_name, datetime_start, dateti
     result = None
 
     for (h5file, i_0, i_f) in files_and_indices:
-        with connectors.hdf5.HDF5(h5file, mode='r') as f:
+        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
             # Version : depending on the O.S /
             version = f['/'].attrs.get('version', 1)
-            if len(file[group_name].shape) == 1:
-                dataset_slice = file[group_name][i_0:i_f]
+            if len(f[group_name].shape) == 1:
+                dataset_slice = f[group_name][i_0:i_f]
                 axis = 0
             elif len(f[group_name].shape) == 2:
                 if version == 1:
@@ -168,7 +168,7 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     result = None
 
     for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
-        with connectors.hdf5.HDF5(h5file, mode='r') as f:
+        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
             df_slice = f.to_dataframe(group_name)
             df_slice = df_slice[(df_slice.index >= datetime_start) 
                                 & (df_slice.index < datetime_end)]

@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tokio.connectors
 
-SAMPLE_INPUT = os.path.join(os.getcwd(), 'inputs', 'sample.hdf5')
+SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.hdf5')
 DATASETS_1D = ['FSStepsGroup/FSStepsDataSet', 'MDSCPUGroup/MDSCPUDataSet']
 DATASETS_2D = [
     'FSMissingGroup/FSMissingDataSet', 'MDSOpsGroup/MDSOpsDataSet',
@@ -17,7 +17,7 @@ POSITIVE_2D = [
 ]
 
 def test_connectors_hdf5():
-    file = tokio.connectors.HDF5(SAMPLE_INPUT)
+    file = tokio.connectors.Hdf5(SAMPLE_INPUT)
 
     # Make sure group_name=None works
     assert len(file.to_dataframe().index)

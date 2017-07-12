@@ -5,10 +5,10 @@ import subprocess
 import datetime
 import json
 
-class SLURM(dict):
+class Slurm(dict):
     
     def __init__(self, jobid=None, cache_file=None):
-        super(SLURM, self).__init__(self)
+        super(Slurm, self).__init__(self)
         self.cache_file = cache_file
         self.jobid = jobid
         self.load()

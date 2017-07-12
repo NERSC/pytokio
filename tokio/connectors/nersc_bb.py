@@ -33,7 +33,7 @@ _SOURCE_FIELDS = ['@timestamp', 'hostname', 'plugin','collectd_type',
            'io_time']
 
 
-class NerscBB(object):
+class NerscBb(object):
     def __init__(self, host='localhost', port='9200', output_file=None):
         self.client = None
         self.num_bundle = 0

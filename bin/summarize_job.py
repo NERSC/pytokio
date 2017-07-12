@@ -242,7 +242,7 @@ def retrieve_darshan_data(results, files):
     if i < len(files):
         darshan_log_file = files[i]
         # Extract the performance data from the darshan log
-        d = tokio.connectors.darshan.DARSHAN(darshan_log_file)
+        d = tokio.connectors.darshan.Darshan(darshan_log_file)
         darshan_perf_data = d.darshan_parser_perf()
         darshan_base_data = d.darshan_parser_base()
 

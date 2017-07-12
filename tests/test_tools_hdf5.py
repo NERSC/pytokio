@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 tokio.tools.hdf5.H5LMT_BASE = os.path.join(os.getcwd(), 'inputs' )
 SAMPLE_INPUT = 'sample.hdf5'
 DATASET_NAME = 'FSStepsGroup/FSStepsDataSet'
-with tokio.connectors.HDF5(os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE_INPUT)) as fp:
+with tokio.connectors.Hdf5(os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE_INPUT)) as fp:
     t0 = fp[DATASET_NAME][0]
     dt = int(fp[DATASET_NAME][1] - t0)
 
@@ -38,7 +38,7 @@ def check_get_files_and_indices(start_offset, duration):
 
     files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_INPUT, start_time, end_time)
     for count, (file_name, istart, iend) in enumerate(files_and_indices):
-        with tokio.connectors.HDF5(file_name, mode='r') as file:
+        with tokio.connectors.Hdf5(file_name, mode='r') as file:
             derived_start = datetime.fromtimestamp(file[DATASET_NAME][istart])
             derived_end = datetime.fromtimestamp(file[DATASET_NAME][iend])
             assert (derived_start == start_time) or istart == 0

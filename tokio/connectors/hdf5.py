@@ -10,12 +10,12 @@ import pandas as pd
 
 _NATIVE_VERSION = 1
 
-class HDF5(h5py.File):
+class Hdf5(h5py.File):
     """
-    Create a parsed HDF5 file class 
+    Create a parsed Hdf5 file class 
     """
     def __init__(self, *args, **kwargs):
-        super(HDF5,self).__init__(*args, **kwargs)
+        super(Hdf5,self).__init__(*args, **kwargs)
 
         # Timestanp that will help to sort hdf5 files  
         if 'FSStepsGroup/FSStepsDataSet' in self:
@@ -130,7 +130,7 @@ class HDF5(h5py.File):
 
     def init_timestamps(self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None):
         """
-        Initialize timestamps for the whole HDF5 file.  Version 1 populates an
+        Initialize timestamps for the whole Hdf5 file.  Version 1 populates an
         entire dataset with equally spaced epoch timestamps, while version 2
         only sets a global timestamp for the first row of each dataset and a
         timestep thereafter.
@@ -199,7 +199,6 @@ class HDF5(h5py.File):
             else:
                 self.timestep = LMT_TIMESTEP
         
-        # TODO :this if statement may be useless
         if 'first_timestamp' in self.attrs: 
             t0 = datetime.datetime.fromtimestamp(self.attrs['first_timestamp'])
         else:

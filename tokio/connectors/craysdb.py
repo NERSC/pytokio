@@ -9,7 +9,7 @@ import sys
 import collections
 import subprocess
 
-class CraySDBProc(dict):
+class CraySdbProc(dict):
     """
     Presents certain views of the Cray Service Database (SDB) as a dictionary.
     Lazy load data to prevent unnecessary touches to the actual service
@@ -19,7 +19,7 @@ class CraySDBProc(dict):
     
     """
     def __init__(self, cache_file=None):
-        super(CraySDBProc, self).__init__(self)
+        super(CraySdbProc, self).__init__(self)
         self.cache_file = cache_file
         # Keep the order in which we parse xtdb2proc output file  
         self.key_order = []
@@ -64,9 +64,9 @@ class CraySDBProc(dict):
                 # Look at the type of each val and 
                 # return the correponding string
                 if val is None:
-                    line.append("%s='%s'" % (key, val))
-                elif isinstance(val, basestring):
                     line.append("%s=null" % key)
+                elif isinstance(val, basestring):
+                    line.append("%s='%s'" % (key, val))
                 else:
                     line.append("%s=%s" % (key, val))
                 

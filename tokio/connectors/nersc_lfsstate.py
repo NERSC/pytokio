@@ -25,7 +25,7 @@ _REX_OST_MAP = re.compile('^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(\
 _REX_LFS_DF = re.compile('^\s*(snx\d+-\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+).\s+(\S+)\[([^:]+):(\d+)\]\s*$')
 
 
-class NERSCLFSOSTMap(dict):
+class NerscLfsOstMap(dict):
     """
     Parser for ost-map.txt.  Generates a dict of form
 
@@ -36,7 +36,7 @@ class NERSCLFSOSTMap(dict):
     failover situation)
     """
     def __init__(self, cache_file=None):
-        super(NERSCLFSOSTMap, self).__init__(self)
+        super(NerscLfsOstMap, self).__init__(self)
         self.cache_file = cache_file
         self.load_ost_map_file()
 
@@ -119,7 +119,7 @@ class NERSCLFSOSTMap(dict):
    
     def get_failovers(self):
         """
-        Given a NERSCLFSOSTMap, figure out OSTs that are probably failed over and,
+        Given a NerscLfsOstMap, figure out OSTs that are probably failed over and,
         for each time stamp and file system, return a list of abnormal OSSes and the
         expected number of OSTs per OSS.
         
@@ -164,7 +164,7 @@ class NERSCLFSOSTMap(dict):
         
         return resulting_data
 
-class NERSCLFSOSTFullness(dict):
+class NerscLfsOstFullness(dict):
     """
     Parser for ost-fullness.txt.  Generates a dict of form
 
@@ -172,7 +172,7 @@ class NERSCLFSOSTFullness(dict):
     
     """
     def __init__(self, cache_file=None):
-        super(NERSCLFSOSTFullness, self).__init__(self)
+        super(NerscLfsOstFullness, self).__init__(self)
         self.cache_file = cache_file
         self.load_ost_fullness_file()
 

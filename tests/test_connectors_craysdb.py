@@ -20,13 +20,13 @@ def verify_craysdbproc(craysdbproc):
 
 def test_craysdbproc_from_cache():
     # Read from a cache file
-    craysdbproc = tokio.connectors.craysdb.CraySDBProc(SAMPLE_XTDB2PROC_FILE)
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
     verify_craysdbproc(craysdbproc)
 
 def test_craysdbproc_from_sdb():
     # Read from the Cray Service Database
     try:
-        craysdbproc = tokio.connectors.craysdb.CraySDBProc()
+        craysdbproc = tokio.connectors.craysdb.CraySdbProc()
     except OSError as exception:
         # Sdb isn't available
         # if exception.errno == 2:
@@ -36,13 +36,13 @@ def test_craysdbproc_from_sdb():
 
 def test_craysdbproc_serializer():
     # Read from a cache file
-    craysdbproc = tokio.connectors.craysdb.CraySDBProc(SAMPLE_XTDB2PROC_FILE)
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
     # Serialize the object, then re-read it and verify it
     cache_file = tempfile.NamedTemporaryFile(delete=False)
     print "Caching to %s" % cache_file.name
     craysdbproc.save_cache(cache_file.name)
     # Open a second file handle to this cached file to load it
-    craysdbproc = tokio.connectors.craysdb.CraySDBProc(cache_file.name)
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(cache_file.name)
     cache_file.close()
     verify_craysdbproc(craysdbproc)
 

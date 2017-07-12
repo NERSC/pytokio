@@ -10,9 +10,9 @@ import sys
 import re
 import json
 
-class DARSHAN(dict):
+class Darshan(dict):
     def __init__(self, log_file=None, cache_file=None):
-        super(DARSHAN,self).__init__(self)
+        super(Darshan,self).__init__(self)
         self.cache_file = cache_file
         self.log_file = log_file
         self.load()
@@ -121,7 +121,10 @@ class DARSHAN(dict):
                 else:
                     value = long(value)
                 insert_base[counter] = value
-   
+        
+        if self.logfile is None:
+            return self
+
         darshan_data = {}
         section = None
         counter = None

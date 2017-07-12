@@ -9,7 +9,7 @@ import tokio
 import tokio.tools
 
 _BYTES_TO_GIB = 2.0**(-30.0)
-INTERESTING_MDS_OPS = [ 'open', 'close', 'getattr', 'unlink', 'setattr', 'getxattr', 'rmdir', 'rename', 'mkdir' ]
+INTERESTING_MDS_OPS = ['open', 'close', 'getattr', 'unlink', 'setattr', 'getxattr', 'rmdir', 'rename', 'mkdir']
 
 def print_datum(datum=None):
     """
@@ -95,7 +95,7 @@ def print_data_summary(data, use_json=False):
     return print_str
 
 def bin_h5lmt(h5lmt_file):
-    f = tokio.HDF5(h5lmt_file)
+    f = tokio.Hdf5(h5lmt_file)
     if 'version' in f['/'].attrs and f['/'].attrs['version'] > 1:
         raise Exception("TOKIOfile version > 1 not supported")
 

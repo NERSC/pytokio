@@ -58,23 +58,23 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         ost_health_files = [cache_file]
 
     # TODO : Remove this comment after the package is deleted
-    # We can get away with the following because NERSCLFSOSTFullness,
-    # NERSCLFSOSTMap, and NERSCLFSOSTMap.get_failovers all have the same
+    # We can get away with the following because NerscLfsOstFullness,
+    # NerscLfsOstMap, and NerscLfsOstMap.get_failovers all have the same
     # structure
     if metric == "fullness":
         ost_health = None
         for df_file in ost_health_files:
             if ost_health is None:
-                ost_health = nersc_lfsstate.NERSCLFSOSTFullness(cache_file=df_file)
+                ost_health = nersc_lfsstate.NerscLfsOstFullness(cache_file=df_file)
             else:
-                ost_health.update(nersc_lfsstate.NERSCLFSOSTFullness(cache_file=df_file))
+                ost_health.update(nersc_lfsstate.NerscLfsOstFullness(cache_file=df_file))
     elif metric == "failures":
         ost_map = None
         for map_file in ost_health_files:
             if ost_map is None:
-                ost_map = nersc_lfsstate.NERSCLFSOSTMap(cache_file=map_file)
+                ost_map = nersc_lfsstate.NerscLfsOstMap(cache_file=map_file)
             else:
-                ost_map.update(nersc_lfsstate.NERSCLFSOSTMap(cache_file=map_file))
+                ost_map.update(nersc_lfsstate.NerscLfsOstMap(cache_file=map_file))
         ost_health = ost_map.get_failovers()
 
     timestamps = sorted([int(x) for x in ost_health.keys()])
