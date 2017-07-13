@@ -8,6 +8,7 @@ import json
 import datetime
 from gzip import open
 from elasticsearch import Elasticsearch
+import datetime
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 MAX_DOC_BUNDLE = 50000
@@ -16,16 +17,13 @@ _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 _ES_INDEX = "cori-collectd-*"
 _QUERY_OST_DATA = {
     "query": {
-        "bool": {
-            "must": {
-                "query_string": {
-                    "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
-                    "analyze_wildcard": True,
+        "query_string": {
+            "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
+            "analyze_wildcard": True,
                 },
-            },
-        },
     },
 }
+
 _SOURCE_FIELDS = ['@timestamp', 'hostname', 'plugin','collectd_type',
            'type_instance','plugin_instance','value','longterm',
            'midterm','shortterm','majflt','minflt','if_octets',
@@ -33,9 +31,10 @@ _SOURCE_FIELDS = ['@timestamp', 'hostname', 'plugin','collectd_type',
            'io_time']
 
 
-class NerscBb(object):
+class NerscCollectd(object):
     def __init__(self, host='localhost', port='9200', output_file=None):
         self.client = None
+        self.page = None
         self.num_bundle = 0
         self.output_file = output_file
         self.last_index = None
@@ -44,7 +43,7 @@ class NerscBb(object):
     def connect(self, host='localhost', port='9200', timeout=30):
         self.client = Elasticsearch(host=host, 
                                     timeout=timeout,
-                                    port = port
+                                    port=port
         )
 
     def close(self):
@@ -76,9 +75,12 @@ class NerscBb(object):
             self.last_index = index.replace('-*', '')
         else:
             self.last_index = index
+        t0 = datetime.datetime.now()
         self.page = self.client.search(index=index,body=query,
                                        scroll=scroll,size=size,
                                        sort=sort,_source=_source)
+        print("Fetching page took %.2f seconds" % 
+              (datetime.datetime.now() - t0).total_seconds())
         return self.page
 
     def scroll(self, scrollid=None, scroll='1m'):
@@ -87,7 +89,10 @@ class NerscBb(object):
                 sid = self.page['_scroll_id']
             else:
                 sid = scrollid
+            t0 = datetime.datetime.now()
             self.page = self.client.scroll(scroll_id=sid, scroll=scroll)
+            print("Scrolling took %.2f seconds" 
+                  % (datetime.datetime.now() - t0).total_seconds())
             print("I scrolled %s page" % scroll)
             return self.page
             
@@ -107,3 +112,10 @@ class NerscBb(object):
     #     if save and bundled:
     #         save(bundle, output_file)
     #     print("I scrolled all the data") 
+
+
+class NerscBb(NerscCollectd):
+    def __init__(self):
+        super(NerscBb, self).__init__(self)
+    
+    

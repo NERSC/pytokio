@@ -122,7 +122,7 @@ class Darshan(dict):
                     value = long(value)
                 insert_base[counter] = value
         
-        if self.logfile is None:
+        if self.log_file is None:
             return self
 
         darshan_data = {}
