@@ -11,7 +11,7 @@ SAMPLE_DARSHAN_LOG = os.path.join(os.getcwd(), 'inputs', 'sample.darshan')
 SAMPLE_DARSHAN_JOBID = '69443066'
 SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47' # start_time_asci: Mon Mar 20 02:07:47 2017
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43' # end_time_asci: Mon Mar 20 02:09:43 2017
-SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
+SAMPLE_DARSHAN_FILE_SYSTEM = '_test'
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
