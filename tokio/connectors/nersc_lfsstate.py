@@ -16,15 +16,16 @@ import os
 import sys
 import re
 
-### only try to match osc/mdc lines; skip mgc/lov/lmv
+# Only try to match osc/mdc lines; skip mgc/lov/lmv
 # 351 UP osc snx11025-OST0007-osc-ffff8875ac1e7c00 3f30f170-90e6-b332-b141-a6d4a94a1829 5 10.100.100.12@o2ib1
-_REX_OST_MAP = re.compile('^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(\d+)\s+(\S+@\S+)\s*$')
+#
 # snx11035-OST0000_UUID 90767651352 54512631228 35277748388  61% /scratch2[OST:0]
 #                             snx000-OST... tot     use     avail      00%    /scra[OST    :0     ]
+_REX_OST_MAP = re.compile('^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(\d+)\s+(\S+@\S+)\s*$')
 _REX_LFS_DF = re.compile('^\s*(snx\d+-\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+).\s+(\S+)\[([^:]+):(\d+)\]\s*$')
 
 
-class NERSCLFSOSTMap(dict):
+class NerscLfsOstMap(dict):
     """
     Parser for ost-map.txt.  Generates a dict of form
 
@@ -35,20 +36,21 @@ class NERSCLFSOSTMap(dict):
     failover situation)
     """
     def __init__(self, cache_file=None):
-        super(NERSCLFSOSTMap, self).__init__(self)
+        super(NerscLfsOstMap, self).__init__(self)
         self.cache_file = cache_file
         self.load_ost_map_file()
 
     def __repr__(self):
         """
         Serialize ost-map.txt back out into a format that can be re-loaded
+        
         """
         repr_result = ""
-        ### iterate over time steps ("BEGIN" lines)
+        # Iterate over time steps ("BEGIN" lines)
         for timestamp in sorted(self.keys()):
             fs_data = self[timestamp]
             repr_result += "BEGIN %d\n" % timestamp
-            ### iterate over file systems within each time step
+            # Iterate over file systems within each time step
             for target_name in sorted(fs_data.keys()):
                 obd_data = fs_data[target_name]
                 for obd_name in sorted(obd_data.keys(), key=lambda x: int(obd_data[x]['index']) ):
@@ -67,6 +69,7 @@ class NERSCLFSOSTMap(dict):
         This is a generally logical structure, although this map is always almost
         fed into a routine that tries to find multiple OSTs on the same OSS (i.e., a
         failover situation)
+        
         """
         this_timestamp = None
         with open( self.cache_file, 'r' ) as fp:
@@ -83,7 +86,7 @@ class NERSCLFSOSTMap(dict):
                         if file_system not in self[this_timestamp]:
                             self[this_timestamp][file_system] = {}
     
-                        ### duplicates can happen if a file system is doubly mounted
+                        # Duplicates can happen if a file system is doubly mounted
                         if target_name in self[this_timestamp][file_system]:
                             raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
     
@@ -101,6 +104,7 @@ class NERSCLFSOSTMap(dict):
     def save_cache(self, output_file=None):
         """
         Serialize the object in a form compatible with the output of ost-map.txt
+        
         """
         if output_file is None:
             self._save_cache(sys.stdout)
@@ -111,11 +115,14 @@ class NERSCLFSOSTMap(dict):
     def _save_cache(self, output):
         output.write(str(self))
 
+     #=================================================#
+   
     def get_failovers(self):
         """
-        Given a NERSCLFSOSTMap, figure out OSTs that are probably failed over and,
+        Given a NerscLfsOstMap, figure out OSTs that are probably failed over and,
         for each time stamp and file system, return a list of abnormal OSSes and the
         expected number of OSTs per OSS.
+        
         """
         resulting_data = {}
         for timestamp, fs_data in self.iteritems():
@@ -128,7 +135,7 @@ class NERSCLFSOSTMap(dict):
                     ip_addr = ost_values['target_ip']
                     ost_counts[ip_addr] = ost_counts.get(ip_addr, 0) + 1
 
-                ### get mode of OSTs per OSS to infer what "normal" OST/OSS ratio is
+                # Get mode of OSTs per OSS to infer what "normal" OST/OSS ratio is
                 histogram = {}
                 for ip_addr, ost_count in ost_counts.iteritems():
                     if ost_count not in histogram:
@@ -137,7 +144,7 @@ class NERSCLFSOSTMap(dict):
                         histogram[ost_count] += 1
                 mode = max(histogram, key=histogram.get)
 
-                ### build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }
+                # Build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }
                 abnormal_ips = {}
                 for ost_name, ost_values in ost_data.iteritems():
                     if ost_values['role'] != 'osc': # don't care about mdc, mgc
@@ -157,20 +164,22 @@ class NERSCLFSOSTMap(dict):
         
         return resulting_data
 
-class NERSCLFSOSTFullness(dict):
+class NerscLfsOstFullness(dict):
     """
     Parser for ost-fullness.txt.  Generates a dict of form
 
         { timestamp(int) : { file_system: { ost_name : { keys: values } } } }
+    
     """
     def __init__(self, cache_file=None):
-        super(NERSCLFSOSTFullness, self).__init__(self)
+        super(NerscLfsOstFullness, self).__init__(self)
         self.cache_file = cache_file
         self.load_ost_fullness_file()
 
     def __repr__(self):
         """
         snx11025-OST0001_UUID 90767651352 63381521692 26424604184  71% /scratch1[OST:1]
+    
         """
         repr_result = ""
         for timestamp in sorted(self.keys()):
@@ -186,9 +195,8 @@ class NERSCLFSOSTFullness(dict):
                         keyvalues['total_kib'],
                         keyvalues['used_kib'],
                         keyvalues['remaining_kib'],
-                        ### note that lfs dl's percents are not divided by
-                        ### avail_kib, but rather the sum of used and remaining.
-                        ### unclear why these are different
+                        # Note that lfs dl's percents are not divided by
+                        # avail_kib, but rather the sum of used and remaining.
                         round(100.0 * keyvalues['used_kib'] / (keyvalues['remaining_kib'] + keyvalues['used_kib'])),
                         keyvalues['mount_pt'],
                         keyvalues['role'].upper(),
@@ -202,6 +210,7 @@ class NERSCLFSOSTFullness(dict):
         separated by lines of the form `BEGIN 0000` where 0000 is the UNIX epoch
         time.  At NERSC, this file was (foolishly) called osts.txt in the h5lmt
         dump directory.
+
         """
         this_timestamp = None
         with open(self.cache_file, 'r') as fp:
@@ -218,7 +227,7 @@ class NERSCLFSOSTFullness(dict):
                         if file_system not in self[this_timestamp]:
                             self[this_timestamp][file_system] = {}
     
-                        ### duplicates can happen if a file system is doubly mounted
+                        # Duplicates can happen if a file system is doubly mounted
                         if target_name in self[this_timestamp][file_system]:
                             raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
     
@@ -235,6 +244,7 @@ class NERSCLFSOSTFullness(dict):
         """
         Serialize the object in a form compatible with the output of
         ost-fullness.txt
+        
         """
         if output_file is None:
             self._save_cache(sys.stdout)

@@ -7,10 +7,10 @@ the command line
 import re
 import argparse
 import os
-import tokio.grabbers.darshan
+import tokio.connectors.darshan
 
-### key = regex to identify a file system based on an output path
-### val = a string that uniquely identifies that file system
+# key = regex to identify a file system based on an output path
+# val = a string that uniquely identifies that file system
 _FS_PATTERNS = {
     '^/projects/radix-io': 'mira-fs1',
     '^/scratch1' : 'scratch1',
@@ -21,8 +21,8 @@ _FS_PATTERNS = {
     '^/var/opt/cray/dws/mounts/.*/ps/' : 'bb-private',
 }
 
-### key = the string that uniquely identifies a file system from _FS_PATTERNS
-### val = the compute platform associated with that file system
+# key = the string that uniquely identifies a file system from _FS_PATTERNS
+# val = the compute platform associated with that file system
 _FS_PATTERN_TO_HOST = {
     'mira-fs1':   "mira",
     'scratch1':   "edison",
@@ -35,7 +35,8 @@ _FS_PATTERN_TO_HOST = {
 
 def extract_darshan_perf(darshan_log):
 
-    darshan_data = tokio.grabbers.darshan.darshan_parser_perf(darshan_log)
+    d = tokio.connectors.darshan.DARSHAN(darshan_log)
+    darshan_data = d.darshan_parser_perf()
 
     exe_cmd_line = darshan_data['header']['exe']
     jobid = darshan_data['header']['jobid']
@@ -50,7 +51,7 @@ def extract_darshan_perf(darshan_log):
     else:
         return {}
 
-    darshan_data = tokio.grabbers.darshan.darshan_parser_total(darshan_log)
+    darshan_data = d.darshan_parser_total()
     total_opens = darshan_data['counters']['posix']['_total']['OPENS']
     total_rws = (darshan_data['counters']['posix']['_total']['READS'] +
                 darshan_data['counters']['posix']['_total']['WRITES'])
@@ -61,13 +62,13 @@ def extract_darshan_perf(darshan_log):
     file_system = 'UNKNOWN'
     platform = 'UNKNOWN'
 
-    # determine exe name so we know how to identify other benchmark params
+    # Determine exe name so we know how to identify other benchmark params
     exe = os.path.basename(exe_cmd_line[0])
     exe_args = exe_cmd_line[1:]
     if exe == 'ior':
         app = 'IOR'
 
-        # use cmdline args to determine api, rw, and file system (and platform)
+        # Use cmdline args to determine api, rw, and file system (and platform)
         for pos, field in enumerate(exe_args):
             if field == '-w':
                 rw = 'write'
@@ -91,7 +92,7 @@ def extract_darshan_perf(darshan_log):
         api = 'GLEAN'
         rw  = 'write'
 
-        # use output file name to determine file system (and platform)
+        # Use output file name to determine file system (and platform)
         for pattern, fs_key in _FS_PATTERNS.iteritems():
             match = re.search(pattern, exe_args[-1])
             if match is not None:
@@ -103,7 +104,7 @@ def extract_darshan_perf(darshan_log):
         api = 'GLEAN'
         rw  = 'read'
 
-        # use output file name to determine file system (and platform)
+        # Use output file name to determine file system (and platform)
         for pattern, fs_key in _FS_PATTERNS.iteritems():
             match = re.search(pattern, exe_args[-1])
             if match is not None:
@@ -115,7 +116,7 @@ def extract_darshan_perf(darshan_log):
         api = 'H5Part'
         rw  = 'write'
 
-        # use output file name to determine file system (and platform)
+        # Use output file name to determine file system (and platform)
         for pattern, fs_key in _FS_PATTERNS.iteritems():
             match = re.search(pattern, exe_args[0])
             if match is not None:
@@ -127,7 +128,7 @@ def extract_darshan_perf(darshan_log):
         api = 'H5Part'
         rw  = 'read'
 
-        # use cmdline args to determine file system (and platform)
+        # Use cmdline args to determine file system (and platform)
         for pos, field in enumerate(exe_args):
             if field == '-f':
                 for pattern, fs_key in _FS_PATTERNS.iteritems():
@@ -137,7 +138,7 @@ def extract_darshan_perf(darshan_log):
                         platform = _FS_PATTERN_TO_HOST[file_system]
                         break
 
-    # total io time is sum of shared and unique file io times
+    # Total io time is sum of shared and unique file io times
     io_time = float(time_by_slowest) + float(slowest_rank_io_time)
 
     return {

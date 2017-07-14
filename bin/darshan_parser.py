@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import tokio.grabbers.darshan
+import tokio.connectors.darshan
 
 import json
 import argparse
@@ -12,12 +12,12 @@ if __name__ == '__main__':
     parser.add_argument('--total', action='store_true', help='aggregated darshan field data')
     parser.add_argument('--perf', action='store_true', help='derived perf data')
     args = parser.parse_args()
-
+    darshan = tokio.connectors.darshan.DARSHAN(args.logfile)
     if args.total:
-        darshan_data = tokio.grabbers.darshan.darshan_parser_total(args.logfile)
+        darshan_data = darshan.darshan_parser_total()
     elif args.perf:
-        darshan_data = tokio.grabbers.darshan.darshan_parser_perf(args.logfile)
+        darshan_data = darshan.darshan_parser_perf()
     else:
-        darshan_data = tokio.grabbers.darshan.darshan_parser_base(args.logfile)
+        darshan_data = darshan.darshan_parser_base()
 
     print json.dumps(darshan_data, indent=4, sort_keys=True)
