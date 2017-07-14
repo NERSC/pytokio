@@ -51,6 +51,7 @@ def test_summary_without_darshan():
     Functionality when no darshan log is present
 
     """
+    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs' )
     assert subprocess.check_call([ BINARY,
                                    '--json',
                                    '--jobid', SAMPLE_DARSHAN_JOBID,

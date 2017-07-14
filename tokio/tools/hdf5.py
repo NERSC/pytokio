@@ -12,10 +12,12 @@ import ConfigParser
 
 cfg = ConfigParser.ConfigParser()
 cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
-H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE'))
+
+H5LMT_BASE = os.environ.get('PYTOKIO_H5LMT_BASE')
+if H5LMT_BASE is None:
+    H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE'))
 if H5LMT_BASE is None:
     H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE_NERSC'))
-
 
 def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """

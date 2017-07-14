@@ -7,7 +7,7 @@ from test_connectors_hdf5 import DATASETS_1D, DATASETS_2D
 from datetime import datetime, timedelta
 
 tokio.tools.hdf5.H5LMT_BASE = os.path.join(os.getcwd(), 'inputs' )
-SAMPLE_INPUT = 'sample.hdf5'
+SAMPLE_INPUT = 'sample.h5lmt'
 DATASET_NAME = 'FSStepsGroup/FSStepsDataSet'
 with tokio.connectors.Hdf5(os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE_INPUT)) as fp:
     t0 = fp[DATASET_NAME][0]

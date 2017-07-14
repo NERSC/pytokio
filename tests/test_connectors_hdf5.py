@@ -4,7 +4,7 @@ import os
 import numpy as np
 import tokio.connectors
 
-SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.hdf5')
+SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.h5lmt')
 DATASETS_1D = ['FSStepsGroup/FSStepsDataSet', 'MDSCPUGroup/MDSCPUDataSet']
 DATASETS_2D = [
     'FSMissingGroup/FSMissingDataSet', 'MDSOpsGroup/MDSOpsDataSet',
