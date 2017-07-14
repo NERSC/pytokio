@@ -21,6 +21,10 @@ SAMPLE_OSTFULLNESS_FILE = os.path.join(os.getcwd(), 'inputs', 'sample_ost-fullne
 BINARY = os.path.join('..', 'bin', 'summarize_job.py')
 
 def test_darshan_summary():
+    """
+    Basic summarize_job.py functionality (darshan and LMT integration)
+
+    """
     assert subprocess.check_call([ BINARY, '--json', SAMPLE_DARSHAN_LOG ], stdout=open(os.devnull, 'w')) == 0
 
 #def test_darshan_summary_with_craysdb():
@@ -31,6 +35,10 @@ def test_darshan_summary():
 #    assert subprocess.check_call([ BINARY, '--craysdb', SAMPLE_XTDB2PROC_FILE, '--json', SAMPLE_DARSHAN_LOG ]) == 0
 
 def test_darshan_summary_with_lfsstatus():
+    """
+    Integration between lfsstatus and summarize_job.py
+
+    """
     assert subprocess.check_call([ BINARY,
                                    '--json',
                                    '--ost',
@@ -38,7 +46,11 @@ def test_darshan_summary_with_lfsstatus():
                                    '--ost-map', SAMPLE_OSTMAP_FILE,
                                    SAMPLE_DARSHAN_LOG ], stdout=open(os.devnull, 'w')) == 0
 
-def test_darshan_summary_with_lmt():
+def test_summary_without_darshan():
+    """
+    Functionality when no darshan log is present
+
+    """
     assert subprocess.check_call([ BINARY,
                                    '--json',
                                    '--jobid', SAMPLE_DARSHAN_JOBID,
