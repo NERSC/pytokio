@@ -5,6 +5,15 @@ import subprocess
 import datetime
 import json
 
+class SetEncoder(json.JSONEncoder):
+    """
+    Necessary because sets are not JSON-serializable
+    """
+    def default(self, obj):
+        if isinstance(obj,set):
+            return list(obj)
+        return json.JSONEncoder.default(self,obj)
+
 class Slurm(dict):
     
     def __init__(self, jobid=None, cache_file=None):
@@ -14,7 +23,7 @@ class Slurm(dict):
         self.load()
         
     def __repr__(self):
-        return json.dumps(self.values())
+        return json.dumps(self, cls=SetEncoder)
         
     def load(self):
         if self.cache_file is None and self.jobid is None:
@@ -22,6 +31,9 @@ class Slurm(dict):
         
         if self.cache_file:
             self.__setitem__(json.load(cache_file))
+
+        if 'node_names' in self:
+            self['node_names'] = set(self['node_names'])
     
     def save_cache(self, output_file=None):
         """
@@ -30,11 +42,12 @@ class Slurm(dict):
         if output_file is None:
             self._save_cache(sys.stdout)
         else:
-            with open(output_file, 'w') as fp:
-                self.save_cache(json.dumps(self))
+            self._save_cache(output_file)
 
-    def _save_cache(self, output):
-        output.write(str(self))
+    def _save_cache(self, output_file):
+        with open(output_file, 'w') as fp:
+            self.save_cache(json.dumps(self, cls=SetEncoder))
+            output_file.write(str(self))
    
     
     #======================================================#
@@ -91,7 +104,7 @@ class Slurm(dict):
             
         node_names = set([])
         for node_string in node_strings:
-            for node_name in _expand_nodelist(node_string):
+            for node_name in self._expand_nodelist(node_string):
                 node_names.add(node_name)
         
         self.__setitem__('node_names', node_names)
