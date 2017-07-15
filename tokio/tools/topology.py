@@ -9,10 +9,11 @@ def get_job_diameter(jobid, cache_file=None):
     metric
 
     """
-    jobnodes = slurm.get_job_nodes(jobid)
+    job_info = slurm.Slurm(jobid)
+    job_info.get_job_nodes()
     proc_table = craysdb.CraySdbProc(cache_file=cache_file)
     node_positions = []
-    for jobnode in jobnodes:
+    for jobnode in job_info['node_names']:
         nid_num = int(jobnode.lstrip('nid'))
         node_x = proc_table[nid_num]['x_coord']
         node_y = proc_table[nid_num]['y_coord']
