@@ -325,12 +325,12 @@ def retrieve_topology_data(results, craysdb):
     if craysdb is not None:
         if '_jobid' not in results:
             raise Exception('cannot get_job_diameter without a jobid')
-            if craysdb == "":
-                cache_file = None
-            else:
-                cache_file = craysdb
-                module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=cache_file)
-                merge_dicts(results, module_results, prefix='craysdb_')
+        if craysdb == "":
+            cache_file = None
+        else:
+            cache_file = craysdb
+        module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=cache_file)
+        merge_dicts(results, module_results, prefix='craysdb_')
     return results
 
 def retrieve_jobid(results, jobid, nbfiles):
