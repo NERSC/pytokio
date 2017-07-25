@@ -208,7 +208,7 @@ class Hdf5(h5py.File):
 
     def to_dataframe(self, dataset_name=None):
         """
-        Convert the hdf5 class in a pandas dataframe 
+        Convert the hdf5 class in a Pandas DataFrame indexed by local time
         """
         # Convenience:may put in lower case
         _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'

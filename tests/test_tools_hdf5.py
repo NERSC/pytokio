@@ -57,14 +57,21 @@ def check_get_dataframe_from_time_range(dataset_name, start_offset, duration, ex
     get_dataframe_from_time_range correctness
     """
     print "checking [%s] to [%s]" % (start_offset, duration)
+
+    # express start_time in the sample input's time zone
     start_time = datetime.utcfromtimestamp(t0) + start_offset + SAMPLE_TZ_OFFSET
     end_time = start_time + duration
+
     # Make sure we're touching at least two files
     assert (end_time.date() - start_time.date()).days == 1
+
+    # the following fails for start_offset < (sample_offset - local_offset) -- why?
     result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_INPUT, dataset_name, start_time, end_time)
+
+    # ensure the return is not empty
     assert len(result.index) > 0
     assert len(result.columns) > 0 or expected_dimensions == 1
-    # result.index[0] is stored in localtime
+
     local_offset = (datetime.fromtimestamp(t0) - datetime.utcfromtimestamp(t0))
     print "local offset vs. utc:", local_offset
     print "sample offset vs. utc:", SAMPLE_TZ_OFFSET

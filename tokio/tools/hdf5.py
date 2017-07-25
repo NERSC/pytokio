@@ -160,16 +160,17 @@ def get_group_data_from_time_range(file_name, group_name, datetime_start, dateti
 
 def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetime_end):
     """
-    Returns the same content as get_group_data_from_time_range 
-    into a dataframe
+    Returns the same content as get_group_data_from_time_range but in DataFrame
+    form.  Note that DataFrame index is cast from UTC (as stored in HDF5) to
+    localtime by connectors.hdf5.Hdf5.to_dataframe()
     
     """
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     if not files_and_indices:
         raise Exception("no relevant hdf5 files found")
-    result = None
 
-    for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
+    result = None
+    for h5file, _, _ in files_and_indices:
         with connectors.hdf5.Hdf5(h5file, mode='r') as f:
             df_slice = f.to_dataframe(group_name)
             df_slice = df_slice[(df_slice.index >= datetime_start) 
