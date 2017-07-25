@@ -35,10 +35,13 @@ TIME_OFFSETS = [
 ]
 
 def check_get_files_and_indices(start_offset, duration):
-    start_time = datetime.utcfromtimestamp(t0) + start_offset
+    """
+    get_files_and_indices correctness
+    """
+    start_time = datetime.utcfromtimestamp(t0) + start_offset + SAMPLE_TZ_OFFSET
     end_time = start_time + duration
     # Make sure we're touching at least two files
-    assert ((end_time+SAMPLE_TZ_OFFSET).date() - (start_time+SAMPLE_TZ_OFFSET).date()).days == 1
+    assert (end_time.date() - start_time.date()).days == 1
 
     files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_INPUT, start_time, end_time)
     assert len(files_and_indices) > 0
@@ -49,23 +52,35 @@ def check_get_files_and_indices(start_offset, duration):
             assert (derived_start == start_time) or istart == 0
             assert (derived_end == end_time - timedelta(seconds=dt)) or iend == -1 
 
-def check_get_dataframe_from_time_range(dataset_name, start_offset, duration, zero_columns):
-    start_time = datetime.utcfromtimestamp(t0) + start_offset
+def check_get_dataframe_from_time_range(dataset_name, start_offset, duration, expected_dimensions):
+    """
+    get_dataframe_from_time_range correctness
+    """
+    print "checking [%s] to [%s]" % (start_offset, duration)
+    start_time = datetime.utcfromtimestamp(t0) + start_offset + SAMPLE_TZ_OFFSET
     end_time = start_time + duration
     # Make sure we're touching at least two files
-    assert ((end_time+SAMPLE_TZ_OFFSET).date() - (start_time+SAMPLE_TZ_OFFSET).date()).days == 1
+    assert (end_time.date() - start_time.date()).days == 1
     result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_INPUT, dataset_name, start_time, end_time)
     assert len(result.index) > 0
-    print dataset_name, result.columns
-    assert zero_columns or len(result.columns) > 0
-    assert result.index[0] == start_time
-    assert result.index[-1] == end_time - timedelta(seconds=dt)
+    assert len(result.columns) > 0 or expected_dimensions == 1
+    # result.index[0] is stored in localtime
+    local_offset = (datetime.fromtimestamp(t0) - datetime.utcfromtimestamp(t0))
+    print "local offset vs. utc:", local_offset
+    print "sample offset vs. utc:", SAMPLE_TZ_OFFSET
+    print "result.index[0]:", result.index[0]
+    print "start_time:", start_time
+    print "result.index[-1]:", result.index[-1]
+    print "end_time", end_time
+
+    # the following fails for start_offset < (sample_offset - local_offset) -- why?
+    assert (result.index[0]) == start_time
+    assert (result.index[-1]) == end_time - timedelta(seconds=dt)
 
 def test():
     for (start_offset, duration) in TIME_OFFSETS:
         yield check_get_files_and_indices, start_offset, duration
         for dataset_name in DATASETS_1D:
-            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, True
+            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, 1
         for dataset_name in DATASETS_2D:
-            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, False
-
+            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, 2
