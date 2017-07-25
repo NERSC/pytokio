@@ -8,6 +8,10 @@ from datetime import datetime, timedelta
 
 tokio.tools.hdf5.H5LMT_BASE = os.path.join(os.getcwd(), 'inputs' )
 SAMPLE_INPUT = 'sample.h5lmt'
+SAMPLE_TZ_OFFSET = timedelta(hours=-7) # the difference in timezone as implied
+                                       # by the sample's directory-based date
+                                       # index and the epoch timestamps
+                                       # contained within the file
 DATASET_NAME = 'FSStepsGroup/FSStepsDataSet'
 with tokio.connectors.Hdf5(os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE_INPUT)) as fp:
     t0 = fp[DATASET_NAME][0]
@@ -31,30 +35,37 @@ TIME_OFFSETS = [
 ]
 
 def check_get_files_and_indices(start_offset, duration):
-    start_time = datetime.fromtimestamp(t0) + start_offset
+    start_time = datetime.utcfromtimestamp(t0) + start_offset
     end_time = start_time + duration
     # Make sure we're touching at least two files
-    assert (end_time.date() - start_time.date()).days == 1
+    assert ((end_time+SAMPLE_TZ_OFFSET).date() - (start_time+SAMPLE_TZ_OFFSET).date()).days == 1
 
     files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_INPUT, start_time, end_time)
+    assert len(files_and_indices) > 0
     for count, (file_name, istart, iend) in enumerate(files_and_indices):
-        with tokio.connectors.Hdf5(file_name, mode='r') as file:
-            derived_start = datetime.fromtimestamp(file[DATASET_NAME][istart])
-            derived_end = datetime.fromtimestamp(file[DATASET_NAME][iend])
+        with tokio.connectors.Hdf5(file_name, mode='r') as h5lmt_file:
+            derived_start = datetime.fromtimestamp(h5lmt_file[DATASET_NAME][istart])
+            derived_end = datetime.fromtimestamp(h5lmt_file[DATASET_NAME][iend])
             assert (derived_start == start_time) or istart == 0
             assert (derived_end == end_time - timedelta(seconds=dt)) or iend == -1 
 
-def check_get_dataframe_from_time_range(dataset_name, start_offset, duration):
-    start_time = datetime.fromtimestamp(t0) + start_offset
+def check_get_dataframe_from_time_range(dataset_name, start_offset, duration, zero_columns):
+    start_time = datetime.utcfromtimestamp(t0) + start_offset
     end_time = start_time + duration
     # Make sure we're touching at least two files
-    assert (end_time.date() - start_time.date()).days == 1
+    assert ((end_time+SAMPLE_TZ_OFFSET).date() - (start_time+SAMPLE_TZ_OFFSET).date()).days == 1
     result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_INPUT, dataset_name, start_time, end_time)
+    assert len(result.index) > 0
+    print dataset_name, result.columns
+    assert zero_columns or len(result.columns) > 0
     assert result.index[0] == start_time
     assert result.index[-1] == end_time - timedelta(seconds=dt)
 
 def test():
     for (start_offset, duration) in TIME_OFFSETS:
         yield check_get_files_and_indices, start_offset, duration
-        for dataset_name in DATASETS_1D + DATASETS_2D:
-            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration
+        for dataset_name in DATASETS_1D:
+            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, True
+        for dataset_name in DATASETS_2D:
+            yield check_get_dataframe_from_time_range, dataset_name, start_offset, duration, False
+
