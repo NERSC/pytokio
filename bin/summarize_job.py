@@ -47,9 +47,17 @@ def _identify_fs_from_path(path, mounts):
             matching_mount = mount
     return matching_mount
 
-def _summarize_darshan_header(results, darshan_header_src):
-    if 'header' in darshan_header_src:
-        d_header = darshan_header_src['header']
+def summarize_darshan(darshan_data):
+    """
+    Synthesize new Darshan summary metrics based on the contents of a
+    connectors.darshan.Darshan object that is partially or fully populated
+    
+    """
+
+    results = {}
+
+    if 'header' in darshan_data:
+        d_header = darshan_data['header']
         results['walltime'] = d_header.get('walltime')
         results['end_time'] = d_header.get('end_time')
         results['start_time'] = d_header.get('start_time')
@@ -57,34 +65,32 @@ def _summarize_darshan_header(results, darshan_header_src):
         results['app'] = d_header.get('exe')
         if results['app']:
             results['app'] = results['app'][0]
-    return results
 
-def _summarize_darshan_perf(results, darshan_perf_data):
-    if darshan_perf_data and 'counters' in darshan_perf_data:
-        # Extract POSIX performance counters if present
-        d_counter = darshan_perf_data['counters']
-        if 'posix' in  d_counter and '_perf' in d_counter['posix']:
-            d_perf = darshan_perf_data['counters']['posix']['_perf']
-            results['total_gibs_posix'] = d_perf.get('total_bytes')
-            if results['total_gibs_posix']:
-                results['total_gibs_posix'] /= 2.0**30
-                results['agg_perf_by_slowest_posix'] = d_perf.get('agg_perf_by_slowest')
-                results['io_time'] = d_perf.get('slowest_rank_io_time_unique_files')
-                if results['io_time']:
-                    results['io_time'] += d_perf.get('time_by_slowest_shared_files')
-    return results
+    # Extract POSIX performance counters if present
+    if 'counters' in darshan_data \
+    and 'posix' in darshan_data['counters'] \
+    and '_perf' in darshan_data['counters']['posix']:
+        d_perf = darshan_data['counters']['posix']['_perf']
+        results['total_gibs_posix'] = d_perf.get('total_bytes')
+        if results['total_gibs_posix']:
+            results['total_gibs_posix'] /= 2.0**30
+            results['agg_perf_by_slowest_posix'] = d_perf.get('agg_perf_by_slowest')
+            results['io_time'] = d_perf.get('slowest_rank_io_time_unique_files')
+            if results['io_time']:
+                results['io_time'] += d_perf.get('time_by_slowest_shared_files')
 
-def _summarize_darshan_base(results, darshan_base_data):    
-    if darshan_base_data and 'counters' in darshan_base_data:
+    if 'counters' in darshan_data:
         # Try to find the most-used API, the most time spent in that api
         biggest_api = {}
-        for api_name in darshan_base_data['counters'].keys():
+        for api_name in darshan_data['counters'].keys():
             biggest_api[api_name] = {
                 'write': 0,
                 'read': 0,
             }
-            for file_path in darshan_base_data['counters'][api_name]:
-                for rank, record in darshan_base_data['counters'][api_name][file_path].iteritems():
+            for file_path in darshan_data['counters'][api_name]:
+                if file_path in ('_perf', '_total'): # only consider file records
+                    continue
+                for rank, record in darshan_data['counters'][api_name][file_path].iteritems():
                     bytes_read = record.get('BYTES_READ')
                     if bytes_read is not None:
                         biggest_api[api_name]['read'] += bytes_read
@@ -99,10 +105,12 @@ def _summarize_darshan_base(results, darshan_base_data):
 
         # Try to find the most-used file system based on the most-used API
         biggest_fs = {}
-        mounts = darshan_base_data['mounts'].keys()
+        mounts = darshan_data['mounts'].keys()
         for api_name in results['biggest_read_api'], results['biggest_write_api']:
-            for file_path in darshan_base_data['counters'][api_name]:
-                for rank, record in darshan_base_data['counters'][api_name][file_path].iteritems():
+            for file_path in darshan_data['counters'][api_name]:
+                if file_path in ('_perf', '_total'): # only consider file records
+                    continue
+                for rank, record in darshan_data['counters'][api_name][file_path].iteritems():
                     key = _identify_fs_from_path(file_path, mounts)
                     if key is None:
                         key = '_unknown' ### for stuff like STDIO
@@ -120,38 +128,6 @@ def _summarize_darshan_base(results, darshan_base_data):
         results['biggest_read_fs_bytes'] = biggest_fs[results['biggest_read_fs']]['read']
     return results
     
-
-def summarize_darshan(darshan_base_data=None,
-                      darshan_perf_data=None,
-                      darshan_total_data=None):
-    """
-    Take the results of extract_darshan_* and return only the counters of
-    interest.
-    
-    """
-    # We assume that mpiio activity is a superset of posix, but posix activity
-    # is never a superset of mpiio
-    API_CHECK_ORDER = ['mpiio', 'posix']
-
-    results = {}
-    # Extract all the counters from the file's common header
-    if darshan_base_data is not None:
-        darshan_header_src = darshan_base_data
-    elif darshan_perf_data is not None:
-        darshan_header_src = darshan_perf_data
-    elif darshan_total_data is not None:
-        darshan_header_src = darshan_total_data
-    else:
-        raise Exception("no viable source of darshan header info provided")
-    
-    results = _summarize_darshan_header(results, darshan_header_src)
-    # Hopefully the Darshan log isn't just empty...
-    results = _summarize_darshan_perf(results, darshan_perf_data)
-    results = _summarize_darshan_base(results, darshan_base_data)
-    return results
-
-### the following have to be synthesized
-#   'lmt_bytes_covered'
 
 def summarize_byterate_df(df, rw, timestep=None):
     """
@@ -243,19 +219,18 @@ def retrieve_darshan_data(results, files):
         darshan_log_file = files[i]
         # Extract the performance data from the darshan log
         d = tokio.connectors.darshan.Darshan(darshan_log_file)
-        darshan_perf_data = d.darshan_parser_perf()
-        darshan_base_data = d.darshan_parser_base()
+        d.darshan_parser_perf()
+        d.darshan_parser_base()
 
         # Define start/end time from darshan log
-        results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['start_time']))
-        results['_datetime_end'] = datetime.datetime.fromtimestamp(int(darshan_perf_data['header']['end_time']))
+        results['_datetime_start'] = datetime.datetime.fromtimestamp(int(d['header']['start_time']))
+        results['_datetime_end'] = datetime.datetime.fromtimestamp(int(d['header']['end_time']))
         
         if '_jobid' not in results:
-            results['_jobid'] = darshan_perf_data['header']['jobid']
+            results['_jobid'] = d['header']['jobid']
             
         # Get the summary of the Darshan log
-        module_results = summarize_darshan(darshan_perf_data=darshan_perf_data,
-                                           darshan_base_data=darshan_base_data)
+        module_results = summarize_darshan(d)
         merge_dicts(results, module_results, prefix='darshan_')
     return results
 
