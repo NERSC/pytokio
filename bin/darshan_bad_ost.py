@@ -24,8 +24,16 @@ def correlate_ost_performance(darshan_logs):
     """
     df = darshanlogs_to_ost_dataframe(darshan_logs)
 
+    # in the unlikely event that all performance measurements are the same (or
+    # there is only one), we simply cannot perform correlation analysis
+    if len(df['performance'].unique()) == 1:
+        return []
+
     results = []
     for ost_name in [ x for x in df.columns if x.startswith('OST') ]:
+        # if all values are the same (or there is only one), we cannot correlate
+        if len(df[ost_name].unique()) == 1:
+            continue
         coeff, pval = scipy.stats.pearsonr(df['performance'], df[ost_name])
         results.append({ 'ost_name': ost_name,
                          'coefficient': coeff,
@@ -132,7 +140,8 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-j", "--json", action="store_true", help="return output in JSON format")
-    parser.add_argument("-t", "--threshold", type=float, default=0.05, help="p-value above which correlations will not be displayed")
+    parser.add_argument("-p", "--p-threshold", type=float, default=0.05, help="p-value above which correlations will not be displayed")
+    parser.add_argument("-c", "--c-threshold", type=float, default=0.0, help="correlation coefficient below which abs(correlations) will not be displayed")
     parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
     args = parser.parse_args()
 
@@ -141,10 +150,10 @@ if __name__ == "__main__":
     if args.json:
         filtered_results = []
         for result in sorted(results, key=lambda k: k['coefficient']):
-            if result['p-value'] < args.threshold:
+            if result['p-value'] < args.p_threshold and abs(result['coefficient']) > args.c_threshold:
                 filtered_results.append(result)
         print json.dumps(filtered_results, indent=4, sort_keys=True)
     else:
         for result in sorted(results, key=lambda k: k['coefficient']):
-            if result['p-value'] < args.threshold:
+            if result['p-value'] < args.p_threshold and abs(result['coefficient']) > args.c_threshold:
                 print "%(ost_name)-12s %(coefficient)10.6f %(p-value)10.4g" % result
