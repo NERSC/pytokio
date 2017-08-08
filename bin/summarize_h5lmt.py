@@ -95,7 +95,7 @@ def print_data_summary(data, use_json=False):
     return print_str
 
 def bin_h5lmt(h5lmt_file):
-    f = tokio.Hdf5(h5lmt_file)
+    f = tokio.connectors.hdf5.Hdf5(h5lmt_file)
     if 'version' in f['/'].attrs and f['/'].attrs['version'] > 1:
         raise Exception("TOKIOfile version > 1 not supported")
 
@@ -152,7 +152,6 @@ def bin_h5lmt_like_object(f, timestep, num_bins=24):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='aggregate bytes in/out from h5lmt file every hour')
     parser.add_argument('h5lmt', metavar='N', type=str, nargs='+', help='h5lmt file to examine')
-    parser.add_argument('--brief', dest='brief', action='store_true', help='print a single line of output per h5lmt')
     parser.add_argument('--summary', dest='summary', action='store_true', help='print a summary of all output')
     parser.add_argument('--bytes', dest='bytes', action='store_true', help='print bytes, not GiB')
     parser.add_argument('--bins', dest='bins', type=int, default=24, help="number of bins per day")
