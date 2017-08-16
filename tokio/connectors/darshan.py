@@ -42,13 +42,13 @@ class Darshan(dict):
      #=================================================#
     
     def darshan_parser_base(self):
-        return self._darshan_parser("BASE")["BASE"]
+        return self._darshan_parser("BASE")
 
     def darshan_parser_total(self):
-        return self._darshan_parser("TOTAL")["TOTAL"]
+        return self._darshan_parser("TOTAL")
 
     def darshan_parser_perf(self):
-        return self._darshan_parser("PERF")["PERF"]
+        return self._darshan_parser("PERF")
 
     def _darshan_parser(self, counter_flag="BASE"):
         """
@@ -100,18 +100,18 @@ class Darshan(dict):
                     raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
                     
             # Otherwise insert the record--this logic should be made more flexible
-            if section not in darshan_data:
-                darshan_data[section] = {}
-            if module not in darshan_data[section]:
-                darshan_data[section][module] = {}
-            if file_name not in darshan_data[section][module]:
-                darshan_data[section][module][file_name] = {}
+            if section not in self:
+                self[section] = {}
+            if module not in self[section]:
+                self[section][module] = {}
+            if file_name not in self[section][module]:
+                self[section][module][file_name] = {}
             if rank is None:
-                insert_base = darshan_data[section][module][file_name]
+                insert_base = self[section][module][file_name]
             else:
-                if rank not in darshan_data[section][module][file_name]:
-                    darshan_data[section][module][file_name][rank] = {}
-                insert_base = darshan_data[section][module][file_name][rank]
+                if rank not in self[section][module][file_name]:
+                    self[section][module][file_name][rank] = {}
+                insert_base = self[section][module][file_name][rank]
 
             if counter in insert_base:
                 raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
@@ -125,7 +125,6 @@ class Darshan(dict):
         if self.log_file is None:
             return self
 
-        darshan_data = {}
         section = None
         counter = None
         module_section = None
@@ -143,25 +142,18 @@ class Darshan(dict):
             # Why do we look at section, refactorize failed 
             if section is None and line.startswith("# darshan log version:"):
                 section = "header"
-                if section not in darshan_data:
-                    darshan_data[section] = {}
-                else:
-                    raise Exception("duplicate %s sections found" % section)
+                if section not in self.keys():
+                    self[section] = {}
                     
             elif section == "header" and line.startswith("# mounted file systems"):
                 section = "mounts"
-                if section not in darshan_data:
-                    darshan_data[section] = {}
-                else:
-                    raise Exception("duplicate %s sections found" % section)
+                if section not in self.keys():
+                    self[section] = {}
                     
             elif section == "mounts" and line.startswith("# **********************"):  # understand the utility of these stars
                 section = "counters"
-                if section not in darshan_data:
-                    darshan_data[section] = {}
-                else:
-                    raise Exception("duplicate %s sections found" % section)
-                            
+                if section not in self.keys():
+                    self[section] = {}
 
             # otherwise use the appropriate parser for this section
             if section == "header":
@@ -169,15 +161,15 @@ class Darshan(dict):
                 if key is None:
                     pass
                 elif key == "metadata":
-                    if key not in darshan_data[section]:
-                        darshan_data[section][key] = []
-                    darshan_data[section][key].append(val)
+                    if key not in self[section]:
+                        self[section][key] = []
+                    self[section][key].append(val)
                 else:
-                    darshan_data[section][key] = val
+                    self[section][key] = val
             elif section == 'mounts':
                 key, val = self._parse_mounts(line)
                 if key is not None:
-                    darshan_data[section][key] = val
+                    self[section][key] = val
 
             elif section == 'counters':
                 if counter_flag == "BASE":
@@ -213,7 +205,6 @@ class Darshan(dict):
                           counter=counter,
                           value=value,
                           counter_prefix=counter_prefix)
-        self.__setitem__(counter_flag, darshan_data)
         return self
 
     def _parse_header(self, line):
