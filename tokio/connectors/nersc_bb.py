@@ -38,7 +38,6 @@ class NerscCollectd(object):
         self.num_bundle = 0
         self.output_file = output_file
         self.last_index = None
-        self.connect()
 
     def connect(self, host='localhost', port='9200', timeout=30):
         self.client = Elasticsearch(host=host, 
@@ -67,18 +66,13 @@ class NerscCollectd(object):
             json.dump(bundle, fp)
         self.num_bundle += 1
     
-    def query(self, t_start, t_stop, index=_ES_INDEX, scroll='1m', query = _QUERY_OST_DATA,
-              sort='@timestamp', _source=_SOURCE_FIELDS, size=DEFAULT_PAGE_SIZE):
-        t_start = datetime.datetime.strptime(t_start, _DATE_FMT)
-        t_stop = datetime.datetime.strptime(t_stop, _DATE_FMT)
+    def query(self, query=_QUERY_OST_DATA, index=_ES_INDEX):
         if index == _ES_INDEX:
             self.last_index = index.replace('-*', '')
         else:
             self.last_index = index
         t0 = datetime.datetime.now()
-        self.page = self.client.search(index=index,body=query,
-                                       scroll=scroll,size=size,
-                                       sort=sort,_source=_source)
+        self.page = self.client.search(body=query, index=index)
         print("Fetching page took %.2f seconds" % 
               (datetime.datetime.now() - t0).total_seconds())
         return self.page
@@ -86,6 +80,8 @@ class NerscCollectd(object):
     def scroll(self, scrollid=None, scroll='1m'):
         if self.page:
             if scrollid is None:
+                if '_scroll_id' not in self.page:
+                    raise Exception('Scroll not available')
                 sid = self.page['_scroll_id']
             else:
                 sid = scrollid
