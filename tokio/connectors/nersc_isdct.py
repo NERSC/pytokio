@@ -6,6 +6,7 @@ import json
 import gzip
 import pandas
 import tarfile
+import itertools
 import mimetypes
 
 class NerscIsdct(dict):
@@ -51,7 +52,7 @@ class NerscIsdct(dict):
             tar = tarfile.open(self.input_file, 'r')
 
         for member in tar.getmembers():
-            # only care about file members, not directories
+            # we only care about file members, not directories
             if not member.isfile():
                 continue
 
@@ -59,8 +60,9 @@ class NerscIsdct(dict):
             file_obj = tar.extractfile(member)
 
             # infer the node name from the member's path
-            nodename = self._decode_nersc_nid(member.name)
+            nodename = _decode_nersc_nid(member.name)
 
+            # process the member's contents, then add it to self
             parsed_counters_list.append(
                 self.parse_counters_fileobj(file_obj, nodename))
 
@@ -77,7 +79,7 @@ class NerscIsdct(dict):
         for root, dirs, files in os.walk(self.input_file):
             for file_name in files:
                 fq_file_name = os.path.join(root, file_name)
-                nodename = self._decode_nersc_nid(fq_file_name)
+                nodename = _decode_nersc_nid(fq_file_name)
                 parsed_counters = self.parse_counters_fileobj(
                     open(fq_file_name, 'r'),
                     nodename=nodename)
@@ -155,7 +157,7 @@ class NerscIsdct(dict):
     
         data = {}
         device_sn = None
-        parse_mode = 0      # =0 for regular counters, >1 for SMART data
+        parse_mode = 0      # =0 for regular counters, 1 for SMART data
         smart_buffer = {}
         for line in fileobj.readlines():
             line = line.strip()
@@ -166,24 +168,28 @@ class NerscIsdct(dict):
 
                     if nodename is not None:
                         data['NodeName'] = nodename
-                    if rex_match.group(1) == "Intel SSD":
+                    if rex_match.group(1) == "Intel SSD" or rex_match.group(1) == "SMART and Health Information":
                         parse_mode = 0
-                    elif rex_match.group(1) == "SMART Attributes" or rex_match.group(1) == "SMART and Health Information":
+                    elif rex_match.group(1) == "SMART Attributes":
                         parse_mode = 1
                     else:
                         raise Exception("Unknown counter file format")
             elif parse_mode == 0 and ':' in line:
                 key, val = line.split(':')
-                data[key.strip()] = val.strip()
+                key = _normalize_key(key)
+                data[key] = val.strip()
             elif parse_mode > 0 and ':' in line:
                 key, val = line.split(':')
-                smart_buffer[key.strip()] = val.strip()
+                key = _normalize_key(key)
+                smart_buffer[key] = val.strip()
             elif parse_mode > 0 and line.startswith('-') and line.endswith('-'):
-                for key, val in self._rekey_smart_buffer(smart_buffer).iteritems():
-                    data[key.strip()] = val
+                for key, val in _rekey_smart_buffer(smart_buffer).iteritems():
+                    key = _normalize_key(key)
+                    data[key] = val
                 smart_buffer = { '_id' : line.split()[1] }
         if parse_mode > 0: # flush the last SMART register
-            for key, val in self._rekey_smart_buffer(smart_buffer).iteritems():
+            for key, val in _rekey_smart_buffer(smart_buffer).iteritems():
+                key = _normalize_key(key)
                 data[key] = val
 
         if device_sn is None:
@@ -239,27 +245,69 @@ class NerscIsdct(dict):
     
         return all_data
 
-    def _decode_nersc_nid(self, path):
-        """
-        Given a path to some ISDCT output file, somehow figure out what the nid
-        name for that node is.  This encoding is specific to the way NERSC collects
-        and preserves ISDCT outputs.
-        """
-        abs_path = os.path.abspath(path)
-        nid_name = os.path.dirname(abs_path).split(os.sep)[-1]
-        return nid_name
+def _decode_nersc_nid(path):
+    """
+    Given a path to some ISDCT output file, somehow figure out what the nid
+    name for that node is.  This encoding is specific to the way NERSC collects
+    and preserves ISDCT outputs.
+    """
+    abs_path = os.path.abspath(path)
+    nid_name = os.path.dirname(abs_path).split(os.sep)[-1]
+    return nid_name
 
-    def _rekey_smart_buffer(self, smart_buffer):
-        """
-        Take a buffer containing smart values associated with one register and
-        create unique counters
-        """
-        data = {}
-        prefix = smart_buffer.get("Description")
-        if prefix is None:
-            prefix = smart_buffer.get("_id")
-    
-        for key, val in smart_buffer.iteritems():
-            key = ("%s_%s" % (prefix, key.strip())).replace("-","").replace(" ", "_")
-            data[key] = val.strip()
-        return data
+def _rekey_smart_buffer(smart_buffer):
+    """
+    Take a buffer containing smart values associated with one register and
+    create unique counters.  Only necessary for older versions of ISDCT
+    which did not output SMART registers in a standard "Key: value" text
+    format.
+    """
+    data = {}
+    prefix = smart_buffer.get("Description")
+    if prefix is None:
+        prefix = smart_buffer.get("_id")
+
+    for key, val in smart_buffer.iteritems():
+        key = ("SMART_%s_%s" % (prefix, key.strip())).replace("-","").replace(" ", "_")
+        key = _normalize_key(key)
+        data[key] = val.strip()
+    return data
+
+def _normalize_key(key):
+    """
+    Try to make the keys all follow similar formatting conventions.  Converts
+    Intel's mix of camel-case and snake-case counters into all snake-case.
+    Contains some nasty acronym hacks that may require modification if/when
+    Intel adds new funny acronyms that contain a mix of upper and lower case
+    letters (e.g., SMBus and NVMe)
+    """
+    key = key.strip().replace(' ', '_').replace('-', '')
+    key = key.replace("NVMe", "nvme").replace("SMBus", "smbus")
+    last_letter = None
+    new_key = ""
+    letter_list = list(key)
+    for index, letter in enumerate(letter_list):
+
+        if index+1 < len(letter_list):
+            next_letter = letter_list[index+1]
+        else:
+            next_leter = None
+
+        # don't allow repeated underscores
+        if letter == "_" and last_letter == "_":
+            continue
+
+
+        if last_letter is not None and last_letter != "_":
+            # start of a camelcase word?
+            if letter.isupper():
+                # don't stick underscores in acronyms
+                if not last_letter.isupper() and last_letter != "_":
+                    new_key += "_"
+                # unless this is the end of an acronym
+                elif next_letter is not None and not next_letter.isupper() and next_letter != "_":
+                    new_key += "_"
+        new_key += letter
+        last_letter = letter
+
+    return new_key.lower()
