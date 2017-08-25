@@ -263,7 +263,7 @@ def _rekey_smart_buffer(smart_buffer):
     format.
     """
     data = {}
-    prefix = smart_buffer.get("Description")
+    prefix = smart_buffer.get("description")
     if prefix is None:
         prefix = smart_buffer.get("_id")
 
