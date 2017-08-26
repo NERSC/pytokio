@@ -27,6 +27,8 @@ def validate_object(isdct_data):
         for counter in counters:
             # a counter didn't get parsed correctly
             assert not counter.startswith("None") 
+        # ensure that synthesized metrics are being calculated
+        assert 'write_amplification_factor' in counters
 
 def validate_dataframe(isdct_data):
     """

@@ -14,9 +14,10 @@ class NerscIsdct(dict):
         super(NerscIsdct,self).__init__(self)
         self.input_file = input_file
         self.load()
+        # synthesize metrics independent of the input format
+        self._synthesize_metrics()
 
     def __repr__(self):
-#       return json.dumps(self.values())
         return json.dumps(self)
 
     def load(self):
@@ -197,6 +198,29 @@ class NerscIsdct(dict):
         else:
             return { device_sn : data }
 
+    def _synthesize_metrics(self):
+        """
+        Calculate some additional convenient metrics that are not directly
+        presented by ISDCT
+        """
+
+        for serial_no, counters in self.iteritems():
+            # native units are "kiloblocks," whatever that signifies
+            for key in 'data_units_read', 'data_units_written':
+                if key in counters:
+                    self[serial_no][key + "_bytes"] = counters[key] * 1000 * 512
+
+            # native units are in 32 MiB
+            for key in 'smart_nand_bytes_written_raw', 'smart_host_bytes_written_raw':
+                if key in counters:
+                    self[serial_no][key.replace('_raw', '_bytes')] = counters[key] * 32 * 1024 * 1024
+
+            # calculate WAF
+            nand_writes = counters.get('smart_nand_bytes_written_raw')
+            host_writes = counters.get('smart_host_bytes_written_raw')
+            if nand_writes is not None and host_writes is not None and host_writes > 0:
+                self[serial_no]['write_amplification_factor'] = float(nand_writes) / float(host_writes)
+
     def _merge_parsed_counters(self, parsed_counters_list):
         """
         Receives a list of parsed ISDCT outputs as dicts.  The counters from
@@ -296,7 +320,6 @@ def _normalize_key(key):
         # don't allow repeated underscores
         if letter == "_" and last_letter == "_":
             continue
-
 
         if last_letter is not None and last_letter != "_":
             # start of a camelcase word?
