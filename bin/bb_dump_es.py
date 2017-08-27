@@ -15,8 +15,7 @@ try:
 except:
     import pickle
 
-import elasticsearch
-import elasticsearch.helpers
+import tokio.connectors.collectd_es
 
 # Maximum number of documents to serialize into a single output file
 MAX_DOC_BUNDLE = 50000
@@ -64,81 +63,30 @@ _SOURCE_FIELDS = [
     'io_time',
 ]
 
-def serialize_bundle_json(bundle, output_file):
+def serialize_bundle_json(es_obj):
     """
     save our bundled pages into gzipped json
     """
+    output_file = "%s.%08d.json.gz" % (es_obj.index.replace('-*', ''), es_obj.num_flushes)
     t0 = datetime.datetime.now()
     with gzip.open( filename=output_file, mode='w', compresslevel=1 ) as fp:
-        json.dump(bundle, fp)
+        json.dump(es_obj.scroll_pages, fp)
     print "  Serialization took %.2f seconds" % (datetime.datetime.now() - t0).total_seconds()
+    print "  Bundled %d documents into %s" % (len(es_obj.scroll_pages), output_file)
+    es_obj.scroll_pages = []
 
-def serialize_bundle_pickle(bundle, output_file):
+def serialize_bundle_pickle(es_obj):
     """
     save our bundled pages into gzipped pickle
     """
+    output_file = "%s.%08d.json.gz" % (es_obj.index.replace('-*', ''), es_obj.num_flushes)
     t0 = datetime.datetime.now()
     with gzip.open( filename=output_file.replace('json', 'pickle'), mode='w', compresslevel=1 ) as fp:
-        pickle.dump(bundle, fp, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(es_obj.scroll_pages, fp, pickle.HIGHEST_PROTOCOL)
     print "  Serialization took %.2f seconds" % (datetime.datetime.now() - t0).total_seconds()
+    print "  Bundled %d documents into %s" % (len(es_obj.scroll_pages), output_file)
+    es_obj.scroll_pages = []
 
-def query_and_page( esdb, query, index=_ES_INDEX, scroll='1m', size=DEFAULT_PAGE_SIZE, _source=_SOURCE_FIELDS, serialize_bundle=serialize_bundle_json ):
-    t_begin = datetime.datetime.now()
-
-    # Get first set of results and a scroll id
-    result = esdb.search(
-        index=index,
-        body=query,
-        scroll=scroll,
-        size=size,
-        sort='@timestamp',
-        _source=_source,
-    )
-
-    print "Fetching first page took %.2f seconds" % (datetime.datetime.now() - t_begin).total_seconds()
-
-    num_bundles = 0
-    total_retrieved = 0
-    bundled_pages = []
-    # Keep scrolling until we have all the data
-    while len(result['hits']['hits']) > 0:
-        t_iterate = datetime.datetime.now()
-        sid = result['_scroll_id']
-
-        docs_retrieved = len(result['hits']['hits'])
-        total_retrieved += docs_retrieved
-        print "  Retrieved %d hits, %d to go (%d total)" % (docs_retrieved,
-                                                          result['hits']['total'] - total_retrieved,
-                                                          result['hits']['total'])
-
-        # If this page will overflow the bundle, flush the bundle first
-        if (len(bundled_pages) + docs_retrieved) > MAX_DOC_BUNDLE:
-            output_file = "%s.%08d.json.gz" % (_ES_INDEX.replace('-*', ''), num_bundles)
-            serialize_bundle(bundled_pages, output_file)
-            print "  Bundled %d documents into %s" % (len(bundled_pages), output_file)
-            bundled_pages = []
-            num_bundles += 1
-
-        bundled_pages += result['hits']['hits']
-
-        # Fetch a new page
-        t0 = datetime.datetime.now()
-        result = esdb.scroll(scroll_id=sid, scroll='1m')
-        tf = datetime.datetime.now()
-        print "  Fetching data took %.2f seconds" % (tf - t0).total_seconds()
-        print "Total cycle took %.2f seconds" % (tf - t_iterate).total_seconds()
-
-    # Flush the last bundle if it's not empty
-    if len(bundled_pages) > 0:
-        output_file = "%s.%08d.json.gz" % (_ES_INDEX.replace('-*', ''), num_bundles)
-        serialize_bundle(bundled_pages, output_file)
-        print "Bundled %d documents into %s" % (len(bundled_pages), output_file)
-
-    t_wall = (datetime.datetime.now() - t_begin).total_seconds()
-    print "Packaged %d documents in %.2f seconds (%.2f docs/sec)" % (total_retrieved,
-                                                                     t_wall,
-                                                                     total_retrieved/t_wall)
-                                                                     
 if __name__ == '__main__':
     # Parse CLI options
     parser = argparse.ArgumentParser( add_help=False)
@@ -180,21 +128,35 @@ if __name__ == '__main__':
         if node_name not in this_node:
             this_node[node_name] = {}
         this_node = this_node[node_name]
+
     # Update the timeseries filter
     this_node['gte'] = t_start.strftime("%s")
     this_node['lt'] = t_stop.strftime("%s")
     this_node['format'] = "epoch_second"
 
     # Print query
-    print json.dumps(query,indent=4)
+    if args.debug:
+        print json.dumps(query,indent=4)
 
     # Try to connect
-    esdb = elasticsearch.Elasticsearch([{
-        'host': args.host,
-        'port': args.port, }])
+    es_obj = tokio.connectors.collectd_es.CollectdEs(
+        host='localhost',
+        port=9200,
+        index='cori-collectd-*')
 
     # Run query
     if args.pickle:
-        query_and_page(esdb, query, serialize_bundle=serialize_bundle_pickle)
+        flush_function = serialize_bundle_pickle
     else:
-        query_and_page(esdb, query)
+        flush_function = serialize_bundle_json
+
+    es_obj.query_and_scroll(
+        query=query,
+        source_filter=_SOURCE_FIELDS,
+        filter_function=lambda x: x['hits']['hits'],
+        flush_every=MAX_DOC_BUNDLE,
+        flush_function=flush_function
+    )
+
+    if len(es_obj.scroll_pages) > 0:
+        flush_function(es_obj)
