@@ -11,7 +11,7 @@ import tempfile
 import ConfigParser
 
 cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
+cfg.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'tokio.cfg'))
 
 H5LMT_BASE = os.environ.get('PYTOKIO_H5LMT_BASE')
 if H5LMT_BASE is None:
