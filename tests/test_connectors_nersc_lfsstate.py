@@ -54,16 +54,23 @@ def verify_ostfullness(keyvalues):
              
 
 def test_ostmap_from_cache():
-    # Read from a cache file
+    """
+    Read OST map from a cache file
+    """
     ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
     verify_ost(ostmap, type='ostmap')
 
 def test_ostfullness_from_cache():
-    # Read from a cache file
+    """
+    Read OST fullness from a cache file
+    """
     ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     verify_ost(ostfullness, type='ostfullness')
 
 def test_ostmap_serializer():
+    """
+    OST map can deserialize its serialization
+    """
     # Read from a cache file
     ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
     # Serialize the object, then re-read it and verify it
@@ -76,6 +83,9 @@ def test_ostmap_serializer():
     verify_ost(ostmap, type='ostmap')
 
 def test_ostfullness_serializer():
+    """
+    OST fullness can deserialize its serialization
+    """
     # Read from a cache file
     ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     # Serialize the object, then re-read it and verify it

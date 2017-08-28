@@ -31,6 +31,9 @@ TIME_OFFSETS = [
 ]
 
 def check_get_files_and_indices(start_offset, duration):
+    """
+    Enumerate input files from time range
+    """
     start_time = datetime.fromtimestamp(t0) + start_offset
     end_time = start_time + duration
     # Make sure we're touching at least two files
@@ -45,6 +48,9 @@ def check_get_files_and_indices(start_offset, duration):
             assert (derived_end == end_time - timedelta(seconds=dt)) or iend == -1 
 
 def check_get_dataframe_from_time_range(dataset_name, start_offset, duration):
+    """
+    Retrieve DataFrame from time range
+    """
     start_time = datetime.fromtimestamp(t0) + start_offset
     end_time = start_time + duration
     # Make sure we're touching at least two files
@@ -54,6 +60,9 @@ def check_get_dataframe_from_time_range(dataset_name, start_offset, duration):
     assert result.index[-1] == end_time - timedelta(seconds=dt)
 
 def test():
+    """
+    Correctness of tools.hdf5 edge cases
+    """
     for (start_offset, duration) in TIME_OFFSETS:
         yield check_get_files_and_indices, start_offset, duration
         for dataset_name in DATASETS_1D + DATASETS_2D:
