@@ -7,16 +7,13 @@ import json
 import datetime
 import gzip
 from elasticsearch import Elasticsearch
-from .. import debug
-debug.DEBUG = True
-
 
 QUERY_DISK_BYTES_RW = {
     "query": {
         "query_string": {
-            "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
+            "query": "hostname:bb* AND plugin:disk AND collectd_type:disk_octets AND plugin_instance:nvme*",
             "analyze_wildcard": True,
-                },
+        },
     },
 }
 
@@ -37,6 +34,8 @@ class CollectdEs(object):
         self.scroll_id = None
         # for query_and_scroll
         self.num_flushes = 0
+        # hidden parameters to refine how ElasticSearch queries are issued
+        self.sort_by = ''
 
         self.connect()
 
@@ -63,7 +62,7 @@ class CollectdEs(object):
         """
         Issue an ElasticSearch query 
         """
-        self.page = self.client.search(body=query, index=self.index)
+        self.page = self.client.search(body=query, index=self.index, sort=self.sort_by)
         if '_scroll_id' in self.page:
             self.scroll_id = self.page['_scroll_id']
         return self.page
@@ -106,8 +105,6 @@ class CollectdEs(object):
             num_hits = len(self.page['hits']['hits'])
             scroll_state['total_hits'] += num_hits 
 
-            debug.debug_print("Page %d contains %d hits" % (scroll_state['num_hits_since_flush'], num_hits))
-
             # if this page will push us over flush_every, flush it first
             if flush_function is not None \
             and flush_every \
@@ -140,7 +137,6 @@ class CollectdEs(object):
             'num_hits_since_flush': 0
         }
 
-        debug.debug_print("Sending initial query")
         # Get first set of results and a scroll id
         self.page = self.client.search(
             index=self.index,
@@ -149,7 +145,6 @@ class CollectdEs(object):
             size=self.page_size,
             _source=source_filter,
         )
-        debug.debug_print('First query got %d hits' % len(self.page['hits']['hits']))
 
         more_results = process_page(scroll_state)
 
