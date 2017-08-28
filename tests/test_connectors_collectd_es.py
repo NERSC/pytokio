@@ -63,7 +63,7 @@ def to_epoch(dt):
 
 def test_flush_function_correctness():
     """
-    flush function correctness
+    CollectdEs flush function correctness
     """
 
     # Define start/end time.  Because we don't know what's in the remote server,
