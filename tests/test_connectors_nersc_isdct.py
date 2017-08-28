@@ -38,14 +38,14 @@ def validate_dataframe(isdct_data):
 
 def test_tgz_input():
     """
-    Load .tgz input files
+    Load NerscIsdct from .tgz input files
     """
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_TGZ_INPUT)
     validate_object(isdct_data)
 
 def test_tar_input():
     """
-    Load .tar input files (no compression)
+    Load NerscIsdct from .tar input files (no compression)
     """
     gunzip(SAMPLE_TGZ_INPUT, SAMPLE_TAR_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_TAR_INPUT)
@@ -54,7 +54,7 @@ def test_tar_input():
 
 def test_unpacked_input():
     """
-    Load unpacked .tgz directories
+    Load NerscIsdct from unpacked .tgz directories
     """
     untar(SAMPLE_TGZ_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_UNPACKED_INPUT)
@@ -63,14 +63,14 @@ def test_unpacked_input():
 
 def test_json_gz_input():
     """
-    Load compressed, serialized json
+    Load NerscIsdct from compressed, serialized json
     """
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_JSON_GZ_INPUT)
     validate_object(isdct_data)
 
 def test_json_input():
     """
-    Load serialized json
+    Load NerscIsdct from uncompressed serialized json
     """
     gunzip(SAMPLE_JSON_GZ_INPUT, SAMPLE_JSON_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_JSON_INPUT)
@@ -79,13 +79,16 @@ def test_json_input():
 
 def test_to_dataframe():
     """
-    convert NerscIsdct object into a DataFrame
+    Convert NerscIsdct object into a DataFrame
     """
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(DEFAULT_INPUT)
     isdct_df = isdct_data.to_dataframe()
     validate_dataframe(isdct_df)
 
 def test_serializer():
+    """
+    NerscIsdct can deserialize its serialization
+    """
     # Read from a cache file
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(DEFAULT_INPUT)
     # Serialize the object, then re-read it and verify it
