@@ -2,12 +2,16 @@
 
 import os
 import re
+import sys
 import json
 import gzip
 import pandas
 import tarfile
 import itertools
 import mimetypes
+import time
+import datetime
+import warnings
 
 class NerscIsdct(dict):
     def __init__(self, input_file):
@@ -52,10 +56,25 @@ class NerscIsdct(dict):
         else:
             tar = tarfile.open(self.input_file, 'r')
 
+        timestamp_str = None
+        min_mtime = None
         for member in tar.getmembers():
             # we only care about file members, not directories
             if not member.isfile():
                 continue
+
+            # is this a magic timestamp file?
+            if 'timestamp_' in member.name:
+                timestamp_str = member.name.split('_')[-1]
+                continue
+
+            # independently, track the earliest mtime we can find.  In the
+            # future, we may want to set an mtime for each individual file_obj,
+            # but for now we treat the whole dump as a single timestamped entity
+            if min_mtime is None:
+                min_mtime = member.mtime
+            else:
+                min_mtime = min(min_mtime, member.mtime)
 
             # extract the file member into a memory buffer
             file_obj = tar.extractfile(member)
@@ -66,6 +85,21 @@ class NerscIsdct(dict):
             # process the member's contents, then add it to self
             parsed_counters_list.append(
                 self.parse_counters_fileobj(file_obj, nodename))
+
+        # If no timestamp file was found, use the earliest mtime as a guess
+        if timestamp_str is None:
+            timestamp = datetime.datetime.fromtimestamp(min_mtime)
+        # Otherwise, the timestamp file is the ground truth
+        else:
+            timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+
+        # Set the timestamp for each device serial number
+        timestamp = long(time.mktime(timestamp.timetuple()))
+        for parsed_counters in parsed_counters_list:
+            if len(parsed_counters.keys()) > 1:
+                warnings.warn("Multiple serial numbers detected in a single file_obj: " + str(parsed_counters.keys()))
+            for serialno, counters in parsed_counters.iteritems():
+                counters['timestamp'] = timestamp
 
         merged_counters = self._merge_parsed_counters(parsed_counters_list)
         for key, val in merged_counters.iteritems():

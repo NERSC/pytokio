@@ -10,6 +10,7 @@ import tokio.connectors.nersc_isdct
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tgz')
+SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_timestamped.tgz')
 SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tar')
 SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_dir')
 SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.json')
@@ -29,6 +30,9 @@ def validate_object(isdct_data):
             assert not counter.startswith("None") 
         # ensure that synthesized metrics are being calculated
         assert 'write_amplification_factor' in counters
+        # ensure that timestamp is set
+        print json.dumps(counters,indent=4,sort_keys=True)
+        assert 'timestamp' in counters
 
 def validate_dataframe(isdct_data):
     """
@@ -41,6 +45,13 @@ def test_tgz_input():
     Load NerscIsdct from .tgz input files
     """
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_TGZ_INPUT)
+    validate_object(isdct_data)
+
+def test_timestamped_input():
+    """
+    Load NerscIsdct containing a timestamp file
+    """
+    isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_TIMESTAMPED_INPUT)
     validate_object(isdct_data)
 
 def test_tar_input():
