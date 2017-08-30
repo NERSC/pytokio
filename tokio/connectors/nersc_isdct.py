@@ -83,8 +83,9 @@ class NerscIsdct(dict):
             nodename = _decode_nersc_nid(member.name)
 
             # process the member's contents, then add it to self
-            parsed_counters_list.append(
-                self.parse_counters_fileobj(file_obj, nodename))
+            parsed_counters = self.parse_counters_fileobj(file_obj, nodename)
+            if parsed_counters is not None:
+                parsed_counters_list.append(parsed_counters)
 
         # If no timestamp file was found, use the earliest mtime as a guess
         if timestamp_str is None:
@@ -228,7 +229,7 @@ class NerscIsdct(dict):
                 data[key] = val
 
         if device_sn is None:
-            warnings.warn("Couldn't find device sn in " + path)
+            warnings.warn("Could not find device serial number in %s" % fileobj.name)
         else:
             return { device_sn : data }
 
@@ -264,7 +265,6 @@ class NerscIsdct(dict):
         all_data = {}
         for parsed_counters in parsed_counters_list:
             if parsed_counters is None:
-                warnings.warn("No valid counters found in " + f)
                 continue
             elif len(parsed_counters.keys()) > 1:
                 raise Exception("Received multiple serial numbers from parse_dct_counters_file")
