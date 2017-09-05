@@ -117,6 +117,9 @@ if __name__ == "__main__":
     t_start = datetime.datetime.fromtimestamp(isdct0.itervalues().next()['timestamp'])
     t_stop = datetime.datetime.fromtimestamp(isdct1.itervalues().next()['timestamp'])
 
+    if t_start >= t_stop:
+        raise Exception('t_start >= t_stop')
+
     ### Calculate the increase in host bytes written from ISDCT
     deltas = {}
     for serial_no, counters in isdct1.iteritems():
