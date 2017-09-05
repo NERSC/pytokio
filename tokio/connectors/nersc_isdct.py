@@ -174,8 +174,8 @@ class NerscIsdct(dict):
 
                 numeric_keys.append( i )
 
-            if 'NodeName' in df:
-                numeric_keys = [ 'NodeName' ] + numeric_keys
+            if 'node_name' in df:
+                numeric_keys = [ 'node_name' ] + numeric_keys
             return df[numeric_keys]
         else:
             return df
@@ -203,7 +203,7 @@ class NerscIsdct(dict):
                     device_sn = rex_match.group(2)
 
                     if nodename is not None:
-                        data['NodeName'] = nodename
+                        data['node_name'] = nodename
                     if rex_match.group(1) == "Intel SSD" or rex_match.group(1) == "SMART and Health Information":
                         parse_mode = 0
                     elif rex_match.group(1) == "SMART Attributes":
