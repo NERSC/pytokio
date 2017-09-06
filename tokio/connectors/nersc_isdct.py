@@ -158,6 +158,7 @@ class NerscIsdct(dict):
         Express the object as a dataframe
         """
         df = pandas.DataFrame.from_dict(self, orient='index')
+        df.index.name = "serial_number"
         if only_numeric:
             numeric_df = df.apply(pandas.to_numeric, errors='coerce')
             numeric_keys = []
