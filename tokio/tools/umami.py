@@ -203,8 +203,9 @@ class UmamiMetric(object):
     must always be the same.
     """
     def __init__(self, timestamps, values, label, big_is_good=True):
-        self.timestamps = timestamps
-        self.values = values
+        # don't copy list by reference; copy its values
+        self.timestamps = timestamps[:]
+        self.values = values[:]
         self.label = label
         self.big_is_good = big_is_good
         if len(self.timestamps) != len(self.values):
