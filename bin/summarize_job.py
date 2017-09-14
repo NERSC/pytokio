@@ -13,10 +13,11 @@ import datetime
 import re
 import ConfigParser
 import os
-# Import aggr_h5lmt
+import warnings
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
+import tokio.connectors.nersc_jobsdb
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 cfg = ConfigParser.ConfigParser()
@@ -214,24 +215,26 @@ def output_json(json_flag, json_rows, csv_rows):
         for csv_row in csv_rows:
             print ','.join(str(x) for x in csv_row)
 
-def retrieve_darshan_data(results, files):
-    if i < len(files):
-        darshan_log_file = files[i]
-        # Extract the performance data from the darshan log
-        d = tokio.connectors.darshan.Darshan(darshan_log_file)
-        d.darshan_parser_perf()
-        d.darshan_parser_base()
+def retrieve_darshan_data(results, darshan_log_file):
+    # Extract the performance data from the darshan log
+    darshan_data = tokio.connectors.darshan.Darshan(darshan_log_file)
+    darshan_data.darshan_parser_perf()
+    darshan_data.darshan_parser_base()
 
-        # Define start/end time from darshan log
-        results['_datetime_start'] = datetime.datetime.fromtimestamp(int(d['header']['start_time']))
-        results['_datetime_end'] = datetime.datetime.fromtimestamp(int(d['header']['end_time']))
+    if 'header' not in darshan_data:
+        warnings.warn("%s is not a valid darshan log" % darshan_log_file)
+        return results
+
+    # Define start/end time from darshan log
+    results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['start_time']))
+    results['_datetime_end'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['end_time']))
+    
+    if '_jobid' not in results:
+        results['_jobid'] = darshan_data['header']['jobid']
         
-        if '_jobid' not in results:
-            results['_jobid'] = d['header']['jobid']
-            
-        # Get the summary of the Darshan log
-        module_results = summarize_darshan(d)
-        merge_dicts(results, module_results, prefix='darshan_')
+    # Get the summary of the Darshan log
+    module_results = summarize_darshan(darshan_data)
+    merge_dicts(results, module_results, prefix='darshan_')
     return results
 
 def retrieve_lmt_data(results, file_system):
@@ -253,7 +256,7 @@ def retrieve_lmt_data(results, file_system):
         results['_file_system'] = file_system
     h5lmt_file = FS_NAME_TO_H5LMT.get(results['_file_system'])
     if h5lmt_file is None:
-        raise Exception("Unknown file system %s" % results['_file_system'])
+        return results
 
     module_results = {}
     # Read rates
@@ -320,7 +323,10 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     # Get Lustre server status (Sonexion)
     if ost:
         # Divine the sonexion name from the file system map
-        snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
+        fs_key = results['_file_system']
+        if fs_key not in FS_NAME_TO_H5LMT:
+            return results
+        snx_name = FS_NAME_TO_H5LMT[fs_key].split('_')[-1].split('.')[0]
         
         # Get the OST fullness summary
         module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
@@ -355,13 +361,10 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         #               results.pop(key)
     return results
 
-def retrieve_concurrent_job_data(results, darshan_log_file, concurrentjobs):
-    # Get the concurrently running jobs (NERSC)
-    #       ### TODO: fix the API for this
-    if concurrentjobs:
-        results['job_concurrent_jobs'] = nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
-    return results
-
+# def retrieve_concurrent_job_data(results, darshan_log_file, concurrentjobs):
+#     if concurrentjobs:
+#         results['job_concurrent_jobs'] = tokio.connectors.nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
+#     return results
 
 
 if __name__ == "__main__":
@@ -369,7 +372,9 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
     parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
-    parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
+    ### concurrent job data relies on nersc_jobsdb connector, which exists
+    ### but hasn't been correctly ported to pytokio2
+#   parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
@@ -405,22 +410,27 @@ if __name__ == "__main__":
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.jobid, len(args.files))
     for i in range(records_to_process):
-        results = retrieve_darshan_data(results, args.files)
+        results = retrieve_darshan_data(results, args.files[i])
         results = retrieve_lmt_data(results, args.file_system)    
         results = retrieve_topology_data(results, args.craysdb)
-        # results = retrieve_concurrent_job_data(results, filea[i], concurrentjobs)
+        ### concurrent job data relies on nersc_jobsdb connector, which exists
+        ### but hasn't been correctly ported to pytokio2
+#       results = retrieve_concurrent_job_data(results, args.files[i], args.concurrentjobs)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
         if sorted_keys is None:
             sorted_keys = sorted(results.keys())
             csv_rows = [sorted_keys]
             
-            sorted_values = []
-            for key in sorted_keys:
+        sorted_values = []
+        for key in sorted_keys:
+            if key in results:
                 sorted_values.append(results[key])
+            else:
+                sorted_values.append(None)
                 
-            csv_rows.append(sorted_values)
-            json_rows.append(results)
-            results = {}
+        csv_rows.append(sorted_values)
+        json_rows.append(results)
+        results = {}
 
     output_json(args.json, json_rows, csv_rows)
 
