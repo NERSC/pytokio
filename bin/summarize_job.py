@@ -20,7 +20,7 @@ import tokio.connectors.darshan
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
+cfg.read( os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio', 'tokio.cfg') )
 FS_NAME_TO_H5LMT = eval(cfg.get('tokio', 'FS_NAME_TO_H5LMT'))
 FS_PATH = eval(cfg.get('tokio', 'FS_PATH'))
 FS_NAME_TO_HOST = eval(cfg.get('tokio', 'FS_NAME_TO_HOST'))
