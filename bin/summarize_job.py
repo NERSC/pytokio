@@ -18,7 +18,7 @@ import pandas
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
-import tokio.connectors.nersc_jobsdb
+#import tokio.connectors.nersc_jobsdb
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 cfg = ConfigParser.ConfigParser()
