@@ -14,6 +14,7 @@ import re
 import ConfigParser
 import os
 import warnings
+import pandas
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
@@ -207,13 +208,6 @@ def serialize_datetime(obj):
         serial = obj.isoformat()
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
     raise TypeError ("Type %s not serializable" % type(obj))
-
-def output_json(json_flag, json_rows, csv_rows):
-    if json_flag:
-        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
-    else:
-        for csv_row in csv_rows:
-            print ','.join(str(x) for x in csv_row)
 
 def retrieve_darshan_data(results, darshan_log_file):
     # Extract the performance data from the darshan log
@@ -432,5 +426,12 @@ if __name__ == "__main__":
         json_rows.append(results)
         results = {}
 
-    output_json(args.json, json_rows, csv_rows)
+    if args.json:
+        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
+    else:
+        tmp_df = pandas.DataFrame.from_records(json_rows)
+        tmp_df.index.name = "index"
+        print tmp_df.to_csv()
+
+
 
