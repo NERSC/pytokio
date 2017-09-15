@@ -8,6 +8,7 @@ import os
 import json
 import random
 import tempfile
+import datetime
 import tokio.tools.umami
 
 # keep it deterministic
@@ -16,7 +17,7 @@ random.seed(0)
 TEMP_FILE = None
 
 # arbitrary but fixed start time
-SAMPLE_TIMES = [ 1505345992 + n*86400 for n in range(5) ]
+SAMPLE_TIMES = [ datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in range(5) ]
 
 # procedurally generated garbage data to plot
 SAMPLE_DATA = [
@@ -63,7 +64,7 @@ def test_umami_to_dict():
     """
     umami = build_umami_from_sample()
     umami_dict = umami.to_dict()
-    print json.dumps(umami_dict)
+    print umami_dict
 
     for metric, measurement in umami_dict.iteritems():
         # get the corresponding SAMPLE_DATA row number from the metric name,
@@ -80,12 +81,21 @@ def test_umami_to_dict():
             assert value == SAMPLE_TIMES[index]
         row_num += 1
 
+def test_umami_to_json():
+    """
+    Umami.to_json() functionality
+    """
+    # Don't bother checking correctness.  Just make sure json.dumps doesn't fail
+    umami = build_umami_from_sample()
+    print umami.to_json()
+
 def test_umami_to_df():
     """
     Umami.to_dataframe() correctness
     """
     umami = build_umami_from_sample()
     umami_df = umami.to_dataframe()
+    print umami_df
     for metric in umami_df:
         # get the corresponding SAMPLE_DATA row number from the metric name,
         # which should be test_metric_XX
@@ -138,3 +148,11 @@ def test_umamimetric_append():
     fig = umami.plot()
     validate_umami_fig(fig)
 
+def test_umamimetric_to_json():
+    """
+    Umami.to_json() functionality
+    """
+    # Don't bother checking correctness.  Just make sure json.dumps doesn't fail
+    umami = build_umami_from_sample()
+    for key, umamimetric in umami.iteritems():
+        print umamimetric.to_json()
