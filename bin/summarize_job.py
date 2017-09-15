@@ -258,20 +258,20 @@ def retrieve_lmt_data(results, file_system):
     module_results = {}
     # Read rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,'/OSTReadGroup/OSTBulkReadDataSet',
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTReadGroup/OSTBulkReadDataSet',
                                                   results['_datetime_start'],results['_datetime_end']),
                                                   'read'
     ))
 
     # Write rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,'/OSTWriteGroup/OSTBulkWriteDataSet',
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTWriteGroup/OSTBulkWriteDataSet',
                                                   results['_datetime_start'],results['_datetime_end']),
                                                   'written'
     ))
     # Oss cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/OSSCPUGroup/OSSCPUDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end']),
@@ -279,7 +279,7 @@ def retrieve_lmt_data(results, file_system):
     ))
     # Mds cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/MDSCPUGroup/MDSCPUDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end']),
@@ -287,7 +287,7 @@ def retrieve_lmt_data(results, file_system):
     ))
     # Missing data
     module_results.update(summarize_missing_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/FSMissingGroup/FSMissingDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end'])))
@@ -316,7 +316,7 @@ def retrieve_jobid(results, jobid, nbfiles):
     return results
 
 
-def retrieve_ost_data(results, ost, ost_fullness, ost_map):
+def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     # Get Lustre server status (Sonexion)
     if ost:
         # Divine the sonexion name from the file system map
