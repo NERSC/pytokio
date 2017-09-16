@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import nose
 import tempfile
 import tokio.connectors.craysdb
 
@@ -30,7 +31,7 @@ def test_craysdbproc_from_sdb():
     except OSError as exception:
         # Sdb isn't available
         # if exception.errno == 2:
-        pass
+        raise nose.SkipTest(exception)
     else:
         verify_craysdbproc(craysdbproc)
 
