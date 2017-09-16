@@ -34,11 +34,8 @@ class Darshan(dict):
             self._save_cache(sys.stdout)
         else:
             with open(output_file, 'w') as fp:
-                self.save_cache(fp)
+                output.write(json.dumps(self))
 
-    def _save_cache(self, output):
-        output.write(json.dumps(self))
-        
      #=================================================#
     
     def darshan_parser_base(self):
