@@ -4,19 +4,27 @@ import os
 import nose
 import tokio.tools.topology
 
-SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
-SAMPLE_SLURM_JOBID = 2000000
+SAMPLE_XTDB2PROC_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.xtdb2proc')
+SAMPLE_SLURM_CACHE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.slurm')
 
 def test_basic():
     """
-    Basic tools.topology functionality
+    tools.topology.get_job_diameter
 
     """
-    try:
-        tokio.tools.topology.get_job_diameter(SAMPLE_SLURM_JOBID, cache_file=SAMPLE_XTDB2PROC_FILE)
-    except OSError as error:
-        # sacct is not available
-        raise nose.SkipTest(error)
-    except KeyError as error:
-        # sacct is available, but job's nodes aren't in our CraySdb cache
-        raise nose.SkipTest(error)
+    topo = tokio.tools.topology.get_job_diameter(
+        slurm_cache_file=SAMPLE_SLURM_CACHE,
+        craysdb_cache_file=SAMPLE_XTDB2PROC_FILE)
+    assert len(topo) > 0
+    for expected_key in 'job_min_radius', 'job_max_radius', 'job_avg_radius':
+        assert expected_key in topo
+        assert topo[expected_key] > 0
+
+#   try:
+#       ...
+#   except OSError as error:
+#       # sacct is not available
+#       raise nose.SkipTest(error)
+#   except KeyError as error:
+#       # sacct is available, but job's nodes aren't in our CraySdb cache
+#       raise nose.SkipTest(error)

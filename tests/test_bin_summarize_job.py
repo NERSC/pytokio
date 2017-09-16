@@ -92,14 +92,15 @@ def test_bogus_darshans():
     Correctly handle mix of valid and invalid Darshan logs
 
     """
-    p = subprocess.Popen([ BINARY,
-                           SAMPLE_DARSHAN_LOG,      # valid log
-                           SAMPLE_XTDB2PROC_FILE,   # not valid log
-                           SAMPLE_DARSHAN_LOG_2,    # valid log
-                           'garbagefile'            # file doesn't exist
-                         ], stdout=subprocess.PIPE)
-    output_str = p.communicate()[0]
-    assert p.returncode == 0
+    with open(os.devnull, 'w') as FNULL:
+        output_str = subprocess.check_output([
+            BINARY,
+            SAMPLE_DARSHAN_LOG,      # valid log
+            SAMPLE_XTDB2PROC_FILE,   # not valid log
+            SAMPLE_DARSHAN_LOG_2,    # valid log
+            'garbagefile'            # file doesn't exist
+            ], stderr=FNULL)
+    # subprocess.check_output will throw exception if returncode != 0
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
