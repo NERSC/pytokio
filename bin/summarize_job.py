@@ -304,7 +304,7 @@ def retrieve_topology_data(results, craysdb):
             cache_file = None
         else:
             cache_file = craysdb
-        module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=cache_file)
+        module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], craysdb_cache_file=cache_file)
         merge_dicts(results, module_results, prefix='craysdb_')
     return results
 

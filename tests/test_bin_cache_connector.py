@@ -22,6 +22,10 @@ def verify_csv(csv_str):
     data = pandas.read_csv(StringIO.StringIO(csv_str))
     assert len(data) > 0
 
+def verify_sacct(csv_str):
+    data = pandas.read_csv(StringIO.StringIO(csv_str), sep="|")
+    assert len(data) > 0
+
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 BIN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'bin')
 
@@ -70,6 +74,21 @@ CACHE_CONNECTOR_CONFIGS = [
         'binary':    os.path.join(BIN_DIR, 'cache_darshan.py'),
         'args':       [ '--base', '--perf', '--total', os.path.join(INPUT_DIR, 'sample.darshan') ],
         'validators': [ verify_json, ],
+    },
+    {
+        'binary':    os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'args':       [ '--json', os.path.join(INPUT_DIR, 'sample.slurm') ],
+        'validators': [ verify_json, ],
+    },
+    {
+        'binary':    os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'args':       [ '--csv', os.path.join(INPUT_DIR, 'sample.slurm') ],
+        'validators': [ verify_csv, ],
+    },
+    {
+        'binary':    os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'args':       [ '--native', os.path.join(INPUT_DIR, 'sample.slurm') ],
+        'validators': [ verify_sacct, ],
     },
 ]
 
