@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser.add_argument('--total', action='store_true', help='aggregated darshan field data')
     parser.add_argument('--perf', action='store_true', help='derived perf data')
     args = parser.parse_args()
-    darshan = tokio.connectors.darshan.DARSHAN(args.logfile)
+    darshan = tokio.connectors.darshan.Darshan(args.logfile)
     if args.total:
         darshan_data = darshan.darshan_parser_total()
     elif args.perf:
