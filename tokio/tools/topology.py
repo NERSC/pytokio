@@ -14,6 +14,9 @@ def get_job_diameter(jobid, cache_file=None):
     job_info.get_job_nodes()
     proc_table = craysdb.CraySdbProc(cache_file=cache_file)
     node_positions = []
+    if 'node_names' not in job_info or len(job_info['node_names']) == 0:
+        warnings.warn("no valid job_info received from slurm.Slurm")
+        return {}
     for jobnode in job_info['node_names']:
         if not jobnode.startswith('nid'):
             warnings.warn("unable to parse jobnode '%s' for jobid %s" % (jobnode, jobid))
