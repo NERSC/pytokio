@@ -29,6 +29,8 @@ class NerscIsdct(dict):
         Infer the type of input we're receiving, dispatch the correct loading
         function, and populate keys/values
         """
+        if not os.path.exists(self.input_file):
+            raise Exception("Input file %s does not exist" % self.input_file)
         if os.path.isdir(self.input_file):
             self.load_directory()
         else:
@@ -40,7 +42,7 @@ class NerscIsdct(dict):
             elif mime_type == 'application/json':
                 self.load_json(encoding)
             else:
-                raise Exception("Unknown mime type %s" % mime_type)
+                raise Exception("Unknown mime type '%s' for %s" % (mime_type, self.input_file))
 
     def load_tarfile(self, encoding):
         """

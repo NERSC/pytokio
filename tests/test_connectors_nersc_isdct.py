@@ -9,12 +9,12 @@ import shutil
 import tokio.connectors.nersc_isdct
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tgz')
-SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_timestamped.tgz')
-SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tar')
-SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_dir')
-SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.json')
-SAMPLE_JSON_GZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.json.gz')
+SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')
+SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_timestamped.tgz')
+SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tar')
+SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_dir')
+SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json')
+SAMPLE_JSON_GZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json.gz')
 DEFAULT_INPUT = SAMPLE_TGZ_INPUT
 
 def validate_object(isdct_data):
