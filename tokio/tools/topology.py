@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import math
+import warnings
 from ..connectors import slurm, craysdb
 
 def get_job_diameter(jobid, cache_file=None):
@@ -14,6 +15,9 @@ def get_job_diameter(jobid, cache_file=None):
     proc_table = craysdb.CraySdbProc(cache_file=cache_file)
     node_positions = []
     for jobnode in job_info['node_names']:
+        if not jobnode.startswith('nid'):
+            warnings.warn("unable to parse jobnode '%s' for jobid %s" % (jobnode, jobid))
+            return {}
         nid_num = int(jobnode.lstrip('nid'))
         node_x = proc_table[nid_num]['x_coord']
         node_y = proc_table[nid_num]['y_coord']
