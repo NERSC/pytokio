@@ -234,10 +234,12 @@ def retrieve_darshan_data(results, darshan_log_file):
 def retrieve_lmt_data(results, file_system):
     # Figure out the H5LMT file corresponding to this run
     if file_system is None:
-        results['_file_system'] = None
+        if 'darshan_biggest_write_fs_bytes' not in results.keys() \
+        or 'darshan_biggest_read_fs_bytes' not in results.keys():
+            return results
+
         # Attempt to divine file system from Darshan log
-        # if 'darshan_biggest_write_fs_bytes' not in results.keys() or 'darshan_biggest_read_fs_bytes' not in results.keys():
-        #     pass
+        results['_file_system'] = None
         if results['darshan_biggest_write_fs_bytes'] > results['darshan_biggest_read_fs_bytes']:
             fs_key = 'darshan_biggest_write_fs'
         else:
@@ -296,7 +298,8 @@ def retrieve_topology_data(results, craysdb):
     # Get the diameter of the job (Cray XC)
     if craysdb is not None:
         if '_jobid' not in results:
-            raise Exception('cannot get_job_diameter without a jobid')
+            # bail out
+            return results
         if craysdb == "":
             cache_file = None
         else:
@@ -317,8 +320,8 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     # Get Lustre server status (Sonexion)
     if ost:
         # Divine the sonexion name from the file system map
-        fs_key = results['_file_system']
-        if fs_key not in FS_NAME_TO_H5LMT:
+        fs_key = results.get('_file_system')
+        if fs_key is None or fs_key not in FS_NAME_TO_H5LMT:
             return results
         snx_name = FS_NAME_TO_H5LMT[fs_key].split('_')[-1].split('.')[0]
         
@@ -377,8 +380,6 @@ if __name__ == "__main__":
     parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
     args = parser.parse_args()
-    sorted_keys = None
-    csv_rows = []
     json_rows = []
     records_to_process = 0
 
@@ -404,26 +405,19 @@ if __name__ == "__main__":
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.jobid, len(args.files))
     for i in range(records_to_process):
-        results = retrieve_darshan_data(results, args.files[i])
+        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+        if len(args.files) > 0:
+            results = retrieve_darshan_data(results, args.files[i])
         results = retrieve_lmt_data(results, args.file_system)    
         results = retrieve_topology_data(results, args.craysdb)
         ### concurrent job data relies on nersc_jobsdb connector, which exists
         ### but hasn't been correctly ported to pytokio2
 #       results = retrieve_concurrent_job_data(results, args.files[i], args.concurrentjobs)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-        if sorted_keys is None:
-            sorted_keys = sorted(results.keys())
-            csv_rows = [sorted_keys]
-            
-        sorted_values = []
-        for key in sorted_keys:
-            if key in results:
-                sorted_values.append(results[key])
-            else:
-                sorted_values.append(None)
-                
-        csv_rows.append(sorted_values)
-        json_rows.append(results)
+
+        # don't append empty rows
+        if len(results) > 0:
+            json_rows.append(results)
         results = {}
 
     if args.json:
