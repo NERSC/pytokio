@@ -3,6 +3,7 @@
 Parse and cache an ISDCT dump to simply reanalysis and sharing its data.
 """
 
+import os
 import sys
 import json
 import argparse
@@ -22,18 +23,8 @@ if __name__ == "__main__":
 
     # Serialize the object
     cache_file = args.output
-    if cache_file is None: # try to come up with our own output file name
-        if args.csv:
-            output_suffix = ".csv"
-        else:
-            output_suffix = ".json"
-        for known_suffix in ('.tgz', '.tar.gz'):
-            if input_file.endswith(known_suffix):
-                cache_file = sys.argv[1].replace(known_suffix, output_suffix)
-    if cache_file is None:
-        cache_file = "%s%s" % (input_file, output_suffix)
-
-    print "Caching to %s" % cache_file
+    if cache_file is not None:
+        print "Caching to %s" % cache_file
 
     if args.csv:
         isdct_data.to_dataframe().to_csv(cache_file)
