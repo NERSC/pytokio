@@ -34,7 +34,7 @@ class Umami(collections.OrderedDict):
         """
         return { k: v.__dict__ for k, v in self.iteritems() }
 
-    def to_dataframe(self):
+    def _to_dict_for_pandas(self, stringify_key=False):
         """
         Convert this object into a DataFrame, indexed by timestamp, with each
         column as a metric.  The Umami attributes (labels, etc) are not
@@ -43,11 +43,21 @@ class Umami(collections.OrderedDict):
         to_df = {}
         for metric, measurement in self.iteritems():
             for index, timestamp in enumerate(measurement.timestamps):
-                if timestamp not in to_df:
-                    to_df[timestamp] = {}
-                to_df[timestamp].update({metric: measurement.values[index]})
+                if stringify_key:
+                    key = str(timestamp)
+                else:
+                    key = timestamp
 
-        return pandas.DataFrame.from_dict(to_df, orient='index')
+                if key not in to_df:
+                    to_df[key] = {}
+                to_df[key].update({metric: measurement.values[index]})
+        return to_df
+
+    def to_json(self):
+        return json.dumps(self._to_dict_for_pandas(stringify_key=True), indent=4, sort_keys=True)
+
+    def to_dataframe(self):
+        return pandas.DataFrame.from_dict(self._to_dict_for_pandas(), orient='index')
 
     def plot(self, output_file=None,
                    linewidth=DEFAULT_LINEWIDTH,
@@ -76,8 +86,7 @@ class Umami(collections.OrderedDict):
             else:
                 row_num += 1
 
-            ### Cast all pandas times (numpy.datetime64) into Python datetimes
-            x = [ datetime.datetime.fromtimestamp(x) for x in measurement.timestamps ]
+            x = measurement.timestamps
             y = measurement.values
     
             ### first plot the timeseries of the given variable
@@ -203,15 +212,25 @@ class UmamiMetric(object):
     must always be the same.
     """
     def __init__(self, timestamps, values, label, big_is_good=True):
-        self.timestamps = timestamps
-        self.values = values
+        # If we are given pandas.Series, convert them to lists, then copy.
+        # Otherwise, just copy the list-like inputs.
+        if type(timestamps) == pandas.Series:
+            self.timestamps = timestamps.tolist()[:]
+        else:
+            self.timestamps = timestamps[:]
+
+        if type(values) == pandas.Series:
+            self.values = values.tolist()[:]
+        else:
+            self.values = values[:]
+
         self.label = label
         self.big_is_good = big_is_good
         if len(self.timestamps) != len(self.values):
             raise Exception('timestamps and values must be of equal length')
 
-    def __repr__(self):
-        return json.dumps(self.__dict__)
+    def to_json(self):
+        return json.dumps(self.__dict__, default=_serialize_datetime)
  
     def append(self, timestamp, value):
         """
@@ -227,3 +246,14 @@ class UmamiMetric(object):
         t = self.timestamps.pop()
         v = self.values.pop()
         return t, v
+
+def _serialize_datetime(obj):
+    """
+    Special serializer function that converts datetime into something that can
+    be encoded in json
+    
+    """
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        serial = obj.isoformat()
+        return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
+    raise TypeError ("Type %s not serializable" % type(obj))
