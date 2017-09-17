@@ -9,6 +9,7 @@ HDF5 files are stored on the local system.
 import sys
 import json
 import argparse
+import time
 import datetime
 import re
 import ConfigParser
@@ -18,7 +19,7 @@ import pandas
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
-#import tokio.connectors.nersc_jobsdb
+import tokio.connectors.nersc_jobsdb
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 cfg = ConfigParser.ConfigParser()
@@ -26,7 +27,6 @@ cfg.read( os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio'
 FS_NAME_TO_H5LMT = eval(cfg.get('tokio', 'FS_NAME_TO_H5LMT'))
 FS_PATH = eval(cfg.get('tokio', 'FS_PATH'))
 FS_NAME_TO_HOST = eval(cfg.get('tokio', 'FS_NAME_TO_HOST'))
-
 
 # Empirically, it looks like we have to add one more LMT timestep after the
 # Darshan log registers completion to capture the full amount of data
@@ -358,24 +358,41 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         #               results.pop(key)
     return results
 
-# def retrieve_concurrent_job_data(results, darshan_log_file, concurrentjobs):
-#     if concurrentjobs:
-#         results['job_concurrent_jobs'] = tokio.connectors.nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
-#     return results
+def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
+    """
+    Get information about all jobs that were running during a time period
+    """
+
+    if concurrentjobs is not None \
+    and results['_datetime_start'] is not None \
+    and results['_datetime_end'] is not None \
+    and jobhost is not None:
+        if concurrentjobs == "":
+            cache_file = None
+        else:
+            cache_file = concurrentjobs
+
+        start_stamp = long(time.mktime(results['_datetime_start'].timetuple()))
+        end_stamp = long(time.mktime(results['_datetime_end'].timetuple()))
+        nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=cache_file)
+        concurrent_job_info = nerscjobsdb.get_concurrent_jobs(start_stamp, end_stamp, jobhost)
+        results['jobsdb_concurrent_jobs'] = concurrent_job_info['numjobs']
+        results['jobsdb_concurrent_nodes'] = concurrent_job_info['numnodes']
+        results['jobsdb_concurrent_nodehrs'] = concurrent_job_info['nodehrs']
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-c", "--concurrentjobs", nargs='?', const="", type=str, help="add number of jobs concurrently running from jobsdb; can specify optional path to cache db")
     parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
-    ### concurrent job data relies on nersc_jobsdb connector, which exists
-    ### but hasn't been correctly ported to pytokio2
-#   parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
+    parser.add_argument("--jobhost", type=str, default=None, help="host on which job ran (used with --concurrentjobs)")
     parser.add_argument("--ost-fullness", type=str, default=None, help="path to an ost fullness file (lfs df)")
     parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
@@ -410,10 +427,8 @@ if __name__ == "__main__":
             results = retrieve_darshan_data(results, args.files[i])
         results = retrieve_lmt_data(results, args.file_system)    
         results = retrieve_topology_data(results, args.craysdb)
-        ### concurrent job data relies on nersc_jobsdb connector, which exists
-        ### but hasn't been correctly ported to pytokio2
-#       results = retrieve_concurrent_job_data(results, args.files[i], args.concurrentjobs)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
+        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
 
         # don't append empty rows
         if len(results) > 0:
