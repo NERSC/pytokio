@@ -39,10 +39,11 @@ class NerscIsdct(dict):
 
             if mime_type == 'application/x-tar':
                 self.load_tarfile(encoding)
-            elif mime_type == 'application/json':
-                self.load_json(encoding)
             else:
-                raise Exception("Unknown mime type '%s' for %s" % (mime_type, self.input_file))
+                try:
+                    self.load_json(encoding)
+                except ValueError as error:
+                    raise ValueError(str(error) + " (is this a valid json file?)")
 
     def load_tarfile(self, encoding):
         """
