@@ -7,7 +7,7 @@ MySQL database.
 
 import os
 import tempfile
-import nose # nose.plugins.skip.SkipTest(e)
+import nose
 import tokio.connectors.nersc_jobsdb
 
 # Express job start/end time as epoch.  Note that these specific start/stop
@@ -45,8 +45,7 @@ def setup_tmpfile():
     Create a temporary file
     """
     global TEMP_FILE
-#   TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
-    TEMP_FILE = open('temp_file.sqlite', 'wb')
+    TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
 
 def teardown_tmpfile():
     """
@@ -56,7 +55,7 @@ def teardown_tmpfile():
     global TEMP_FILE
     if not TEMP_FILE.closed:
         TEMP_FILE.close()
-#   os.unlink(TEMP_FILE.name)
+    os.unlink(TEMP_FILE.name)
 
 def verify_concurrent_jobs(results, nerscjobsdb, expected_queries=None):
     """
