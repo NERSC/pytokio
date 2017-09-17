@@ -85,44 +85,79 @@ def test_get_concurrent_jobs_mysql():
 
 def test_get_concurrent_jobs_sqlite():
     """
-    NerscJobsDb.get_concurrent_jobs functionality (SQLite)
+    NerscJobsDb.get_concurrent_jobs() functionality (SQLite)
     """
     nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=SAMPLE_CACHE_DB)
     results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
     verify_concurrent_jobs(results, nerscjobsdb, 1)
 
+def test_memory_cache():
+    """
+    NerscJobsDb memory cache functionality
+    """
+    nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=SAMPLE_CACHE_DB)
+
+    ### First query will hit the cache database, then be cached in memory
+    results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
+    verify_concurrent_jobs(results, nerscjobsdb, 1)
+
+    ### Second time query is run, it should be served out of cache
+    results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_MEMORY
+    verify_concurrent_jobs(results, nerscjobsdb, 1)
+
+    ### Drop the query cache from memory
+    nerscjobsdb.clear_memory()
+
+    ### Third time should go back to hitting the memory cache
+    results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
+    verify_concurrent_jobs(results, nerscjobsdb, 1)
+
 @nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
 def test_save_cache():
     """
-    NerscJobsDb.save_cache functionality
+    NerscJobsDb.save_cache() functionality
     """
+    ### First run a query against the ground truth source
     nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=SAMPLE_CACHE_DB)
     truth_result = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
     truth_rows = nerscjobsdb.last_results
     assert len(truth_result) > 0
 
-    # Save the results in pieces
+    ### Cache the results in pieces to force append behavior
     piecewise_results = []
     piecewise_rows = []
     for sample_query in SAMPLE_QUERIES:
-        # Perform part of the original query
+        ### Perform part of the original query
         print "Querying %s to %s on %s" % sample_query
         piecewise_result = nerscjobsdb.get_concurrent_jobs(*(sample_query))
         print "Got %d hits from source %d" % (len(nerscjobsdb.last_results), nerscjobsdb.last_hit)
         assert len(piecewise_result) > 0
 
+        ### Keep a running list of all rows these piecewise queries return
         piecewise_results.append(piecewise_result)
         piecewise_rows += nerscjobsdb.last_results
 
-        # Save (append) results to a new cache db
+        ### Save (append) results to a new cache db
         nerscjobsdb.save_cache(TEMP_FILE.name)
+        ### clear_memory() would necessary if NerscJobsDb didn't INSERT OR
+        ### REPLACE on save_cache; each successive query and save writes
+        ### the full contents retrieved from all past queries without it
 #       nerscjobsdb.clear_memory()
 
-    # Open the newly minted cache db
+    ### Open the newly minted cache db
     nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=TEMP_FILE.name)
     test_result = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    test_rows = nerscjobsdb.last_results
 
-    # Verify that the two queries' results are equivalent
+    ### Verify the queries should return the same number of rows
+    assert len(test_rows) == len(truth_rows)
+
+    ### Verify that the original query against the ground-truth database and the
+    ### same query against this newly created database return the same reduced
+    ### result (total nodehrs, total jobs, and total nodes)
     assert len(test_result) > 0
     for key, value in test_result.iteritems():
         print "Comparing truth(%s=%d) to piecewise(%s=%d)" % (
@@ -131,7 +166,9 @@ def test_save_cache():
         assert value != 0
         assert value == truth_result[key]
 
-    # Verify that the raw query outputs result in the same set of jobs
+    ### Verify that the original query against the ground-truth database and the
+    ### same query against this newly created database return the same set of
+    ### jobids
     piecewise_jobs = set([])
     truth_jobs = set([])
     for row in piecewise_rows:
