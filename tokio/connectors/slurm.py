@@ -105,20 +105,18 @@ class Slurm(dict):
         """
         if self.cache_file is not None:
             self._load_cache()
-            self._recast_keys()
         elif self.jobid is not None:
             self.load_keys('jobidraw', 'start', 'end', 'nodelist')
-            # public load_keys implicitly calls _recast_keys()
         else:
             raise Exception("Either jobid or cache_file must be specified on init")
 
     def _load_cache(self):
         """
-        Load a Slurm job from a cache file
+        Load a Slurm job from a JSON-encoded cache file
         """
         if self.cache_file is None:
             raise Exception("load_cache with None as cache_file")
-        self.update(parse_sacct(open(self.cache_file, 'r').read()))
+        self.from_json(open(self.cache_file, 'r').read())
 
     def load_keys(self, *keys):
         """
@@ -142,19 +140,22 @@ class Slurm(dict):
     def _recast_keys(self, *target_keys):
         """
         Scan self and convert special keys into native Python objects where
-        appropriate.  If no keys are given, scan everything.
+        appropriate.  If no keys are given, scan everything.  Do NOT attempt
+        to recast anything that is not a string--this is to avoid relying on
+        expand_nodelist if a key is already recast since expand_nodelist does
+        not function outside of an environment containing Slurm.
         """
         scan_keys = len(target_keys)
         for taskid, counters in self.iteritems():
             # if specific keys were passed, only look for those keys
             if scan_keys > 0:
                 for key, value in target_keys.iteritems():
-                    if key in _RECAST_KEY_MAP:
+                    if key in _RECAST_KEY_MAP and isinstance(value, basestring):
                         counters[key] = _RECAST_KEY_MAP[key][0](value)
             # otherwise, attempt to recast every key
             else:
                 for key, value in counters.iteritems():
-                    if key in _RECAST_KEY_MAP:
+                    if key in _RECAST_KEY_MAP and isinstance(value, basestring):
                         counters[key] = _RECAST_KEY_MAP[key][0](value)
 
     def save_cache(self, output_file=None):
@@ -168,7 +169,7 @@ class Slurm(dict):
                 self._save_cache(fp)
 
     def _save_cache(self, output):
-        output.write(str(self))
+        output.write(self.to_json())
    
 #   def get_task_startend(self, taskid=self.jobid):
 #       """
@@ -230,10 +231,17 @@ class Slurm(dict):
         """
         Return a json-encoded string representation of self.  Can't just
         json.dumps(slurm.Slurm) because of the effects of _RECAST_KEY_MAP.
-        Note that this json cannot be currently used to initialize a Slurm
-        object.
         """
         return json.dumps(self, cls=SlurmEncoder, **kwargs)
+
+    def from_json(self, json_string):
+        """
+        Take a json-encoded string and use it to initialize self
+        """
+        decoded_dict = json.loads(json_string)
+        for key, value in decoded_dict.iteritems():
+            self[key] = value
+        self._recast_keys()
         
     def to_dataframe(self):
         """
