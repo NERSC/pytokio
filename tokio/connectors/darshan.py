@@ -10,6 +10,8 @@ import sys
 import re
 import json
 
+DARSHAN_PARSER_BIN = 'darshan-parser'
+
 class Darshan(dict):
     def __init__(self, log_file=None, cache_file=None):
         super(Darshan,self).__init__(self)
@@ -28,7 +30,7 @@ class Darshan(dict):
     
     def save_cache(self, output_file=None):
         """
-        Save the dictionnary in a json file
+        Save the dictionary in a json file
         """
         if output_file is None:
             self._save_cache(sys.stdout)
@@ -131,7 +133,7 @@ class Darshan(dict):
             darshan_flag = "--" + counter_flag.lower()
         else:
             darshan_flag = ""
-        p = subprocess.Popen(['darshan-parser', darshan_flag, self.log_file], stdout=subprocess.PIPE)
+        p = subprocess.Popen([DARSHAN_PARSER_BIN, darshan_flag, self.log_file], stdout=subprocess.PIPE)
             
 
         for line in p.stdout:

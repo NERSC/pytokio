@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 import os
+import nose
+import subprocess
+import tokiotest
 import tokio.connectors.darshan
 
 SAMPLE_INPUT = os.path.join('inputs', 'sample.darshan')
@@ -20,10 +23,12 @@ def aux_darshan(darshan_data):
     assert 'posix' in darshan_data['counters'] 
     assert darshan_data['counters']['posix']
 
+@tokiotest.needs_darshan
 def test_base():
     """
     darshan_parser_base() method
     """
+    tokiotest.check_darshan()
     darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
     darshan.darshan_parser_base()
     aux_darshan(darshan)
@@ -42,10 +47,12 @@ def verify_base_counters(darshan_data):
     # Ensure that multiple modules were found (STDIO should always exist too)
     assert 'stdio' in darshan_data['counters']
 
+@tokiotest.needs_darshan
 def test_total():
     """
     darshan_parser_total() method
     """
+    tokiotest.check_darshan()
     darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
     darshan.darshan_parser_total()
     aux_darshan(darshan)
@@ -62,10 +69,12 @@ def verify_total_counters(darshan_data):
     assert 'OPENS' in darshan_data['counters']['stdio']['_total']
 
 
+@tokiotest.needs_darshan
 def test_perf():
     """
     darshan_parser_perf() method
     """
+    tokiotest.check_darshan()
     darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
     darshan.darshan_parser_perf()
     aux_darshan(darshan)
@@ -83,10 +92,12 @@ def verify_perf_counters(darshan_data):
             # the lustre module does not provide any perf information
             assert module == 'lustre' or counter in darshan_data['counters'][module]['_perf']
 
+@tokiotest.needs_darshan
 def test_all():
     """
     ensure that all parsers produce non-conflicting keys
     """
+    tokiotest.check_darshan()
     # try parsing in different orders just to make sure that no method is nuking the others
     darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
     darshan.darshan_parser_perf()

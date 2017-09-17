@@ -47,7 +47,7 @@ if __name__ == "__main__":
                 fp.write(slurm_data.to_json())
     elif args.native:
         if cache_file is None:
-            print slurm_data.save_cache()
+            print str(slurm_data)
         else:
             slurm_data.save_cache(cache_file)
     else:

@@ -7,12 +7,13 @@ methods.
 """
 
 import os
-import nose
 import json
 import pandas
 import tempfile
 import StringIO
 import subprocess
+import nose
+import tokiotest
 
 def verify_json(json_str):
     data = json.loads(json_str)
@@ -95,29 +96,32 @@ CACHE_CONNECTOR_CONFIGS = [
 TEMP_FILE = None
 FNULL = None
 
-def setup_tmpfile():
+def setup():
     global TEMP_FILE
     global FNULL
     TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
     FNULL = open(os.devnull, 'w')
 
-def teardown_tmpfile():
+def teardown():
     global TEMP_FILE
     global FNULL
-    TEMP_FILE.close()
-    os.unlink(TEMP_FILE.name)
+    if not TEMP_FILE.closed:
+        TEMP_FILE.close()
+    if os.path.exists(TEMP_FILE.name):
+        os.unlink(TEMP_FILE.name)
     FNULL.close()
 
+@tokiotest.needs_darshan
 def run_cache_connector(binary, args, validators):
     global TEMP_FILE
+    if binary.endswith('cache_darshan.py'):
+        tokiotest.check_darshan()
 
     ### first test caching to stdout
     cmd = [ binary ] + args
     print "Executing:", cmd
     print "Caching to stdout..."
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    output_str = p.communicate()[0]
-    assert p.returncode == 0
+    output_str = subprocess.check_output(cmd)
     for validator in validators:
         validator(output_str)
 
@@ -130,7 +134,7 @@ def run_cache_connector(binary, args, validators):
     for validator in validators:
         validator(output_str)
 
-@nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
+@nose.tools.with_setup(setup, teardown)
 def test():
     """
     Test all connector cache scripts
