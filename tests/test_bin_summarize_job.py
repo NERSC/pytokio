@@ -43,7 +43,7 @@ def setup():
     """
     global SKIP_DARSHAN
     try:
-        output_str = subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN)
+        subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN, stderr=subprocess.STDOUT)
     except OSError as error:
         if error[0] == errno.ENOENT:
             SKIP_DARSHAN = True
