@@ -165,7 +165,6 @@ class NerscJobsDb(object):
         self.close_cache()
         self.connect_cache(old_cache_file)
 
-
     def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
         """
         Grab all of the jobs that were running, in part or in full, during the
