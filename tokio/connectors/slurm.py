@@ -79,11 +79,11 @@ class Slurm(dict):
         Returns the object in a similar format as the sacct output so that this
         object can be circularly serialized and deserialized.
         """
-        output_str = None
+        output_str = ""
         key_order = [ 'jobidraw' ]
         for jobidraw, counters in self.iteritems():
             # print the column headers on the first pass
-            if output_str is None:
+            if output_str is "":
                 for key in counters:
                     if key not in key_order:
                         key_order.append(key)
