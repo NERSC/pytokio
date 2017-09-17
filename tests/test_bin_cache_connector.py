@@ -7,14 +7,13 @@ methods.
 """
 
 import os
-import errno
 import json
 import pandas
 import tempfile
 import StringIO
 import subprocess
 import nose
-import tokio.connectors.darshan
+import tokiotest
 
 def verify_json(json_str):
     data = json.loads(json_str)
@@ -95,24 +94,13 @@ CACHE_CONNECTOR_CONFIGS = [
 ]
 
 TEMP_FILE = None
-SKIP_DARSHAN = False # if darshan-parser isn't present
 FNULL = None
 
 def setup():
     global TEMP_FILE
-    global SKIP_DARSHAN
     global FNULL
     TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
     FNULL = open(os.devnull, 'w')
-    try:
-        subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN, stderr=subprocess.STDOUT)
-    except OSError as error:
-        if error[0] == errno.ENOENT:
-            SKIP_DARSHAN = True
-    except subprocess.CalledProcessError:
-        # this is ok--there's no way to make darshan-parser return zero without
-        # giving it a real darshan log
-        pass
 
 def teardown():
     global TEMP_FILE
@@ -123,13 +111,11 @@ def teardown():
         os.unlink(TEMP_FILE.name)
     FNULL.close()
 
+@tokiotest.needs_darshan
 def run_cache_connector(binary, args, validators):
     global TEMP_FILE
-
-    if SKIP_DARSHAN and binary.endswith('cache_darshan.py'):
-        raise nose.SkipTest("%s not available for %s" % (
-                            tokio.connectors.darshan.DARSHAN_PARSER_BIN,
-                            binary))
+    if binary.endswith('cache_darshan.py'):
+        tokiotest.check_darshan()
 
     ### first test caching to stdout
     cmd = [ binary ] + args

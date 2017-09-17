@@ -2,12 +2,11 @@
 
 import os
 import json
-import errno
 import pandas
 import StringIO
 import subprocess
+import tokiotest
 import nose
-import tokio.connectors.darshan
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 
@@ -34,23 +33,6 @@ SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample.sqlite3')
 SAMPLE_SLURM_CACHE_FILE = os.path.join(INPUT_DIR, 'sample.slurm')
 
 BINARY = os.path.join('..', 'bin', 'summarize_job.py')
-
-SKIP_DARSHAN = False # if darshan-parser isn't present
-def setup():
-    """
-    Need to check if darshan-parser is available; if not, just skip all
-    Darshan-related tests
-    """
-    global SKIP_DARSHAN
-    try:
-        subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN, stderr=subprocess.STDOUT)
-    except OSError as error:
-        if error[0] == errno.ENOENT:
-            SKIP_DARSHAN = True
-    except subprocess.CalledProcessError:
-        # this is ok--there's no way to make darshan-parser return zero without
-        # giving it a real darshan log
-        pass
 
 def verify_output_json(output_str, key=None, value=None):
     """
@@ -82,15 +64,13 @@ def verify_output_csv(output_str, key=None, value=None, expected_rows=None):
 
     return True
 
+@tokiotest.needs_darshan
 def test_darshan_summary_json():
     """
     Baseline integration of darshan and LMT data (json)
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         '--json',
@@ -98,30 +78,26 @@ def test_darshan_summary_json():
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
+@tokiotest.needs_darshan
 def test_darshan_summary_csv():
     """
     Baseline integration of darshan and LMT data (csv)
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         SAMPLE_DARSHAN_LOG])
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written')
 
+@tokiotest.needs_darshan
 def test_darshan_summaries():
     """
     Correctly handle multiple Darshan logs (csv)
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         SAMPLE_DARSHAN_LOG,
@@ -129,15 +105,13 @@ def test_darshan_summaries():
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
+@tokiotest.needs_darshan
 def test_bogus_darshans():
     """
     Correctly handle mix of valid and invalid Darshan logs
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     with open(os.devnull, 'w') as FNULL:
         output_str = subprocess.check_output([
             BINARY,
@@ -150,6 +124,7 @@ def test_bogus_darshans():
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
+@tokiotest.needs_darshan
 def test_darshan_summary_with_topology():
     """
     Integration of CraySdb
@@ -158,10 +133,7 @@ def test_darshan_summary_with_topology():
     requires either access to Slurm or a Slurm job cache file (to map jobid to node list)
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         '--topology', SAMPLE_XTDB2PROC_FILE,
@@ -171,15 +143,13 @@ def test_darshan_summary_with_topology():
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='topology_job_max_radius')
 
+@tokiotest.needs_darshan
 def test_darshan_summary_with_lfsstatus():
     """
     Integration of tools.lfsstatus
 
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         '--json',
@@ -192,14 +162,12 @@ def test_darshan_summary_with_lfsstatus():
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
 
+@tokiotest.needs_darshan
 def test_darshan_summary_with_nersc_jobsdb():
     """
     Integration of NerscJobsDb
     """
-    global SKIP_DARSHAN
-    if SKIP_DARSHAN:
-        raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
-
+    tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
         '--json',
