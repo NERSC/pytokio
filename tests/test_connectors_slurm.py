@@ -140,16 +140,21 @@ def test_expand_nodelist():
 
 def test_compact_nodelist():
     """
-    compact_nodelist functionality
+    compact_nodelist functionality (from set and string)
     """
     min_node = random.randint(1, 6000)
     max_node = min_node + random.randint(1, 10000)
     nodelist = set([ "nid%05d" % i for i in range(min_node, max_node + 1) ])
-    nodelist_str_from_set = tokio.connectors.slurm.compact_nodelist(nodelist)
-    nodelist_str_from_str = tokio.connectors.slurm.compact_nodelist(','.join(list(nodelist)))
-    assert len(nodelist_str_from_set) > 0
-    assert len(nodelist_str_from_str) > 0
-    assert nodelist_str_from_set == nodelist_str_from_str
+    try:
+        nodelist_str_from_set = tokio.connectors.slurm.compact_nodelist(nodelist)
+        nodelist_str_from_str = tokio.connectors.slurm.compact_nodelist(','.join(list(nodelist)))
+        assert len(nodelist_str_from_set) > 0
+        assert len(nodelist_str_from_str) > 0
+        assert nodelist_str_from_set == nodelist_str_from_str
+    except OSError as error:
+        # scontrol is not available
+        raise nose.SkipTest(error)
+
 
 @nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
 def test_slurm_serializer():

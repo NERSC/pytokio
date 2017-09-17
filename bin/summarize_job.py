@@ -294,25 +294,40 @@ def retrieve_lmt_data(results, file_system):
    
     return results
 
-def retrieve_topology_data(results, craysdb):
+def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
     # Get the diameter of the job (Cray XC)
-    if craysdb is not None:
+    if craysdb_cache_file is not None:
         if '_jobid' not in results:
             # bail out
             return results
-        if craysdb == "":
-            cache_file = None
+
+        # verify craysdb cache file
+        if craysdb_cache_file == "":
+            craysdb_cache_file = None
         else:
-            cache_file = craysdb
-        module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], craysdb_cache_file=cache_file)
-        merge_dicts(results, module_results, prefix='craysdb_')
+            craysdb_cache_file = craysdb_cache_file
+
+        # verify slurm cache file
+        if slurm_cache_file == "" \
+        or not os.path.isfile(slurm_cache_file):
+            slurm_cache_file = None
+
+        module_results = tokio.tools.topology.get_job_diameter(
+            results['_jobid'],
+            slurm_cache_file=slurm_cache_file,
+            craysdb_cache_file=craysdb_cache_file)
+        merge_dicts(results, module_results, prefix='topology_')
     return results
 
 def retrieve_jobid(results, jobid, nbfiles):
     if jobid is not None: 
         if nbfiles:
             raise Exception("behavior of --jobid when files > 1 is undefined")
-        results['_jobid'] = jobid
+        if os.path.isfile(jobid):
+            slurm_data = tokio.connectors.slurm.Slurm(cache_file=jobid)
+            results['_jobid'] = slurm_data.get_job_ids()[0]
+        else:
+            results['_jobid'] = jobid
     return results
 
 
@@ -384,14 +399,14 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-t", "--topology", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
     parser.add_argument("-c", "--concurrentjobs", nargs='?', const="", type=str, help="add number of jobs concurrently running from jobsdb; can specify optional path to cache db")
     parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
+    parser.add_argument("--slurm-jobid", type=str, default=None, help="job id or path to slurm cache file (req'd for --topology, --concurrentjobs, or if no darshan log provided)")
     parser.add_argument("--jobhost", type=str, default=None, help="host on which job ran (used with --concurrentjobs)")
     parser.add_argument("--ost-fullness", type=str, default=None, help="path to an ost fullness file (lfs df)")
     parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
@@ -420,13 +435,15 @@ if __name__ == "__main__":
         results = {}
 
     # If --jobid is specified, override whatever is in the Darshan log
-    results = retrieve_jobid(results, args.jobid, len(args.files))
+    results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
         # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
         if len(args.files) > 0:
             results = retrieve_darshan_data(results, args.files[i])
         results = retrieve_lmt_data(results, args.file_system)    
-        results = retrieve_topology_data(results, args.craysdb)
+        results = retrieve_topology_data(results,
+                                         slurm_cache_file=args.slurm_jobid,
+                                         craysdb_cache_file=args.topology)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
         results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
 

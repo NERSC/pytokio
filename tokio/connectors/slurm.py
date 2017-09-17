@@ -3,6 +3,7 @@
 import sys
 import copy
 import json
+import errno
 import pandas
 import datetime
 import StringIO
@@ -29,7 +30,13 @@ def compact_nodelist(node_string):
     """
     if not isinstance(node_string, basestring):
         node_string = ','.join(list(node_string))
-    return subprocess.check_output(['scontrol', 'show', 'hostlist', node_string]).strip()
+    try:
+        node_string = subprocess.check_output(['scontrol', 'show', 'hostlist', node_string]).strip()
+    except OSError as error:
+        if error[0] == errno.ENOENT:
+            # "No such file or directory" from subprocess.check_output
+            pass
+    return node_string
 
 # keyed by Slurm field keys; value[0] is the function to cast to Python;
 #                            value[1] is the function to cast back to a str
@@ -221,10 +228,10 @@ class Slurm(dict):
         """
         Return the top-level jobid(s) (not taskids) contained in object
         """
-        jobids = set([])
+        jobids = []
         for rawjobid, counters in self.iteritems():
             if '.' not in rawjobid:
-                jobids.add(rawjobid)
+                jobids.append(rawjobid)
         return jobids
 
     def to_json(self, **kwargs):
