@@ -309,6 +309,7 @@ def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
 
         # verify slurm cache file
         if slurm_cache_file == "" \
+        or slurm_cache_file is None \
         or not os.path.isfile(slurm_cache_file):
             slurm_cache_file = None
 
