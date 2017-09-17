@@ -3,6 +3,7 @@
 import os
 import nose
 import tempfile
+import errno
 import tokio.connectors.craysdb
 
 SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
@@ -20,22 +21,31 @@ def verify_craysdbproc(craysdbproc):
             assert record[key] >= 0
 
 def test_craysdbproc_from_cache():
+    """
+    Initialize CraySdb from cache
+    """
     # Read from a cache file
     craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
     verify_craysdbproc(craysdbproc)
 
 def test_craysdbproc_from_sdb():
+    """
+    Initialize CraySdb from sdb CLI
+    """
     # Read from the Cray Service Database
     try:
         craysdbproc = tokio.connectors.craysdb.CraySdbProc()
     except OSError as exception:
         # Sdb isn't available
-        # if exception.errno == 2:
-        raise nose.SkipTest(exception)
+        if exception.errno == errno.ENOENT:
+            raise nose.SkipTest("craysdb CLI not available")
     else:
         verify_craysdbproc(craysdbproc)
 
 def test_craysdbproc_serializer():
+    """
+    serialized CraySdb can be used to initialize
+    """
     # Read from a cache file
     craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
     # Serialize the object, then re-read it and verify it
@@ -46,4 +56,3 @@ def test_craysdbproc_serializer():
     craysdbproc = tokio.connectors.craysdb.CraySdbProc(cache_file.name)
     cache_file.close()
     verify_craysdbproc(craysdbproc)
-
