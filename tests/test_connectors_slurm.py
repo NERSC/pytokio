@@ -3,9 +3,9 @@
 import os
 import json
 import random
-import tempfile
 import datetime
 import nose
+import tokiotest
 import tokio.connectors.slurm
 
 # Just to verify that the basic sacct interface works.  Hopefully jobid=1000
@@ -20,20 +20,8 @@ SAMPLE_INPUT_JOBCT = 1
 SAMPLE_INPUT_NODECT = 128
 SAMPLE_INPUT_MAX_WALLSECS = 3600
 
-TEMP_FILE = None
-
 # keep it deterministic
 random.seed(0)
-
-def setup_tmpfile():
-    global TEMP_FILE
-    TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
-
-def teardown_tmpfile():
-    global TEMP_FILE
-    if not TEMP_FILE.closed:
-        TEMP_FILE.close()
-    os.unlink(TEMP_FILE.name)
 
 def verify_slurm(slurm):
     """
@@ -156,7 +144,7 @@ def test_compact_nodelist():
         raise nose.SkipTest(error)
 
 
-@nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_slurm_serializer():
     """
     Serialize and deserialize connectors.Slurm
@@ -164,11 +152,11 @@ def test_slurm_serializer():
     # Read from a cache file
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % TEMP_FILE.name
-    slurm_data.save_cache(TEMP_FILE.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    slurm_data.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    slurm_cached = tokio.connectors.slurm.Slurm(cache_file=TEMP_FILE.name)
-    TEMP_FILE.close()
+    slurm_cached = tokio.connectors.slurm.Slurm(cache_file=tokiotest.TEMP_FILE.name)
+    tokiotest.TEMP_FILE.close()
     verify_slurm(slurm_cached)
 
 def test_get_job_ids():

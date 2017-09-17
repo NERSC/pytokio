@@ -6,8 +6,8 @@ MySQL database.
 """
 
 import os
-import tempfile
 import nose
+import tokiotest
 import tokio.connectors.nersc_jobsdb
 
 # Express job start/end time as epoch.  Note that these specific start/stop
@@ -37,25 +37,6 @@ SAMPLE_QUERIES = [
         SAMPLE_QUERY[2]
     ),
 ]
-
-TEMP_FILE = None
-
-def setup_tmpfile():
-    """
-    Create a temporary file
-    """
-    global TEMP_FILE
-    TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
-
-def teardown_tmpfile():
-    """
-    Destroy the temporary file regardless of if the wrapped function succeeded
-    or not
-    """
-    global TEMP_FILE
-    if not TEMP_FILE.closed:
-        TEMP_FILE.close()
-    os.unlink(TEMP_FILE.name)
 
 def verify_concurrent_jobs(results, nerscjobsdb, expected_queries=None):
     """
@@ -114,7 +95,7 @@ def test_memory_cache():
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
     verify_concurrent_jobs(results, nerscjobsdb, 1)
 
-@nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_save_cache():
     """
     NerscJobsDb.save_cache() functionality
@@ -140,14 +121,14 @@ def test_save_cache():
         piecewise_rows += nerscjobsdb.last_results
 
         ### Save (append) results to a new cache db
-        nerscjobsdb.save_cache(TEMP_FILE.name)
+        nerscjobsdb.save_cache(tokiotest.TEMP_FILE.name)
         ### clear_memory() would necessary if NerscJobsDb didn't INSERT OR
         ### REPLACE on save_cache; each successive query and save writes
         ### the full contents retrieved from all past queries without it
 #       nerscjobsdb.clear_memory()
 
     ### Open the newly minted cache db
-    nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=TEMP_FILE.name)
+    nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=tokiotest.TEMP_FILE.name)
     test_result = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
     test_rows = nerscjobsdb.last_results
 

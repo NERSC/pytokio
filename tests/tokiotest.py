@@ -1,11 +1,17 @@
 #!/usr/bin/env python
+"""
+Useful helpers that are used throughout the TOKIO test suite
+"""
 
-import subprocess
+import os
 import errno
+import tempfile
+import subprocess
 import nose
 import tokio.connectors.darshan
 
 SKIP_DARSHAN = None
+TEMP_FILE = None
 
 def needs_darshan(func):
     """
@@ -27,6 +33,28 @@ def needs_darshan(func):
     return func
 
 def check_darshan():
+    """
+    If we don't have darshan, skip the test
+    """
     global SKIP_DARSHAN
     if SKIP_DARSHAN:
         raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
+
+
+def create_tempfile():
+    """
+    Create a temporary file
+    """
+    global TEMP_FILE
+    TEMP_FILE = tempfile.NamedTemporaryFile()
+
+def delete_tempfile():
+    """
+    Destroy the temporary file regardless of if the wrapped function succeeded
+    or not
+    """
+    global TEMP_FILE
+    if not TEMP_FILE.closed:
+        TEMP_FILE.close()
+    if os.path.isfile(TEMP_FILE.name):
+        os.unlink(TEMP_FILE.name)

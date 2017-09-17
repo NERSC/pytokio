@@ -9,7 +9,6 @@ methods.
 import os
 import json
 import pandas
-import tempfile
 import StringIO
 import subprocess
 import nose
@@ -93,27 +92,19 @@ CACHE_CONNECTOR_CONFIGS = [
     },
 ]
 
-TEMP_FILE = None
 FNULL = None
-
 def setup():
-    global TEMP_FILE
     global FNULL
-    TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
     FNULL = open(os.devnull, 'w')
+    tokiotest.create_tempfile()
 
 def teardown():
-    global TEMP_FILE
     global FNULL
-    if not TEMP_FILE.closed:
-        TEMP_FILE.close()
-    if os.path.exists(TEMP_FILE.name):
-        os.unlink(TEMP_FILE.name)
     FNULL.close()
+    tokiotest.delete_tempfile()
 
 @tokiotest.needs_darshan
 def run_cache_connector(binary, args, validators):
-    global TEMP_FILE
     if binary.endswith('cache_darshan.py'):
         tokiotest.check_darshan()
 
@@ -126,7 +117,7 @@ def run_cache_connector(binary, args, validators):
         validator(output_str)
 
     ### then test caching to a file
-    cmd = [ binary ] + args + [ '-o', TEMP_FILE.name ]
+    cmd = [ binary ] + args + [ '-o', tokiotest.TEMP_FILE.name ]
     print "Executing:", cmd
     print "Caching to file..."
     returncode = subprocess.call(cmd, stdout=FNULL)

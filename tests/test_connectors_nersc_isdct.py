@@ -3,9 +3,10 @@
 import os
 import gzip
 import tarfile
-import tempfile
 import json
 import shutil
+import nose
+import tokiotest
 import tokio.connectors.nersc_isdct
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
@@ -96,6 +97,7 @@ def test_to_dataframe():
     isdct_df = isdct_data.to_dataframe()
     validate_dataframe(isdct_df)
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_serializer():
     """
     NerscIsdct can deserialize its serialization
@@ -103,13 +105,10 @@ def test_serializer():
     # Read from a cache file
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(DEFAULT_INPUT)
     # Serialize the object, then re-read it and verify it
-    cache_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-    print "Caching to %s" % cache_file.name
-    isdct_data.save_cache(cache_file.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    isdct_data.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(cache_file.name)
-    os.unlink(cache_file.name)
-    cache_file.close()
+    isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.TEMP_FILE.name)
     validate_object(isdct_cached)
 
 ################################################################################

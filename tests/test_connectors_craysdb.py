@@ -2,8 +2,9 @@
 
 import os
 import nose
-import tempfile
 import errno
+import nose
+import tokiotest
 import tokio.connectors.craysdb
 
 SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
@@ -42,6 +43,7 @@ def test_craysdbproc_from_sdb():
     else:
         verify_craysdbproc(craysdbproc)
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_craysdbproc_serializer():
     """
     serialized CraySdb can be used to initialize
@@ -49,10 +51,8 @@ def test_craysdbproc_serializer():
     # Read from a cache file
     craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
     # Serialize the object, then re-read it and verify it
-    cache_file = tempfile.NamedTemporaryFile(delete=False)
-    print "Caching to %s" % cache_file.name
-    craysdbproc.save_cache(cache_file.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    craysdbproc.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    craysdbproc = tokio.connectors.craysdb.CraySdbProc(cache_file.name)
-    cache_file.close()
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(tokiotest.TEMP_FILE.name)
     verify_craysdbproc(craysdbproc)

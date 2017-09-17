@@ -3,18 +3,16 @@
 import matplotlib
 matplotlib.use('agg')
 
-import nose
 import os
 import json
 import random
-import tempfile
 import datetime
+import nose
+import tokiotest
 import tokio.tools.umami
 
 # keep it deterministic
 random.seed(0)
-
-TEMP_FILE = None
 
 # arbitrary but fixed start time
 SAMPLE_TIMES = [ datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in range(5) ]
@@ -25,14 +23,6 @@ SAMPLE_DATA = [
     [ random.randrange(0, 1000.0) for n in range(5) ],
     [ random.randrange(-1000.0, 1000.0) for n in range(5) ],
 ]
-
-def teardown_tmpfile():
-    global TEMP_FILE
-    os.unlink(TEMP_FILE.name)
-
-def setup_tmpfile():
-    global TEMP_FILE
-    TEMP_FILE = tempfile.NamedTemporaryFile(delete=False)
 
 def validate_umami_fig(fig):
     ### more correctness assertions?
@@ -48,14 +38,14 @@ def build_umami_from_sample():
             big_is_good=True)
     return umami
 
-@nose.tools.with_setup(setup_tmpfile, teardown_tmpfile)
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_umami_plot_to_file():
     """
     Ensure that basic UMAMI plot can be generated
     """
     umami = build_umami_from_sample()
-    fig = umami.plot(output_file=TEMP_FILE)
-    print "Wrote output to %s" % TEMP_FILE
+    fig = umami.plot(output_file=tokiotest.TEMP_FILE.name)
+    print "Wrote output to %s" % tokiotest.TEMP_FILE.name
     validate_umami_fig(fig)
 
 def test_umami_to_dict():

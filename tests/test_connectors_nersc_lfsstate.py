@@ -2,7 +2,8 @@
 
 import os
 import json
-import tempfile
+import nose
+import tokiotest
 import tokio.connectors.nersc_lfsstate
 
 INPUTS = os.path.join(os.getcwd(), 'inputs')
@@ -67,6 +68,7 @@ def test_ostfullness_from_cache():
     ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     verify_ost(ostfullness, type='ostfullness')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_serializer():
     """
     OST map can deserialize its serialization
@@ -74,14 +76,14 @@ def test_ostmap_serializer():
     # Read from a cache file
     ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
     # Serialize the object, then re-read it and verify it
-    cache_file = tempfile.NamedTemporaryFile(delete=False)
-    print "Caching to %s" % cache_file.name
-    ostmap.save_cache(cache_file.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    ostmap.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(cache_file.name)
-    cache_file.close()
+    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(tokiotest.TEMP_FILE.name)
+    tokiotest.TEMP_FILE.close()
     verify_ost(ostmap, type='ostmap')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_serializer():
     """
     OST fullness can deserialize its serialization
@@ -89,10 +91,9 @@ def test_ostfullness_serializer():
     # Read from a cache file
     ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
     # Serialize the object, then re-read it and verify it
-    cache_file = tempfile.NamedTemporaryFile(delete=False)
-    print "Caching to %s" % cache_file.name
-    ostfullness.save_cache(cache_file.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    ostfullness.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(cache_file.name)
-    cache_file.close()
+    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(tokiotest.TEMP_FILE.name)
+    tokiotest.TEMP_FILE.close()
     verify_ost(ostfullness, type='ostfullness')
