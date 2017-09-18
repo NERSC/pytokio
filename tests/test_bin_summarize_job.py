@@ -1,12 +1,14 @@
 #!/usr/bin/env python
+"""
+Test the bin/summarize_job.py tool
+"""
 
 import os
 import json
-import pandas
 import StringIO
 import subprocess
+import pandas
 import tokiotest
-import nose
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 
@@ -15,7 +17,7 @@ SAMPLE_DARSHAN_LOG = os.path.join(INPUT_DIR, 'sample.darshan')
 SAMPLE_DARSHAN_LOG_2 = os.path.join(INPUT_DIR, 'sample-2.darshan')
 
 ### For tokio.tools.hdf5, which is used by summarize_job.py
-os.environ['H5LMT_BASE'] = INPUT_DIR
+os.environ['PYTOKIO_H5LMT_BASE'] = INPUT_DIR
 
 ### For tests that function without the Darshan log--these values must reflect
 ### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
@@ -52,20 +54,20 @@ def verify_output_csv(output_str, key=None, value=None, expected_rows=None):
     Given the stdout of summarize_job.py, ensure that it is re-readable by
     pandas.read_csv and ensure that a given column (key) is present
     """
-    df = pandas.read_csv(StringIO.StringIO(output_str))
+    dataframe = pandas.read_csv(StringIO.StringIO(output_str))
     if key is not None:
-        assert key in df.columns
+        assert key in dataframe.columns
 
     if value is not None:
-        assert df[key][0] == value
+        assert dataframe[key][0] == value
 
     if expected_rows is not None:
-        assert len(df) == expected_rows
+        assert len(dataframe) == expected_rows
 
     return True
 
 @tokiotest.needs_darshan
-def test_darshan_summary_json():
+def test_json():
     """
     Baseline integration of darshan and LMT data (json)
 
@@ -79,7 +81,7 @@ def test_darshan_summary_json():
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
 @tokiotest.needs_darshan
-def test_darshan_summary_csv():
+def test_csv():
     """
     Baseline integration of darshan and LMT data (csv)
 
@@ -112,22 +114,22 @@ def test_bogus_darshans():
 
     """
     tokiotest.check_darshan()
-    with open(os.devnull, 'w') as FNULL:
+    with open(os.devnull, 'w') as devnull:
         output_str = subprocess.check_output([
             BINARY,
             SAMPLE_DARSHAN_LOG,      # valid log
             SAMPLE_XTDB2PROC_FILE,   # not valid log
             SAMPLE_DARSHAN_LOG_2,    # valid log
             'garbagefile'            # file doesn't exist
-            ], stderr=FNULL)
+            ], stderr=devnull)
     # subprocess.check_output will throw exception if returncode != 0
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
 @tokiotest.needs_darshan
-def test_darshan_summary_with_topology():
+def test_with_topology():
     """
-    Integration of CraySdb
+    Integration of topology (CraySDB + Slurm)
 
     requires either an SDB cache file or access to xtdb2proc
     requires either access to Slurm or a Slurm job cache file (to map jobid to node list)
@@ -137,14 +139,15 @@ def test_darshan_summary_with_topology():
     output_str = subprocess.check_output([
         BINARY,
         '--topology', SAMPLE_XTDB2PROC_FILE,
+        '--slurm-jobid', SAMPLE_SLURM_CACHE_FILE,
         '--json',
-        SAMPLE_DARSHAN_LOG ])
+        SAMPLE_DARSHAN_LOG])
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='topology_job_max_radius')
 
 @tokiotest.needs_darshan
-def test_darshan_summary_with_lfsstatus():
+def test_with_lfsstatus():
     """
     Integration of tools.lfsstatus
 
@@ -156,14 +159,14 @@ def test_darshan_summary_with_lfsstatus():
         '--ost',
         '--ost-fullness', SAMPLE_OSTFULLNESS_FILE,
         '--ost-map', SAMPLE_OSTMAP_FILE,
-        SAMPLE_DARSHAN_LOG ])
+        SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
 
 @tokiotest.needs_darshan
-def test_darshan_summary_with_nersc_jobsdb():
+def test_with_nersc_jobsdb():
     """
     Integration of NerscJobsDb
     """
@@ -173,32 +176,31 @@ def test_darshan_summary_with_nersc_jobsdb():
         '--json',
         '--concurrentjobs', SAMPLE_NERSCJOBSDB_FILE,
         '--jobhost', SAMPLE_DARSHAN_JOBHOST,
-        SAMPLE_DARSHAN_LOG ])
+        SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
 
-def test_summary_without_darshan():
+def test_without_darshan():
     """
     LMT-only functionality when no darshan log is present
     """
-    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs' )
+    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs')
     output_str = subprocess.check_output([
         BINARY,
         '--json',
         '--slurm-jobid', SAMPLE_DARSHAN_JOBID,
         '--start-time', SAMPLE_DARSHAN_START_TIME,
         '--end-time', SAMPLE_DARSHAN_END_TIME,
-        '--file-system', SAMPLE_DARSHAN_FILE_SYSTEM,
-        ])
+        '--file-system', SAMPLE_DARSHAN_FILE_SYSTEM,])
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
-def test_most_summary_without_darshan():
+def test_most_without_darshan():
     """
     Most functionality when no darshan log is present
     """
-    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs' )
+    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs')
     output_str = subprocess.check_output([
         BINARY,
         '--json',
@@ -214,8 +216,7 @@ def test_most_summary_without_darshan():
         '--ost-fullness', SAMPLE_OSTFULLNESS_FILE,
         '--ost-map', SAMPLE_OSTMAP_FILE,
 
-        '--topology', SAMPLE_XTDB2PROC_FILE,
-        ])
+        '--topology', SAMPLE_XTDB2PROC_FILE,])
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')

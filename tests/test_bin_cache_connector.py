@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 """
-This script tests the basic functionality of each connector's standalone cache
-script that just wraps a CLI interface around the connector's caching
-methods.
-
+Test each connector's standalone CLI cache tool
 """
 
 import os

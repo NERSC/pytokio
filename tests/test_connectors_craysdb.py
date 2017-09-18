@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+"""
+Test the CraySDB connector
+"""
 
 import os
-import nose
 import errno
 import nose
 import tokiotest
@@ -10,11 +12,14 @@ import tokio.connectors.craysdb
 SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
 
 def verify_craysdbproc(craysdbproc):
+    """
+    Correctness tests of an CraySDB object
+    """
     assert craysdbproc
     print "Found %d entries" % len(craysdbproc)
     for nidnum, record in craysdbproc.iteritems():
         assert record
-        assert nidnum == record['processor_id']        
+        assert nidnum == record['processor_id']
         assert record['process_slots_free'] >= record['process_slots']
         tmp = ['cab_position', 'cab_row', 'cage', 'cpu', 'process_slots', \
                'slot', 'x_coord', 'y_coord', 'z_coord']
