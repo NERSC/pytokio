@@ -10,15 +10,13 @@ import subprocess
 import pandas
 import tokiotest
 
-INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-
 ### For tests that base all tests off of the sample Darshan log
-SAMPLE_DARSHAN_LOG_2 = os.path.join(INPUT_DIR, 'sample-2.darshan')
+SAMPLE_DARSHAN_LOG_2 = os.path.join(tokiotest.INPUT_DIR, 'sample-2.darshan')
 
 ### For tokio.tools.hdf5, which is used by summarize_job.py
-os.environ['PYTOKIO_H5LMT_BASE'] = INPUT_DIR
+os.environ['PYTOKIO_H5LMT_BASE'] = tokiotest.INPUT_DIR
 
-BINARY = os.path.join('..', 'bin', 'summarize_job.py')
+BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_job.py')
 
 def verify_output_json(output_str, key=None, value=None):
     """

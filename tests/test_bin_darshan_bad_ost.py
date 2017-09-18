@@ -18,7 +18,7 @@ MODEST_CORRELATION_CUTOFF = "0.10"
 STRONG_PVALUE_CUTOFF = "0.00001"
 MODEST_PVALUE_CUTOFF = "0.01"
 
-BINARY = os.path.join('..', 'bin', 'darshan_bad_ost.py')
+BINARY = os.path.join(tokiotest.BIN_DIR, 'darshan_bad_ost.py')
 
 @tokiotest.needs_darshan
 def test_good_log():
