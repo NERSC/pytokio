@@ -5,12 +5,10 @@ attempt to determine the performance each file saw, and try to correlate poorly
 performing files with specific Lustre OSTs.
 """
 
-import sys
 import json
 import argparse
 import warnings
-import numpy as np
-import pandas as pd
+import pandas
 import scipy.stats
 import tokio.connectors.darshan
 
@@ -22,25 +20,27 @@ def correlate_ost_performance(darshan_logs):
     Generate a DataFrame containing files, performance measurements, and OST
     mappings and attempt to correlate performance with individual OSTs.
     """
-    df = darshanlogs_to_ost_dataframe(darshan_logs)
+    darshan_df = darshanlogs_to_ost_dataframe(darshan_logs)
 
     # in the unlikely event that all performance measurements are the same (or
     # there is only one), we simply cannot perform correlation analysis
-    if len(df['performance'].unique()) == 1:
+    if len(darshan_df['performance'].unique()) == 1:
         return []
 
     results = []
-    for ost_name in [ x for x in df.columns if x.startswith('OST') ]:
+    for ost_name in [x for x in darshan_df.columns if x.startswith('OST')]:
         # if all values are the same (or there is only one), we cannot correlate
-        if len(df[ost_name].unique()) == 1:
+        if len(darshan_df[ost_name].unique()) == 1:
             continue
-        coeff, pval = scipy.stats.pearsonr(df['performance'], df[ost_name])
-        results.append({ 'ost_name': ost_name,
-                         'coefficient': coeff,
-                         'p-value': pval })
+        coeff, pval = scipy.stats.pearsonr(darshan_df['performance'],
+                                           darshan_df[ost_name])
+        results.append({
+            'ost_name': ost_name,
+            'coefficient': coeff,
+            'p-value': pval})
     return results
 
-def estimate_darshan_file_performance(ranks_data):
+def estimate_darshan_perf(ranks_data):
     """
     Calculate performance in a sideways fashion: find the longest I/O time
     across any rank for this file, then divide the sum of all bytes
@@ -50,7 +50,7 @@ def estimate_darshan_file_performance(ranks_data):
     """
     max_io_time = 0.0
     sum_bytes = 0.0
-    for rank_id, counter_data in ranks_data.iteritems():
+    for counter_data in ranks_data.itervalues():
         this_io_time = counter_data['F_WRITE_TIME'] + \
                        counter_data['F_READ_TIME'] + \
                        counter_data['F_META_TIME']
@@ -60,44 +60,42 @@ def estimate_darshan_file_performance(ranks_data):
                      counter_data['BYTES_WRITTEN']
     return sum_bytes / max_io_time
 
-def darshanlogs_to_ost_dataframe(darshan_logs):
+def summarize_darshan_perf(darshan_logs):
     """
-    Given a Darshan log file path, (1) calculate the performance observed when
-    accessing each individual file, (2) identify OSTs over which each file was
-    striped, and (3) create a dataframe containing each file, its observed
-    performance, and a matrix of values corresponding to what fraction of that
-    file's contents were probably striped on each OST.
+    Given a list of Darshan log file paths, calculate the performance observed
+    from each file and identify OSTs over which each file was striped.  Return
+    this summary of file performances and stripes.
     """
-
     results = {
         'file_paths': [],
         'performance': [],
         'ost_lists': [],
     }
     for darshan_log in darshan_logs:
-        d = tokio.connectors.darshan.Darshan( darshan_log )
-        d.darshan_parser_base()
-        if 'counters' not in d:
+        darshan_data = tokio.connectors.darshan.Darshan(darshan_log)
+        darshan_data.darshan_parser_base()
+        if 'counters' not in darshan_data:
             warnings.warn("Invalid Darshan log %s" % darshan_log)
             continue
-        if 'lustre' not in d['counters']:
+        elif 'lustre' not in darshan_data['counters']:
             warnings.warn("Darshan log %s does not contain Lustre module data" % darshan_log)
             continue
+        counters = darshan_data['counters']
 
-        for logged_file_path, ranks_data in d['counters']['posix'].iteritems():
+        for logged_file_path, ranks_data in counters['posix'].iteritems():
             # encode the darshan log's name in addition to the file path in case
             # multiple Darshan logs with identical file paths (but different
             # striping) are being processed
             file_path = "%s@%s" % (darshan_log, logged_file_path)
 
             # calculate the file's I/O performance
-            performance = estimate_darshan_file_performance(ranks_data)
+            performance = estimate_darshan_perf(ranks_data)
 
             # assemble a list of OSTs
             ost_list = set([])
-            if logged_file_path not in d['counters']['lustre']:
+            if logged_file_path not in counters['lustre']:
                 continue
-            for rank_id, counter_data in d['counters']['lustre'][logged_file_path].iteritems():
+            for counter_data in counters['lustre'][logged_file_path].itervalues():
                 for ost_id in range(counter_data['STRIPE_WIDTH']):
                     key = "OST_ID_%d" % ost_id
                     ost_list.add(counter_data[key])
@@ -113,9 +111,19 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
                     results['performance'][index] = performance
                 results['ost_lists'][index] = \
                     list(set(results['ost_lists'][index]) | ost_list)
+    return results
+
+def darshanlogs_to_ost_dataframe(darshan_logs):
+    """
+    Given a set of Darshan log file paths, create a dataframe containing each
+    file, its observed performance, and a matrix of values corresponding to what
+    fraction of that file's contents were probably striped on each OST.
+    """
+
+    # get a dict of files, their performances, and their stripes
+    results = summarize_darshan_perf(darshan_logs)
 
     # build a dataframe from the results dictionary
-    num_records = len(results['file_paths'])
     pre_dataframe = {
         'file_paths': results['file_paths'],
         'performance': results['performance'],
@@ -126,22 +134,27 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
         for ost_id in ost_id_list:
             ost_name = OST_NAME_FMT % ost_id
             if ost_name not in pre_dataframe:
-                pre_dataframe[ost_name] = [ 0.0 ] * num_records
+                pre_dataframe[ost_name] = [0.0] * len(results['file_paths'])
 
     # for each file record, calculate the fraction it contributed to each OST
-    for index, file_path in enumerate(results['file_paths']):
+    for index in range(len(results['file_paths'])):
         num_osts = float(len(results['ost_lists'][index]))
         for ost_id in results['ost_lists'][index]:
             ost_name = OST_NAME_FMT % ost_id
             pre_dataframe[ost_name][index] = 1.0 / num_osts
 
-    return pd.DataFrame(pre_dataframe)
+    return pandas.DataFrame(pre_dataframe)
 
-if __name__ == "__main__":
+def darshan_bad_ost():
+    """
+    Parse command line arguments and dispatch analysis
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("-j", "--json", action="store_true", help="return output in JSON format")
-    parser.add_argument("-p", "--p-threshold", type=float, default=0.05, help="p-value above which correlations will not be displayed")
-    parser.add_argument("-c", "--c-threshold", type=float, default=0.0, help="correlation coefficient below which abs(correlations) will not be displayed")
+    parser.add_argument("-p", "--p-threshold", type=float, default=0.05,
+                        help="p-value above which correlations will not be displayed")
+    parser.add_argument("-c", "--c-threshold", type=float, default=0.0,
+                        help="coefficient below which abs(correlations) will not be displayed")
     parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
     args = parser.parse_args()
 
@@ -150,10 +163,15 @@ if __name__ == "__main__":
     if args.json:
         filtered_results = []
         for result in sorted(results, key=lambda k: k['coefficient']):
-            if result['p-value'] < args.p_threshold and abs(result['coefficient']) > args.c_threshold:
+            if result['p-value'] < args.p_threshold \
+            and abs(result['coefficient']) > args.c_threshold:
                 filtered_results.append(result)
         print json.dumps(filtered_results, indent=4, sort_keys=True)
     else:
         for result in sorted(results, key=lambda k: k['coefficient']):
-            if result['p-value'] < args.p_threshold and abs(result['coefficient']) > args.c_threshold:
+            if result['p-value'] < args.p_threshold \
+            and abs(result['coefficient']) > args.c_threshold:
                 print "%(ost_name)-12s %(coefficient)10.6f %(p-value)10.4g" % result
+
+if __name__ == "__main__":
+    darshan_bad_ost()

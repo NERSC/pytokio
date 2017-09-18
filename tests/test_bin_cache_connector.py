@@ -35,6 +35,10 @@ def verify_sacct(csv_str):
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 BIN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'bin')
 
+SAMPLE_SLURM_JOBID = '4478544'
+SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
+SAMPLE_SLURM_CACHE_FILE = os.path.join(INPUT_DIR, 'sample.slurm')
+
 CACHE_CONNECTOR_CONFIGS = [
     {
         'binary':     os.path.join(BIN_DIR, 'cache_isdct.py'),
@@ -96,6 +100,14 @@ CACHE_CONNECTOR_CONFIGS = [
         'args':       ['--native', os.path.join(INPUT_DIR, 'sample.slurm')],
         'validators': [verify_sacct,],
     },
+    {
+        'binary':     os.path.join(BIN_DIR, 'cache_topology.py'),
+        'args':       [
+            '--craysdb-cache', SAMPLE_XTDB2PROC_FILE,
+            '--slurm-cache', SAMPLE_SLURM_CACHE_FILE,
+        ],
+        'validators': [verify_json,],
+    },
 ]
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -121,6 +133,21 @@ def run_cache_connector(binary, args, validators, to_file=False):
     for validator in validators:
         validator(output_str)
 
+def craft_description(config, suffix):
+    """
+    Take a cache_*.py command invocation and craft a clever test description
+    """
+    if 'cache_topology' in config['binary']:
+        result = "%s %s" % (
+            os.sep.join(config['binary'].split(os.sep)[-2:]),
+            suffix)
+    else:
+        result = "%s %s %s" % (
+            os.sep.join(config['binary'].split(os.sep)[-2:]),
+            ' '.join(config['args'][0:-1]),
+            suffix)
+    return result
+
 @tokiotest.needs_darshan
 def test():
     """
@@ -129,12 +156,8 @@ def test():
     for config in CACHE_CONNECTOR_CONFIGS:
         func = run_cache_connector
 
-        func.description = "%s %s (to stdout)" % (
-            os.sep.join(config['binary'].split(os.sep)[-2:]),
-            ' '.join(config['args'][0:-1]))
+        func.description = craft_description(config, '(to stdout)')
         yield func, config['binary'], config['args'], config['validators'], False
 
-        func.description = "%s %s (to file)" % (
-            os.sep.join(config['binary'].split(os.sep)[-2:]),
-            ' '.join(config['args'][0:-1]))
+        func.description = craft_description(config, '(to file)')
         yield func, config['binary'], config['args'], config['validators'], True
