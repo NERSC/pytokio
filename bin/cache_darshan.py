@@ -1,11 +1,16 @@
 #!/usr/bin/env python
-
-import tokio.connectors.darshan
+"""
+Parse and cache a Darshan log to simplify reanalysis and sharing its data.
+"""
 
 import json
 import argparse
+import tokio.connectors.darshan
 
-if __name__ == '__main__':
+def cache_darshan():
+    """
+    CLI wrapper around the Darshan connector's I/O methods
+    """
     parser = argparse.ArgumentParser(description='parse a darshan log')
     parser.add_argument('logfile', metavar='N', type=str, help='darshan log file to parse')
     parser.add_argument('--base', action='store_true', help='darshan log field data [default]')
@@ -30,4 +35,7 @@ if __name__ == '__main__':
         print json.dumps(darshan, indent=4, sort_keys=True)
     else:
         print "Caching to %s" % cache_file
-        json.dump(darshan, open(cache_file, 'w'), indent=4, sort_keys=True)
+        json.dump(darshan, open(cache_file, 'w'))
+
+if __name__ == '__main__':
+    cache_darshan()

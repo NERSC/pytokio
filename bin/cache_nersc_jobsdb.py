@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Parse and cache a Slurm job record to simply reanalysis and sharing its data.
+Parse and cache parts of the NERSC jobs database.
 """
 
 import os
@@ -9,7 +9,10 @@ import datetime
 import argparse
 import tokio.connectors.nersc_jobsdb
 
-if __name__ == "__main__":
+def cache_nersc_jobsdb():
+    """
+    CLI wrapper around NerscJobsDb object's I/O methods
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")
     parser.add_argument("end", type=str, help="end time in YYYY-MM-DDTHH:MM:SS format")
@@ -37,3 +40,6 @@ if __name__ == "__main__":
                 break
     print "Caching to %s" % cache_file
     nerscjobsdb.save_cache(cache_file)
+
+if __name__ == "__main__":
+    cache_nersc_jobsdb()
