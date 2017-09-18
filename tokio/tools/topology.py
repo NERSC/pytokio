@@ -1,19 +1,27 @@
 #!/usr/bin/env python
 
 import math
+import warnings
 from ..connectors import slurm, craysdb
 
-def get_job_diameter(jobid, cache_file=None):
+def get_job_diameter(jobid=None, craysdb_cache_file=None, slurm_cache_file=None):
     """
     An extremely crude way to reduce a job's node allocation into a scalar
     metric
 
     """
-    job_info = slurm.Slurm(jobid)
-    job_info.get_job_nodes()
-    proc_table = craysdb.CraySdbProc(cache_file=cache_file)
+    job_info = slurm.Slurm(jobid=jobid, cache_file=slurm_cache_file)
+    node_list = job_info.get_job_nodes()
+    proc_table = craysdb.CraySdbProc(cache_file=craysdb_cache_file)
     node_positions = []
-    for jobnode in job_info['node_names']:
+    if len(node_list) == 0:
+        warnings.warn("no valid job_info received from slurm.Slurm")
+        return {}
+    for jobnode in node_list:
+        if not jobnode.startswith('nid'):
+            job_ids = job_info.get_jobids()
+            warnings.warn("unable to parse jobnode '%s' for jobid '%s'" % (jobnode, ','.join(job_ids)))
+            return {}
         nid_num = int(jobnode.lstrip('nid'))
         node_x = proc_table[nid_num]['x_coord']
         node_y = proc_table[nid_num]['y_coord']

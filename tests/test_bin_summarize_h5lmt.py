@@ -1,29 +1,33 @@
 #!/usr/bin/env python
+"""
+Test the bin/summarize_h5lmt.py tool
+"""
 
 import os
 import json
 import subprocess
-import nose.plugins.skip
+import nose
 
 SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.h5lmt')
 BINARY = os.path.join('..', 'bin', 'summarize_h5lmt.py')
+
+def verify_json(output):
+    """
+    Verify the contents of summarize_h5lmt.py when encoded as json
+    """
+    assert output
 
 def test_basic():
     """
     Basic functionality of default settings
     """
-    p = subprocess.Popen([BINARY, SAMPLE_INPUT], stdout=subprocess.PIPE)
-    output_str = p.communicate()[0]
-    assert p.returncode == 0
+    subprocess.check_output([BINARY, SAMPLE_INPUT])
 
+@nose.SkipTest
 def test_json():
     """
     Basic functionality of json output--NOT YET IMPLEMENTED
     """
-    p = subprocess.Popen([BINARY, '--json', SAMPLE_INPUT], stdout=subprocess.PIPE)
-    output_str = p.communicate()[0]
-    try:
-        output_json = json.loads(output_str)
-    except ValueError as e:
-        raise nose.plugins.skip.SkipTest(e)
-    assert p.returncode == 0
+    output_str = subprocess.check_output([BINARY, '--json', SAMPLE_INPUT])
+    output_json = json.loads(output_str)
+    verify_json(output_json)

@@ -9,22 +9,24 @@ HDF5 files are stored on the local system.
 import sys
 import json
 import argparse
+import time
 import datetime
 import re
 import ConfigParser
 import os
-# Import aggr_h5lmt
+import warnings
+import pandas
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
+import tokio.connectors.nersc_jobsdb
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
 cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join('..', 'tokio', 'tokio.cfg'))
+cfg.read( os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio', 'tokio.cfg') )
 FS_NAME_TO_H5LMT = eval(cfg.get('tokio', 'FS_NAME_TO_H5LMT'))
 FS_PATH = eval(cfg.get('tokio', 'FS_PATH'))
 FS_NAME_TO_HOST = eval(cfg.get('tokio', 'FS_NAME_TO_HOST'))
-
 
 # Empirically, it looks like we have to add one more LMT timestep after the
 # Darshan log registers completion to capture the full amount of data
@@ -207,40 +209,37 @@ def serialize_datetime(obj):
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
     raise TypeError ("Type %s not serializable" % type(obj))
 
-def output_json(json_flag, json_rows, csv_rows):
-    if json_flag:
-        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
-    else:
-        for csv_row in csv_rows:
-            print ','.join(str(x) for x in csv_row)
+def retrieve_darshan_data(results, darshan_log_file):
+    # Extract the performance data from the darshan log
+    darshan_data = tokio.connectors.darshan.Darshan(darshan_log_file)
+    darshan_data.darshan_parser_perf()
+    darshan_data.darshan_parser_base()
 
-def retrieve_darshan_data(results, files):
-    if i < len(files):
-        darshan_log_file = files[i]
-        # Extract the performance data from the darshan log
-        d = tokio.connectors.darshan.Darshan(darshan_log_file)
-        d.darshan_parser_perf()
-        d.darshan_parser_base()
+    if 'header' not in darshan_data:
+        warnings.warn("%s is not a valid darshan log" % darshan_log_file)
+        return results
 
-        # Define start/end time from darshan log
-        results['_datetime_start'] = datetime.datetime.fromtimestamp(int(d['header']['start_time']))
-        results['_datetime_end'] = datetime.datetime.fromtimestamp(int(d['header']['end_time']))
+    # Define start/end time from darshan log
+    results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['start_time']))
+    results['_datetime_end'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['end_time']))
+    
+    if '_jobid' not in results:
+        results['_jobid'] = darshan_data['header']['jobid']
         
-        if '_jobid' not in results:
-            results['_jobid'] = d['header']['jobid']
-            
-        # Get the summary of the Darshan log
-        module_results = summarize_darshan(d)
-        merge_dicts(results, module_results, prefix='darshan_')
+    # Get the summary of the Darshan log
+    module_results = summarize_darshan(darshan_data)
+    merge_dicts(results, module_results, prefix='darshan_')
     return results
 
 def retrieve_lmt_data(results, file_system):
     # Figure out the H5LMT file corresponding to this run
     if file_system is None:
-        results['_file_system'] = None
+        if 'darshan_biggest_write_fs_bytes' not in results.keys() \
+        or 'darshan_biggest_read_fs_bytes' not in results.keys():
+            return results
+
         # Attempt to divine file system from Darshan log
-        # if 'darshan_biggest_write_fs_bytes' not in results.keys() or 'darshan_biggest_read_fs_bytes' not in results.keys():
-        #     pass
+        results['_file_system'] = None
         if results['darshan_biggest_write_fs_bytes'] > results['darshan_biggest_read_fs_bytes']:
             fs_key = 'darshan_biggest_write_fs'
         else:
@@ -253,25 +252,25 @@ def retrieve_lmt_data(results, file_system):
         results['_file_system'] = file_system
     h5lmt_file = FS_NAME_TO_H5LMT.get(results['_file_system'])
     if h5lmt_file is None:
-        raise Exception("Unknown file system %s" % results['_file_system'])
+        return results
 
     module_results = {}
     # Read rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,'/OSTReadGroup/OSTBulkReadDataSet',
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTReadGroup/OSTBulkReadDataSet',
                                                   results['_datetime_start'],results['_datetime_end']),
                                                   'read'
     ))
 
     # Write rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,'/OSTWriteGroup/OSTBulkWriteDataSet',
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTWriteGroup/OSTBulkWriteDataSet',
                                                   results['_datetime_start'],results['_datetime_end']),
                                                   'written'
     ))
     # Oss cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/OSSCPUGroup/OSSCPUDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end']),
@@ -279,7 +278,7 @@ def retrieve_lmt_data(results, file_system):
     ))
     # Mds cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/MDSCPUGroup/MDSCPUDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end']),
@@ -287,7 +286,7 @@ def retrieve_lmt_data(results, file_system):
     ))
     # Missing data
     module_results.update(summarize_missing_df(
-        tokio.tools.get_dataframe_from_time_range(h5lmt_file,
+        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
                                                   '/FSMissingGroup/FSMissingDataSet',
                                                   results['_datetime_start'],
                                                   results['_datetime_end'])))
@@ -295,32 +294,52 @@ def retrieve_lmt_data(results, file_system):
    
     return results
 
-def retrieve_topology_data(results, craysdb):
+def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
     # Get the diameter of the job (Cray XC)
-    if craysdb is not None:
+    if craysdb_cache_file is not None:
         if '_jobid' not in results:
-            raise Exception('cannot get_job_diameter without a jobid')
-        if craysdb == "":
-            cache_file = None
+            # bail out
+            return results
+
+        # verify craysdb cache file
+        if craysdb_cache_file == "":
+            craysdb_cache_file = None
         else:
-            cache_file = craysdb
-        module_results = tokio.tools.topology.get_job_diameter(results['_jobid'], cache_file=cache_file)
-        merge_dicts(results, module_results, prefix='craysdb_')
+            craysdb_cache_file = craysdb_cache_file
+
+        # verify slurm cache file
+        if slurm_cache_file == "" \
+        or slurm_cache_file is None \
+        or not os.path.isfile(slurm_cache_file):
+            slurm_cache_file = None
+
+        module_results = tokio.tools.topology.get_job_diameter(
+            results['_jobid'],
+            slurm_cache_file=slurm_cache_file,
+            craysdb_cache_file=craysdb_cache_file)
+        merge_dicts(results, module_results, prefix='topology_')
     return results
 
-def retrieve_jobid(results, jobid, nbfiles):
+def retrieve_jobid(results, jobid, file_count):
     if jobid is not None: 
-        if nbfiles:
-            raise Exception("behavior of --jobid when files > 1 is undefined")
-        results['_jobid'] = jobid
+        if file_count > 1:
+            raise Exception("Behavior of --jobid when files > 1 is undefined")
+        if os.path.isfile(jobid):
+            slurm_data = tokio.connectors.slurm.Slurm(cache_file=jobid)
+            results['_jobid'] = slurm_data.get_job_ids()[0]
+        else:
+            results['_jobid'] = jobid
     return results
 
 
-def retrieve_ost_data(results, ost, ost_fullness, ost_map):
+def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     # Get Lustre server status (Sonexion)
     if ost:
         # Divine the sonexion name from the file system map
-        snx_name = FS_NAME_TO_H5LMT[results['_file_system']].split('_')[-1].split('.')[0]
+        fs_key = results.get('_file_system')
+        if fs_key is None or fs_key not in FS_NAME_TO_H5LMT:
+            return results
+        snx_name = FS_NAME_TO_H5LMT[fs_key].split('_')[-1].split('.')[0]
         
         # Get the OST fullness summary
         module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
@@ -355,31 +374,45 @@ def retrieve_ost_data(results, ost, ost_fullness, ost_map):
         #               results.pop(key)
     return results
 
-def retrieve_concurrent_job_data(results, darshan_log_file, concurrentjobs):
-    # Get the concurrently running jobs (NERSC)
-    #       ### TODO: fix the API for this
-    if concurrentjobs:
-        results['job_concurrent_jobs'] = nersc_jobsdb.get_concurrent_jobs(darshan_log_file)
-    return results
+def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
+    """
+    Get information about all jobs that were running during a time period
+    """
 
+    if concurrentjobs is not None \
+    and results['_datetime_start'] is not None \
+    and results['_datetime_end'] is not None \
+    and jobhost is not None:
+        if concurrentjobs == "":
+            cache_file = None
+        else:
+            cache_file = concurrentjobs
+
+        start_stamp = long(time.mktime(results['_datetime_start'].timetuple()))
+        end_stamp = long(time.mktime(results['_datetime_end'].timetuple()))
+        nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=cache_file)
+        concurrent_job_info = nerscjobsdb.get_concurrent_jobs(start_stamp, end_stamp, jobhost)
+        results['jobsdb_concurrent_jobs'] = concurrent_job_info['numjobs']
+        results['jobsdb_concurrent_nodes'] = concurrent_job_info['numnodes']
+        results['jobsdb_concurrent_nodehrs'] = concurrent_job_info['nodehrs']
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--craysdb", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-t", "--topology", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-c", "--concurrentjobs", nargs='?', const="", type=str, help="add number of jobs concurrently running from jobsdb; can specify optional path to cache db")
     parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
-    parser.add_argument("-c", "--concurrentjobs", help="add number of jobs concurrently running from jobsdb", action="store_true")
     parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
     parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument("--jobid", type=str, default=None, help="job id (for resource manager interactions)")
+    parser.add_argument("--slurm-jobid", type=str, default=None, help="job id or path to slurm cache file (req'd for --topology, --concurrentjobs, or if no darshan log provided)")
+    parser.add_argument("--jobhost", type=str, default=None, help="host on which job ran (used with --concurrentjobs)")
     parser.add_argument("--ost-fullness", type=str, default=None, help="path to an ost fullness file (lfs df)")
     parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
     args = parser.parse_args()
-    sorted_keys = None
-    csv_rows = []
     json_rows = []
     records_to_process = 0
 
@@ -403,24 +436,29 @@ if __name__ == "__main__":
         results = {}
 
     # If --jobid is specified, override whatever is in the Darshan log
-    results = retrieve_jobid(results, args.jobid, len(args.files))
+    results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
-        results = retrieve_darshan_data(results, args.files)
+        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+        if len(args.files) > 0:
+            results = retrieve_darshan_data(results, args.files[i])
         results = retrieve_lmt_data(results, args.file_system)    
-        results = retrieve_topology_data(results, args.craysdb)
-        # results = retrieve_concurrent_job_data(results, filea[i], concurrentjobs)
+        results = retrieve_topology_data(results,
+                                         slurm_cache_file=args.slurm_jobid,
+                                         craysdb_cache_file=args.topology)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-        if sorted_keys is None:
-            sorted_keys = sorted(results.keys())
-            csv_rows = [sorted_keys]
-            
-            sorted_values = []
-            for key in sorted_keys:
-                sorted_values.append(results[key])
-                
-            csv_rows.append(sorted_values)
-            json_rows.append(results)
-            results = {}
+        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
 
-    output_json(args.json, json_rows, csv_rows)
+        # don't append empty rows
+        if len(results) > 0:
+            json_rows.append(results)
+        results = {}
+
+    if args.json:
+        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
+    else:
+        tmp_df = pandas.DataFrame.from_records(json_rows)
+        tmp_df.index.name = "index"
+        print tmp_df.to_csv()
+
+
 

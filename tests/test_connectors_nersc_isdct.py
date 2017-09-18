@@ -1,20 +1,24 @@
 #!/usr/bin/env python
+"""
+Test the ISDCT connector
+"""
 
 import os
 import gzip
 import tarfile
-import tempfile
 import json
 import shutil
+import nose
+import tokiotest
 import tokio.connectors.nersc_isdct
 
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tgz')
-SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_timestamped.tgz')
-SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.tar')
-SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct_dir')
-SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.json')
-SAMPLE_JSON_GZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_idsct.json.gz')
+SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')
+SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_timestamped.tgz')
+SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tar')
+SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_dir')
+SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json')
+SAMPLE_JSON_GZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json.gz')
 DEFAULT_INPUT = SAMPLE_TGZ_INPUT
 
 def validate_object(isdct_data):
@@ -27,11 +31,11 @@ def validate_object(isdct_data):
         assert len(serial_no) > 1
         for counter in counters:
             # a counter didn't get parsed correctly
-            assert not counter.startswith("None") 
+            assert not counter.startswith("None")
         # ensure that synthesized metrics are being calculated
         assert 'write_amplification_factor' in counters
         # ensure that timestamp is set
-        print json.dumps(counters,indent=4,sort_keys=True)
+        print json.dumps(counters, indent=4, sort_keys=True)
         assert 'timestamp' in counters
 
 def validate_dataframe(isdct_data):
@@ -69,7 +73,7 @@ def test_unpacked_input():
     """
     untar(SAMPLE_TGZ_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_UNPACKED_INPUT)
-    cleanup_untar(SAMPLE_TGZ_INPUT) 
+    cleanup_untar(SAMPLE_TGZ_INPUT)
     validate_object(isdct_data)
 
 def test_json_gz_input():
@@ -96,6 +100,7 @@ def test_to_dataframe():
     isdct_df = isdct_data.to_dataframe()
     validate_dataframe(isdct_df)
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_serializer():
     """
     NerscIsdct can deserialize its serialization
@@ -103,26 +108,29 @@ def test_serializer():
     # Read from a cache file
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(DEFAULT_INPUT)
     # Serialize the object, then re-read it and verify it
-    cache_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-    print "Caching to %s" % cache_file.name
-    isdct_data.save_cache(cache_file.name)
+    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    isdct_data.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(cache_file.name)
-    os.unlink(cache_file.name)
-    cache_file.close()
+    isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.TEMP_FILE.name)
     validate_object(isdct_cached)
 
 ################################################################################
 #  Helper functions
 ################################################################################
-def untar(input_file):
-    cleanup_untar(input_file)
-    tar = tarfile.open(input_file)
+def untar(input_filename):
+    """
+    Unpack a tarball to test support for that input type
+    """
+    cleanup_untar(input_filename)
+    tar = tarfile.open(input_filename)
     tar.extractall(path=INPUT_DIR)
     tar.close()
 
-def cleanup_untar(input_file):
-    tar = tarfile.open(input_file)
+def cleanup_untar(input_filename):
+    """
+    Clean up the artifacts created by this test's untar() function
+    """
+    tar = tarfile.open(input_filename)
     for member in tar.getmembers():
         fq_name = os.path.join(INPUT_DIR, member.name)
         if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
@@ -132,24 +140,22 @@ def cleanup_untar(input_file):
             else:
                 os.unlink(fq_name)
 
-def gunzip(input_file, output_file):
+def gunzip(input_filename, output_filename):
     """
     To check support for both compressed and uncompressed data streams, create
     an uncompressed version of an input file on the fly
     """
-    try_unlink(output_file)
-    with gzip.open(input_file, 'rb') as f:
-        file_content = f.read()
-    with open(output_file, 'w+b') as f:
-        print "Creating %s" % output_file
-        f.write(file_content)
+    try_unlink(output_filename)
+    with gzip.open(input_filename, 'rb') as input_file:
+        file_content = input_file.read()
+    with open(output_filename, 'w+b') as output_file:
+        print "Creating %s" % output_filename
+        output_file.write(file_content)
 
-def try_unlink(output_file):
+def try_unlink(output_filename):
     """
     Destroy a temporarily decompressed input file
     """
-    if os.path.exists(output_file):
-        print "Destroying %s" % output_file
-        os.unlink(output_file)
-
-
+    if os.path.exists(output_filename):
+        print "Destroying %s" % output_filename
+        os.unlink(output_filename)

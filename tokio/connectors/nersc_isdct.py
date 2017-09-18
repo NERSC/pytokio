@@ -29,6 +29,8 @@ class NerscIsdct(dict):
         Infer the type of input we're receiving, dispatch the correct loading
         function, and populate keys/values
         """
+        if not os.path.exists(self.input_file):
+            raise Exception("Input file %s does not exist" % self.input_file)
         if os.path.isdir(self.input_file):
             self.load_directory()
         else:
@@ -37,10 +39,11 @@ class NerscIsdct(dict):
 
             if mime_type == 'application/x-tar':
                 self.load_tarfile(encoding)
-            elif mime_type == 'application/json':
-                self.load_json(encoding)
             else:
-                raise Exception("Unknown mime type %s" % mime_type)
+                try:
+                    self.load_json(encoding)
+                except ValueError as error:
+                    raise ValueError(str(error) + " (is this a valid json file?)")
 
     def load_tarfile(self, encoding):
         """
@@ -49,6 +52,8 @@ class NerscIsdct(dict):
         single invocation of the isdct tool, and outputs are grouped into
         directories named according to their nid numbers (e.g.,
         nid00984/somefile.txt).
+
+        TODO: this needs to be refactored with load_directory
         """
         parsed_counters_list = []
         if encoding == 'gzip':
@@ -63,9 +68,10 @@ class NerscIsdct(dict):
             if not member.isfile():
                 continue
 
+            fq_file_name = member.name
             # is this a magic timestamp file?
-            if 'timestamp_' in member.name:
-                timestamp_str = member.name.split('_')[-1]
+            if 'timestamp_' in fq_file_name:
+                timestamp_str = fq_file_name.split('_')[-1]
                 continue
 
             # independently, track the earliest mtime we can find.  In the
@@ -80,10 +86,14 @@ class NerscIsdct(dict):
             file_obj = tar.extractfile(member)
 
             # infer the node name from the member's path
-            nodename = _decode_nersc_nid(member.name)
+            nodename = _decode_nersc_nid(fq_file_name)
 
             # process the member's contents, then add it to self
-            parsed_counters = self.parse_counters_fileobj(file_obj, nodename)
+            try:
+                parsed_counters = self.parse_counters_fileobj(file_obj, nodename)
+            except:
+                warnings.warn("Parsing error in %s" % fq_file_name)
+                raise
             if parsed_counters is not None:
                 parsed_counters_list.append(parsed_counters)
 
@@ -111,15 +121,50 @@ class NerscIsdct(dict):
         Functionally identical to load_tarfile(), but operates on the untarred
         contents of the tarfile.
         """
+        timestamp_str = None
+        min_mtime = None
         parsed_counters_list = []
         for root, dirs, files in os.walk(self.input_file):
             for file_name in files:
                 fq_file_name = os.path.join(root, file_name)
+                # is this a magic timestamp file?
+                if 'timestamp_' in fq_file_name:
+                    timestamp_str = fq_file_name.split('_')[-1]
+                    continue
+
+
+                # independently, track the earliest mtime we can find.  In the
+                # future, we may want to set an mtime for each individual file_obj,
+                # but for now we treat the whole dump as a single timestamped entity
+                if min_mtime is None:
+                    min_mtime = os.path.getmtime(fq_file_name)
+                else:
+                    min_mtime = min(min_mtime, os.path.getmtime(fq_file_name))
+
                 nodename = _decode_nersc_nid(fq_file_name)
-                parsed_counters = self.parse_counters_fileobj(
-                    open(fq_file_name, 'r'),
-                    nodename=nodename)
+                try:
+                    parsed_counters = self.parse_counters_fileobj(
+                        open(fq_file_name, 'r'),
+                        nodename=nodename)
+                except:
+                    warnings.warn("Parsing error in %s" % fq_file_name)
+                    raise
                 parsed_counters_list.append(parsed_counters)
+
+        # If no timestamp file was found, use the earliest mtime as a guess
+        if timestamp_str is None:
+            timestamp = datetime.datetime.fromtimestamp(min_mtime)
+        # Otherwise, the timestamp file is the ground truth
+        else:
+            timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
+
+        # Set the timestamp for each device serial number
+        timestamp = long(time.mktime(timestamp.timetuple()))
+        for parsed_counters in parsed_counters_list:
+            if len(parsed_counters.keys()) > 1:
+                warnings.warn("Multiple serial numbers detected in a single file_obj: " + str(parsed_counters.keys()))
+            for serialno, counters in parsed_counters.iteritems():
+                counters['timestamp'] = timestamp
 
         merged_counters = self._merge_parsed_counters(parsed_counters_list)
         for key, val in merged_counters.iteritems():
@@ -158,6 +203,7 @@ class NerscIsdct(dict):
         Express the object as a dataframe
         """
         df = pandas.DataFrame.from_dict(self, orient='index')
+        df.index.name = "serial_number"
         if only_numeric:
             numeric_df = df.apply(pandas.to_numeric, errors='coerce')
             numeric_keys = []
@@ -174,8 +220,8 @@ class NerscIsdct(dict):
 
                 numeric_keys.append( i )
 
-            if 'NodeName' in df:
-                numeric_keys = [ 'NodeName' ] + numeric_keys
+            if 'node_name' in df:
+                numeric_keys = [ 'node_name' ] + numeric_keys
             return df[numeric_keys]
         else:
             return df
@@ -203,7 +249,7 @@ class NerscIsdct(dict):
                     device_sn = rex_match.group(2)
 
                     if nodename is not None:
-                        data['NodeName'] = nodename
+                        data['node_name'] = nodename
                     if rex_match.group(1) == "Intel SSD" or rex_match.group(1) == "SMART and Health Information":
                         parse_mode = 0
                     elif rex_match.group(1) == "SMART Attributes":
@@ -211,11 +257,11 @@ class NerscIsdct(dict):
                     else:
                         raise Exception("Unknown counter file format")
             elif parse_mode == 0 and ':' in line:
-                key, val = line.split(':')
+                key, val = line.split(':', 1)
                 key = _normalize_key(key)
                 data[key] = val.strip()
             elif parse_mode > 0 and ':' in line:
-                key, val = line.split(':')
+                key, val = line.split(':', 1)
                 key = _normalize_key(key)
                 smart_buffer[key] = val.strip()
             elif parse_mode > 0 and line.startswith('-') and line.endswith('-'):
