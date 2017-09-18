@@ -320,10 +320,10 @@ def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
         merge_dicts(results, module_results, prefix='topology_')
     return results
 
-def retrieve_jobid(results, jobid, nbfiles):
+def retrieve_jobid(results, jobid, file_count):
     if jobid is not None: 
-        if nbfiles:
-            raise Exception("behavior of --jobid when files > 1 is undefined")
+        if file_count > 1:
+            raise Exception("Behavior of --jobid when files > 1 is undefined")
         if os.path.isfile(jobid):
             slurm_data = tokio.connectors.slurm.Slurm(cache_file=jobid)
             results['_jobid'] = slurm_data.get_job_ids()[0]
