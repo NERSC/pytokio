@@ -11,6 +11,9 @@ import pandas
 import nose
 import tokiotest
 
+# For cache_lfsstatus.py
+os.environ['PYTOKIO_H5LMT_BASE'] = tokiotest.INPUT_DIR
+
 def verify_json(json_str):
     """
     Ensure that json is loadable
@@ -32,81 +35,120 @@ def verify_sacct(csv_str):
     data = pandas.read_csv(StringIO.StringIO(csv_str), sep="|")
     assert len(data) > 0
 
-INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 BIN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'bin')
-
-SAMPLE_SLURM_JOBID = '4478544'
-SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
-SAMPLE_SLURM_CACHE_FILE = os.path.join(INPUT_DIR, 'sample.slurm')
 
 CACHE_CONNECTOR_CONFIGS = [
     {
         'binary':     os.path.join(BIN_DIR, 'cache_isdct.py'),
-        'args':       ['--json', os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')],
+        'args':       ['--json', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_isdct.py'),
-        'args':       ['--csv', os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')],
+        'args':       ['--csv', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_csv,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--base', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--base', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--perf', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--total', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--base', '--perf', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--base', '--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--base', '--total', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--base', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--perf', '--total', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
-        'args':       ['--base', '--perf', '--total', os.path.join(INPUT_DIR, 'sample.darshan')],
+        'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
-        'args':       ['--json', os.path.join(INPUT_DIR, 'sample.slurm')],
+        'args':       ['--json', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_json,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
-        'args':       ['--csv', os.path.join(INPUT_DIR, 'sample.slurm')],
+        'args':       ['--csv', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_csv,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
-        'args':       ['--native', os.path.join(INPUT_DIR, 'sample.slurm')],
+        'args':       ['--native', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_sacct,],
     },
     {
         'binary':     os.path.join(BIN_DIR, 'cache_topology.py'),
         'args':       [
-            '--craysdb-cache', SAMPLE_XTDB2PROC_FILE,
-            '--slurm-cache', SAMPLE_SLURM_CACHE_FILE,
+            '--craysdb-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
+            '--slurm-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
         ],
         'validators': [verify_json,],
+    },
+    {
+        'description': 'bin/cache_lfsstatus.py --fullness, no cache',
+        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'args':        [
+            '--fullness', 
+            '--',
+            tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
+            tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
+        ],
+        'validators':  [verify_json,],
+    },
+    {
+        'description': 'bin/cache_lfsstatus.py --fullness, explicit cache',
+        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'args':        [
+            '--fullness', 
+            tokiotest.SAMPLE_OSTFULLNESS_FILE,
+            tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
+            tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
+        ],
+        'validators':  [verify_json,],
+    },
+    {
+        'description': 'bin/cache_lfsstatus.py --failure, no cache',
+        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'args':        [
+            '--failure', 
+            '--',
+            tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
+            tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
+        ],
+        'validators':  [verify_json,],
+    },
+    {
+        'description': 'bin/cache_lfsstatus.py --failure, explicit cache',
+        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'args':        [
+            '--failure', 
+            tokiotest.SAMPLE_OSTMAP_FILE,
+            tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
+            tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
+        ],
+        'validators':  [verify_json,],
     },
 ]
 
@@ -119,7 +161,7 @@ def run_cache_connector(binary, args, validators, to_file=False):
         tokiotest.check_darshan()
 
     if to_file:
-        cmd = [binary] + args + ['-o', tokiotest.TEMP_FILE.name]
+        cmd = [binary] + ['-o', tokiotest.TEMP_FILE.name] + args
         print "Caching to", tokiotest.TEMP_FILE.name
         print "Executing:", cmd
         subprocess.check_output(cmd)
@@ -137,7 +179,9 @@ def craft_description(config, suffix):
     """
     Take a cache_*.py command invocation and craft a clever test description
     """
-    if 'cache_topology' in config['binary']:
+    if 'description' in config:
+        result = "%s %s" % (config['description'], suffix)
+    elif 'cache_topology' in config['binary']:
         result = "%s %s" % (
             os.sep.join(config['binary'].split(os.sep)[-2:]),
             suffix)

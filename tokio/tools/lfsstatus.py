@@ -35,7 +35,6 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
     """
     file_system_to_h5lmt = FS_TO_H5LMT
     h5lmt_file = file_system_to_h5lmt[file_system]
-    ### TODO: this is terrible; need to not hard-code these names and paths
     if metric == "fullness":
         file_basename = FILE_BASENAME_FULLNESS
     elif metric == "failures":
@@ -56,6 +55,9 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
             ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
     else:
         ost_health_files = [cache_file]
+
+    if len(ost_health_files) == 0:
+        raise Exception("No OST health files (%s) found in %s for %s" % (file_basename, hdf5.H5LMT_BASE, str(datetime_target)))
 
     # TODO : Remove this comment after the package is deleted
     # We can get away with the following because NerscLfsOstFullness,
