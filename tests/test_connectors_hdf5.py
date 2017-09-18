@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Test the HDF5 connector
+"""
 
 import os
 import numpy as np
@@ -12,40 +15,44 @@ DATASETS_2D = [
     'OSTWriteGroup/OSTBulkWriteDataSet'
 ]
 POSITIVE_2D = [
-    'MDSOpsGroup/MDSOpsDataSet','OSSCPUGroup/OSSCPUDataSet',
-    'OSTReadGroup/OSTBulkReadDataSet','OSTWriteGroup/OSTBulkWriteDataSet'
+    'MDSOpsGroup/MDSOpsDataSet', 'OSSCPUGroup/OSSCPUDataSet',
+    'OSTReadGroup/OSTBulkReadDataSet', 'OSTWriteGroup/OSTBulkWriteDataSet'
 ]
 
 def test_connectors_hdf5():
-    file = tokio.connectors.Hdf5(SAMPLE_INPUT)
+    """
+    Test the HDF5 connector functionality and correctness
+    """
+    hdf_file = tokio.connectors.Hdf5(SAMPLE_INPUT)
 
     # Make sure group_name=None works
-    assert len(file.to_dataframe().index)
-    
+    assert len(hdf_file.to_dataframe().index)
+
     for dataset in DATASETS_1D:
-        assert dataset in file
-        assert len(file[dataset].shape) == 1
-        assert file[dataset][:].sum() > 0
-        assert len(file.to_dataframe(dataset).index)
-    
+        assert dataset in hdf_file
+        assert len(hdf_file[dataset].shape) == 1
+        assert hdf_file[dataset][:].sum() > 0
+        assert len(hdf_file.to_dataframe(dataset).index)
+
     for dataset in DATASETS_2D:
-        assert dataset in file
-        assert len(file[dataset].shape) == 2
-        assert file[dataset][:,:].sum() > 0
-        assert len(file.to_dataframe(dataset).columns)
+        assert dataset in hdf_file
+        assert len(hdf_file[dataset].shape) == 2
+        assert hdf_file[dataset][:, :].sum() > 0
+        assert len(hdf_file.to_dataframe(dataset).columns)
 
         # Test dataset-dependent correctness
         #
         # Last timstamp greater than the first timestamp
-        assert file['FSStepsGroup/FSStepsDataSet'][0] < file['FSStepsGroup/FSStepsDataSet'][-1]
+        assert hdf_file['FSStepsGroup/FSStepsDataSet'][0] \
+               < hdf_file['FSStepsGroup/FSStepsDataSet'][-1]
 
         # No negative loads
-        assert np.greater_equal(file['MDSCPUGroup/MDSCPUDataSet'][:], 0.0).all()
-        
+        assert np.greater_equal(hdf_file['MDSCPUGroup/MDSCPUDataSet'][:], 0.0).all()
+
         # Only 0 or 1 allowed
-        assert np.logical_or(np.equal(file['FSMissingGroup/FSMissingDataSet'][:,:], 0),
-                             np.equal(file['FSMissingGroup/FSMissingDataSet'][:,:], 1)).all()
-        
-        # No negative rates
-        for dataset in POSITIVE_2D:
-            assert np.greater_equal(file[dataset][:], 0.0).all()
+        assert np.logical_or(np.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 0),
+                             np.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 1)).all()
+
+    # No negative rates
+    for dataset in POSITIVE_2D:
+        assert np.greater_equal(hdf_file[dataset][:], 0.0).all()
