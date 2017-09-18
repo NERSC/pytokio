@@ -79,8 +79,11 @@ def test_slurm_to_json_kwargs():
     Slurm.to_json() functionality with json.dumps kwargs
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
-    json_str = slurm_data.to_json(indent=4, sort_keys=True)
-    slurm_json = json.loads(json_str)
+    json_str_sm = slurm_data.to_json(indent=2, sort_keys=True)
+    json_str_lg = slurm_data.to_json(indent=4, sort_keys=True)
+    # one made with two spaces instead of four should be shorter
+    assert len(json_str_lg) > len(json_str_sm)
+    slurm_json = json.loads(json_str_lg)
     verify_slurm_json(slurm_json)
 
 def test_slurm_to_dataframe():
