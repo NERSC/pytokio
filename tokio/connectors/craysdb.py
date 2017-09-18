@@ -6,6 +6,7 @@ node's configuration within the network fabric.
 
 import os
 import sys
+import errno
 import collections
 import subprocess
 
@@ -32,7 +33,12 @@ class CraySdbProc(dict):
         """
         if self.cache_file is None:
             # Load directly from the Cray service database
-            sdb = subprocess.check_output(['xtdb2proc', '-f', '-'])
+            try:
+                sdb = subprocess.check_output(['xtdb2proc', '-f', '-'])
+            except OSError as error:
+                if error[0] == errno.ENOENT:
+                    raise type(error)(error[0], "CraySDB CLI (xtdb2proc command) not found")
+                raise
             # sdb = subprocess.Popen(['xtdb2proc', '-f', '-'], stdout=subprocess.PIPE).communicate()[0]
             self._parse_xtdb2proc_table(sdb.splitlines())
         else:
