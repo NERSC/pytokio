@@ -15,9 +15,14 @@ def expand_nodelist(node_string):
     string into a list of nodes
     """
     node_names = set([])
-    p = subprocess.Popen(['scontrol', 'show', 
-                          'hostname', node_string], stdout=subprocess.PIPE)
-    for line in p.stdout:
+    try:
+        output_str = subprocess.check_output(['scontrol', 'show', 'hostname', node_string])
+    except OSError as error:
+        if error[0] == errno.ENOENT:
+            raise type(error)(error[0], "Slurm CLI (sacct command) not found")
+        raise
+
+    for line in output_str:
         node_name = line.strip()
         if len(node_name) > 0:
             node_names.add(node_name)
@@ -30,6 +35,7 @@ def compact_nodelist(node_string):
     """
     if not isinstance(node_string, basestring):
         node_string = ','.join(list(node_string))
+
     try:
         node_string = subprocess.check_output(['scontrol', 'show', 'hostlist', node_string]).strip()
     except OSError as error:
@@ -139,6 +145,10 @@ class Slurm(dict):
                 '--jobs', self.jobid,
                 '--format=%s' % ','.join(keys),
                 '--parsable2'])
+        except OSError as error:
+            if error[0] == errno.ENOENT:
+                raise type(error)(error[0], "Slurm CLI (sacct command) not found")
+            raise 
         except subprocess.CalledProcessError:
             raise
         self.update(parse_sacct(sacct_str))

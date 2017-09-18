@@ -5,10 +5,12 @@ to a Python dict (or json).  Ideally this will eventually use a native Darshan
 parsing library (like darshan-ruby does).
 """
 
-import subprocess
-import sys
 import re
+import sys
 import json
+import errno
+import warnings
+import subprocess
 
 DARSHAN_PARSER_BIN = 'darshan-parser'
 
@@ -133,10 +135,18 @@ class Darshan(dict):
             darshan_flag = "--" + counter_flag.lower()
         else:
             darshan_flag = ""
-        p = subprocess.Popen([DARSHAN_PARSER_BIN, darshan_flag, self.log_file], stdout=subprocess.PIPE)
-            
+        try:
+            output_str = subprocess.check_output([DARSHAN_PARSER_BIN, darshan_flag, self.log_file])
+        except subprocess.CalledProcessError as error:
+            warnings.warn("darshan-parser returned nonzero exit code (%d)" % error.returncode)
+            output_str = error.output
+        except OSError as error:
+            if error[0] == errno.ENOENT:
+                raise type(error)(error[0], "darshan-parser command not found")
+            raise
 
-        for line in p.stdout:
+
+        for line in output_str.splitlines():
             # Is this the start of a new section?
             # Why do we look at section, refactorize failed 
             if section is None and line.startswith("# darshan log version:"):
