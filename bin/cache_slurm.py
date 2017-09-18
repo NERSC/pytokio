@@ -4,15 +4,17 @@ Parse and cache a Slurm job record to simply reanalysis and sharing its data.
 """
 
 import os
-import sys
-import json
 import argparse
 import tokio.connectors.slurm
 
-if __name__ == "__main__":
+def cache_slurm():
+    """
+    CLI wrapper around the tokio.connectors.slurm.Slurm's serialization functions
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("slurm_jobid", type=str, help="slurm jobid to process")
-    parser.add_argument("-n", "--native", action="store_true", default=True, help="return output in native format")
+    parser.add_argument("-n", "--native", action="store_true", default=True,
+                        help="return output in native format")
     parser.add_argument("-j", "--json", action="store_true", help="return output in JSON format")
     parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
@@ -34,21 +36,26 @@ if __name__ == "__main__":
     if cache_file is not None:
         print "Caching to %s" % cache_file
 
-    if args.csv:
-        if cache_file is None:
-            print slurm_data.to_dataframe().to_csv()
-        else:
-            slurm_data.to_dataframe().to_csv(cache_file)
-    elif args.json:
-        if cache_file is None:
+    if cache_file is None:
+        if args.csv:
+            print (slurm_data.to_dataframe()).to_csv()
+        elif args.json:
             print slurm_data.to_json(indent=4, sort_keys=True)
-        else:
-            with open(cache_file, 'w') as fp:
-                fp.write(slurm_data.to_json())
-    elif args.native:
-        if cache_file is None:
+        elif args.native:
             print str(slurm_data)
         else:
-            slurm_data.save_cache(cache_file)
+            raise Exception("No output format specified")
     else:
-        raise Exception("No output format specified")
+        if args.csv:
+            (slurm_data.to_dataframe()).to_csv(cache_file)
+        elif args.json:
+            with open(cache_file, 'w') as cache_fd:
+                cache_fd.write(slurm_data.to_json())
+        elif args.native:
+            with open(cache_file, 'w') as cache_fd:
+                cache_fd.write(str(slurm_data))
+        else:
+            raise Exception("No output format specified")
+
+if __name__ == "__main__":
+    cache_slurm()

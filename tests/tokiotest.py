@@ -22,7 +22,8 @@ def needs_darshan(func):
     if SKIP_DARSHAN is not None:
         return func
     try:
-        subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN, stderr=subprocess.STDOUT)
+        subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN,
+                                stderr=subprocess.STDOUT)
     except OSError as error:
         if error[0] == errno.ENOENT:
             SKIP_DARSHAN = True
@@ -40,13 +41,12 @@ def check_darshan():
     if SKIP_DARSHAN:
         raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
 
-
-def create_tempfile():
+def create_tempfile(delete=True):
     """
     Create a temporary file
     """
     global TEMP_FILE
-    TEMP_FILE = tempfile.NamedTemporaryFile()
+    TEMP_FILE = tempfile.NamedTemporaryFile(delete=delete)
 
 def delete_tempfile():
     """
