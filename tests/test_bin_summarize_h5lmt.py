@@ -9,7 +9,7 @@ import subprocess
 import nose
 import tokiotest
 
-BINARY = os.path.join('..', 'bin', 'summarize_h5lmt.py')
+BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_h5lmt.py')
 
 def verify_json(output):
     """

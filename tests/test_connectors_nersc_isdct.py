@@ -12,13 +12,12 @@ import nose
 import tokiotest
 import tokio.connectors.nersc_isdct
 
-INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-SAMPLE_TGZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')
-SAMPLE_TIMESTAMPED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_timestamped.tgz')
-SAMPLE_TAR_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tar')
-SAMPLE_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct_dir')
-SAMPLE_JSON_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json')
-SAMPLE_JSON_GZ_INPUT = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json.gz')
+SAMPLE_TGZ_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct.tgz')
+SAMPLE_TIMESTAMPED_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct_timestamped.tgz')
+SAMPLE_TAR_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct.tar')
+SAMPLE_UNPACKED_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct_dir')
+SAMPLE_JSON_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct.json')
+SAMPLE_JSON_GZ_INPUT = os.path.join(tokiotest.INPUT_DIR, 'sample_nersc_isdct.json.gz')
 DEFAULT_INPUT = SAMPLE_TGZ_INPUT
 
 def validate_object(isdct_data):
@@ -123,7 +122,7 @@ def untar(input_filename):
     """
     cleanup_untar(input_filename)
     tar = tarfile.open(input_filename)
-    tar.extractall(path=INPUT_DIR)
+    tar.extractall(path=tokiotest.INPUT_DIR)
     tar.close()
 
 def cleanup_untar(input_filename):
@@ -132,8 +131,8 @@ def cleanup_untar(input_filename):
     """
     tar = tarfile.open(input_filename)
     for member in tar.getmembers():
-        fq_name = os.path.join(INPUT_DIR, member.name)
-        if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
+        fq_name = os.path.join(tokiotest.INPUT_DIR, member.name)
+        if os.path.exists(fq_name) and fq_name.startswith(tokiotest.INPUT_DIR): # one final backstop
             print "Removing", fq_name
             if member.isdir():
                 shutil.rmtree(fq_name)
