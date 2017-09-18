@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Test the Slurm connector
+"""
 
 import os
 import json
@@ -28,7 +31,7 @@ def verify_slurm(slurm):
     Verify contents of a Slurm object
     """
     assert len(slurm) > 0
-    for rawjobid, counters in slurm.iteritems():
+    for counters in slurm.itervalues():
         assert len(counters) > 0
 
 def verify_slurm_json(slurm_json):
@@ -36,7 +39,7 @@ def verify_slurm_json(slurm_json):
     Verify correctness of a json-serialized Slurm object
     """
     assert len(slurm_json) > 0
-    for rawjobid, counters in slurm_json.iteritems():
+    for counters in slurm_json.itervalues():
         assert len(counters) > 0
         for key in SAMPLE_INPUT_KEYS:
             assert key in counters.keys()
@@ -53,7 +56,7 @@ def test_load_slurm_sacct():
     Initialize Slurm from sacct command
     """
     try:
-        slurm_data = tokio.connectors.slurm.Slurm(SAMPLE_JOBID)
+        _ = tokio.connectors.slurm.Slurm(SAMPLE_JOBID)
     except OSError as error:
         # sacct is not available
         raise nose.SkipTest(error)
@@ -71,7 +74,7 @@ def test_slurm_to_json():
     slurm_json = json.loads(json_str)
     verify_slurm_json(slurm_json)
 
-def test_slurm_to_json():
+def test_slurm_to_json_kwargs():
     """
     Slurm.to_json() functionality with json.dumps kwargs
     """
@@ -86,25 +89,28 @@ def test_slurm_to_dataframe():
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
 
-    df = slurm_data.to_dataframe()
+    dataframe = slurm_data.to_dataframe()
 
-    assert len(df) > 0
+    assert len(dataframe) > 0
 
     # Ensure that a few critical keys are included
     for key in SAMPLE_INPUT_KEYS:
-        assert key in df.columns
-        assert len(df[key]) > 0
+        assert key in dataframe.columns
+        assert len(dataframe[key]) > 0
 
     # Ensure that datetime fields were correctly converted
     for datetime_field in 'start', 'end':
         # ensure that the absolute time is sensible
-        assert df[datetime_field][0] > datetime.datetime(1980, 1, 1)
+        assert dataframe[datetime_field][0] > datetime.datetime(1980, 1, 1)
 
         # verify that basic arithmetic works
-        day_ago = df[datetime_field][0] - datetime.timedelta(days=1)
-        assert (df[datetime_field][0] - day_ago).total_seconds() == 86400
+        day_ago = dataframe[datetime_field][0] - datetime.timedelta(days=1)
+        assert (dataframe[datetime_field][0] - day_ago).total_seconds() == 86400
 
 def expand_nodelist(min_nid, max_nid):
+    """
+    Create a known nodelist and ensure that it expands correctly
+    """
     # + 1 below because node list is inclusive
     num_nodes = max_nid - min_nid + 1
     nid_str = "nid[%05d-%05d]" % (min_nid, max_nid)
@@ -132,7 +138,7 @@ def test_compact_nodelist():
     """
     min_node = random.randint(1, 6000)
     max_node = min_node + random.randint(1, 10000)
-    nodelist = set([ "nid%05d" % i for i in range(min_node, max_node + 1) ])
+    nodelist = set(["nid%05d" % i for i in range(min_node, max_node + 1)])
     try:
         nodelist_str_from_set = tokio.connectors.slurm.compact_nodelist(nodelist)
         nodelist_str_from_str = tokio.connectors.slurm.compact_nodelist(','.join(list(nodelist)))
