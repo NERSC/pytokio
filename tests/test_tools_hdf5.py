@@ -5,17 +5,16 @@ Test HDF5 tools interfaces
 
 import os
 import datetime
+import tokiotest
 import tokio.tools.hdf5
 import tokio.connectors.hdf5
 from test_connectors_hdf5 import DATASETS_1D, DATASETS_2D
 
-INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-tokio.tools.hdf5.H5LMT_BASE = INPUT_DIR
-SAMPLE_INPUT_BN = 'sample.h5lmt'
-SAMPLE_INPUT = os.path.join(tokio.tools.hdf5.H5LMT_BASE, SAMPLE_INPUT_BN)
+tokio.tools.hdf5.H5LMT_BASE = tokiotest.INPUT_DIR
+SAMPLE_H5LMT_FILE_BN = os.path.basename(tokiotest.SAMPLE_H5LMT_FILE)
 TIMESTAMPS_DATASET = 'FSStepsGroup/FSStepsDataSet'
 
-TIME_0, TIME_1 = tokio.connectors.Hdf5(SAMPLE_INPUT)[TIMESTAMPS_DATASET][0:2]
+TIME_0, TIME_1 = tokio.connectors.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)[TIMESTAMPS_DATASET][0:2]
 LMT_TIMESTEP = int(TIME_1 - TIME_0)
 
 # Tuple of (offset relative to start of first day, duration)
@@ -44,7 +43,7 @@ def check_get_files_and_indices(start_offset, duration):
     # Make sure we're touching at least two files
     assert (end_time.date() - start_time.date()).days == 1
 
-    files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_INPUT_BN,
+    files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_H5LMT_FILE_BN,
                                                                start_time,
                                                                end_time)
     for (file_name, istart, iend) in files_and_indices:
@@ -63,7 +62,7 @@ def check_get_df_from_time_range(dataset_name, start_offset, duration):
     end_time = start_time + duration
     # Make sure we're touching at least two files
     assert (end_time.date() - start_time.date()).days == 1
-    result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_INPUT_BN,
+    result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_H5LMT_FILE_BN,
                                                             dataset_name,
                                                             start_time,
                                                             end_time)

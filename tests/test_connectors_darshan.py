@@ -3,11 +3,8 @@
 Test the Darshan connector
 """
 
-import os
 import tokiotest
 import tokio.connectors.darshan
-
-SAMPLE_INPUT = os.path.join('inputs', 'sample.darshan')
 
 def verify_darshan(darshan_data):
     """
@@ -80,7 +77,7 @@ def test_base():
     darshan_parser_base() method
     """
     tokiotest.check_darshan()
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_base()
     verify_darshan(darshan)
     verify_base_counters(darshan)
@@ -91,7 +88,7 @@ def test_total():
     darshan_parser_total() method
     """
     tokiotest.check_darshan()
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_total()
     verify_darshan(darshan)
     verify_total_counters(darshan)
@@ -102,7 +99,7 @@ def test_perf():
     darshan_parser_perf() method
     """
     tokiotest.check_darshan()
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_perf()
     verify_darshan(darshan)
     verify_perf_counters(darshan)
@@ -114,7 +111,7 @@ def test_all():
     """
     tokiotest.check_darshan()
     # try parsing in different orders just to make sure that no method is nuking the others
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_perf()
     darshan.darshan_parser_base()
     darshan.darshan_parser_total()
@@ -123,7 +120,7 @@ def test_all():
     verify_base_counters(darshan)
     verify_total_counters(darshan)
 
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_base()
     darshan.darshan_parser_perf()
     darshan.darshan_parser_total()
@@ -132,7 +129,7 @@ def test_all():
     verify_base_counters(darshan)
     verify_total_counters(darshan)
 
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_base()
     darshan.darshan_parser_total()
     darshan.darshan_parser_perf()
@@ -141,7 +138,7 @@ def test_all():
     verify_base_counters(darshan)
     verify_total_counters(darshan)
 
-    darshan = tokio.connectors.darshan.Darshan(SAMPLE_INPUT)
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_LOG)
     darshan.darshan_parser_perf()
     darshan.darshan_parser_total()
     darshan.darshan_parser_base()

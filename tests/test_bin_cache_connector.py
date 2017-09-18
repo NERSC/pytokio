@@ -35,71 +35,69 @@ def verify_sacct(csv_str):
     data = pandas.read_csv(StringIO.StringIO(csv_str), sep="|")
     assert len(data) > 0
 
-BIN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'bin')
-
 CACHE_CONNECTOR_CONFIGS = [
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_isdct.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_isdct.py'),
         'args':       ['--json', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_isdct.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_isdct.py'),
         'args':       ['--csv', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_csv,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--base', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--base', '--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--base', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_darshan.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
         'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
         'args':       ['--json', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
         'args':       ['--csv', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_csv,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_slurm.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
         'args':       ['--native', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_sacct,],
     },
     {
-        'binary':     os.path.join(BIN_DIR, 'cache_topology.py'),
+        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_topology.py'),
         'args':       [
             '--craysdb-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
             '--slurm-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
@@ -108,7 +106,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --fullness, no cache',
-        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
             '--fullness',
             '--',
@@ -119,7 +117,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --fullness, explicit cache',
-        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
             '--fullness',
             tokiotest.SAMPLE_OSTFULLNESS_FILE,
@@ -130,7 +128,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --failure, no cache',
-        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
             '--failure',
             '--',
@@ -141,7 +139,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --failure, explicit cache',
-        'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
             '--failure',
             tokiotest.SAMPLE_OSTMAP_FILE,

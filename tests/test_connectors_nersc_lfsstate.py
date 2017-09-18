@@ -6,11 +6,10 @@ Test the NERSC Lustre health data connector
 import os
 import nose
 import tokiotest
+from tokiotest import SAMPLE_OSTMAP_FILE, SAMPLE_OSTFULLNESS_FILE
 import tokio.connectors.nersc_lfsstate
 
 INPUTS = os.path.join(os.getcwd(), 'inputs')
-SAMPLE_OSTMAP_FILE = os.path.join(INPUTS, 'sample_ost-map.txt')
-SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUTS, 'sample_ost-fullness.txt')
 
 def verify_ost(ost, input_type):
     """

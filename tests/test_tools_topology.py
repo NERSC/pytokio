@@ -3,15 +3,8 @@
 Test topology tool interface
 """
 
-import os
+import tokiotest
 import tokio.tools.topology
-
-SAMPLE_XTDB2PROC_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                     'inputs',
-                                     'sample.xtdb2proc')
-SAMPLE_SLURM_CACHE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                  'inputs',
-                                  'sample.slurm')
 
 def test_basic():
     """
@@ -19,8 +12,8 @@ def test_basic():
 
     """
     topo = tokio.tools.topology.get_job_diameter(
-        slurm_cache_file=SAMPLE_SLURM_CACHE,
-        craysdb_cache_file=SAMPLE_XTDB2PROC_FILE)
+        slurm_cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE,
+        craysdb_cache_file=tokiotest.SAMPLE_XTDB2PROC_FILE)
     assert len(topo) > 0
     for expected_key in 'job_min_radius', 'job_max_radius', 'job_avg_radius':
         assert expected_key in topo

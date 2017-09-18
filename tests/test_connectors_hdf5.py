@@ -3,11 +3,10 @@
 Test the HDF5 connector
 """
 
-import os
-import numpy as np
+import numpy
+import tokiotest
 import tokio.connectors
 
-SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.h5lmt')
 DATASETS_1D = ['FSStepsGroup/FSStepsDataSet', 'MDSCPUGroup/MDSCPUDataSet']
 DATASETS_2D = [
     'FSMissingGroup/FSMissingDataSet', 'MDSOpsGroup/MDSOpsDataSet',
@@ -23,7 +22,7 @@ def test_connectors_hdf5():
     """
     Test the HDF5 connector functionality and correctness
     """
-    hdf_file = tokio.connectors.Hdf5(SAMPLE_INPUT)
+    hdf_file = tokio.connectors.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
     # Make sure group_name=None works
     assert len(hdf_file.to_dataframe().index)
@@ -47,12 +46,13 @@ def test_connectors_hdf5():
                < hdf_file['FSStepsGroup/FSStepsDataSet'][-1]
 
         # No negative loads
-        assert np.greater_equal(hdf_file['MDSCPUGroup/MDSCPUDataSet'][:], 0.0).all()
+        assert numpy.greater_equal(hdf_file['MDSCPUGroup/MDSCPUDataSet'][:], 0.0).all()
 
         # Only 0 or 1 allowed
-        assert np.logical_or(np.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 0),
-                             np.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 1)).all()
+        assert numpy.logical_or(
+            numpy.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 0),
+            numpy.equal(hdf_file['FSMissingGroup/FSMissingDataSet'][:, :], 1)).all()
 
     # No negative rates
     for dataset in POSITIVE_2D:
-        assert np.greater_equal(hdf_file[dataset][:], 0.0).all()
+        assert numpy.greater_equal(hdf_file[dataset][:], 0.0).all()
