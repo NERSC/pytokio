@@ -10,6 +10,29 @@ import subprocess
 import nose
 import tokio.connectors.darshan
 
+### Sample input files and their expected contents
+INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
+
+### For tests that function without the Darshan log--these values must reflect
+### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
+SAMPLE_DARSHAN_LOG = os.path.join(INPUT_DIR, 'sample.darshan')
+SAMPLE_DARSHAN_JOBID = '4478544'
+SAMPLE_DARSHAN_JOBHOST = 'edison'
+SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47' # start_time_asci: Mon Mar 20 02:07:47 2017
+SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43' # end_time_asci: Mon Mar 20 02:09:43 2017
+SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
+SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
+
+### Other cached files corresponding to SAMPLE_DARSHAN_LOG
+SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
+SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
+SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
+SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample.sqlite3')
+SAMPLE_SLURM_CACHE_FILE = os.path.join(INPUT_DIR, 'sample.slurm')
+
+SAMPLE_NERSCISDCT_FILE = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')
+
+### Global state
 SKIP_DARSHAN = None
 TEMP_FILE = None
 
