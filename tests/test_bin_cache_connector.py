@@ -110,7 +110,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_lfsstatus.py --fullness, no cache',
         'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
-            '--fullness', 
+            '--fullness',
             '--',
             tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
             tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
@@ -121,7 +121,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_lfsstatus.py --fullness, explicit cache',
         'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
-            '--fullness', 
+            '--fullness',
             tokiotest.SAMPLE_OSTFULLNESS_FILE,
             tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
             tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
@@ -132,7 +132,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_lfsstatus.py --failure, no cache',
         'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
-            '--failure', 
+            '--failure',
             '--',
             tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
             tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
@@ -143,7 +143,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_lfsstatus.py --failure, explicit cache',
         'binary':      os.path.join(BIN_DIR, 'cache_lfsstatus.py'),
         'args':        [
-            '--failure', 
+            '--failure',
             tokiotest.SAMPLE_OSTMAP_FILE,
             tokiotest.SAMPLE_DARSHAN_SONEXION_ID,
             tokiotest.SAMPLE_DARSHAN_START_TIME.replace(' ', 'T'),
