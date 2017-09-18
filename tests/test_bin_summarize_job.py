@@ -186,7 +186,6 @@ def test_without_darshan():
     """
     LMT-only functionality when no darshan log is present
     """
-    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs')
     output_str = subprocess.check_output([
         BINARY,
         '--json',
@@ -200,7 +199,6 @@ def test_most_without_darshan():
     """
     Most functionality when no darshan log is present
     """
-    os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(os.getcwd(), 'inputs')
     output_str = subprocess.check_output([
         BINARY,
         '--json',
