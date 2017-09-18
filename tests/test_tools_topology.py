@@ -1,11 +1,17 @@
 #!/usr/bin/env python
+"""
+Test topology tool interface
+"""
 
 import os
-import nose
 import tokio.tools.topology
 
-SAMPLE_XTDB2PROC_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.xtdb2proc')
-SAMPLE_SLURM_CACHE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.slurm')
+SAMPLE_XTDB2PROC_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                     'inputs',
+                                     'sample.xtdb2proc')
+SAMPLE_SLURM_CACHE = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                  'inputs',
+                                  'sample.slurm')
 
 def test_basic():
     """

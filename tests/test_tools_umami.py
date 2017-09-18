@@ -1,34 +1,43 @@
 #!/usr/bin/env python
+"""
+Test the UMAMI tool interface
+"""
 
-import matplotlib
-matplotlib.use('agg')
-
-import os
 import json
 import random
 import datetime
 import nose
+import matplotlib
 import tokiotest
 import tokio.tools.umami
+
+# prevent the test from throwing DISPLAY errors
+matplotlib.pyplot.switch_backend('agg')
 
 # keep it deterministic
 random.seed(0)
 
 # arbitrary but fixed start time
-SAMPLE_TIMES = [ datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in range(5) ]
+SAMPLE_TIMES = [datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in range(5)]
 
 # procedurally generated garbage data to plot
 SAMPLE_DATA = [
-    [ random.randrange(0, 100.0) for n in range(5) ],
-    [ random.randrange(0, 1000.0) for n in range(5) ],
-    [ random.randrange(-1000.0, 1000.0) for n in range(5) ],
+    [random.randrange(0, 100.0) for n in range(5)],
+    [random.randrange(0, 1000.0) for n in range(5)],
+    [random.randrange(-1000.0, 1000.0) for n in range(5)],
 ]
 
-def validate_umami_fig(fig):
+def verify_umami_fig(fig):
+    """
+    Verify basic UMAMI correctness
+    """
     ### more correctness assertions?
-    assert(len(fig.axes) == 2*len(SAMPLE_DATA))
+    assert len(fig.axes) == 2*len(SAMPLE_DATA)
 
 def build_umami_from_sample():
+    """
+    Construct an Umami object from the test's constants
+    """
     umami = tokio.tools.umami.Umami()
     for index, sample_data in enumerate(SAMPLE_DATA):
         umami['test_metric_%d' % index] = tokio.tools.umami.UmamiMetric(
@@ -46,7 +55,7 @@ def test_umami_plot_to_file():
     umami = build_umami_from_sample()
     fig = umami.plot(output_file=tokiotest.TEMP_FILE.name)
     print "Wrote output to %s" % tokiotest.TEMP_FILE.name
-    validate_umami_fig(fig)
+    verify_umami_fig(fig)
 
 def test_umami_to_dict():
     """
@@ -102,7 +111,7 @@ def test_umamimetric_pop():
     """
     umami = build_umami_from_sample()
     row_num = 0
-    for key, umami_metric in umami.iteritems():
+    for umami_metric in umami.itervalues():
         index = -1
         while len(umami_metric.values) > 0:
             # prevent an infinite loop...
@@ -126,9 +135,11 @@ def test_umamimetric_append():
             values=[],
             label="Test Metric %d" % index,
             big_is_good=True)
-        print "%d: sample_data is %d units long (%s)" % (index, len(sample_data), json.dumps(sample_data))
-        for jndex in range(len(sample_data)):
-            umami_metric.append(SAMPLE_TIMES[jndex], sample_data[jndex])
+        print "%d: sample_data is %d units long (%s)" % (index,
+                                                         len(sample_data),
+                                                         json.dumps(sample_data))
+        for jndex, sample_datum in enumerate(sample_data):
+            umami_metric.append(SAMPLE_TIMES[jndex], sample_datum)
         umami_metrics.append(umami_metric)
 
     umami = tokio.tools.umami.Umami()
@@ -136,7 +147,7 @@ def test_umamimetric_append():
         umami["test_metric_%d" % index] = umami_metric
 
     fig = umami.plot()
-    validate_umami_fig(fig)
+    verify_umami_fig(fig)
 
 def test_umamimetric_to_json():
     """
@@ -144,5 +155,5 @@ def test_umamimetric_to_json():
     """
     # Don't bother checking correctness.  Just make sure json.dumps doesn't fail
     umami = build_umami_from_sample()
-    for key, umamimetric in umami.iteritems():
+    for umamimetric in umami.itervalues():
         print umamimetric.to_json()

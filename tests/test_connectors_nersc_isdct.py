@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+Test the ISDCT connector
+"""
 
 import os
 import gzip
@@ -28,11 +31,11 @@ def validate_object(isdct_data):
         assert len(serial_no) > 1
         for counter in counters:
             # a counter didn't get parsed correctly
-            assert not counter.startswith("None") 
+            assert not counter.startswith("None")
         # ensure that synthesized metrics are being calculated
         assert 'write_amplification_factor' in counters
         # ensure that timestamp is set
-        print json.dumps(counters,indent=4,sort_keys=True)
+        print json.dumps(counters, indent=4, sort_keys=True)
         assert 'timestamp' in counters
 
 def validate_dataframe(isdct_data):
@@ -70,7 +73,7 @@ def test_unpacked_input():
     """
     untar(SAMPLE_TGZ_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_UNPACKED_INPUT)
-    cleanup_untar(SAMPLE_TGZ_INPUT) 
+    cleanup_untar(SAMPLE_TGZ_INPUT)
     validate_object(isdct_data)
 
 def test_json_gz_input():
@@ -114,14 +117,20 @@ def test_serializer():
 ################################################################################
 #  Helper functions
 ################################################################################
-def untar(input_file):
-    cleanup_untar(input_file)
-    tar = tarfile.open(input_file)
+def untar(input_filename):
+    """
+    Unpack a tarball to test support for that input type
+    """
+    cleanup_untar(input_filename)
+    tar = tarfile.open(input_filename)
     tar.extractall(path=INPUT_DIR)
     tar.close()
 
-def cleanup_untar(input_file):
-    tar = tarfile.open(input_file)
+def cleanup_untar(input_filename):
+    """
+    Clean up the artifacts created by this test's untar() function
+    """
+    tar = tarfile.open(input_filename)
     for member in tar.getmembers():
         fq_name = os.path.join(INPUT_DIR, member.name)
         if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
@@ -131,24 +140,22 @@ def cleanup_untar(input_file):
             else:
                 os.unlink(fq_name)
 
-def gunzip(input_file, output_file):
+def gunzip(input_filename, output_filename):
     """
     To check support for both compressed and uncompressed data streams, create
     an uncompressed version of an input file on the fly
     """
-    try_unlink(output_file)
-    with gzip.open(input_file, 'rb') as f:
-        file_content = f.read()
-    with open(output_file, 'w+b') as f:
-        print "Creating %s" % output_file
-        f.write(file_content)
+    try_unlink(output_filename)
+    with gzip.open(input_filename, 'rb') as input_file:
+        file_content = input_file.read()
+    with open(output_filename, 'w+b') as output_file:
+        print "Creating %s" % output_filename
+        output_file.write(file_content)
 
-def try_unlink(output_file):
+def try_unlink(output_filename):
     """
     Destroy a temporarily decompressed input file
     """
-    if os.path.exists(output_file):
-        print "Destroying %s" % output_file
-        os.unlink(output_file)
-
-
+    if os.path.exists(output_filename):
+        print "Destroying %s" % output_filename
+        os.unlink(output_filename)
