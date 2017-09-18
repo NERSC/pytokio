@@ -3,13 +3,10 @@
 Test the CraySDB connector
 """
 
-import os
 import errno
 import nose
 import tokiotest
 import tokio.connectors.craysdb
-
-SAMPLE_XTDB2PROC_FILE = os.path.join(os.getcwd(), 'inputs', 'sample.xtdb2proc')
 
 def verify_craysdbproc(craysdbproc):
     """
@@ -31,7 +28,7 @@ def test_craysdbproc_from_cache():
     Initialize CraySdb from cache
     """
     # Read from a cache file
-    craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(tokiotest.SAMPLE_XTDB2PROC_FILE)
     verify_craysdbproc(craysdbproc)
 
 def test_craysdbproc_from_sdb():
@@ -54,7 +51,7 @@ def test_craysdbproc_serializer():
     serialized CraySdb can be used to initialize
     """
     # Read from a cache file
-    craysdbproc = tokio.connectors.craysdb.CraySdbProc(SAMPLE_XTDB2PROC_FILE)
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(tokiotest.SAMPLE_XTDB2PROC_FILE)
     # Serialize the object, then re-read it and verify it
     print "Caching to %s" % tokiotest.TEMP_FILE.name
     craysdbproc.save_cache(tokiotest.TEMP_FILE.name)

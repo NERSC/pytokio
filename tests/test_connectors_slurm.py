@@ -3,7 +3,6 @@
 Test the Slurm connector
 """
 
-import os
 import json
 import random
 import datetime
@@ -14,14 +13,6 @@ import tokio.connectors.slurm
 # Just to verify that the basic sacct interface works.  Hopefully jobid=1000
 # exists on the system where this test is run.
 SAMPLE_JOBID = 1000
-
-# If you change the contents of the SAMPLE_INPUT file, you must update the
-# expected input values as well or the validation tests may fail
-SAMPLE_INPUT = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs', 'sample.slurm')
-SAMPLE_INPUT_KEYS = ['start', 'end', 'jobidraw']
-SAMPLE_INPUT_JOBCT = 1
-SAMPLE_INPUT_NODECT = 128
-SAMPLE_INPUT_MAX_WALLSECS = 3600
 
 # keep it deterministic
 random.seed(0)
@@ -41,14 +32,14 @@ def verify_slurm_json(slurm_json):
     assert len(slurm_json) > 0
     for counters in slurm_json.itervalues():
         assert len(counters) > 0
-        for key in SAMPLE_INPUT_KEYS:
+        for key in tokiotest.SAMPLE_SLURM_CACHE_KEYS:
             assert key in counters.keys()
 
 def test_load_slurm_cache():
     """
     Initialize Slurm from cache file
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     verify_slurm(slurm_data)
 
 def test_load_slurm_sacct():
@@ -69,7 +60,7 @@ def test_slurm_to_json():
     """
     Slurm.to_json() baseline functionality
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     json_str = slurm_data.to_json()
     slurm_json = json.loads(json_str)
     verify_slurm_json(slurm_json)
@@ -78,7 +69,7 @@ def test_slurm_to_json_kwargs():
     """
     Slurm.to_json() functionality with json.dumps kwargs
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     json_str_sm = slurm_data.to_json(indent=2, sort_keys=True)
     json_str_lg = slurm_data.to_json(indent=4, sort_keys=True)
     # one made with two spaces instead of four should be shorter
@@ -90,14 +81,14 @@ def test_slurm_to_dataframe():
     """
     Slurm.to_dataframe() functionality and correctness
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
 
     dataframe = slurm_data.to_dataframe()
 
     assert len(dataframe) > 0
 
     # Ensure that a few critical keys are included
-    for key in SAMPLE_INPUT_KEYS:
+    for key in tokiotest.SAMPLE_SLURM_CACHE_KEYS:
         assert key in dataframe.columns
         assert len(dataframe[key]) > 0
 
@@ -159,7 +150,7 @@ def test_slurm_serializer():
     Serialize and deserialize connectors.Slurm
     """
     # Read from a cache file
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     # Serialize the object, then re-read it and verify it
     print "Caching to %s" % tokiotest.TEMP_FILE.name
     slurm_data.save_cache(tokiotest.TEMP_FILE.name)
@@ -172,20 +163,20 @@ def test_get_job_ids():
     """
     Slurm.get_job_ids() functionality
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
-    assert len(slurm_data.get_job_ids()) == SAMPLE_INPUT_JOBCT
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
+    assert len(slurm_data.get_job_ids()) == tokiotest.SAMPLE_SLURM_CACHE_JOBCT
 
 def test_get_job_nodes():
     """
     Slurm.get_job_nodes() functionality
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
-    assert len(slurm_data.get_job_nodes()) == SAMPLE_INPUT_NODECT
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
+    assert len(slurm_data.get_job_nodes()) == tokiotest.SAMPLE_SLURM_CACHE_NODECT
 
 def test_get_job_startend():
     """
     Slurm.get_job_startend() functionality
     """
-    slurm_data = tokio.connectors.slurm.Slurm(cache_file=SAMPLE_INPUT)
+    slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     start, end = slurm_data.get_job_startend()
-    assert (end - start).total_seconds() < SAMPLE_INPUT_MAX_WALLSECS
+    assert (end - start).total_seconds() < tokiotest.SAMPLE_SLURM_CACHE_MAX_WALLSECS

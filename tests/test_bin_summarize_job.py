@@ -13,26 +13,10 @@ import tokiotest
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
 
 ### For tests that base all tests off of the sample Darshan log
-SAMPLE_DARSHAN_LOG = os.path.join(INPUT_DIR, 'sample.darshan')
 SAMPLE_DARSHAN_LOG_2 = os.path.join(INPUT_DIR, 'sample-2.darshan')
 
 ### For tokio.tools.hdf5, which is used by summarize_job.py
 os.environ['PYTOKIO_H5LMT_BASE'] = INPUT_DIR
-
-### For tests that function without the Darshan log--these values must reflect
-### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
-SAMPLE_DARSHAN_JOBID = '4478544'
-SAMPLE_DARSHAN_JOBHOST = 'edison'
-SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47' # start_time_asci: Mon Mar 20 02:07:47 2017
-SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43' # end_time_asci: Mon Mar 20 02:09:43 2017
-SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
-
-### Other cached files corresponding to SAMPLE_DARSHAN_LOG
-SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
-SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
-SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
-SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample.sqlite3')
-SAMPLE_SLURM_CACHE_FILE = os.path.join(INPUT_DIR, 'sample.slurm')
 
 BINARY = os.path.join('..', 'bin', 'summarize_job.py')
 
@@ -76,7 +60,7 @@ def test_json():
     output_str = subprocess.check_output([
         BINARY,
         '--json',
-        SAMPLE_DARSHAN_LOG])
+        tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
@@ -89,7 +73,7 @@ def test_csv():
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
-        SAMPLE_DARSHAN_LOG])
+        tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written')
 
@@ -102,7 +86,7 @@ def test_darshan_summaries():
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
-        SAMPLE_DARSHAN_LOG,
+        tokiotest.SAMPLE_DARSHAN_LOG,
         SAMPLE_DARSHAN_LOG_2])
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
@@ -117,8 +101,8 @@ def test_bogus_darshans():
     with open(os.devnull, 'w') as devnull:
         output_str = subprocess.check_output([
             BINARY,
-            SAMPLE_DARSHAN_LOG,      # valid log
-            SAMPLE_XTDB2PROC_FILE,   # not valid log
+            tokiotest.SAMPLE_DARSHAN_LOG,      # valid log
+            tokiotest.SAMPLE_XTDB2PROC_FILE,   # not valid log
             SAMPLE_DARSHAN_LOG_2,    # valid log
             'garbagefile'            # file doesn't exist
             ], stderr=devnull)
@@ -138,10 +122,10 @@ def test_with_topology():
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
         BINARY,
-        '--topology', SAMPLE_XTDB2PROC_FILE,
-        '--slurm-jobid', SAMPLE_SLURM_CACHE_FILE,
+        '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,
+        '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
         '--json',
-        SAMPLE_DARSHAN_LOG])
+        tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='topology_job_max_radius')
@@ -157,9 +141,9 @@ def test_with_lfsstatus():
         BINARY,
         '--json',
         '--ost',
-        '--ost-fullness', SAMPLE_OSTFULLNESS_FILE,
-        '--ost-map', SAMPLE_OSTMAP_FILE,
-        SAMPLE_DARSHAN_LOG])
+        '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
+        '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
+        tokiotest.SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
@@ -174,9 +158,9 @@ def test_with_nersc_jobsdb():
     output_str = subprocess.check_output([
         BINARY,
         '--json',
-        '--concurrentjobs', SAMPLE_NERSCJOBSDB_FILE,
-        '--jobhost', SAMPLE_DARSHAN_JOBHOST,
-        SAMPLE_DARSHAN_LOG])
+        '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
+        '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
+        tokiotest.SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
@@ -189,10 +173,10 @@ def test_without_darshan():
     output_str = subprocess.check_output([
         BINARY,
         '--json',
-        '--slurm-jobid', SAMPLE_DARSHAN_JOBID,
-        '--start-time', SAMPLE_DARSHAN_START_TIME,
-        '--end-time', SAMPLE_DARSHAN_END_TIME,
-        '--file-system', SAMPLE_DARSHAN_FILE_SYSTEM,])
+        '--slurm-jobid', tokiotest.SAMPLE_DARSHAN_JOBID,
+        '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
+        '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
+        '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,])
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
 def test_most_without_darshan():
@@ -202,19 +186,19 @@ def test_most_without_darshan():
     output_str = subprocess.check_output([
         BINARY,
         '--json',
-        '--slurm-jobid', SAMPLE_SLURM_CACHE_FILE,
-        '--start-time', SAMPLE_DARSHAN_START_TIME,
-        '--end-time', SAMPLE_DARSHAN_END_TIME,
-        '--file-system', SAMPLE_DARSHAN_FILE_SYSTEM,
+        '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
+        '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
+        '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
+        '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,
 
-        '--concurrentjobs', SAMPLE_NERSCJOBSDB_FILE,
-        '--jobhost', SAMPLE_DARSHAN_JOBHOST,
+        '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
+        '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
 
         '--ost',
-        '--ost-fullness', SAMPLE_OSTFULLNESS_FILE,
-        '--ost-map', SAMPLE_OSTMAP_FILE,
+        '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
+        '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
 
-        '--topology', SAMPLE_XTDB2PROC_FILE,])
+        '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,])
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
