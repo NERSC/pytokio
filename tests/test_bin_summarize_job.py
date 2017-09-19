@@ -49,6 +49,30 @@ def verify_output_csv(output_str, key=None, value=None, expected_rows=None):
     return True
 
 @tokiotest.needs_darshan
+def test_get_biggest_fs():
+    """
+    summarize_job.get_biggest_fs() functionality
+    """
+    tokiotest.check_darshan()
+    output_str = subprocess.check_output([
+        BINARY,
+        '--json',
+        tokiotest.SAMPLE_DARSHAN_LOG])
+    assert verify_output_json(output_str, key='darshan_biggest_read_fs')
+
+@tokiotest.needs_darshan
+def test_get_biggest_api():
+    """
+    summarize_job.get_biggest_api() functionality
+    """
+    tokiotest.check_darshan()
+    output_str = subprocess.check_output([
+        BINARY,
+        '--json',
+        tokiotest.SAMPLE_DARSHAN_LOG])
+    assert verify_output_json(output_str, key='darshan_biggest_read_api')
+
+@tokiotest.needs_darshan
 def test_json():
     """
     Baseline integration of darshan and LMT data (json)
@@ -60,6 +84,8 @@ def test_json():
         '--json',
         tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
+    assert verify_output_json(output_str, key='darshan_biggest_read_api')
+    assert verify_output_json(output_str, key='darshan_biggest_read_fs')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
 
 @tokiotest.needs_darshan
@@ -73,6 +99,8 @@ def test_csv():
         BINARY,
         tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
+    assert verify_output_csv(output_str, key='darshan_biggest_read_api')
+    assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written')
 
 @tokiotest.needs_darshan
@@ -87,6 +115,8 @@ def test_darshan_summaries():
         tokiotest.SAMPLE_DARSHAN_LOG,
         SAMPLE_DARSHAN_LOG_2])
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
+    assert verify_output_csv(output_str, key='darshan_biggest_read_api')
+    assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
 @tokiotest.needs_darshan
@@ -106,6 +136,8 @@ def test_bogus_darshans():
             ], stderr=devnull)
     # subprocess.check_output will throw exception if returncode != 0
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
+    assert verify_output_csv(output_str, key='darshan_biggest_read_api')
+    assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
     assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
 
 @tokiotest.needs_darshan
@@ -125,6 +157,8 @@ def test_with_topology():
         '--json',
         tokiotest.SAMPLE_DARSHAN_LOG])
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
+    assert verify_output_json(output_str, key='darshan_biggest_read_api')
+    assert verify_output_json(output_str, key='darshan_biggest_read_fs')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='topology_job_max_radius')
 
@@ -144,6 +178,8 @@ def test_with_lfsstatus():
         tokiotest.SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
+    assert verify_output_json(output_str, key='darshan_biggest_read_api')
+    assert verify_output_json(output_str, key='darshan_biggest_read_fs')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
 
@@ -161,6 +197,8 @@ def test_with_nersc_jobsdb():
         tokiotest.SAMPLE_DARSHAN_LOG])
     print output_str
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
+    assert verify_output_json(output_str, key='darshan_biggest_read_api')
+    assert verify_output_json(output_str, key='darshan_biggest_read_fs')
     assert verify_output_json(output_str, key='lmt_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
 
