@@ -2,48 +2,23 @@
 
 import os
 import datetime
-import numpy as np
-from .. import connectors
-from ..debug import debug_print as _debug_print
-# For repack_h5lmt
-import subprocess
 import tempfile
-import ConfigParser
-
-cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'tokio.cfg'))
-
-H5LMT_BASE = os.environ.get('PYTOKIO_H5LMT_BASE')
-if H5LMT_BASE is None:
-    H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE'))
-if H5LMT_BASE is None:
-    H5LMT_BASE = eval(cfg.get('tokio', 'H5LMT_BASE_NERSC'))
+import subprocess
+import numpy as np
+import common
+from .. import connectors, config
+from ..debug import debug_print as _debug_print
 
 def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """
     Given a starting datetime and (optionally) an ending datetime, return all
     H5LMT files that contain data inside of that date range (inclusive).
-
-    # :param str file_name: The basename of the H5LMT files you want to find (e.g., cori_snx11168.h5lmt)
-    # :param datetime_start: The first day of H5LMT data you want to collect
-    # :type datetime_start: datetime.datetime
-    # :param datetime_end: The last day of H5LMT data you want to collect
-    # :type datetime_end: datetime.datetime or None
-    # :return: fully qualified paths to existing H5LMT files
-    # :rtype: list(str)
     
     """   
-    if datetime_start is None:
-        raise Exception('A start time must be provided')
-    if datetime_end is None: 
-        datatime_end = datetime.datetime.day()
-    day = datetime_start
-    h5lmt_files = []
-    while day.date() <= datetime_end.date():
-        h5lmt_file = os.path.join(H5LMT_BASE, day.strftime("%Y-%m-%d"), file_name)
-        if os.path.isfile(h5lmt_file):
-            h5lmt_files.append(h5lmt_file)
-        day += datetime.timedelta(days=1)
+    h5lmt_files = common.enumerate_dated_dir(config.H5LMT_BASE_DIR,
+                                             datetime_start,
+                                             datetime_end,
+                                             file_name=file_name)
     return h5lmt_files
 
 
@@ -166,7 +141,7 @@ def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetim
     """
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     if not files_and_indices:
-        raise Exception("no relevant hdf5 files found")
+        raise Exception("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
     result = None
 
     for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
