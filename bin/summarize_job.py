@@ -6,7 +6,6 @@ tokio.tool package, which uses H5LMT_HOME to determine where the LMT
 HDF5 files are stored on the local system.
 """
 
-import sys
 import json
 import argparse
 import time
@@ -22,11 +21,11 @@ import tokio.connectors.darshan
 import tokio.connectors.nersc_jobsdb
 
 # Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
-cfg = ConfigParser.ConfigParser()
-cfg.read( os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio', 'tokio.cfg') )
-FS_NAME_TO_H5LMT = eval(cfg.get('tokio', 'FS_NAME_TO_H5LMT'))
-FS_PATH = eval(cfg.get('tokio', 'FS_PATH'))
-FS_NAME_TO_HOST = eval(cfg.get('tokio', 'FS_NAME_TO_HOST'))
+CONFIG = ConfigParser.ConfigParser()
+CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio', 'tokio.cfg'))
+FS_NAME_TO_H5LMT = eval(CONFIG.get('tokio', 'FS_NAME_TO_H5LMT'))
+FS_PATH = eval(CONFIG.get('tokio', 'FS_PATH'))
+FS_NAME_TO_HOST = eval(CONFIG.get('tokio', 'FS_NAME_TO_HOST'))
 
 # Empirically, it looks like we have to add one more LMT timestep after the
 # Darshan log registers completion to capture the full amount of data
@@ -49,26 +48,12 @@ def _identify_fs_from_path(path, mounts):
             matching_mount = mount
     return matching_mount
 
-def summarize_darshan(darshan_data):
+def summarize_darshan_posix(darshan_data):
     """
-    Synthesize new Darshan summary metrics based on the contents of a
-    connectors.darshan.Darshan object that is partially or fully populated
-    
+    Extract key metrics from the POSIX module in a Darshan log
     """
-
-    results = {}
-
-    if 'header' in darshan_data:
-        d_header = darshan_data['header']
-        results['walltime'] = d_header.get('walltime')
-        results['end_time'] = d_header.get('end_time')
-        results['start_time'] = d_header.get('start_time')
-        results['jobid'] = d_header.get('jobid')
-        results['app'] = d_header.get('exe')
-        if results['app']:
-            results['app'] = results['app'][0]
-
     # Extract POSIX performance counters if present
+    results = {}
     if 'counters' in darshan_data \
     and 'posix' in darshan_data['counters'] \
     and '_perf' in darshan_data['counters']['posix']:
@@ -80,96 +65,150 @@ def summarize_darshan(darshan_data):
             results['io_time'] = d_perf.get('slowest_rank_io_time_unique_files')
             if results['io_time']:
                 results['io_time'] += d_perf.get('time_by_slowest_shared_files')
-
-    if 'counters' in darshan_data:
-        # Try to find the most-used API, the most time spent in that api
-        biggest_api = {}
-        for api_name in darshan_data['counters'].keys():
-            biggest_api[api_name] = {
-                'write': 0,
-                'read': 0,
-            }
-            for file_path in darshan_data['counters'][api_name]:
-                if file_path in ('_perf', '_total'): # only consider file records
-                    continue
-                for rank, record in darshan_data['counters'][api_name][file_path].iteritems():
-                    bytes_read = record.get('BYTES_READ')
-                    if bytes_read is not None:
-                        biggest_api[api_name]['read'] += bytes_read
-                    bytes_written = record.get('BYTES_WRITTEN')
-                    if bytes_written is not None:
-                        biggest_api[api_name]['write'] += bytes_written
-
-        results['biggest_write_api'] = max(biggest_api, key=lambda k: biggest_api[k]['write'])
-        results['biggest_read_api'] = max(biggest_api, key=lambda k: biggest_api[k]['read'])
-        results['biggest_write_api_bytes'] = biggest_api[results['biggest_write_api']]['write']
-        results['biggest_read_api_bytes'] = biggest_api[results['biggest_read_api']]['read']
-
-        # Try to find the most-used file system based on the most-used API
-        biggest_fs = {}
-        mounts = darshan_data['mounts'].keys()
-        for api_name in results['biggest_read_api'], results['biggest_write_api']:
-            for file_path in darshan_data['counters'][api_name]:
-                if file_path in ('_perf', '_total'): # only consider file records
-                    continue
-                for rank, record in darshan_data['counters'][api_name][file_path].iteritems():
-                    key = _identify_fs_from_path(file_path, mounts)
-                    if key is None:
-                        key = '_unknown' ### for stuff like STDIO
-                    if key not in biggest_fs:
-                        biggest_fs[key] = { 'write': 0, 'read': 0 }
-                    bytes_read = record.get('BYTES_READ')
-                    if bytes_read is not None:
-                        biggest_fs[key]['read'] += bytes_read
-                    bytes_written = record.get('BYTES_WRITTEN')
-                    if bytes_written is not None:
-                        biggest_fs[key]['write'] += bytes_written
-        results['biggest_write_fs'] = max(biggest_fs, key=lambda k: biggest_fs[k]['write'])
-        results['biggest_read_fs'] = max(biggest_fs, key=lambda k: biggest_fs[k]['read'])
-        results['biggest_write_fs_bytes'] = biggest_fs[results['biggest_write_fs']]['write']
-        results['biggest_read_fs_bytes'] = biggest_fs[results['biggest_read_fs']]['read']
     return results
-    
 
-def summarize_byterate_df(df, rw, timestep=None):
+def get_biggest_api(darshan_data):
+    """
+    Determine the most-used API and file system based on the Darshan log
+    """
+    if 'counters' not in darshan_data:
+        return {}
+
+    biggest_api = {}
+    for api_name in darshan_data['counters'].keys():
+        biggest_api[api_name] = {
+            'write': 0,
+            'read': 0,
+        }
+        for file_path in darshan_data['counters'][api_name]:
+            if file_path in ('_perf', '_total'): # only consider file records
+                continue
+            for record in darshan_data['counters'][api_name][file_path].itervalues():
+                bytes_read = record.get('BYTES_READ')
+                if bytes_read is not None:
+                    biggest_api[api_name]['read'] += bytes_read
+                bytes_written = record.get('BYTES_WRITTEN')
+                if bytes_written is not None:
+                    biggest_api[api_name]['write'] += bytes_written
+
+    results = {}
+    for readwrite in 'read', 'write':
+        key = 'biggest_%s_api' % readwrite
+        results[key] = max(biggest_api, key=lambda k, rw=readwrite: biggest_api[k][rw])
+        results['%s_bytes' % key] = biggest_api[results[key]][readwrite]
+
+    return results
+
+def get_biggest_fs(darshan_data):
+    """
+    Determine the most-used file system based on the Darshan log
+    """
+    if 'counters' not in darshan_data:
+        return {}
+
+    if 'biggest_read_api' not in darshan_data or 'biggest_write_api' not in darshan_data:
+        biggest_api = get_biggest_api(darshan_data)
+        biggest_read_api = biggest_api['biggest_read_api']
+        biggest_write_api = biggest_api['biggest_write_api']
+    else:
+        biggest_read_api = darshan_data['biggest_read_api']
+        biggest_write_api = darshan_data['biggest_write_api']
+
+    biggest_fs = {}
+    mounts = darshan_data['mounts'].keys()
+    for api_name in biggest_read_api, biggest_write_api:
+        for file_path in darshan_data['counters'][api_name]:
+            if file_path in ('_perf', '_total'): # only consider file records
+                continue
+            for record in darshan_data['counters'][api_name][file_path].itervalues():
+                key = _identify_fs_from_path(file_path, mounts)
+                if key is None:
+                    key = '_unknown' ### for stuff like STDIO
+                if key not in biggest_fs:
+                    biggest_fs[key] = {'write': 0, 'read': 0}
+                bytes_read = record.get('BYTES_READ')
+                if bytes_read is not None:
+                    biggest_fs[key]['read'] += bytes_read
+                bytes_written = record.get('BYTES_WRITTEN')
+                if bytes_written is not None:
+                    biggest_fs[key]['write'] += bytes_written
+
+    results = {}
+    for readwrite in 'read', 'write':
+        key = 'biggest_%s_fs' % readwrite
+        results[key] = max(biggest_fs, key=lambda k, rw=readwrite: biggest_fs[k][rw])
+        results['%s_bytes' % key] = biggest_fs[results[key]][readwrite]
+
+    return results
+
+def summarize_darshan(darshan_data):
+    """
+    Synthesize new Darshan summary metrics based on the contents of a
+    connectors.darshan.Darshan object that is partially or fully populated
+
+    """
+
+    results = {}
+
+    if 'header' in darshan_data:
+        d_header = darshan_data['header']
+        for key in 'walltime', 'end_time', 'start_time', 'jobid':
+            results[key] = d_header.get(key)
+        if 'exe' in d_header:
+            results['app'] = d_header['exe'][0]
+        else:
+            results['app'] = None
+
+    results.update(summarize_darshan_posix(darshan_data))
+    results.update(get_biggest_api(darshan_data))
+    results.update(get_biggest_fs(darshan_data))
+
+    return results
+
+def summarize_byterate_df(dataframe, readwrite, timestep=None):
     """
     Calculate some interesting statistics from a dataframe containing byte rate
     data.
-    
+
     """
-    assert rw in ['read', 'written']
+    assert readwrite in ['read', 'written']
     if timestep is None:
-        if df.shape[0] < 2:
+        if dataframe.shape[0] < 2:
             raise Exception("must specify timestep for single-row dataframe")
-        timestep = (df.index[1].to_pydatetime() - df.index[0].to_pydatetime()).total_seconds()
+        timestep = (dataframe.index[1].to_pydatetime() \
+                    - dataframe.index[0].to_pydatetime()).total_seconds()
     results = {}
-    results['tot_bytes_%s' % rw] = df.sum().sum() * timestep
-    results['tot_gibs_%s' % rw] = results['tot_bytes_%s' % rw] / 2.0**30
-    results['ave_bytes_%s_per_timestep' % rw] = (df.sum(axis=1) / df.columns.shape[0]).mean() * timestep
-    results['ave_gibs_%s_per_timestep' % rw] = results['ave_bytes_%s_per_timestep' % rw] / 2.0**30
-    results['frac_zero_%s' % rw] = float((df == 0.0).sum().sum()) / float((df.shape[0]*df.shape[1]))
+    results['tot_bytes_%s' % readwrite] = dataframe.sum().sum() * timestep
+    results['tot_gibs_%s' % readwrite] = results['tot_bytes_%s' % readwrite] / 2.0**30
+    results['ave_bytes_%s_per_timestep' % readwrite] = \
+        (dataframe.sum(axis=1) / dataframe.columns.shape[0]).mean() * timestep
+    results['ave_gibs_%s_per_timestep' % readwrite] = \
+        results['ave_bytes_%s_per_timestep' % readwrite] / 2.0**30
+    results['frac_zero_%s' % readwrite] = \
+        float((dataframe == 0.0).sum().sum()) / float((dataframe.shape[0]*dataframe.shape[1]))
     return results
 
-def summarize_cpu_df(df, servertype):
+def summarize_cpu_df(dataframe, servertype):
     """
     Calculate some interesting statistics from a dataframe containing CPU load
     data.
-    
+
     """
     assert servertype in ['oss', 'mds']
     results = {}
     # df content depends on the servertype
-    results['ave_%s_cpu' % servertype] = df.mean().mean()
-    results['max_%s_cpu' % servertype] = df.max().max()
+    results['ave_%s_cpu' % servertype] = dataframe.mean().mean()
+    results['max_%s_cpu' % servertype] = dataframe.max().max()
     return results
 
-def summarize_missing_df(df):
+def summarize_missing_df(dataframe):
     """
-    frac_missing
-    
+    Populate the fraction missing counter from a given DataFrame
+
     """
     results = {
-        'frac_missing': float((df != 0.0).sum().sum()) / float((df.shape[0]*df.shape[1]))
+        'frac_missing': float((dataframe != 0.0).sum().sum()) \
+                        / float((dataframe.shape[0]*dataframe.shape[1]))
     }
     return results
 
@@ -178,7 +217,7 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
     Take two dictionaries and merge their keys.  Optionally raise an exception
     if a duplicate key is found, and optionally merge the new dict into the old
     after adding a prefix to every key.
-    
+
     """
     for key, value in dict2.iteritems():
         if prefix is not None:
@@ -202,15 +241,16 @@ def serialize_datetime(obj):
     """
     Special serializer function that converts datetime into something that can
     be encoded in json
-    
+
     """
     if isinstance(obj, (datetime.datetime, datetime.date)):
-        serial = obj.isoformat()
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
-    raise TypeError ("Type %s not serializable" % type(obj))
+    raise TypeError("Type %s not serializable" % type(obj))
 
 def retrieve_darshan_data(results, darshan_log_file):
-    # Extract the performance data from the darshan log
+    """
+    Extract the performance data from the Darshan log
+    """
     darshan_data = tokio.connectors.darshan.Darshan(darshan_log_file)
     darshan_data.darshan_parser_perf()
     darshan_data.darshan_parser_base()
@@ -220,19 +260,23 @@ def retrieve_darshan_data(results, darshan_log_file):
         return results
 
     # Define start/end time from darshan log
-    results['_datetime_start'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['start_time']))
-    results['_datetime_end'] = datetime.datetime.fromtimestamp(int(darshan_data['header']['end_time']))
-    
+    results['_datetime_start'] = datetime.datetime.fromtimestamp(
+        int(darshan_data['header']['start_time']))
+    results['_datetime_end'] = datetime.datetime.fromtimestamp(
+        int(darshan_data['header']['end_time']))
+
     if '_jobid' not in results:
         results['_jobid'] = darshan_data['header']['jobid']
-        
+
     # Get the summary of the Darshan log
     module_results = summarize_darshan(darshan_data)
     merge_dicts(results, module_results, prefix='darshan_')
     return results
 
 def retrieve_lmt_data(results, file_system):
-    # Figure out the H5LMT file corresponding to this run
+    """
+    Figure out the H5LMT file corresponding to this run
+    """
     if file_system is None:
         if 'darshan_biggest_write_fs_bytes' not in results.keys() \
         or 'darshan_biggest_read_fs_bytes' not in results.keys():
@@ -257,45 +301,55 @@ def retrieve_lmt_data(results, file_system):
     module_results = {}
     # Read rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTReadGroup/OSTBulkReadDataSet',
-                                                  results['_datetime_start'],results['_datetime_end']),
-                                                  'read'
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/OSTReadGroup/OSTBulkReadDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
+        'read'
     ))
 
     # Write rates
     module_results.update(summarize_byterate_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,'/OSTWriteGroup/OSTBulkWriteDataSet',
-                                                  results['_datetime_start'],results['_datetime_end']),
-                                                  'written'
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file, '/OSTWriteGroup/OSTBulkWriteDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
+        'written'
     ))
     # Oss cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
-                                                  '/OSSCPUGroup/OSSCPUDataSet',
-                                                  results['_datetime_start'],
-                                                  results['_datetime_end']),
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/OSSCPUGroup/OSSCPUDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
         'oss'
     ))
     # Mds cpu loads
     module_results.update(summarize_cpu_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
-                                                  '/MDSCPUGroup/MDSCPUDataSet',
-                                                  results['_datetime_start'],
-                                                  results['_datetime_end']),
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/MDSCPUGroup/MDSCPUDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
         'mds'
     ))
     # Missing data
     module_results.update(summarize_missing_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(h5lmt_file,
-                                                  '/FSMissingGroup/FSMissingDataSet',
-                                                  results['_datetime_start'],
-                                                  results['_datetime_end'])))
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/FSMissingGroup/FSMissingDataSet',
+            results['_datetime_start'],
+            results['_datetime_end'])))
     merge_dicts(results, module_results, prefix='lmt_')
-   
+
     return results
 
 def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
-    # Get the diameter of the job (Cray XC)
+    """
+    Get the diameter of the job (Cray XC)
+    """
     if craysdb_cache_file is not None:
         if '_jobid' not in results:
             # bail out
@@ -321,7 +375,10 @@ def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
     return results
 
 def retrieve_jobid(results, jobid, file_count):
-    if jobid is not None: 
+    """
+    Get JobId from either Slurm or the CLI argument
+    """
+    if jobid is not None:
         if file_count > 1:
             raise Exception("Behavior of --jobid when files > 1 is undefined")
         if os.path.isfile(jobid):
@@ -333,20 +390,22 @@ def retrieve_jobid(results, jobid, file_count):
 
 
 def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
-    # Get Lustre server status (Sonexion)
+    """
+    Get Lustre server status via lfsstatus tool
+    """
     if ost:
         # Divine the sonexion name from the file system map
         fs_key = results.get('_file_system')
         if fs_key is None or fs_key not in FS_NAME_TO_H5LMT:
             return results
         snx_name = FS_NAME_TO_H5LMT[fs_key].split('_')[-1].split('.')[0]
-        
+
         # Get the OST fullness summary
         module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
                                                                         results['_datetime_start'],
                                                                         cache_file=ost_fullness)
         merge_dicts(results, module_results, prefix='fshealth_')
-        
+
         # Get the OST failure status
         # Note that get_failures_at_datetime will clobber the
         # ost_timestamp_* keys from get_fullness_at_datetime above;
@@ -356,22 +415,25 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
                                                                         results['_datetime_start'],
                                                                         cache_file=ost_map)
         merge_dicts(results, module_results, False, prefix='fshealth_')
-        
+
         # A measure, in sec, expressing how far before the job our OST fullness data was measured
-        results['fshealth_ost_fullness_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_actual_timestamp'])).total_seconds()
-        
+        results['fshealth_ost_fullness_lead_secs'] = \
+            (results['_datetime_start'] \
+            - datetime.datetime.fromtimestamp(
+                results['fshealth_ost_actual_timestamp'])).total_seconds()
+
         # Ost_overloaded_pct becomes the percent of OSTs in file system which are
         # in an abnormal state
-        results["fshealth_ost_overloaded_pct"] = 100.0 * float(results["fshealth_ost_overloaded_ost_count"]) / float(results["fshealth_ost_count"])
-            
+        results["fshealth_ost_overloaded_pct"] = \
+            100.0 * float(results["fshealth_ost_overloaded_ost_count"]) \
+            / float(results["fshealth_ost_count"])
+
         # A measure, in sec, expressing how far before the job our OST failure data was measured
-        results['fshealth_ost_failures_lead_secs'] = (results['_datetime_start'] - datetime.datetime.fromtimestamp(results['fshealth_ost_actual_timestamp'])).total_seconds()
-        
-        ### drop some keys, used for debugging, that are clobbered by
-        ### combining get_failures_at_datetime and get_fullness_at_datetime
-        ### anyway
-        #           for key in "fshealth_ost_next_timestamp", "fshealth_ost_requested_timestamp", "fshealth_ost_actual_timestamp":
-        #               results.pop(key)
+        results['fshealth_ost_failures_lead_secs'] = \
+            (results['_datetime_start'] \
+            - datetime.datetime.fromtimestamp(
+                results['fshealth_ost_actual_timestamp'])).total_seconds()
+
     return results
 
 def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
@@ -397,26 +459,44 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
         results['jobsdb_concurrent_nodehrs'] = concurrent_job_info['nodehrs']
     return results
 
-
-if __name__ == "__main__":
+def summarize_job():
+    """
+    CLI wrapper around process that pulls in data from a variety of connectors
+    and reports a summary of data from all connectors for a time range of
+    interest.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t", "--topology", nargs='?', const="", type=str, help="include job diameter (Cray XC only); can specify optional path to cached xtprocadmin output")
-    parser.add_argument("-c", "--concurrentjobs", nargs='?', const="", type=str, help="add number of jobs concurrently running from jobsdb; can specify optional path to cache db")
-    parser.add_argument("-o", "--ost", action='store_true', help="add information about OST fullness/failover")
+    parser.add_argument("-t", "--topology", nargs='?', const="", type=str,
+                        help="include job diameter (Cray XC only);"
+                        + " can specify optional path to cached xtprocadmin output")
+    parser.add_argument("-c", "--concurrentjobs", nargs='?', const="", type=str,
+                        help="add number of jobs concurrently running from jobsdb;"
+                        + " can specify optional path to cache db")
+    parser.add_argument("-o", "--ost", action='store_true',
+                        help="add information about OST fullness/failover")
     parser.add_argument("-j", "--json", help="output in json", action="store_true")
-    parser.add_argument("-f", "--file-system", type=str, default=None, help="file system name (e.g., cscratch, bb-private)")
-    parser.add_argument("--start-time", type=str, default=None, help="start time of job, in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument("--end-time", type=str, default=None, help="end time of job, in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument("--slurm-jobid", type=str, default=None, help="job id or path to slurm cache file (req'd for --topology, --concurrentjobs, or if no darshan log provided)")
-    parser.add_argument("--jobhost", type=str, default=None, help="host on which job ran (used with --concurrentjobs)")
-    parser.add_argument("--ost-fullness", type=str, default=None, help="path to an ost fullness file (lfs df)")
-    parser.add_argument("--ost-map", type=str, default=None, help="path to an ost map file (lctl dl -t)")
-    parser.add_argument("files", nargs='*', default=None, help="darshan logs to process")
+    parser.add_argument("-f", "--file-system", type=str, default=None,
+                        help="file system name (e.g., cscratch, bb-private)")
+    parser.add_argument("--start-time", type=str, default=None,
+                        help="start time of job, in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument("--end-time", type=str, default=None,
+                        help="end time of job, in YYYY-MM-DD HH:MM:SS format")
+    parser.add_argument("--slurm-jobid", type=str, default=None,
+                        help="job id or path to slurm cache file"
+                        + " (req'd w/ --topology, --concurrentjobs, or if no darshan log provided)")
+    parser.add_argument("--jobhost", type=str, default=None,
+                        help="host on which job ran (used with --concurrentjobs)")
+    parser.add_argument("--ost-fullness", type=str, default=None,
+                        help="path to an ost fullness file (lfs df)")
+    parser.add_argument("--ost-map", type=str, default=None,
+                        help="path to an ost map file (lctl dl -t)")
+    parser.add_argument("files", nargs='*', default=None,
+                        help="darshan logs to process")
     args = parser.parse_args()
     json_rows = []
     records_to_process = 0
 
-    # If --start-time is specified, --end-time MUST be specified, and 
+    # If --start-time is specified, --end-time MUST be specified, and
     # files CANNOT be specified
     if (args.start_time is not None and args.end_time is None) \
     or (args.start_time is None and args.end_time is not None):
@@ -441,7 +521,7 @@ if __name__ == "__main__":
         # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
         if len(args.files) > 0:
             results = retrieve_darshan_data(results, args.files[i])
-        results = retrieve_lmt_data(results, args.file_system)    
+        results = retrieve_lmt_data(results, args.file_system)
         results = retrieve_topology_data(results,
                                          slurm_cache_file=args.slurm_jobid,
                                          craysdb_cache_file=args.topology)
@@ -460,5 +540,5 @@ if __name__ == "__main__":
         tmp_df.index.name = "index"
         print tmp_df.to_csv()
 
-
-
+if __name__ == "__main__":
+    summarize_job()
