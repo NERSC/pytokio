@@ -6,15 +6,12 @@ fullness at that time
 
 import os
 import datetime
+import common
 from ..connectors import nersc_lfsstate
-import hdf5
-import ConfigParser
-cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'tokio.cfg'))
-FILE_BASENAME_FULLNESS = eval(cfg.get('tokio', 'FILE_BASENAME_FULLNESS'))
-FILE_BASENAME_FAILURES = eval(cfg.get('tokio', 'FILE_BASENAME_FAILURES'))
-FS_TO_H5LMT = eval(cfg.get('tokio', 'FS_TO_H5LMT'))
-
+from ..config import LFSNAME_TO_H5LMT_FILE, \
+                     LFSSTATUS_BASE_DIR, \
+                     LFSSTATUS_FULLNESS_FILE, \
+                     LFSSTATUS_MAP_FILE
 
 def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
     return get_summary_at_datetime(file_system, datetime_target, "fullness", cache_file)
@@ -33,12 +30,10 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         3. return summary statistics about the OST fullness or OST failures
 
     """
-    file_system_to_h5lmt = FS_TO_H5LMT
-    h5lmt_file = file_system_to_h5lmt[file_system]
     if metric == "fullness":
-        file_basename = FILE_BASENAME_FULLNESS
+        file_basename = LFSSTATUS_FULLNESS_FILE
     elif metric == "failures":
-        file_basename = FILE_BASENAME_FAILURES
+        file_basename = LFSSTATUS_MAP_FILE
     else:
         raise Exception("unknown metric " + metric)
 
@@ -48,16 +43,22 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         # the previous day's index.  The lookahead can be much more conservative
         # since it only needs to compensate for sampling intervals (15 min in
         # practice at NERSC)
-        ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
-                                                 datetime_target - datetime.timedelta(days=1),
-                                                 datetime_target + datetime.timedelta(hours=1))
+        ost_health_files = common.enumerate_dated_dir(
+            base_dir=LFSSTATUS_BASE_DIR,
+            datetime_start=datetime_target - datetime.timedelta(days=1),
+            datetime_end=datetime_target + datetime.timedelta(hours=1),
+            file_name=file_basename)
+
         for index, df_file in enumerate(ost_health_files):
-            ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
+            ost_health_files[index] = ost_health_files[index]
     else:
         ost_health_files = [cache_file]
 
     if len(ost_health_files) == 0:
-        raise Exception("No OST health files (%s) found in %s for %s" % (file_basename, hdf5.H5LMT_BASE, str(datetime_target)))
+        raise Exception("No OST health files (%s) found in %s for %s" % (
+            file_basename,
+            datetime_target.strftime(LFSSTATUS_BASE_DIR),
+            str(datetime_target)))
 
     # TODO : Remove this comment after the package is deleted
     # We can get away with the following because NerscLfsOstFullness,
