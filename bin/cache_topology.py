@@ -14,8 +14,10 @@ def get_topology():
     """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--slurm-cache", default=None, type=str, help="path to slurm job cache file" )
-    parser.add_argument("--craysdb-cache", default=None, type=str, help="path to xtdb2proc cache file" )
+    group.add_argument("--slurm-cache", default=None, type=str,
+                       help="path to slurm job cache file")
+    parser.add_argument("--craysdb-cache", default=None, type=str,
+                        help="path to xtdb2proc cache file")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     group.add_argument("jobid", nargs='?', default=None, help="Slurm job id of interest")
     args = parser.parse_args()
