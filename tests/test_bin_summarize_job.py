@@ -14,8 +14,8 @@ import tokiotest
 SAMPLE_DARSHAN_LOG_2 = os.path.join(tokiotest.INPUT_DIR, 'sample-2.darshan')
 
 ### For tokio.tools.hdf5, which is used by summarize_job.py
-os.environ['PYTOKIO_H5LMT_BASE'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-os.environ['PYTOKIO_LFSSTATUS_BASE'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_job.py')
 

@@ -13,8 +13,8 @@ PYTOKIO_CONFIG = os.environ.get(
     'PYTOKIO_CONFIG',
     os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
 
-H5LMT_BASE_DIR = os.environ.get('PYTOKIO_H5LMT_BASE')
-LFSSTATUS_BASE_DIR = os.environ.get('PYTOKIO_LFSSTATUS_BASE')
+H5LMT_BASE_DIR = os.environ.get('PYTOKIO_H5LMT_BASE_DIR')
+LFSSTATUS_BASE_DIR = os.environ.get('PYTOKIO_LFSSTATUS_BASE_DIR')
 
 _CONFIG = json.load(open(PYTOKIO_CONFIG, 'r'))
 # Convert config json into a set of top-level constants
