@@ -9,12 +9,15 @@ import json
 import tokio.tools.lfsstatus as lfsstatus
 
 def cache_lfsstatus():
+    """
+    CLI wrapper around the tools.lfsstatus I/O methods
+    """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--fullness", nargs='?', const="", type=str,
-        help="path to lfs_df text file; summarize fullness of OSTs ")
+                       help="path to lfs_df text file; summarize fullness of OSTs ")
     group.add_argument("--failure", nargs='?', const="", type=str,
-        help="path to ost_map text file; summarize failure state of OSSes and OSTs")
+                       help="path to ost_map text file; summarize failure state of OSSes and OSTs")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     parser.add_argument("filesystem", help="file system identifier (e.g., snx11168)")
     parser.add_argument("datetime", help="date and time of interest in YYYY-MM-DDTHH:MM:SS format")
