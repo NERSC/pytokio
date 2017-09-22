@@ -39,8 +39,22 @@ SAMPLE_SLURM_CACHE_JOBCT = 1
 SAMPLE_SLURM_CACHE_NODECT = 128
 SAMPLE_SLURM_CACHE_MAX_WALLSECS = 3600
 
-
 SAMPLE_NERSCISDCT_FILE = os.path.join(INPUT_DIR, 'sample_nersc_isdct.tgz')
+# SAMPLE_NERSCISDCT_PREV_FILE is used to verify the .diff() method.  It should
+# be sufficiently different from SAMPLE_NERSCISDCT_FILE to exercise .diff()'s
+# ability to detect new and missing SSDs and calculate the difference between
+# certain monotonic counters correctly.
+SAMPLE_NERSCISDCT_DIFF_FILE = os.path.join(INPUT_DIR, 'sample_nersc_isdct.json.gz')
+SAMPLE_NERSCISDCT_PREV_FILE = os.path.join(INPUT_DIR, 'sample_nersc_isdct-1.json.gz')
+SAMPLE_NERSCISDCT_DIFF_RM = 6  # how many devices were removed between _PREV_FILE and _FILE
+SAMPLE_NERSCISDCT_DIFF_ADD = 2 # how many devices were added between _PREV_FILE and _FILE
+SAMPLE_NERSCISDCT_DIFF_MONOTONICS = [ # counters whose values should be bigger today than yesterday
+    'timestamp',
+    'data_units_written_bytes',
+    'data_units_read_bytes'
+]
+SAMPLE_NERSCISDCT_DIFF_ZEROS = ['physical_size'] # diff should always be numeric zero
+SAMPLE_NERSCISDCT_DIFF_EMPTYSTR =  ['model_number'] # diff should always be an empty string
 
 ### Global state
 SKIP_DARSHAN = None
