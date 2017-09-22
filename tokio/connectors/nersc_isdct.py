@@ -279,6 +279,50 @@ class NerscIsdct(dict):
         else:
             return { device_sn : data }
 
+    def diff(self, old_isdct):
+        """
+        Subtract each counter for each serial number in this object from its
+        counterpart in old_isdct.  Return the changes in each numeric counter
+        and any serial numbers that have appeared or disappeared.
+        """
+        result = {
+            'added_devices': [],
+            'removed_devices': [],
+            'devices': {},
+        }
+        existing_devices = set([])
+        for serial_no, counters in self.iteritems():
+            existing_devices.add(serial_no)
+            # new devices that are appearing for the first time
+            if serial_no not in old_isdct:
+                result['added_devices'].append(serial_no)
+                continue
+
+            # calculate the diff in each counter for this device
+            diff_dict = {}
+            for counter, value in counters.iteritems():
+                if counter not in old_isdct[serial_no]:
+                    warnings.warn("Counter %s does not exist in old_isdct")
+
+                ### just highlight different strings
+                elif isinstance(value, basestring):
+                    if old_isdct[serial_no][counter] != value:
+                        diff_dict[counter] = "+++%s ---%s" % (value, old_isdct[serial_no][counter])
+                    else:
+                        diff_dict[counter] = ""
+
+                ### subtract numeric counters
+                else:
+                    diff_dict[counter] = value - old_isdct[serial_no][counter]
+            result['devices'][serial_no] = diff_dict
+
+        # Look for serial numbers that used to exist but do not appear in self
+        for serial_no in old_isdct.keys():
+            if serial_no not in existing_devices:
+                result['removed_devices'].append(serial_no)
+
+        return result
+
     def _synthesize_metrics(self):
         """
         Calculate some additional convenient metrics that are not directly

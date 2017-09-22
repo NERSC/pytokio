@@ -113,6 +113,27 @@ def test_serializer():
     isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.TEMP_FILE.name)
     validate_object(isdct_cached)
 
+def test_diff():
+    """
+    NerscIsdct.diff() method functionality
+    """
+    # Read from a cache file
+    isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE)
+    isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
+    result = isdct_data.diff(isdct_data_old)
+#   print json.dumps(result, indent=4)
+    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
+    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
+    assert len(result['devices']) > 0
+    for serial_no, counters in result['devices'].iteritems():
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
+            print counter, counters[counter]
+            assert counters[counter] > 0
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
+            assert counters[counter] == 0
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
+            assert counters[counter] == ""
+
 ################################################################################
 #  Helper functions
 ################################################################################
