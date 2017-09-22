@@ -49,7 +49,7 @@ def magic_variable(variable, set_value):
         set_value,
         getattr(tokio.config, variable))
     runtime_value = getattr(tokio.config, variable)
-    assert type(runtime_value) == type(set_value)
+    assert type(runtime_value) == type(set_value) #pylint: disable=unidiomatic-typecheck
     assert runtime_value == set_value
 
 def compare_config_to_runtime(config_file):
@@ -63,17 +63,18 @@ def compare_config_to_runtime(config_file):
     assert os.path.isfile(tokio.config.PYTOKIO_CONFIG)
 
     # Verify that the loaded config wasn't empty
-    assert len(tokio.config._CONFIG) > 0    #pylint: disable=protected-access
+    assert len(tokio.config._CONFIG) > 0 #pylint: disable=protected-access
 
     # Load the reference file and compare its contents to the tokio.config namespace
     print "Comparing runtime config to %s" % config_file
     config_contents = json.load(open(config_file, 'r'))
     for key, expected_value in config_contents.iteritems():
         runtime_value = getattr(tokio.config, key.upper())
-        print "Verifying tokio.config.%s:\n  [%s] == [%s]" % (key.upper(),
-                                                          str(expected_value),
-                                                          str(runtime_value))
-        assert type(runtime_value) == type(expected_value)
+        print "Verifying tokio.config.%s:\n  [%s] == [%s]" % (
+            key.upper(),
+            str(expected_value),
+            str(runtime_value))
+        assert type(runtime_value) == type(expected_value) #pylint: disable=unidiomatic-typecheck
         assert runtime_value == expected_value
 
 @nose.tools.with_setup(flush_env)
@@ -114,7 +115,7 @@ def test_config_magic_variable():
 
 
 @nose.tools.with_setup(flush_env)
-def test_config_post_load_by_env():
+def test_no_env_effects_post_load():
     """
     Magic variables don't affect runtime post-load
     """
@@ -126,7 +127,7 @@ def test_config_post_load_by_env():
     for variable, set_value in MAGIC_VARIABLES.iteritems():
         orig_value = getattr(tokio.config, variable)
         if orig_value == set_value:
-            raise Exception("test is broken; attempting to set a magic variable to its default value?")
+            raise Exception("test is broken; trying to set a magic variable to its default value?")
         os.environ[variable] = set_value
         assert getattr(tokio.config, variable) == orig_value
 
