@@ -7,6 +7,7 @@ import os
 import json
 import subprocess
 import tokiotest
+import test_connectors_nersc_isdct
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'compare_isdct.py')
 
@@ -20,17 +21,7 @@ def test_all_json():
         tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
         tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
     result = json.loads(output_str)
-    ### this is borrowed from test_connectors_nersc_isdct
-    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
-    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
-    assert len(result['devices']) > 0
-    for counters in result['devices'].itervalues():
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
-            assert counters[counter] > 0
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
-            assert counter not in counters
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
-            assert counter not in counters
+    test_connectors_nersc_isdct.validate_diff(result, report_zeros=False)
 
 def test_reduced_json():
     """
@@ -60,17 +51,7 @@ def test_all_json_w_zeros():
         tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
         tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
     result = json.loads(output_str)
-    ### this is borrowed from test_connectors_nersc_isdct
-    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
-    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
-    assert len(result['devices']) > 0
-    for counters in result['devices'].itervalues():
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
-            assert counters[counter] > 0
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
-            assert counters[counter] == 0
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
-            assert counters[counter] == ""
+    test_connectors_nersc_isdct.validate_diff(result, report_zeros=True)
 
 def test_reduced_json_w_zeros():
     """
