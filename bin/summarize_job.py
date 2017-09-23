@@ -6,26 +6,18 @@ tokio.tool package, which uses H5LMT_HOME to determine where the LMT
 HDF5 files are stored on the local system.
 """
 
+import re
+import os
 import json
-import argparse
 import time
 import datetime
-import re
-import ConfigParser
-import os
+import argparse
 import warnings
 import pandas
 import tokio
 import tokio.tools
 import tokio.connectors.darshan
 import tokio.connectors.nersc_jobsdb
-
-# Maps the "file_system" key from extract_darshan_perf to a h5lmt file name
-CONFIG = ConfigParser.ConfigParser()
-CONFIG.read(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'tokio', 'tokio.cfg'))
-FS_NAME_TO_H5LMT = eval(CONFIG.get('tokio', 'FS_NAME_TO_H5LMT'))
-FS_PATH = eval(CONFIG.get('tokio', 'FS_PATH'))
-FS_NAME_TO_HOST = eval(CONFIG.get('tokio', 'FS_NAME_TO_HOST'))
 
 # Empirically, it looks like we have to add one more LMT timestep after the
 # Darshan log registers completion to capture the full amount of data
@@ -288,13 +280,13 @@ def retrieve_lmt_data(results, file_system):
             fs_key = 'darshan_biggest_write_fs'
         else:
             fs_key = 'darshan_biggest_read_fs'
-        for fs_path, fs_name in FS_PATH.iteritems():
+        for fs_path, fs_name in tokio.config.MOUNT_TO_FSNAME.iteritems():
             if re.search(fs_path, results[fs_key]) is not None:
                 results['_file_system'] = fs_name
                 break
     else:
         results['_file_system'] = file_system
-    h5lmt_file = FS_NAME_TO_H5LMT.get(results['_file_system'])
+    h5lmt_file = tokio.config.FSNAME_TO_H5LMT_FILE.get(results['_file_system'])
     if h5lmt_file is None:
         return results
 
@@ -396,9 +388,9 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     if ost:
         # Divine the sonexion name from the file system map
         fs_key = results.get('_file_system')
-        if fs_key is None or fs_key not in FS_NAME_TO_H5LMT:
+        if fs_key is None or fs_key not in tokio.config.FSNAME_TO_H5LMT_FILE:
             return results
-        snx_name = FS_NAME_TO_H5LMT[fs_key].split('_')[-1].split('.')[0]
+        snx_name = tokio.config.FSNAME_TO_H5LMT_FILE[fs_key].split('_')[-1].split('.')[0]
 
         # Get the OST fullness summary
         module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,

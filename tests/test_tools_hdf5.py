@@ -6,11 +6,15 @@ Test HDF5 tools interfaces
 import os
 import datetime
 import tokiotest
+import tokio.config
 import tokio.tools.hdf5
 import tokio.connectors.hdf5
 from test_connectors_hdf5 import DATASETS_1D, DATASETS_2D
 
-tokio.tools.hdf5.H5LMT_BASE = tokiotest.INPUT_DIR
+### For tokio.tools.hdf5, which is used by summarize_job.py
+tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+
 SAMPLE_H5LMT_FILE_BN = os.path.basename(tokiotest.SAMPLE_H5LMT_FILE)
 TIMESTAMPS_DATASET = 'FSStepsGroup/FSStepsDataSet'
 

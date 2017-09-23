@@ -12,7 +12,8 @@ import nose
 import tokiotest
 
 # For cache_lfsstatus.py
-os.environ['PYTOKIO_H5LMT_BASE'] = tokiotest.INPUT_DIR
+os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
+os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
 
 def verify_json(json_str):
     """

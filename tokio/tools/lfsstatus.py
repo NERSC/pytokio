@@ -5,16 +5,11 @@ fullness at that time
 """
 
 import os
+import time
 import datetime
+import common
+from .. import config
 from ..connectors import nersc_lfsstate
-import hdf5
-import ConfigParser
-cfg = ConfigParser.ConfigParser()
-cfg.read(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'tokio.cfg'))
-FILE_BASENAME_FULLNESS = eval(cfg.get('tokio', 'FILE_BASENAME_FULLNESS'))
-FILE_BASENAME_FAILURES = eval(cfg.get('tokio', 'FILE_BASENAME_FAILURES'))
-FS_TO_H5LMT = eval(cfg.get('tokio', 'FS_TO_H5LMT'))
-
 
 def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
     return get_summary_at_datetime(file_system, datetime_target, "fullness", cache_file)
@@ -33,12 +28,10 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         3. return summary statistics about the OST fullness or OST failures
 
     """
-    file_system_to_h5lmt = FS_TO_H5LMT
-    h5lmt_file = file_system_to_h5lmt[file_system]
     if metric == "fullness":
-        file_basename = FILE_BASENAME_FULLNESS
+        file_basename = config.LFSSTATUS_FULLNESS_FILE
     elif metric == "failures":
-        file_basename = FILE_BASENAME_FAILURES
+        file_basename = config.LFSSTATUS_MAP_FILE
     else:
         raise Exception("unknown metric " + metric)
 
@@ -48,18 +41,23 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         # the previous day's index.  The lookahead can be much more conservative
         # since it only needs to compensate for sampling intervals (15 min in
         # practice at NERSC)
-        ost_health_files = hdf5.enumerate_h5lmts(h5lmt_file, 
-                                                 datetime_target - datetime.timedelta(days=1),
-                                                 datetime_target + datetime.timedelta(hours=1))
+        ost_health_files = common.enumerate_dated_dir(
+            base_dir=config.LFSSTATUS_BASE_DIR,
+            datetime_start=datetime_target - datetime.timedelta(days=1),
+            datetime_end=datetime_target + datetime.timedelta(hours=1),
+            file_name=file_basename)
+
         for index, df_file in enumerate(ost_health_files):
-            ost_health_files[index] = ost_health_files[index].replace(h5lmt_file, file_basename)
+            ost_health_files[index] = ost_health_files[index]
     else:
         ost_health_files = [cache_file]
 
     if len(ost_health_files) == 0:
-        raise Exception("No OST health files (%s) found in %s for %s" % (file_basename, hdf5.H5LMT_BASE, str(datetime_target)))
+        raise Exception("No OST health files (%s) found in %s for %s" % (
+            file_basename,
+            datetime_target.strftime(config.LFSSTATUS_BASE_DIR),
+            str(datetime_target)))
 
-    # TODO : Remove this comment after the package is deleted
     # We can get away with the following because NerscLfsOstFullness,
     # NerscLfsOstMap, and NerscLfsOstMap.get_failovers all have the same
     # structure
@@ -81,11 +79,11 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
 
     timestamps = sorted([int(x) for x in ost_health.keys()])
 
-    # Unoptimized walk through to find our timestamp of interest.  gynmastics
-    # with fromtimestamp(0) required to convert a datetime (expressed in local
-    # time) into a UTC-based epoch
-    target_timestamp = int((datetime_target - datetime.datetime.fromtimestamp(0)).total_seconds())
-    target_index = None
+    # Unoptimized walk through to find our timestamp of interest
+    target_timestamp = long(time.mktime(datetime_target.timetuple()))
+    # If the day's records start after the target time stamp, just report the
+    # first record (target_index=0)
+    target_index = 0
     for index, timestamp in enumerate(timestamps):
         if timestamp >= target_timestamp:
             if index == 0:
@@ -93,8 +91,6 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
             else:
                 target_index = index - 1
                 break
-    if target_index is None:
-        raise Exception("no timestamp of interest not found")
 
     fs_data = ost_health[timestamps[target_index]][file_system]
 
