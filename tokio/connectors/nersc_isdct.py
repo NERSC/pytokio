@@ -279,7 +279,7 @@ class NerscIsdct(dict):
         else:
             return { device_sn : data }
 
-    def diff(self, old_isdct):
+    def diff(self, old_isdct, report_zeros=True):
         """
         Subtract each counter for each serial number in this object from its
         counterpart in old_isdct.  Return the changes in each numeric counter
@@ -307,13 +307,18 @@ class NerscIsdct(dict):
                 ### just highlight different strings
                 elif isinstance(value, basestring):
                     if old_isdct[serial_no][counter] != value:
-                        diff_dict[counter] = "+++%s ---%s" % (value, old_isdct[serial_no][counter])
+                        diff_value = "+++%s ---%s" % (value, old_isdct[serial_no][counter])
                     else:
-                        diff_dict[counter] = ""
+                        diff_value = ""
+                    if report_zeros or diff_value != "":
+                        diff_dict[counter] = diff_value
 
                 ### subtract numeric counters
                 else:
-                    diff_dict[counter] = value - old_isdct[serial_no][counter]
+                    diff_value = value - old_isdct[serial_no][counter]
+                    if report_zeros or diff_value != 0:
+                        diff_dict[counter] = diff_value
+
             result['devices'][serial_no] = diff_dict
 
         # Look for serial numbers that used to exist but do not appear in self

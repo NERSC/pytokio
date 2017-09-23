@@ -113,26 +113,47 @@ def test_serializer():
     isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.TEMP_FILE.name)
     validate_object(isdct_cached)
 
-def test_diff():
+def test_diff_baseline():
     """
-    NerscIsdct.diff() method functionality
+    NerscIsdct.diff() functionality and correctness
     """
-    # Read from a cache file
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE)
     isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
     result = isdct_data.diff(isdct_data_old)
-#   print json.dumps(result, indent=4)
     assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
     assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
     assert len(result['devices']) > 0
-    for serial_no, counters in result['devices'].iteritems():
+    for counters in result['devices'].itervalues():
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
-            print counter, counters[counter]
             assert counters[counter] > 0
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
             assert counters[counter] == 0
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
             assert counters[counter] == ""
+
+def test_diff_report_zeros():
+    """
+    NerscIsdct.diff() report_zeros=False functionality
+    """
+    isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE)
+    isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
+    result = isdct_data.diff(isdct_data_old, report_zeros=False)
+    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
+    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
+    assert len(result['devices']) > 0
+    for counters in result['devices'].itervalues():
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
+            assert counters[counter] > 0
+        # these should not be present when report_zeros=False
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
+            if counter in counters:
+                print counter, counters[counter]
+            assert counter not in counters
+        # these should not be present when report_zeros=False
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
+            if counter in counters:
+                print counter, counters[counter]
+            assert counter not in counters
 
 ################################################################################
 #  Helper functions
