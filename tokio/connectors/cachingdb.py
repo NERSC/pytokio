@@ -212,10 +212,10 @@ class CachingDb(object):
         ### Shuffle back in the state of the old cache db
         if len(old_state) > 0:
             self.cache_file = old_state['cache_file']
-            self.cache_db = old_state['old_cache_db']
-            self.cache_db_ps = old_state['old_cache_db_ps']
+            self.cache_db = old_state['cache_db']
+            self.cache_db_ps = old_state['cache_db_ps']
 
-    def query(self, query_str, table=None, table_schema=None, query_variables=()):
+    def query(self, query_str, query_variables=(), table=None, table_schema=None):
         """
         Pass a query through all layers of cache and return on the first hit.
         If a table is specified, the results of this query can be saved to the
@@ -260,7 +260,9 @@ class CachingDb(object):
         buffering, so be careful.
         """
         cursor = self.cache_db.cursor()
-        cursor.execute(query_str % {'ps': self.cache_db_ps}, query_variables)
+        if '%(ps)' in query_str:
+            query_str = query_str % {'ps': self.cache_db_ps}
+        cursor.execute(query_str, query_variables)
         rows = cursor.fetchall()
         cursor.close()
         return rows
@@ -272,7 +274,9 @@ class CachingDb(object):
 
         """
         cursor = self.remote_db.cursor()
-        cursor.execute(query_str % {'ps': self.remote_db_ps}, query_variables)
+        if '%(ps)' in query_str:
+            query_str = query_str % {'ps': self.remote_db_ps}
+        cursor.execute(query_str, query_variables)
         rows = cursor.fetchall()
         cursor.close()
         return rows
