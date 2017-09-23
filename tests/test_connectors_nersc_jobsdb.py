@@ -76,22 +76,31 @@ def test_memory_cache():
     nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=SAMPLE_CACHE_DB)
 
     ### First query will hit the cache database, then be cached in memory
-    results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    results1 = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    print "Got %d hits from source %d" % (len(results1), nerscjobsdb.last_hit)
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
-    verify_concurrent_jobs(results, nerscjobsdb, 1)
+    verify_concurrent_jobs(results1, nerscjobsdb, 1)
 
     ### Second time query is run, it should be served out of cache
-    results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    results2 = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    print "Got %d hits from source %d" % (len(results2), nerscjobsdb.last_hit)
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_MEMORY
-    verify_concurrent_jobs(results, nerscjobsdb, 1)
+    verify_concurrent_jobs(results2, nerscjobsdb, 1)
+
+    ### Results should be the same (and nonzero, per verify_concurrent_jobs)
+    assert results1 == results2
 
     ### Drop the query cache from memory
-    nerscjobsdb.clear_memory()
+    nerscjobsdb.drop_cache()
 
     ### Third time should go back to hitting the memory cache
     results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
+    print "Got %d hits from source %d" % (len(results), nerscjobsdb.last_hit)
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
     verify_concurrent_jobs(results, nerscjobsdb, 1)
+
+    ### Results should be the same (and nonzero, per verify_concurrent_jobs)
+    assert results == results1 == results2
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_save_cache():
@@ -123,7 +132,7 @@ def test_save_cache():
         ### clear_memory() would necessary if NerscJobsDb didn't INSERT OR
         ### REPLACE on save_cache; each successive query and save writes
         ### the full contents retrieved from all past queries without it
-#       nerscjobsdb.clear_memory()
+#       nerscjobsdb.drop_cache()
 
     ### Open the newly minted cache db
     nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=tokiotest.TEMP_FILE.name)
