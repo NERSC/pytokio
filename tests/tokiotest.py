@@ -55,7 +55,7 @@ SAMPLE_NERSCISDCT_DIFF_MONOTONICS = [ # counters whose values should be bigger t
     'data_units_read_bytes'
 ]
 SAMPLE_NERSCISDCT_DIFF_ZEROS = ['physical_size'] # diff should always be numeric zero
-SAMPLE_NERSCISDCT_DIFF_EMPTYSTR =  ['model_number'] # diff should always be an empty string
+SAMPLE_NERSCISDCT_DIFF_EMPTYSTR = ['model_number'] # diff should always be an empty string
 
 ### Global state
 SKIP_DARSHAN = None

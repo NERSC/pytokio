@@ -43,6 +43,29 @@ def validate_dataframe(isdct_data):
     """
     assert len(isdct_data) > 0
 
+def validate_diff(diff_dict, report_zeros=True):
+    """
+    Validate the structure and functional correctness of .diff() output
+    """
+    assert len(diff_dict['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
+    assert len(diff_dict['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
+    assert len(diff_dict['devices']) > 0
+    for counters in diff_dict['devices'].itervalues():
+        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
+            assert counters[counter] > 0
+        if report_zeros:
+            for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
+                assert counters[counter] == 0
+            for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
+                assert counters[counter] == ""
+        else:
+            # these should not be present when report_zeros=False
+            for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
+                assert counter not in counters
+            # these should not be present when report_zeros=False
+            for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
+                assert counter not in counters
+
 def test_tgz_input():
     """
     Load NerscIsdct from .tgz input files
@@ -120,16 +143,7 @@ def test_diff_baseline():
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE)
     isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
     result = isdct_data.diff(isdct_data_old)
-    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
-    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
-    assert len(result['devices']) > 0
-    for counters in result['devices'].itervalues():
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
-            assert counters[counter] > 0
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
-            assert counters[counter] == 0
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
-            assert counters[counter] == ""
+    validate_diff(result, report_zeros=True)
 
 def test_diff_report_zeros():
     """
@@ -138,22 +152,7 @@ def test_diff_report_zeros():
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE)
     isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
     result = isdct_data.diff(isdct_data_old, report_zeros=False)
-    assert len(result['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
-    assert len(result['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
-    assert len(result['devices']) > 0
-    for counters in result['devices'].itervalues():
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
-            assert counters[counter] > 0
-        # these should not be present when report_zeros=False
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_ZEROS:
-            if counter in counters:
-                print counter, counters[counter]
-            assert counter not in counters
-        # these should not be present when report_zeros=False
-        for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_EMPTYSTR:
-            if counter in counters:
-                print counter, counters[counter]
-            assert counter not in counters
+    validate_diff(result, report_zeros=False)
 
 ################################################################################
 #  Helper functions
