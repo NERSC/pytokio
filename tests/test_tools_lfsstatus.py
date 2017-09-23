@@ -144,8 +144,3 @@ def test_get_functions():
             test_func = func
             test_func.description = config['description'] + ", cache"
             yield test_func, config['datetime_target'], CACHE_FILES[func]
-
-# TODO: factor these summaries out into the objects themselves
-# def lfsstatus.summarize_maps_data(fs_data): # fs_data is either nersc_lfsstate.NerscLfsOstFullness
-#                                                                 or nersc_lfsstate.NerscLfsOstMap
-# def lfsstatus.summarize_df_data(fs_data):
