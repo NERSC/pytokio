@@ -170,8 +170,8 @@ def compare_nersc_isdct():
                         help="print summary of differences")
     parser.add_argument("-z", "--report-zeros", action='store_true',
                         help='include counters that do not change')
-    parser.add_argument("new_isdctfile", help="newer ISDCT dump file")
     parser.add_argument("old_isdctfile", help="older ISDCT dump file")
+    parser.add_argument("new_isdctfile", help="newer ISDCT dump file")
     args = parser.parse_args()
 
     old_isdctfile = tokio.connectors.nersc_isdct.NerscIsdct(args.old_isdctfile)
