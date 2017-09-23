@@ -15,8 +15,6 @@ _DB_USER = os.environ.get('TEST_DB_USER', 'root')
 _DB_PASSWORD = os.environ.get('TEST_DB_PASSWORD', '')
 _DB_DBNAME = os.environ.get('TEST_DB_DBNAME', 'testdb')
 
-INPUT_CACHE_FILE = 'cache.sqlite3'
-
 ### You must ensure that each TEST_TABLES table has at least
 ### LIMIT_CYCLES[-1] records for this test.  This is why we stop
 ### at 24 below (the sample input from LMT has a table with only 24 OST
@@ -151,10 +149,9 @@ def test_cache_db():
     """
     Verify functionality when connecting to a remote database
     """
-    test_db = tokio.connectors.cachingdb.CachingDb(cache_file=INPUT_CACHE_FILE)
+    test_db = tokio.connectors.cachingdb.CachingDb(cache_file=tokiotest.SAMPLE_LMTDB_FILE)
 
     for description, test_function in TEST_FUNCTIONS:
         func = test_function
         func.description = description
-        ### TODO: get this working
-#       yield func, test_db
+        yield func, test_db
