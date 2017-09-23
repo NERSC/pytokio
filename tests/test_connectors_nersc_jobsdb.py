@@ -14,9 +14,7 @@ import tokio.connectors.nersc_jobsdb
 # times coincide with inputs/sample.darshan to facilitate integration testing
 SAMPLE_QUERY = (1490000867L, 1490000983L, 'edison')
 
-SAMPLE_CACHE_DB = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                               'inputs',
-                               'sample.sqlite3')
+SAMPLE_CACHE_DB = tokiotest.SAMPLE_NERSCJOBSDB_FILE
 
 # Expand sample_query into multiple queries
 QUERY_RANGE = SAMPLE_QUERY[1] - SAMPLE_QUERY[0]
