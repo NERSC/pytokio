@@ -6,13 +6,16 @@ for reanalysis on platforms that cannot access the original remote database.
 """
 
 import warnings
-#try:
-#    import MySQLdb
-#except ImportError:
-import pymysql
-pymysql.install_as_MySQLdb()
-import MySQLdb
-#    pass
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass
+try:
+    import MySQLdb
+except ImportError:
+    pass
+
 import sqlite3
 
 CACHE_TABLE_SCHEMA = """
@@ -151,15 +154,6 @@ class CachingDb(object):
 
         ### Open a new cache db connection without closing the old cache db
         self.connect_cache(cache_file)
-
-        # saved_results = {
-        #    'table1': {
-        #       'rows': [ (row1), (row2), (row3), ... ],
-        #       'schema': 'create table if not exists table1(...)',
-        #    }
-        #    'table2': { ... }
-        #    ...
-        # }
 
         ### Commit each table we've retained in memory
         drop_caches = set([])
