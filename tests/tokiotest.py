@@ -24,15 +24,21 @@ SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43'
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
 SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 
-### Other cached files corresponding to SAMPLE_DARSHAN_LOG
-SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
+### For lfsstatus connector/tool.  These values must reflect the contents of
+### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
+### pass.
 SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
 SAMPLE_OSTMAP_START = 1489998203
 SAMPLE_OSTMAP_END = 1489998203
-
+SAMPLE_OSTMAP_OVERLOAD_OSS = 1
+SAMPLE_OSTMAP_OST_PER_OSS = 1
 SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
+
+
+### Other cached files corresponding to SAMPLE_DARSHAN_LOG
+SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample.sqlite3')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 
