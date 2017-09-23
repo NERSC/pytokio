@@ -27,7 +27,12 @@ SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
 SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
+SAMPLE_OSTMAP_START = 1489998203
+SAMPLE_OSTMAP_END = 1489998203
+
 SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
+SAMPLE_OSTFULLNESS_START = 1489998203
+SAMPLE_OSTFULLNESS_END = 1490081107
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample.sqlite3')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 

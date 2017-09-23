@@ -5,13 +5,11 @@ fullness at that time
 """
 
 import os
+import time
 import datetime
 import common
+from .. import config
 from ..connectors import nersc_lfsstate
-from ..config import LFSNAME_TO_H5LMT_FILE, \
-                     LFSSTATUS_BASE_DIR, \
-                     LFSSTATUS_FULLNESS_FILE, \
-                     LFSSTATUS_MAP_FILE
 
 def get_fullness_at_datetime(file_system, datetime_target, cache_file=None):
     return get_summary_at_datetime(file_system, datetime_target, "fullness", cache_file)
@@ -31,9 +29,9 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
 
     """
     if metric == "fullness":
-        file_basename = LFSSTATUS_FULLNESS_FILE
+        file_basename = config.LFSSTATUS_FULLNESS_FILE
     elif metric == "failures":
-        file_basename = LFSSTATUS_MAP_FILE
+        file_basename = config.LFSSTATUS_MAP_FILE
     else:
         raise Exception("unknown metric " + metric)
 
@@ -44,7 +42,7 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         # since it only needs to compensate for sampling intervals (15 min in
         # practice at NERSC)
         ost_health_files = common.enumerate_dated_dir(
-            base_dir=LFSSTATUS_BASE_DIR,
+            base_dir=config.LFSSTATUS_BASE_DIR,
             datetime_start=datetime_target - datetime.timedelta(days=1),
             datetime_end=datetime_target + datetime.timedelta(hours=1),
             file_name=file_basename)
@@ -57,10 +55,9 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
     if len(ost_health_files) == 0:
         raise Exception("No OST health files (%s) found in %s for %s" % (
             file_basename,
-            datetime_target.strftime(LFSSTATUS_BASE_DIR),
+            datetime_target.strftime(config.LFSSTATUS_BASE_DIR),
             str(datetime_target)))
 
-    # TODO : Remove this comment after the package is deleted
     # We can get away with the following because NerscLfsOstFullness,
     # NerscLfsOstMap, and NerscLfsOstMap.get_failovers all have the same
     # structure
@@ -82,11 +79,11 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
 
     timestamps = sorted([int(x) for x in ost_health.keys()])
 
-    # Unoptimized walk through to find our timestamp of interest.  gynmastics
-    # with fromtimestamp(0) required to convert a datetime (expressed in local
-    # time) into a UTC-based epoch
-    target_timestamp = int((datetime_target - datetime.datetime.fromtimestamp(0)).total_seconds())
-    target_index = None
+    # Unoptimized walk through to find our timestamp of interest
+    target_timestamp = long(time.mktime(datetime_target.timetuple()))
+    # If the day's records start after the target time stamp, just report the
+    # first record (target_index=0)
+    target_index = 0
     for index, timestamp in enumerate(timestamps):
         if timestamp >= target_timestamp:
             if index == 0:
@@ -94,8 +91,6 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
             else:
                 target_index = index - 1
                 break
-    if target_index is None:
-        raise Exception("no timestamp of interest not found")
 
     fs_data = ost_health[timestamps[target_index]][file_system]
 
