@@ -5,7 +5,9 @@ Test each connector's standalone CLI cache tool
 
 import os
 import json
+import sqlite3
 import StringIO
+import datetime
 import subprocess
 import pandas
 import nose
@@ -14,6 +16,29 @@ import tokiotest
 # For cache_lfsstatus.py
 os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
 os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def verify_sqlite(output_str):
+    """
+    Ensure that the database contains at least one table, and that table
+    contains at least one row.
+    """
+    output_file = output_str.split(None, 3)[-1]
+    print "Using output_file %s" % output_file
+    tmpdb = sqlite3.connect(output_file)
+    cursor = tmpdb.cursor()
+    ## Count number of tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    tables = cursor.fetchall()
+    print tables
+    print "Found %d tables in %s" % (len(tables), output_file)
+    assert len(tables) > 0
+    for table in [x[0] for x in tables]:
+        cursor.execute('SELECT count(*) FROM %s' % table)
+        rows = cursor.fetchall()
+        num_rows = rows[0][0]
+        print "Found %d rows in %s" % (num_rows, table)
+        assert len(rows) > 0
 
 def verify_json(json_str):
     """
@@ -149,29 +174,80 @@ CACHE_CONNECTOR_CONFIGS = [
         ],
         'validators':  [verify_json,],
     },
+    {
+        'description': 'bin/cache_nersc_jobsdb.py',
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_nersc_jobsdb.py'),
+        'args':        [
+            '-i', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_NERSCJOBSDB_START).strftime("%Y-%m-%dT%H:%M:%S"),
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_NERSCJOBSDB_END).strftime("%Y-%m-%dT%H:%M:%S"),
+            'edison',
+        ],
+        'validators': [verify_sqlite,],
+        'to_file':    [True],
+        'validate_contents': False,
+    },
+    {
+        'description': 'bin/cache_lmtdb.py',
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lmtdb.py'),
+        'args':        [
+            '-i', tokiotest.SAMPLE_LMTDB_FILE,
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_LMTDB_START).strftime("%Y-%m-%dT%H:%M:%S"),
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_LMTDB_END).strftime("%Y-%m-%dT%H:%M:%S"),
+        ],
+        'validators': [verify_sqlite,],
+        'to_file':    [True],
+        'validate_contents': False,
+    },
+    {
+        'description': 'bin/cache_lmtdb.py --limit',
+        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lmtdb.py'),
+        'args':        [
+            '--limit', '2',
+            '-i', tokiotest.SAMPLE_LMTDB_FILE,
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_LMTDB_START).strftime("%Y-%m-%dT%H:%M:%S"),
+            datetime.datetime.fromtimestamp(
+                tokiotest.SAMPLE_LMTDB_END).strftime("%Y-%m-%dT%H:%M:%S"),
+        ],
+        'validators': [verify_sqlite,],
+        'to_file':    [True],
+        'validate_contents': False,
+    },
 ]
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def run_cache_connector(binary, args, validators, to_file=False):
+def run_cache_connector(config, to_file=False):
     """
     Test a connector cache (cache_*.py) CLI interface
     """
-    if binary.endswith('cache_darshan.py'):
+    if config['binary'].endswith('cache_darshan.py'):
         tokiotest.check_darshan()
 
     if to_file:
-        cmd = [binary] + ['-o', tokiotest.TEMP_FILE.name] + args
+        cmd = [config['binary']] \
+            + ['-o', tokiotest.TEMP_FILE.name] \
+            + config['args']
         print "Caching to", tokiotest.TEMP_FILE.name
-        print "Executing:", cmd
-        subprocess.check_output(cmd)
-        output_str = tokiotest.TEMP_FILE.read()
+        print "Executing:", ' '.join(cmd)
+        output_str = subprocess.check_output(cmd)
+        ### validate_contents means return the contents of the tempfile rather
+        ### than the stdout of the subprocess.  Some cache tools cannot print to
+        ### stdout (e.g., anything that caches to a binary format like sqlite)
+        ### so we need to pass the file name to the validator instead.
+        if config.get('validate_contents', True):
+            output_str = tokiotest.TEMP_FILE.read()
     else:
-        cmd = [binary] + args
+        cmd = [config['binary']] + config['args']
         print "Caching to stdout"
-        print "Executing:", cmd
+        print "Executing:", ' '.join(cmd)
         output_str = subprocess.check_output(cmd)
 
-    for validator in validators:
+    for validator in config['validators']:
         validator(output_str)
 
 def craft_description(config, suffix):
@@ -199,8 +275,9 @@ def test():
     for config in CACHE_CONNECTOR_CONFIGS:
         func = run_cache_connector
 
-        func.description = craft_description(config, '(to stdout)')
-        yield func, config['binary'], config['args'], config['validators'], False
-
-        func.description = craft_description(config, '(to file)')
-        yield func, config['binary'], config['args'], config['validators'], True
+        for to_file in config.get('to_file', [True, False]):
+            if to_file:
+                func.description = craft_description(config, '(to file)')
+            else:
+                func.description = craft_description(config, '(to stdout)')
+            yield func, config, to_file
