@@ -122,24 +122,24 @@ def test_summary():
     ### look for a section on devices removed
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_RM > 0:
         func = validate_summary_section
-        func.description = "compare_isdct --summary device removal"
+        func.description = "bin/compare_isdct.py --summary device removal"
         yield func, output_str, 'devices removed', verify_nid_line
 
     ### look for a section on devices added
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD > 0:
         func = validate_summary_section
-        func.description = "compare_isdct --summary device installation"
+        func.description = "bin/compare_isdct.py --summary device installation"
         yield func, output_str, 'devices installed', verify_nid_line
 
     ### look for a section on errors detected
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_ERRS > 0:
         func = validate_summary_section
-        func.description = "compare_isdct --summary error detection"
+        func.description = "bin/compare_isdct.py --summary error detection"
         yield func, output_str, 'errors detected', verify_errors_line
 
     ### look for a section with the workload statistics
     func = validate_summary_section
-    func.description = "compare_isdct --summary workload statistics"
+    func.description = "bin/compare_isdct.py --summary workload statistics"
     yield func, output_str, 'workload statistics', verify_workload_line
 
 def validate_summary_section(output_str, section_header, line_verify_func):
