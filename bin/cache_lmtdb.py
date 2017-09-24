@@ -4,7 +4,6 @@ Retrieve the contents of an LMT database and cache it locally.
 """
 
 import os
-import time
 import datetime
 import argparse
 import tokio.connectors.cachingdb
@@ -95,8 +94,8 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
 
     for lmtdb_table, table_schema in LMTDB_TABLES:
         schema_cmd = 'CREATE TABLE IF NOT EXISTS %s (%s)' % (
-                    lmtdb_table,
-                    table_schema)
+            lmtdb_table,
+            table_schema)
         query_str = 'SELECT * from %s' % lmtdb_table
 
         ### if this table is indexed by time, restrict the time range.
