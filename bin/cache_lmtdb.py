@@ -82,7 +82,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
     of an LMT database.
     """
     # First figure out the timestamp range
-    query_str = "SELECT TS_ID FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
+    query_str = "SELECT MIN(TS_ID), MAX(TS_ID) FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
     query_variables = (
         datetime_start.strftime("%Y-%m-%d %H:%M:%S"),
         datetime_end.strftime("%Y-%m-%d %H:%M:%S"))
@@ -90,7 +90,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
     result = lmtdb.query(query_str=query_str,
                          query_variables=query_variables)
 
-    ts_ids = [x[0] for x in result]
+    min_ts_id, max_ts_id = result[0]
 
     for lmtdb_table, table_schema in LMTDB_TABLES:
         schema_cmd = 'CREATE TABLE IF NOT EXISTS %s (%s)' % (
@@ -101,8 +101,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
         ### if this table is indexed by time, restrict the time range.
         ### otherwise, dump the whole time-independent table
         if 'ts_id' in table_schema.lower():
-            query_str += " WHERE TS_ID >= %d AND TS_ID <= %d" % (min(ts_ids), max(ts_ids))
-
+            query_str += " WHERE TS_ID >= %d AND TS_ID <= %d" % (min_ts_id, max_ts_id)
 
         ### limits (mostly for testing)
         if limit is not None:
