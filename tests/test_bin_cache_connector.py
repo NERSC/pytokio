@@ -23,14 +23,23 @@ def verify_sqlite(output_str):
     Ensure that the database contains at least one table, and that table
     contains at least one row.
     """
-    output_file = output_str.split(None, 3)[-1]
-    print "Using output_file %s" % output_file
+    ### Try to find the caching file name from the application's stdout
+    output_file = None
+    for line in output_str.splitlines():
+        if line.startswith('Caching to'):
+            output_file = line.strip().split(None, 3)[-1]
+            break
+    if output_file is None:
+        print "Could not find cache file name in output:"
+        print output_str
+        assert output_file is not None
+    print "Using output_file [%s]" % output_file
+    assert os.path.isfile(output_file)
     tmpdb = sqlite3.connect(output_file)
     cursor = tmpdb.cursor()
     ## Count number of tables
     cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     tables = cursor.fetchall()
-    print tables
     print "Found %d tables in %s" % (len(tables), output_file)
     assert len(tables) > 0
     for table in [x[0] for x in tables]:
