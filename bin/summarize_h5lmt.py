@@ -230,7 +230,10 @@ def summarize_h5lmt():
             for dataset_string in [D_READS, D_WRITES, D_MDSCPU, D_OSSCPU, D_MISSING, D_TIMESTEPS]:
                 h5lmt_like_object[dataset_string] = tokio.tools.get_group_data_from_time_range(
                     h5lmt_file, dataset_string, tstart, tstop)
-            bin_data = bin_h5lmt_like_object(h5lmt_like_object, tokio.LMT_TIMESTEP, args.bins)
+            bin_data = bin_h5lmt_like_object(
+                h5lmt_like_object,
+                tokio.config.LMT_TIMESTEP,
+                args.bins)
             for bin_datum in bin_data:
                 sys.stdout.write(print_datum(bin_datum))
             all_binned_data = all_binned_data + bin_data
