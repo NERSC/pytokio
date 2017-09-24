@@ -121,6 +121,7 @@ def cache_lmtdb():
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")
     parser.add_argument("end", type=str, help="end time in YYYY-MM-DDTHH:MM:SS format")
+    parser.add_argument("-i", "--input", type=str, default=None, help="input cache db file")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     parser.add_argument("-l", "--limit", type=int, default=None,
                         help="restrict number of records returned per table")
@@ -131,13 +132,18 @@ def cache_lmtdb():
 
     cache_file = args.output
 
-    lmtdb = tokio.connectors.cachingdb.CachingDb(
-        dbhost=_DB_HOST,
-        dbuser=_DB_USER,
-        dbpassword=_DB_PASSWORD,
-        dbname=_DB_DBNAME)
+    ### Unlike nersc_jobsdb connector, CachingDb does not look for any
+    ### environment variables intrinsically
+    if args.input is not None:
+        lmtdb = tokio.connectors.cachingdb.CachingDb(cache_file=args.input)
+    else:
+        lmtdb = tokio.connectors.cachingdb.CachingDb(
+            dbhost=_DB_HOST,
+            dbuser=_DB_USER,
+            dbpassword=_DB_PASSWORD,
+            dbname=_DB_DBNAME)
 
-    retrieve_tables(lmtdb, start, end)
+    retrieve_tables(lmtdb, start, end, args.limit)
 
     if cache_file is None:
         i = 0
