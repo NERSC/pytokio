@@ -22,7 +22,7 @@ def expand_nodelist(node_string):
             raise type(error)(error[0], "Slurm CLI (sacct command) not found")
         raise
 
-    for line in output_str:
+    for line in output_str.splitlines():
         node_name = line.strip()
         if len(node_name) > 0:
             node_names.add(node_name)
