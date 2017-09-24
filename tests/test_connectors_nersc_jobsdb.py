@@ -5,14 +5,16 @@ cache db (mysql) and assumes that querying it is equivalent to querying a remote
 MySQL database.
 """
 
-import os
 import nose
 import tokiotest
 import tokio.connectors.nersc_jobsdb
 
 # Express job start/end time as epoch.  Note that these specific start/stop
 # times coincide with inputs/sample.darshan to facilitate integration testing
-SAMPLE_QUERY = (1490000867L, 1490000983L, 'edison')
+SAMPLE_QUERY = (
+    tokiotest.SAMPLE_NERSCJOBSDB_START,
+    tokiotest.SAMPLE_NERSCJOBSDB_END,
+    tokiotest.SAMPLE_NERSCJOBSDB_HOST)
 
 SAMPLE_CACHE_DB = tokiotest.SAMPLE_NERSCJOBSDB_FILE
 
