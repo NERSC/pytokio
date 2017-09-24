@@ -17,13 +17,17 @@ def cache_nersc_jobsdb():
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")
     parser.add_argument("end", type=str, help="end time in YYYY-MM-DDTHH:MM:SS format")
     parser.add_argument("host", type=str, help="return jobs running on this NERSC host")
+    parser.add_argument("-i", "--input", type=str, default=None, help="input cache db file")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     args = parser.parse_args()
 
     start = datetime.datetime.strptime(args.start, "%Y-%m-%dT%H:%M:%S")
     end = datetime.datetime.strptime(args.end, "%Y-%m-%dT%H:%M:%S")
 
-    nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb()
+    if args.input is not None:
+        nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=args.input)
+    else:
+        nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb()
     nerscjobsdb.get_concurrent_jobs(
         long(time.mktime(start.timetuple())),
         long(time.mktime(end.timetuple())),
