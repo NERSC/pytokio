@@ -38,9 +38,14 @@ SAMPLE_OSTFULLNESS_END = 1490081107
 
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
-SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
-SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_jobsdb.sqlite3')
+SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
+SAMPLE_NERSCJOBSDB_START = 1489872299
+SAMPLE_NERSCJOBSDB_END = 1490167256
+SAMPLE_NERSCJOBSDB_HOST = 'edison'
 SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'sample_lmtdb.sqlite3')
+SAMPLE_LMTDB_START = 1506182400
+SAMPLE_LMTDB_END = 1506182430
+SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 
 ### The following SLURM_CACHE_* all correspond to SLURM_CACHE_FILE; if you
