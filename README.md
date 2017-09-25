@@ -7,22 +7,15 @@ package.  The full documentation is located on the [pytokio GitHub wiki][].
 Contents
 --------------------------------------------------------------------------------
 
-- `bin/` directory contains useful tools implemented on top of pytokio. For instance 
-   summary_job is a script on which TOKIO-ABC relies on to retrieve data from the
-   pytokio package.
+- `bin/` directory contains useful tools implemented on top of pytokio
 - `examples/` contains standalone Jupyter notebooks and scripts that illustrate
-  different aspects of the pytokio API that do useful things.  These
-  demonstrate common use patterns and common ways multiple pytokio components
-  can be strung together.
-- `tests/` contains unit tests, integration tests, and code that is in the
-  process of being converted to such unit/integration tests.
-- `pytokio/` is the Python package itself.  Import this to access the pytokio
-  API
+  different aspects of the pytokio API that do useful things
+- `tests/` contains unit and integration tests for the pytokio library and
+   the scripts bundled in `/bin`
+- `tokio/` is the importable Python package itself
 
 License
 --------------------------------------------------------------------------------
-This software is currently not licensed for public distribution.  As such it can
-only be downloaded and used by employees of the Lawrence Berkeley National
-Laboratory.
+This software is currently not licensed for public distribution.
 
 [pytokio GitHub wiki]: https://github.com/NERSC/pytokio/wiki
