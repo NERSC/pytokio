@@ -10,6 +10,16 @@ from ..config import LMT_TIMESTEP
 
 _NATIVE_VERSION = 1
 
+CONVERT_TO_V1_GROUPNAME = {
+    'readrates': '/OSTReadGroup/OSTBulkReadDataSet',
+    'writerates': '/OSTWriteGroup/OSTBulkWriteDataSet',
+    'osscpu': '/OSSCPUGroup/OSSCPUDataSet',
+    'mdscpu': '/MDSCPUGroup/MDSCPUDataSet',
+    'timestamps': '/FSStepsGroup/FSStepsDataSet',
+    'missing': '/FSMissingGroup/FSMissingDataSet',
+    'metadata': '/MDSOpsGroup/MDSOpsDataSet',
+}
+
 class Hdf5(h5py.File):
     """
     Create a parsed Hdf5 file class 
