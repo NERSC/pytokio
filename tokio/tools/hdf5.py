@@ -1,24 +1,27 @@
 #!/usr/bin/env python
+"""
+Tools for retrieving data from one or more HDF5 files that are indexed by date
+on a file system.
+"""
 
 import os
-import datetime
 import tempfile
 import subprocess
 import numpy as np
-import common
+# from . import common
+import tokio.tools.common
 from .. import connectors, config
-from ..debug import debug_print as _debug_print
 
 def enumerate_h5lmts(file_name, datetime_start, datetime_end):
     """
     Given a starting datetime and (optionally) an ending datetime, return all
     H5LMT files that contain data inside of that date range (inclusive).
-    
-    """   
-    h5lmt_files = common.enumerate_dated_dir(config.H5LMT_BASE_DIR,
-                                             datetime_start,
-                                             datetime_end,
-                                             file_name=file_name)
+
+    """
+    h5lmt_files = tokio.tools.common.enumerate_dated_dir(config.H5LMT_BASE_DIR,
+                                                         datetime_start,
+                                                         datetime_end,
+                                                         file_name=file_name)
     return h5lmt_files
 
 
@@ -26,12 +29,8 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
     """
     Given the name of an Hdf5 file and a start/end date+time, returns a list of
     tuples containing
-    
+
     """
-    if datetime_end is None:
-        datetime_end_local = datetime_start
-    else:
-        datetime_end_local = datetime_end
     h5lmt_files = enumerate_h5lmts(file_name, datetime_start, datetime_end)
     output = []
 
@@ -45,7 +44,7 @@ def get_files_and_indices(file_name, datetime_start, datetime_end):
         i_f = -1
         if hdf5.last_timestamp >= datetime_end:
             # This is the last day's hdf5
-            i_f = hdf5.get_index(datetime_end) - 1  
+            i_f = hdf5.get_index(datetime_end) - 1
             # -1 because datetime_end should be exclusive
             #
             # If the last timestamp is on the first datapoint of a new day,
@@ -61,93 +60,92 @@ def get_metadata_from_time_range(file_name, datetime_start, datetime_end):
     """
     This routine returns a dict with a few specific metadata
     attributes in it which can be stored by the calling application.
-    
+
     Because pytokio returns data in a numpy array, certain metadata gets lost.
     This is particularly bothersome for MDSOpsDataSet, where the 'OpNames'
     attribute is required to understand what each column in the np.array
-    correspond to.  
-    
+    correspond to.
+
     """
     result = {}
-    for (h5file, i_0, i_f) in get_files_and_indices(file_name, datetime_start, datetime_end):
-        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
+    for hdf5_filename in enumerate_h5lmts(file_name, datetime_start, datetime_end):
+        with connectors.hdf5.Hdf5(hdf5_filename, mode='r') as hdf5_file:
             # Copy over MDS op names
-            op_names = list(f['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
+            op_names = list(hdf5_file['MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'])
             if 'OpNames' in result:
                 if op_names != result['OpNames']:
-                    raise Exception("Inconsistent OpNames found across different H5LMT files")
+                    raise IndexError("Inconsistent OpNames found across different H5LMT files")
             else:
                 result['OpNames'] = op_names
 
             # Copy over OST names
-            ost_names = list(f['OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'])
+            ost_names = list(hdf5_file['OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'])
             if 'OSTNames' in result:
                 if ost_names != result['OSTNames']:
-                    raise Exception("Inconsistent OSTNames found across different H5LMT files")
+                    raise IndexError("Inconsistent OSTNames found across different H5LMT files")
             else:
                 result['OSTNames'] = ost_names
     return result
 
 def get_group_data_from_time_range(file_name, group_name, datetime_start, datetime_end):
     """
-    Returns a numpy array containing all the data from the given group 
-    across all of the files of the given filename during the time 
+    Returns a numpy array containing all the data from the given group
+    across all of the files of the given filename during the time
     range specified.
-    
-    """    
-    files_and_indices = get_files_and_indices(file_name, 
-                                              datetime_start, 
+
+    """
+    files_and_indices = get_files_and_indices(file_name,
+                                              datetime_start,
                                               datetime_end)
     result = None
 
-    for (h5file, i_0, i_f) in files_and_indices:
-        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
+    for (hdf5_filename, i_0, i_f) in files_and_indices:
+        with connectors.hdf5.Hdf5(hdf5_filename, mode='r') as hdf5_file:
             # Version : depending on the O.S /
-            version = f['/'].attrs.get('version', 1)
-            if len(f[group_name].shape) == 1:
-                dataset_slice = f[group_name][i_0:i_f]
+            version = hdf5_file['/'].attrs.get('version', 1)
+            if len(hdf5_file[group_name].shape) == 1:
+                dataset_slice = hdf5_file[group_name][i_0:i_f]
                 axis = 0
-            elif len(f[group_name].shape) == 2:
+            elif len(hdf5_file[group_name].shape) == 2:
                 if version == 1:
-                    dataset_slice = f[group_name][:,i_0:i_f]
+                    dataset_slice = hdf5_file[group_name][:, i_0:i_f]
                     axis = 1
                 else:
-                    dataset_slice = f[group_name][i_0:i_f,:]
+                    dataset_slice = hdf5_file[group_name][i_0:i_f, :]
                     axis = 0
-            elif len(f[group_name].shape) == 3:
+            elif len(hdf5_file[group_name].shape) == 3:
                 if version == 1:
                     ### no idea if this is correct
-                    dataset_slice = f[group_name][:,i_0:i_f,:]
+                    dataset_slice = hdf5_file[group_name][:, i_0:i_f, :]
                     axis = 1
                 else:
-                    dataset_slice = f[group_name][i_0:i_f,:,:]
+                    dataset_slice = hdf5_file[group_name][i_0:i_f, :, :]
                     axis = 0
             else:
-                raise Exception("Dimensions of %s in %s are greater than 3" 
-                                % (group_name, h5file))
+                raise IndexError("Dimensions of %s in %s are greater than 3" %
+                                 (group_name, hdf5_filename))
 
             if result is None:
                 result = dataset_slice
             else:
                 result = np.concatenate([result, dataset_slice], axis=axis)
-            _debug_print("added %s from %5d to %5d" % (h5file, i_0, i_f))
     return result
 
 def get_dataframe_from_time_range(file_name, group_name, datetime_start, datetime_end):
     """
-    Returns the same content as get_group_data_from_time_range 
+    Returns the same content as get_group_data_from_time_range
     into a dataframe
-    
+
     """
     files_and_indices = get_files_and_indices(file_name, datetime_start, datetime_end)
     if not files_and_indices:
-        raise Exception("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
+        raise OSError("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
     result = None
 
-    for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
-        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
-            df_slice = f.to_dataframe(group_name)
-            df_slice = df_slice[(df_slice.index >= datetime_start) 
+    for hdf5_filename in enumerate_h5lmts(file_name, datetime_start, datetime_end):
+        with connectors.hdf5.Hdf5(hdf5_filename, mode='r') as hdf5_file:
+            df_slice = hdf5_file.to_dataframe(group_name)
+            df_slice = df_slice[(df_slice.index >= datetime_start)
                                 & (df_slice.index < datetime_end)]
             if result is None:
                 result = df_slice
@@ -183,11 +181,12 @@ def repack_h5lmt(src, dest, datasets):
             cmd_args = ["h5copy", "-i", src, "-o", temp.name, "-s", dset, "-d", dset, "-p"]
             ret_tmp = subprocess.call(cmd_args)
             # Only copy nonzero exit codes into return value
-            if ret_tmp: ret = ret_tmp
-   
+            if ret_tmp:
+                ret = ret_tmp
+
         cmd_args = ["h5repack", "-L", "-v", "-f", "GZIP=1", temp.name, dest]
         ret_tmp = subprocess.call(cmd_args)
         # Only copy nonzero exit codes into return value
-        if ret_tmp: ret = ret_tmp
+        if ret_tmp:
+            ret = ret_tmp
     return ret
-
