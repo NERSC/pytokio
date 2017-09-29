@@ -170,6 +170,7 @@ INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
 """
 
 class LmtDb(cachingdb.CachingDb):
+    ### TODO: this needs a unit test
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
         # Get database parameters
         if dbhost is None:
@@ -213,6 +214,7 @@ class LmtDb(cachingdb.CachingDb):
             self.mds_op_names.append(row[0])
         self.mds_op_names = tuple(self.mds_op_names)
 
+    ### TODO: this needs a unit test
     def get_ts_ids(self, datetime_start, datetime_end):
         """
         Given a starting and ending time, return the lowest and highest ts_id
@@ -230,6 +232,7 @@ class LmtDb(cachingdb.CachingDb):
         ### TODO: make sure this works (it's templated down in test_bin_cache_lmtdb.py)
         return min(ts_ids), max(ts_ids)
 
+    ### TODO: this needs a unit test
     def get_timeseries_data(self, table, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
         """
         Wrapper for _get_timeseries_data that breaks a single large query into
@@ -264,47 +267,10 @@ class LmtDb(cachingdb.CachingDb):
                            """ % format_dict
             self.query(query_str, (start_stamp, end_stamp), table=table, table_schema=table_schema)
             chunk_start += timechunk
-# TODO: resume work here
 
         return self.saved_results[table]['rows'][index0:]
 
-    def _get_rw_data(self, t_start, t_stop, binning_timestep):
-        """
-        Return a tuple of two objects:
-            1. a M*N matrix of int64s that encode the total read bytes for N STs
-               over M timesteps
-            2. a M*N matrix of int64s that encode the total write bytes for N
-               STs over M timesteps
-
-        Time will be binned appropriately if binning_timestep > lmt_timestep.
-        The number of OSTs (the N dimension) is derived from the database.
-
-        """
-        query_str = _QUERY_OST_DATA % (t_start.strftime( _DATE_FMT ),
-                                        t_stop.strftime( _DATE_FMT ))
-        rows = self._query_mysql(query_str)
-
-        # Get the number of timesteps (# rows)
-        ts_ct = int((t_stop - t_start).total_seconds() / binning_timestep)
-        t0 = int(time.mktime(t_start.timetuple()))
-
-        # Get the number of OSTs and their names (# cols)
-        ost_ct = len(self.ost_names)
-
-        # Initialize everything to -0.0; we use the signed zero to distinguish
-        # the absence of data from a measurement of zero
-        buf_r = np.full(shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8')
-        buf_w = np.full(shape=(ts_ct, ost_ct), fill_value=-0.0, dtype='f8')
-
-        for row in rows:
-            icol = int((row[0] - t0) / binning_timestep)
-            irow = self.ost_names.index(row[1])
-            buf_r[icol,irow] = row[2]
-            buf_w[icol,irow] = row[3]
-
-        return (buf_r, buf_w)
-
-
+    ### TODO: 9/28/2017 - this needs to be reviewed and kept/abandoned
     def get_last_rw_data_before(self, t, lookbehind=None):
         """
         Get the last datum reported by each OST before the given timestamp t.
@@ -349,18 +315,3 @@ class LmtDb(cachingdb.CachingDb):
             buf_t[0, tidx] = tup[0]
 
         return (buf_r, buf_w, buf_t)
-
-
-    def _query_mysql(self, query_str):
-        """
-        Connects to MySQL, run a query, and yield the full output tuple.  No
-        buffering or other witchcraft.
-
-        """
-        cursor = self.db.cursor()
-        t0 = time.time()
-        cursor.execute(query_str)
-
-        t0 = time.time()
-        rows = cursor.fetchall()
-        return rows
