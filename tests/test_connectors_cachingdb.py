@@ -21,32 +21,60 @@ _DB_DBNAME = os.environ.get('TEST_DB_DBNAME', 'testdb')
 ### records)
 LIMIT_CYCLES = [8, 16, 24]
 
-TEST_TABLES = [
-    (
-        'OSS_DATA',
-        'OSS_ID, TS_ID, PCT_CPU, PCT_MEMORY, PRIMARY KEY (OSS_ID, TS_ID)',
-    ),
-    (
-        'OSS_INFO',
-        'OSS_ID, FILESYSTEM_ID, HOSTNAME, FAILOVERHOST, PRIMARY KEY(OSS_ID, HOSTNAME)',
-    ),
-    (
-        'OST_DATA',
-        """OST_ID, TS_ID, READ_BYTES, WRITE_BYTES, PCT_CPU, KBYTES_FREE,
-           KBYTES_USED, INODES_FREE, INODES_USED, PRIMARY KEY(OST_ID, TS_ID)""",
-    ),
-    (
-        'OST_INFO',
-        'OST_ID, OSS_ID, OST_NAME, HOSTNAME, OFFLINE, DEVICE_NAME, PRIMARY KEY (OST_ID)',
-    ),
-]
-
+TEST_TABLES = {
+    "OSS_DATA": {
+        'columns': [
+            'OSS_ID',
+            'TS_ID',
+            'PCT_CPU',
+            'PCT_MEMORY'
+        ],
+        'primary_key': ['OSS_ID', 'TS_ID'],
+    },
+    "OSS_INFO": {
+        'columns': [
+            'OSS_ID',
+            'FILESYSTEM_ID',
+            'HOSTNAME',
+            'FAILOVERHOST'
+        ],
+        'primary_key': [
+            'OSS_ID',
+            'HOSTNAME'
+        ],
+    },
+    "OST_DATA": {
+        'columns': [
+            'OST_ID',
+            'TS_ID',
+            'READ_BYTES',
+            'WRITE_BYTES',
+            'PCT_CPU',
+            'KBYTES_FREE',
+            'KBYTES_USED',
+            'INODES_FREE',
+            'INODES_USED'
+        ],
+        'primary_key': ['OST_ID', 'TS_ID'],
+    },
+    "OST_INFO": {
+        'columns': [
+            'OST_ID',
+            'OSS_ID',
+            'OST_NAME',
+            'HOSTNAME',
+            'OFFLINE',
+            'DEVICE_NAME'
+        ],
+        'primary_key': ['OST_ID'],
+    },
+}
 
 def query_without_saving(test_db):
     """
     cachingdb does not save results when table=None
     """
-    for test_table, _ in TEST_TABLES:
+    for test_table in TEST_TABLES.keys():
         limit = 10
         result = test_db.query(
             query_str='SELECT * from %s LIMIT %d' % (test_table, limit))
@@ -70,14 +98,12 @@ def verify_cache_functionality(test_db):
     1. save_cache works when table_schema is only provided once, and not on the
        final query
     """
-    for test_table, test_table_schema in TEST_TABLES:
+    for test_table, test_table_schema in TEST_TABLES.iteritems():
         sum_limits = 0
         for iteration, limit in enumerate(LIMIT_CYCLES):
             sum_limits += limit
             if iteration == 0:
-                schema_param = 'CREATE TABLE IF NOT EXISTS %s (%s)' % (
-                    test_table,
-                    test_table_schema)
+                schema_param = test_table_schema
             else:
                 schema_param = None
             result = test_db.query(
@@ -108,7 +134,7 @@ def verify_cache_functionality(test_db):
     assert result[0][0] == len(TEST_TABLES)
 
     ### Confirm that the size of each table is correct
-    for test_table, test_table_schema in TEST_TABLES:
+    for test_table, test_table_schema in TEST_TABLES.iteritems():
         result = test_db.query(
             query_str='SELECT * from %s' % (test_table),
             table=test_table,

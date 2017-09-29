@@ -13,69 +13,6 @@ _DB_USER = os.environ.get('PYTOKIO_LMTDB_USER', 'root')
 _DB_PASSWORD = os.environ.get('PYTOKIO_LMTDB_PASSWORD', '')
 _DB_DBNAME = os.environ.get('PYTOKIO_LMTDB_DBNAME', 'testdb')
 
-LMTDB_TABLES = [
-    (
-        "FILESYSTEM_INFO",
-        """FILESYSTEM_ID, FILESYSTEM_NAME, FILESYSTEM_MOUNT_NAME, SCHEMA_VERSION,
-           PRIMARY KEY(FILESYSTEM_ID)""",
-    ),
-    (
-        "MDS_DATA",
-        """MDS_ID, TS_ID, PCT_CPU, KBYTES_FREE, KBYTES_USED, INODES_FREE, INODES_USED,
-           PRIMARY KEY(MDS_ID, TS_ID)""",
-    ),
-    (
-        "MDS_INFO",
-        """MDS_ID, FILESYSTEM_ID, MDS_NAME, HOSTNAME, DEVICE_NAME,
-           PRIMARY KEY(MDS_ID)""",
-    ),
-    (
-        "MDS_OPS_DATA",
-        """MDS_ID, TS_ID, OPERATION_ID, SAMPLES, SUM, SUMSQUARES,
-           PRIMARY KEY(MDS_ID, TS_ID, OPERATION_ID)""",
-    ),
-    (
-        "MDS_VARIABLE_INFO",
-        """VARIABLE_ID, VARIABLE_NAME, VARIABLE_LABEL, THRESH_TYPE, THRESH_VAL1, THRESH_VAL2,
-            PRIMARY KEY(VARIABLE_ID)""",
-    ),
-    (
-        "OPERATION_INFO",
-        """OPERATION_ID, OPERATION_NAME, UNITS,
-           PRIMARY KEY(OPERATION_ID)""",
-    ),
-    (
-        "OSS_DATA",
-        """OSS_ID, TS_ID, PCT_CPU, PCT_MEMORY,
-           PRIMARY KEY (OSS_ID, TS_ID)""",
-    ),
-    (
-        "OSS_INFO",
-        """OSS_ID, FILESYSTEM_ID, HOSTNAME, FAILOVERHOST,
-           PRIMARY KEY(OSS_ID, HOSTNAME)""",
-    ),
-    (
-        "OST_DATA",
-        """OST_ID, TS_ID, READ_BYTES, WRITE_BYTES, PCT_CPU, KBYTES_FREE,
-           KBYTES_USED, INODES_FREE, INODES_USED,
-           PRIMARY KEY(OST_ID, TS_ID)""",
-    ),
-    (
-        "OST_INFO",
-        """OST_ID, OSS_ID, OST_NAME, HOSTNAME, OFFLINE, DEVICE_NAME,
-           PRIMARY KEY (OST_ID)""",
-    ),
-    (
-        "OST_VARIABLE_INFO",
-        """VARIABLE_ID, VARIABLE_NAME, VARIABLE_LABEL, THRESH_TYPE, THRESH_VAL1, THRESH_VAL2,
-           PRIMARY KEY (VARIABLE_ID)"""
-    ),
-    (
-        "TIMESTAMP_INFO",
-        """TS_ID, TIMESTAMP, PRIMARY KEY (TS_ID)""",
-    ),
-]
-
 def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
     """
     Given a start and end time, retrieve and cache all of the relevant contents
@@ -92,15 +29,12 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
 
     min_ts_id, max_ts_id = result[0]
 
-    for lmtdb_table, table_schema in LMTDB_TABLES:
-        schema_cmd = 'CREATE TABLE IF NOT EXISTS %s (%s)' % (
-            lmtdb_table,
-            table_schema)
+    for lmtdb_table, table_schema in tokio.connectors.lmtdb.LMTDB_TABLES.iteritems():
         query_str = 'SELECT * from %s' % lmtdb_table
 
         ### if this table is indexed by time, restrict the time range.
         ### otherwise, dump the whole time-independent table
-        if 'ts_id' in table_schema.lower():
+        if 'ts_id' in [x.lower() for x in table_schema['columns']]:
             query_str += " WHERE TS_ID >= %d AND TS_ID <= %d" % (min_ts_id, max_ts_id)
 
         ### limits (mostly for testing)
@@ -110,7 +44,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
         result = lmtdb.query(
             query_str=query_str,
             table=lmtdb_table,
-            table_schema=schema_cmd)
+            table_schema=table_schema)
 
 def cache_lmtdb():
     """

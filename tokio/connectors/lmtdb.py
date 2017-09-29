@@ -1,33 +1,140 @@
 #!/usr/bin/env python
 """
-Interface with the LMT to determine information about OSS, OST and MST health.
+Interface with an LMT database.  Provides wrappers for common queries using the
+CachingDb class.
 """
 
 import os
-import sys
 import time
 import datetime
-import MySQLdb
 import numpy as np
-from ..debug import debug_print as _debug_print
+from . import cachingdb
 
-_DATE_FMT = "%Y-%m-%d %H:%M:%S"
-_MYSQL_FETCHMANY_LIMIT = 10000
-_QUERY_OST_DATA = """
-SELECT
-    UNIX_TIMESTAMP(TIMESTAMP_INFO.`TIMESTAMP`) as ts,
-    OST_NAME as ostname,
-    READ_BYTES as read_b,
-    WRITE_BYTES as write_b
-FROM
-    OST_DATA
-INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = OST_DATA.TS_ID
-INNER JOIN OST_INFO ON OST_INFO.OST_ID = OST_DATA.OST_ID
-WHERE
-    TIMESTAMP_INFO.`TIMESTAMP` >= '%s'
-AND TIMESTAMP_INFO.`TIMESTAMP` < '%s'
-ORDER BY ts, ostname;
-"""
+### Names and schemata of all LMT database tables worth caching
+LMTDB_TABLES = {
+    "FILESYSTEM_INFO": {
+        'columns': [
+            'FILESYSTEM_ID',
+            'FILESYSTEM_NAME',
+            'FILESYSTEM_MOUNT_NAME,'
+            'SCHEMA_VERSION',
+        ],
+        'primary_key': ['FILESYSTEM_ID'],
+    },
+    "MDS_DATA": {
+        'columns': [
+            'MDS_ID',
+            'TS_ID',
+            'PCT_CPU',
+            'KBYTES_FREE',
+            'KBYTES_USED',
+            'INODES_FREE',
+            'INODES_USED',
+        ],
+        'primary_key': ['MDS_ID', 'TS_ID'],
+    },
+    "MDS_INFO": {
+        'columns': [
+            'MDS_ID',
+            'FILESYSTEM_ID',
+            'MDS_NAME',
+            'HOSTNAME',
+            'DEVICE_NAME'
+        ],
+        'primary_key': ['MDS_ID'],
+    },
+    "MDS_OPS_DATA": {
+        'columns': [
+            'MDS_ID',
+            'TS_ID',
+            'OPERATION_ID',
+            'SAMPLES',
+            'SUM',
+            'SUMSQUARES',
+        ],
+        'primary_key': ['MDS_ID', 'TS_ID', 'OPERATION_ID'],
+    },
+    "MDS_VARIABLE_INFO": {
+        'columns': [
+            'VARIABLE_ID',
+            'VARIABLE_NAME',
+            'VARIABLE_LABEL',
+            'THRESH_TYPE',
+            'THRESH_VAL1',
+            'THRESH_VAL2'
+        ],
+        'primary_key': ['VARIABLE_ID'],
+    },
+    "OPERATION_INFO": {
+        'columns': [
+            'OPERATION_ID',
+            'OPERATION_NAME',
+            'UNITS'
+        ],
+        'primary_key': ['OPERATION_ID'],
+    },
+    "OSS_DATA": {
+        'columns': [
+            'OSS_ID',
+            'TS_ID',
+            'PCT_CPU',
+            'PCT_MEMORY'
+        ],
+        'primary_key': ['OSS_ID', 'TS_ID'],
+    },
+    "OSS_INFO": {
+        'columns': [
+            'OSS_ID',
+            'FILESYSTEM_ID',
+            'HOSTNAME',
+            'FAILOVERHOST'
+        ],
+        'primary_key': [
+            'OSS_ID',
+            'HOSTNAME'
+        ],
+    },
+    "OST_DATA": {
+        'columns': [
+            'OST_ID',
+            'TS_ID',
+            'READ_BYTES',
+            'WRITE_BYTES',
+            'PCT_CPU',
+            'KBYTES_FREE',
+            'KBYTES_USED',
+            'INODES_FREE',
+            'INODES_USED'
+        ],
+        'primary_key': ['OST_ID', 'TS_ID'],
+    },
+    "OST_INFO": {
+        'columns': [
+            'OST_ID',
+            'OSS_ID',
+            'OST_NAME',
+            'HOSTNAME',
+            'OFFLINE',
+            'DEVICE_NAME'
+        ],
+        'primary_key': ['OST_ID'],
+    },
+    "OST_VARIABLE_INFO": {
+        'columns': [
+            'VARIABLE_ID',
+            'VARIABLE_NAME',
+            'VARIABLE_LABEL',
+            'THRESH_TYPE',
+            'THRESH_VAL1',
+            'THRESH_VAL2'
+        ],
+        'primary_key': ['VARIABLE_ID'],
+    },
+    "TIMESTAMP_INFO": {
+        'columns': ['TS_ID', 'TIMESTAMP'],
+        'primary_key': ['TS_ID'],
+    },
+}
 
 # Find the most recent timestamp for each OST before a given time range.  This
 # is to calculate the first row of diffs for a time range.  There is an
@@ -62,110 +169,104 @@ INNER JOIN OST_INFO on OST_INFO.OST_ID = last_ostids.ostid
 INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
 """
 
-class LmtDb(object):
-    def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None):
-        # Get database parameters 
+class LmtDb(cachingdb.CachingDb):
+    def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
+        # Get database parameters
         if dbhost is None:
-            dbhost = os.environ.get('PYLMT_HOST')
+            dbhost = os.environ.get('PYTOKIO_LMT_HOST')
         if dbuser is None:
-            dbuser = os.environ.get('PYLMT_USER')
+            dbuser = os.environ.get('PYTOKIO_LMT_USER')
         if dbpassword is None:
-            dbpassword = os.environ.get('PYLMT_PASSWORD')
+            dbpassword = os.environ.get('PYTOKIO_LMT_PASSWORD')
         if dbname is None:
-            dbname = os.environ.get('PYLMT_DB')
+            dbname = os.environ.get('PYTOKIO_LMT_DB')
 
-        # Establish db connection
-        self.db = MySQLdb.connect(host=dbhost,
-                                  user=dbuser,
-                                  passwd=dbpassword,
-                                  db=dbname)
+        super(LmtDb, self).__init__(
+            dbhost=dbhost,
+            dbuser=dbuser,
+            dbpassword=dbpassword,
+            dbname=dbname,
+            cache_file=cache_file)
 
         # The list of OST names is an immutable property of a database, so
         # fetch and cache it here
         self.ost_names = []
-        for row in self._query_mysql('SELECT DISTINCT OST_NAME FROM OST_INFO ORDER BY OST_NAME;'):
+        for row in self.query('SELECT DISTINCT OST_NAME FROM OST_INFO ORDER BY OST_NAME;'):
             self.ost_names.append(row[0])
         self.ost_names = tuple(self.ost_names)
 
         # Do the same for OSSes
         self.oss_names = []
-        for row in self._query_mysql('SELECT DISTINCT HOSTNAME FROM OSS_INFO ORDER BY HOSTNAME;'):
+        for row in self.query('SELECT DISTINCT HOSTNAME FROM OSS_INFO ORDER BY HOSTNAME;'):
             self.oss_names.append(row[0])
         self.oss_names = tuple(self.oss_names)
 
         # Do the same for MDSes
         self.mds_names = []
-        for row in self._query_mysql('SELECT DISTINCT MDS_NAME FROM MDS_INFO ORDER BY MDS_NAME;'):
+        for row in self.query('SELECT DISTINCT MDS_NAME FROM MDS_INFO ORDER BY MDS_NAME;'):
             self.mds_names.append(row[0])
         self.mds_names = tuple(self.mds_names)
 
         # Do the same for MDS operations
         self.mds_op_names = []
-        for row in self._query_mysql('SELECT DISTINCT OPERATION_NAME FROM OPERATION_INFO ORDER BY OPERATION_ID;'):
+        for row in self.query('SELECT DISTINCT OPERATION_NAME FROM OPERATION_INFO ORDER BY OPERATION_ID;'):
             self.mds_op_names.append(row[0])
         self.mds_op_names = tuple(self.mds_op_names)
 
-    ### TODO: revisit the following methods and either implement them
-    ### universally or drop them
-    def __enter__(self):
-        return self
-
-    def __die__(self):
-        if self.db:
-            self.db.close()
-            sys.stderr.write('closing DB connection\n')
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.db:
-            self.db.close()
-            sys.stderr.write('closing DB connection\n')
-
-    def close( self ):
-        if self.db:
-            self.db.close()
-            sys.stderr.write('closing DB connection\n')
-
-    #=================================================#
-
-    def get_rw_data(self, t_start, t_stop, timestep):
+    def get_ts_ids(self, datetime_start, datetime_end):
         """
-        Wrapper function for _get_rw_data that breaks a single large query into
+        Given a starting and ending time, return the lowest and highest ts_id
+        values that encompass those dates, inclusive.
+        """
+        # First figure out the timestamp range
+        query_str = "SELECT TS_ID FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
+        query_variables = (
+            datetime_start.strftime("%Y-%m-%d %H:%M:%S"),
+            datetime_end.strftime("%Y-%m-%d %H:%M:%S"))
+
+        result = self.query(query_str=query_str,
+                            query_variables=query_variables)
+        ts_ids = [x[0] for x in result]
+        ### TODO: make sure this works (it's templated down in test_bin_cache_lmtdb.py)
+        return min(ts_ids), max(ts_ids)
+
+    def get_timeseries_data(self, table, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
+        """
+        Wrapper for _get_timeseries_data that breaks a single large query into
         smaller queries over smaller time ranges.  This is an optimization to
         avoid the O(N*M) scaling of the JOINs in the underlying SQL query.
-        
         """
-        _TIME_CHUNK = datetime.timedelta(hours=1)
-        t0 = t_start
+        table_schema = LMTDB_TABLES.get(table.upper())
+        if table_schema is None:
+            raise KeyError("Table '%s' is not valid" % table)
+        format_dict = {
+            'schema': ', '.join(table_schema['columns']),
+            'table': table,
+        }
 
-        buf_r = None
-        buf_w = None
-        while t0 < t_stop:
-            tf = t0 + _TIME_CHUNK
-            if tf > t_stop:
-                tf = t_stop
-            (tmp_r, tmp_w) = self._get_rw_data( t0, tf, timestep )
-            _debug_print( "Retrieved %.2f GiB read, %.2f GiB written" % (
-                 (tmp_r[-1,:].sum() - tmp_r[0,:].sum())/2**30,
-                 (tmp_w[-1,:].sum() - tmp_w[0,:].sum())/2**30))
+        index0 = len(self.saved_results.get(table, {'rows': []})['rows'])
+        chunk_start = datetime_start
+        ts_id_start, ts_id_end = self.get_ts_ids(datetime_start, datetime_end)
+        while chunk_start < datetime_end:
+            chunk_end = chunk_start + timechunk
+            if chunk_end > datetime_end:
+                chunk_end = datetime_end
+            start_stamp = long(time.mktime(chunk_start.timetuple()))
+            end_stamp = long(time.mktime(chunk_end.timetuple()))
+            query_str = """SELECT
+                               %(schema)s
+                           FROM
+                               %(table)s as t
+                           INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = %(table)s.TS_ID
+                           WHERE
+                               TIMESTAMP_INFO.TIMESTAMP >= %%(ps)s
+                               AND TIMESTAMP_INFO.TIMESTAMP < %%(ps)s
+                           """ % format_dict
+            self.query(query_str, (start_stamp, end_stamp), table=table, table_schema=table_schema)
+            chunk_start += timechunk
+# TODO: resume work here
 
-            # First chunk of output
-            if buf_r is None:
-                buf_r = tmp_r
-                buf_w = tmp_w
-            # Subsequent chunks get concatenated
-            else:
-                assert( tmp_r.shape[1] == buf_r.shape[1] )
-                assert( tmp_w.shape[1] == buf_w.shape[1] )
-                print buf_r.shape, tmp_r.shape
-                buf_r = np.concatenate(( buf_r, tmp_r ), axis=0)
-                buf_w = np.concatenate(( buf_w, tmp_w ), axis=0)
-            t0 += _TIME_CHUNK
-
-        _debug_print("Finished because t0(=%s) !< t_stop(=%s)" % (
-                t0.strftime( _DATE_FMT ), 
-                tf.strftime( _DATE_FMT ) ))
-        return (buf_r, buf_w)
-
+        return self.saved_results[table]['rows'][index0:]
 
     def _get_rw_data(self, t_start, t_stop, binning_timestep):
         """
@@ -177,11 +278,9 @@ class LmtDb(object):
 
         Time will be binned appropriately if binning_timestep > lmt_timestep.
         The number of OSTs (the N dimension) is derived from the database.
-        
+
         """
-        _debug_print("Retrieving %s >= t > %s" % (t_start.strftime( _DATE_FMT ),
-                                                   t_stop.strftime( _DATE_FMT )))
-        query_str = _QUERY_OST_DATA % (t_start.strftime( _DATE_FMT ), 
+        query_str = _QUERY_OST_DATA % (t_start.strftime( _DATE_FMT ),
                                         t_stop.strftime( _DATE_FMT ))
         rows = self._query_mysql(query_str)
 
@@ -224,15 +323,14 @@ class LmtDb(object):
                for each of N OSTs
             3. buf_t - a matrix of size (1, N) with the timestamp from which
                each buf_r and buf_w row datum was found
-        
         """
         if lookbehind is None:
             lookbehind = datetime.timedelta(hours=1)
 
         lookbehind_str = "%d %02d:%02d:%02d" % (
             lookbehind.days,
-            lookbehind.seconds / 3600, 
-            lookbehind.seconds % 3600 / 60, 
+            lookbehind.seconds / 3600,
+            lookbehind.seconds % 3600 / 60,
             lookbehind.seconds % 60 )
 
         ost_ct = len(self.ost_names)
@@ -262,9 +360,7 @@ class LmtDb(object):
         cursor = self.db.cursor()
         t0 = time.time()
         cursor.execute(query_str)
-        _debug_print("Executed query in %f sec" % (time.time() - t0 ))
 
         t0 = time.time()
         rows = cursor.fetchall()
-        _debug_print("%d rows fetched in %f sec" % (_MYSQL_FETCHMANY_LIMIT, time.time() - t0))
         return rows
