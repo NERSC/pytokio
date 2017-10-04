@@ -17,6 +17,7 @@ Presently you must specify a whole day's worth of time range manually to get an
 HDF5 file that encompasses a whole day.
 """
 
+import os
 import gzip
 import json
 import time
@@ -55,18 +56,12 @@ def cache_collectdes():
     ### servers.  Alternatively, we can run a separate ElasticSearch query ahead
     ### of time to find out how many BB servers to expect before we start
     ### scrolling through the raw documents.
-    rows, read_dataset = init_datasets(t_start, t_end, num_servers=288)
-    rows, write_dataset = init_datasets(t_start, t_end, num_servers=288)
-
-    ### Hard-coded names for Cori's burst buffer servers.  See above discussion
-    ### about more generic solutions to this.
-    columns = ["bb%d" % x for x in range(1, 289)]
-    column_map = {}
-    for index, bbname in enumerate(columns):
-        column_map[bbname] = index
+    rows, read_dataset = init_datasets(t_start, t_end, num_servers=288) # TODO fix hard-coded 288
+    rows, write_dataset = init_datasets(t_start, t_end, num_servers=288) # TODO: fix hard-coded 288
 
     ### Iterate over every cached page.  In practice this should loop over
     ### scrolled pages coming out of ElasticSearch.
+    column_map = {}
     for input_filename in args.files:
         if input_filename.endswith('.gz'):
             input_file = gzip.open(input_filename, 'r')
@@ -75,10 +70,15 @@ def cache_collectdes():
         page = json.load(input_file)
         update_datasets(page, rows, column_map, read_dataset, write_dataset)
 
-    ### Write out the final HDF5 file after everything is loaded into memory.
-    commit_datasets(args.output, rows, columns, read_dataset, write_dataset)
+    ### Build the list of column names from the retrieved data
+    columns = [None] * len(column_map)
+    for column_name, index in column_map.iteritems():
+        columns[index] = str(column_name) # can't keep it in unicode; numpy doesn't support this
 
-def commit_datasets(hdf5_filename, rows, columns, read_dataset, write_dataset):
+    ### Write out the final HDF5 file after everything is loaded into memory.
+    commit_datasets(args.output, rows, columns, datasets={'/bytes/readrates': read_dataset, '/bytes/writerates': write_dataset})
+
+def commit_datasets(hdf5_filename, rows, columns, datasets):
     """
     Convert numpy arrays, a list of timestamps, and a list of column headers
     into groups and datasets within an HDF5 file.
@@ -87,31 +87,52 @@ def commit_datasets(hdf5_filename, rows, columns, read_dataset, write_dataset):
     hdf5_file = h5py.File(hdf5_filename)
 
     # Create the read rate dataset
-    hdf5_file.create_dataset(name='/bytes/readrate',
-                             shape=read_dataset.shape,
+    for dataset_name, dataset in datasets.iteritems():
+        check_create_dataset(hdf5_file=hdf5_file,
+                             name=dataset_name,
+                             shape=dataset.shape,
                              chunks=True,
                              compression='gzip',
                              dtype='f8')
-    # Populate the read rate dataset and set basic metadata
-    hdf5_file['/bytes/readrate'][:, :] = read_dataset
-    hdf5_file['/bytes/readrate'].attrs['columns'] = columns
 
-    # Create the write rate dataset
-    hdf5_file.create_dataset(name='/bytes/writerate',
-                             shape=write_dataset.shape,
-                             chunks=True,
-                             compression='gzip',
-                             dtype='f8')
-    # Populate the write rate dataset and set basic metadata
-    hdf5_file['/bytes/writerate'][:, :] = write_dataset
-    hdf5_file['/bytes/writerate'].attrs['columns'] = columns
+        ### TODO: sort the columns at this point
+
+        ### TODO: should only update the slice of the hdf5 file that needs to be
+        ###       changed; for example, maybe calculate the min/max row and
+        ###       column touched, then use these as slice indices
+
+        # Populate the read rate dataset and set basic metadata
+        hdf5_file[dataset_name][:, :] = dataset
+        hdf5_file[dataset_name].attrs['columns'] = columns
+        print "Committed %s of shape %s" % (dataset_name, dataset.shape)
 
     # Create the dataset that contains the timestamps which correspond to each
     # row in the read/write datasets
-    hdf5_file.create_dataset(name='/bytes/timestamps',
-                             shape=rows.shape,
-                             dtype='i8')
-    hdf5_file['/bytes/timestamps'][:] = rows
+    dataset_name = os.path.join(os.path.dirname(dataset_name), 'timestamps')
+    check_create_dataset(hdf5_file=hdf5_file,
+                         name=dataset_name,
+                         shape=rows.shape,
+                         dtype='i8')
+    hdf5_file[dataset_name][:] = rows
+    print "Committed %s of shape %s" % (dataset_name, dataset.shape)
+
+def check_create_dataset(hdf5_file, name, shape, dtype, **kwargs):
+    """
+    Create a dataset if it does not exist.  If it does exist and has the correct
+    shape, do nothing.
+    """
+    if name in hdf5_file:
+        if hdf5_file[name].shape != shape:
+            raise Exception('Dataset %s of shape %s already exists with shape %s' %
+                            name,
+                            shape,
+                            hdf5_file[name].shape)
+    else:
+        hdf5_file.create_dataset(name=name,
+                             shape=shape,
+                             dtype=dtype,
+                             **kwargs)
+
 
 def init_datasets(start_time, end_time, num_servers=10000):
     """
@@ -156,7 +177,11 @@ def update_datasets(page, rows, column_map, read_dataset, write_dataset):
         timestamp = datetime.datetime.strptime(source['@timestamp'].split('.')[0],
                                                '%Y-%m-%dT%H:%M:%S')
         t_index = (long(time.mktime(timestamp.timetuple())) - time0) / timestep
-        s_index = column_map[source['hostname']]
+        s_index = column_map.get(source['hostname'])
+        # if this is a new hostname, create a new column for it
+        if s_index is None:
+            s_index = len(column_map)
+            column_map[source['hostname']] = s_index
         read_dataset[t_index, s_index] = source['read']
         write_dataset[t_index, s_index] = source['write']
 
