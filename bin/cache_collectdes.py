@@ -4,6 +4,7 @@ Dump a lot of data out of ElasticSearch using the Python API and native
 scrolling support
 """
 
+import sys
 import copy
 import json
 import gzip
@@ -31,8 +32,8 @@ _QUERY_OST_DATA = {
         "bool": {
             "must": {
                 "query_string": {
-#                   "query": "hostname:bb*",
-#                   "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
+# "query": "hostname:bb*",
+# "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
                     "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
                     "analyze_wildcard": True,
                 },
@@ -69,7 +70,7 @@ def serialize_bundle_json(es_obj):
     """
     output_file = "%s.%08d.json.gz" % (es_obj.index.replace('-*', ''), es_obj.num_flushes)
     t0 = datetime.datetime.now()
-    with gzip.open( filename=output_file, mode='w', compresslevel=1 ) as fp:
+    with gzip.open(filename=output_file, mode='w', compresslevel=1) as fp:
         json.dump(es_obj.scroll_pages, fp)
     print "  Serialization took %.2f seconds" % (datetime.datetime.now() - t0).total_seconds()
     print "  Bundled %d documents into %s" % (len(es_obj.scroll_pages), output_file)
@@ -81,15 +82,36 @@ def serialize_bundle_pickle(es_obj):
     """
     output_file = "%s.%08d.json.gz" % (es_obj.index.replace('-*', ''), es_obj.num_flushes)
     t0 = datetime.datetime.now()
-    with gzip.open( filename=output_file.replace('json', 'pickle'), mode='w', compresslevel=1 ) as fp:
+    with gzip.open(filename=output_file.replace('json', 'pickle'), mode='w', compresslevel=1) as fp:
         pickle.dump(es_obj.scroll_pages, fp, pickle.HIGHEST_PROTOCOL)
     print "  Serialization took %.2f seconds" % (datetime.datetime.now() - t0).total_seconds()
     print "  Bundled %d documents into %s" % (len(es_obj.scroll_pages), output_file)
     es_obj.scroll_pages = []
 
+def build_timeseries_query(orig_query, start, end):
+    """
+    Given a query dict and a start/end datetime object, return a new query
+    object with the correct time ranges bounded.
+    """
+    query = copy.deepcopy(orig_query)
+
+    # Create the appropriate timeseries filter if it doesn't exist
+    this_node = query
+    for node_name in 'query', 'bool', 'filter', 'range', '@timestamp':
+        if node_name not in this_node:
+            this_node[node_name] = {}
+        this_node = this_node[node_name]
+
+    # Update the timeseries filter
+    this_node['gte'] = start.strftime("%s")
+    this_node['lt'] = end.strftime("%s")
+    this_node['format'] = "epoch_second"
+
+    return query
+
 if __name__ == '__main__':
     # Parse CLI options
-    parser = argparse.ArgumentParser( add_help=False)
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('tstart',
                         type=str,
                         help="lower bound of time to scan, in YYYY-mm-dd HH:MM:SS format")
@@ -120,19 +142,8 @@ if __name__ == '__main__':
         sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT)
         raise
 
-    query = copy.deepcopy( _QUERY_OST_DATA )
-
-    # Create the appropriate timeseries filter if it doesn't exist
-    this_node = query
-    for node_name in 'query', 'bool', 'filter', 'range', '@timestamp':
-        if node_name not in this_node:
-            this_node[node_name] = {}
-        this_node = this_node[node_name]
-
-    # Update the timeseries filter
-    this_node['gte'] = t_start.strftime("%s")
-    this_node['lt'] = t_stop.strftime("%s")
-    this_node['format'] = "epoch_second"
+    ### TODO
+    query = build_timeseries_query(_QUERY_OST_DATA, t_start, t_stop)
 
     # Print query
     if args.debug:
