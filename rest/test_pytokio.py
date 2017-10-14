@@ -9,4 +9,4 @@ Test the functionality of the pytokio REST API.
 #
 # Then accessing the API using the test data:
 #
-#   http://localhost:18880/v1/hdf5/scratch2/group/osscpu/1490012544/1490016603
+#   http://localhost:18880/hdf5/scratch2/mdscpu?start=1490012544&end=1490016603

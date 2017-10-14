@@ -1,0 +1,7 @@
+<!doctype html>
+<dl>
+  {% for path, docstr in urls|dictsort(false, 'key') %}
+  <dt><a href="{{ path }}">{{ path }}</a></dt>
+  <dd><pre>{{ docstr.strip() }}</pre></dd>
+  {% endfor %}
+</dl>
