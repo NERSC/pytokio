@@ -179,16 +179,6 @@ def hdf5_index():
     response_json, _ = validate_file_system(None)
     return response_json
 
-# @APP.route('/v1/hdf5/<file_system>/<string:method>/<string:group>/<int:start>/<int:end>', methods=['GET'])
-def base_route(file_system, tool, method, group, start, end):
-    """
-    Provide API into tokio.tools
-    """
-    if tool == 'hdf5':
-        return tokio_tool_hdf5(method, file_system, group, start, end)
-
-    return rest_error(400, "unknown tool '%s'" % tool)
-
 @APP.route('/')
 def index():
     """
