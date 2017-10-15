@@ -18,11 +18,26 @@ import tokio.tools.hdf5
 import tokio.config
 
 APP = flask.Flask(__name__)
-#APP.logger.addHandler(logging.StreamHandler(sys.stdout))
-#APP.logger.setLevel(logging.DEBUG)
 
 DEFAULT_HDF5_DURATION_SECS = 60 * 15 # by default, retrieve data from last 15 minutes
 MAX_HDF5_DURATION = datetime.timedelta(days=1)
+
+def format_output(result):
+    """
+    Create a Flask response object from a return object
+    """
+    APP.logger.debug('accepts json? ' + str(flask.request.accept_mimetypes.accept_json))
+    APP.logger.debug('accepts html? ' + str(flask.request.accept_mimetypes.accept_html))
+    APP.logger.debug('accepts xhtml? ' + str(flask.request.accept_mimetypes.accept_xhtml))
+    APP.logger.debug('accepts: ' + ' '.join([x for x in flask.request.accept_mimetypes.itervalues()]))
+    if flask.request.accept_mimetypes.accept_json:
+        APP.logger.debug("Returning json")
+        return flask.jsonify(result)
+    else: # flask.request.accept_mimetypes.accept_html:
+        APP.logger.debug("Returning html")
+        return flask.render_template(
+            'json.html',
+            return_data=result)
 
 @APP.before_first_request
 def init_logging(level=logging.DEBUG):
@@ -48,7 +63,7 @@ def rest_error(err_code, err_message):
     Populate the response object and return (error json, error object) tuple
     """
     result = {"message": err_message}
-    response = flask.jsonify(result)
+    response = format_output(result)
     response.status_code = err_code
     return response, result
 
@@ -62,7 +77,7 @@ def validate_file_system(file_system):
             response = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
         except AttributeError:
             raise
-        return flask.jsonify(response), response
+        return format_output(response), response
 
     ### Verify that specified file system is valid
     file_name = tokio.config.FSNAME_TO_H5LMT_FILE.get(file_system, None)
@@ -70,7 +85,7 @@ def validate_file_system(file_system):
         return rest_error(400, "Unknown file system")
 
     response = {"file_name": file_name}
-    return flask.jsonify(response), response
+    return format_output(response), response
 
 def validate_hdf5_resource(resource_name):
     """
@@ -79,7 +94,7 @@ def validate_hdf5_resource(resource_name):
     ### Return list of valid file systems
     if resource_name is None:
         response = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.keys()
-        return flask.jsonify(response), response
+        return format_output(response), response
 
     ### Verify that specified file system is valid
     hdf5_resource = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.get(resource_name, None)
@@ -87,7 +102,7 @@ def validate_hdf5_resource(resource_name):
         return rest_error(400, "Unknown HDF5 resource")
 
     response = {"hdf5_resource": hdf5_resource}
-    return flask.jsonify(response), response
+    return format_output(response), response
 
 def tokio_tool_hdf5(file_name, hdf5_resource, start, end):
     """
@@ -107,32 +122,34 @@ def tokio_tool_hdf5(file_name, hdf5_resource, start, end):
 
     try:
         ### TODO: sanitize flask.request.args values
-        orient = flask.request.args.get('orient', 'columns')
-        date_unit = flask.request.args.get('date_unit', 's')
-        return result_df.to_json(orient=orient, date_unit=date_unit)
+        orient = flask.request.args.get('orient')
+        if orient not in ('columns', 'index'):
+            orient = 'columns'
+        ### this is ugly, but the alternative is to to_dict then encode it with
+        ### a custom json.JSONEncoder
+        return format_output(json.loads(result_df.to_json(orient=orient)))
     except ValueError as error:
         return rest_error(400, str(error))
 
 @APP.route('/hdf5/<file_system>/<resource>')
 def hdf5_resource_route(file_system, resource):
     """
-    GET data from a specific resource on a given file system.
+    GET data from a specific resource on a given file system
 
     Options:
        start: return results after this time (UTC seconds since epoch)
        end: return results before this time (UTC seconds since epoch)
        orient: orientation of resulting data (columns or index)
-       date_unit: units of resulting timestamps (s, ms, us, ns)
     """
     response_json, response = validate_file_system(file_system)
     file_name = response.get('file_name')
     if file_name is None:
-        return response_json
+        return format_output(response)
 
     response_json, response = validate_hdf5_resource(resource)
     hdf5_resource = response.get('hdf5_resource')
     if hdf5_resource is None:
-        return response_json
+        return format_output(response)
 
     ### Get start and end time and sanitize input
 
@@ -164,11 +181,11 @@ def file_system_route(file_system):
     response_json, response = validate_file_system(file_system)
     file_name = response.get('file_name')
     if file_name is None:
-        return response_json
+        return format_output(response)
 
     ### Return list of valid resources
     response_json, _ = validate_hdf5_resource(None)
-    return response_json
+    return format_output(response)
 
 @APP.route('/hdf5')
 def hdf5_index():
@@ -176,19 +193,48 @@ def hdf5_index():
     GET file system time series data resources
     """
     ### Return list of valid file systems
-    response_json, _ = validate_file_system(None)
-    return response_json
+    response_json, response = validate_file_system(None)
+    return format_output(response)
 
 @APP.route('/')
-def index():
+def index_to_list():
     """
     GET to generate list of endpoints
     """
-    urls = dict([(r.rule, flask.current_app.view_functions.get(r.endpoint).func_doc)
-                 for r in flask.current_app.url_map.iter_rules()
-                 if not r.rule.startswith('/static')])
-    return flask.render_template('index.html', urls=urls)
+    routes = []
+    for rule in flask.current_app.url_map.iter_rules():
+        route = rule.rule.lstrip('/')
+        if route == '' or route.startswith('static'):
+            continue
+        
+        ### Only display the top-level routes
+        if len(route.split('/')) != 1:
+            continue
 
+        routes.append(route)
+    return format_output(routes)
+
+def index_to_dict():
+    """
+    GET to generate dictionary of endpoints and descriptions
+    """
+    routes = {} 
+    for rule in flask.current_app.url_map.iter_rules():
+        route = rule.rule
+        if route == '/' or route.startswith('/static'):
+            continue
+        
+        ### Only display the top-level routes
+        if len(route.split('/')) != 2:
+            continue
+
+        ### Print first non-empty line of docstring for function
+        for line in flask.current_app.view_functions.get(rule.endpoint).func_doc.splitlines():
+            if line.strip() != "":
+                description = line.strip()
+                break
+        routes[route] = description
+    return format_output(routes)
 
 def launch_rest_api():
     """
