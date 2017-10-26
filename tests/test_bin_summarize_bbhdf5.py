@@ -25,12 +25,10 @@ def test_basic():
     raise NotImplementedError
     subprocess.check_output([BINARY, tokiotest.SAMPLE_H5LMT_FILE])
 
-@nose.SkipTest
 def test_json():
     """
     bin/test_bin_summarize_bbhdf5.py --json
     """
-    raise NotImplementedError
-    output_str = subprocess.check_output([BINARY, '--json', tokiotest.SAMPLE_H5LMT_FILE])
+    output_str = subprocess.check_output([BINARY, '--json', tokiotest.SAMPLE_TOKIOTS_FILE])
     output_json = json.loads(output_str)
     verify_json(output_json)

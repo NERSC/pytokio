@@ -47,6 +47,7 @@ SAMPLE_LMTDB_START = 1506182400
 SAMPLE_LMTDB_END = 1506182430
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
+SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 
 ### The following SLURM_CACHE_* all correspond to SLURM_CACHE_FILE; if you
 ### change one, you must change them all.
