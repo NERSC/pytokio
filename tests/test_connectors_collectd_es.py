@@ -101,8 +101,12 @@ def test_flush_function_correctness():
     if len(es_obj.scroll_pages) > 0:
         flush_function(es_obj)
 
+    # If no pages were found, there is a problem
+    assert len(FLUSH_STATE['pages']) > 0
+
     if not len(FLUSH_STATE['pages']) > 2:
-        raise nose.plugins.skip.SkipTest("time range only got a single page; cannot test flush function")
+        raise nose.plugins.skip.SkipTest("time range only got %d pages; cannot test flush function"
+                                         % len(FLUSH_STATE['pages']))
 
     ############################################################################
     # Accumulate results on the object without a flush function
