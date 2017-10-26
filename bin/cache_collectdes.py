@@ -8,6 +8,7 @@ import sys
 import copy
 import json
 import gzip
+import time
 import datetime
 import argparse
 
@@ -32,14 +33,18 @@ _QUERY_OST_DATA = {
         "bool": {
             "must": {
                 "query_string": {
-# "query": "hostname:bb*",
-# "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
-                    "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
+                    "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
+### doing a catch-all query over large swaths of time (e.g., one hour) seems to
+### lose a lot of information--not sure if there are degenerate document ids or
+### what.  TODO: debug this
+#                   "query": "hostname:bb* AND (plugin:memory OR plugin:disk OR plugin:cpu OR plugin:interface)",
                     "analyze_wildcard": True,
                 },
             },
         },
     },
+# uncomment following to get a field with @timestamp represented as milliseconds since epoch
+#   "docvalue_fields": ["@timestamp"],
 }
 _SOURCE_FIELDS = [
     '@timestamp',
@@ -73,7 +78,7 @@ def serialize_bundle_json(es_obj):
     with gzip.open(filename=output_file, mode='w', compresslevel=1) as fp:
         json.dump(es_obj.scroll_pages, fp)
     print "  Serialization took %.2f seconds" % (datetime.datetime.now() - t0).total_seconds()
-    print "  Bundled %d documents into %s" % (len(es_obj.scroll_pages), output_file)
+    print "  Bundled %d pages into %s" % (len(es_obj.scroll_pages), output_file)
     es_obj.scroll_pages = []
 
 def serialize_bundle_pickle(es_obj):
@@ -103,8 +108,8 @@ def build_timeseries_query(orig_query, start, end):
         this_node = this_node[node_name]
 
     # Update the timeseries filter
-    this_node['gte'] = start.strftime("%s")
-    this_node['lt'] = end.strftime("%s")
+    this_node['gte'] = long(time.mktime(start.timetuple()))
+    this_node['lt'] = long(time.mktime(end.timetuple()))
     this_node['format'] = "epoch_second"
 
     return query
@@ -142,7 +147,6 @@ if __name__ == '__main__':
         sys.stderr.write("Start and end times must be in format %s\n" % _DATE_FMT)
         raise
 
-    ### TODO
     query = build_timeseries_query(_QUERY_OST_DATA, t_start, t_stop)
 
     # Print query

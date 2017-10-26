@@ -25,19 +25,24 @@ import datetime
 import argparse
 import warnings
 
+import dateutil.parser # because of how ElasticSearch returns time data
 import h5py
 import numpy
 
 COLLECTD_TIMESTEP = 10 ### ten second polling interval
+
+EPOCH = dateutil.parser.parse('1970-01-01T00:00:00.000Z')
+
 def cache_collectdes():
     """
     Parse cached json[.gz] files from ElasticSearch and convert them into HDF5
     files.
     """
+    warnings.simplefilter('always', UserWarning) # One warning per invalid file
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")
     parser.add_argument("end", type=str, help="end time in YYYY-MM-DDTHH:MM:SS format")
-    parser.add_argument("files", nargs="+", default=None, type=str,
+    parser.add_argument("file", nargs="+", default=None, type=str,
                         help="collectd elasticsearch outputs to process")
     #parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
     parser.add_argument("-o", "--output", type=str, default='output.hdf5', help="output file")
@@ -62,12 +67,22 @@ def cache_collectdes():
     ### Iterate over every cached page.  In practice this should loop over
     ### scrolled pages coming out of ElasticSearch.
     column_map = {}
-    for input_filename in args.files:
+    progress = 0
+    num_files = len(args.file)
+    for input_filename in args.file:
+        progress += 1
+        print "Processing file %d of %d" % (progress, num_files)
         if input_filename.endswith('.gz'):
             input_file = gzip.open(input_filename, 'r')
         else:
             input_file = open(input_filename, 'r')
-        page = json.load(input_file)
+
+        try:
+            page = json.load(input_file)
+        except ValueError as error:
+            # don't barf on invalid json
+            warnings.warn(str(error))
+            continue
         update_datasets(page, rows, column_map, read_dataset, write_dataset)
 
     ### Build the list of column names from the retrieved data
@@ -154,7 +169,7 @@ def init_datasets(start_time, end_time, num_servers=10000):
 
     return rows, data_dataset
 
-def update_datasets(page, rows, column_map, read_dataset, write_dataset):
+def update_datasets(pages, rows, column_map, read_dataset, write_dataset):
     """
     Go through a list of pages and insert their data into a numpy matrix.  In
     the future this should be a flush function attached to the CollectdEs
@@ -163,27 +178,35 @@ def update_datasets(page, rows, column_map, read_dataset, write_dataset):
     time0 = rows[0] # in seconds since 1/1/1970
     timestep = rows[1] - rows[0] # in seconds
 
-    # basic validity checking
-    if 'hits' not in page or 'hits' not in page['hits']:
-        warnings.warn("No hits in page")
-        return
+    data_volume = [0, 0]
+    for page in pages:
+        for doc in page:
+            # basic validity checking
+            if '_source' not in doc:
+                warnings.warn("No _source in doc %s" % doc['_id'])
+                continue
+            source = doc['_source']
+            # check to see if this is from plugin:disk
+            if source['plugin'] != 'disk' or 'read' not in source:
+                continue
+            timestamp = long((dateutil.parser.parse(source['@timestamp']) - EPOCH).total_seconds())
+            t_index = (timestamp - time0) / timestep
+            s_index = column_map.get(source['hostname'])
+            # if this is a new hostname, create a new column for it
+            if s_index is None:
+                s_index = len(column_map)
+                column_map[source['hostname']] = s_index
+            # bounds checking
+            if t_index >= read_dataset.shape[0] \
+            or t_index >= write_dataset.shape[0]:
+                warnings.warn("Index %d out of bounds (0:%d) for timestamp %s" % (t_index, read_dataset.shape[0], timestamp))
+                continue
+            read_dataset[t_index, s_index] = source['read']
+            write_dataset[t_index, s_index] = source['write']
 
-    for doc in page['hits']['hits']:
-        # basic validity checking
-        if '_source' not in doc:
-            warnings.warn("No _source in doc %s" % doc['_id'])
-            continue
-        source = doc['_source']
-        timestamp = datetime.datetime.strptime(source['@timestamp'].split('.')[0],
-                                               '%Y-%m-%dT%H:%M:%S')
-        t_index = (long(time.mktime(timestamp.timetuple())) - time0) / timestep
-        s_index = column_map.get(source['hostname'])
-        # if this is a new hostname, create a new column for it
-        if s_index is None:
-            s_index = len(column_map)
-            column_map[source['hostname']] = s_index
-        read_dataset[t_index, s_index] = source['read']
-        write_dataset[t_index, s_index] = source['write']
+            data_volume[0] += source['read'] * timestep
+            data_volume[1] += source['write'] * timestep
+        print "Added %d bytes of read, %d bytes of write" % (data_volume[0], data_volume[1])
 
 if __name__ == "__main__":
     cache_collectdes()
