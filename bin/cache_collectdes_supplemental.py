@@ -179,6 +179,7 @@ def update_datasets(pages, rows, column_map, read_dataset, write_dataset):
     timestep = rows[1] - rows[0] # in seconds
 
     data_volume = [0, 0]
+    index_errors = 0
     for page in pages:
         for doc in page:
             # basic validity checking
@@ -199,13 +200,15 @@ def update_datasets(pages, rows, column_map, read_dataset, write_dataset):
             # bounds checking
             if t_index >= read_dataset.shape[0] \
             or t_index >= write_dataset.shape[0]:
-                warnings.warn("Index %d out of bounds (0:%d) for timestamp %s" % (t_index, read_dataset.shape[0], timestamp))
+                index_errors += 1
                 continue
             read_dataset[t_index, s_index] = source['read']
             write_dataset[t_index, s_index] = source['write']
 
             data_volume[0] += source['read'] * timestep
             data_volume[1] += source['write'] * timestep
+        if index_errors > 0:
+            warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
         print "Added %d bytes of read, %d bytes of write" % (data_volume[0], data_volume[1])
 
 if __name__ == "__main__":
