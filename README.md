@@ -9,7 +9,8 @@ Contents
 
 - `bin/` directory contains useful tools implemented on top of pytokio
 - `examples/` contains standalone Jupyter notebooks and scripts that illustrate
-  different aspects of the pytokio API that do useful things
+  different aspects of the pytokio API that do useful things.  They are designed
+  to run on NERSC systems via https://jupyter.nersc.gov/.
 - `tests/` contains unit and integration tests for the pytokio library and
    the scripts bundled in `/bin`
 - `tokio/` is the importable Python package itself
