@@ -473,9 +473,9 @@ def summarize_job():
                         + " (req'd w/ --topology, --concurrentjobs, or if no darshan log provided)")
     parser.add_argument("--jobhost", type=str, default=None,
                         help="host on which job ran (used with --concurrentjobs)")
-    parser.add_argument("--ost-fullness", type=str, default=None,
+    parser.add_argument("--ost-fullness", type=str, default=None, nargs="?",
                         help="path to an ost fullness file (lfs df)")
-    parser.add_argument("--ost-map", type=str, default=None,
+    parser.add_argument("--ost-map", type=str, default=None, nargs="?",
                         help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None,
                         help="darshan logs to process")
