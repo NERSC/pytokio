@@ -10,6 +10,7 @@ from ..config import LMT_TIMESTEP
 
 _NATIVE_VERSION = 1
 
+# TODO - all references to group names hereafter should reference this dict
 V1_GROUPNAME = {
     'readrates': '/OSTReadGroup/OSTBulkReadDataSet',
     'writerates': '/OSTWriteGroup/OSTBulkWriteDataSet',
