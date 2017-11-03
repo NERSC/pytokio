@@ -4,7 +4,7 @@ Test the functionality of the pytokio REST API.
 """
 # Test by hand by first launching the flask app:
 #
-#   PYTOKIO_H5LMT_BASE_DIR=$(greadlink -f ../tests/inputs)/%Y-%m-%d ./pytokio.py
+#   PYTOKIO_H5LMT_BASE_DIR=$(greadlink -f ../tests/inputs)/%Y-%m-%d ./pytokio_rest.py
 #
 # Then accessing the API using the test data:
 #
@@ -18,7 +18,7 @@ import nose
 import tokio
 import tokio.config
 import tokiotest
-import pytokio
+import pytokio_rest
 tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 APP = None
@@ -28,7 +28,7 @@ def setup():
     Wire up the Flask test infrastructure
     """
     global APP
-    APP = pytokio.APP.test_client()
+    APP = pytokio_rest.APP.test_client()
     APP.testing = True
 
 def verify_json_result(result, expected_status=200):
@@ -39,7 +39,7 @@ def verify_json_result(result, expected_status=200):
     assert result.status_code == expected_status
     print result.data
     try:
-        json.loads(result.data)
+        return json.loads(result.data)
     except ValueError:
         raise ValueError("Did not receive valid JSON output")
 
@@ -59,7 +59,10 @@ def test_hdf5_index():
     """
     global APP
     result = APP.get('/hdf5')
-    verify_json_result(result)
+    result_obj = verify_json_result(result)
+    valid_fsnames = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
+    for fsname in result_obj:
+        assert fsname in valid_fsnames
 
 @nose.tools.with_setup(setup)
 def test_file_system_route():
@@ -69,7 +72,12 @@ def test_file_system_route():
     global APP
     for file_system_name in tokio.config.FSNAME_TO_H5LMT_FILE.keys():
         result = APP.get('/hdf5/' + file_system_name + '/')
-        verify_json_result(result)
+        result_obj = verify_json_result(result)
+
+        ### verify that all valid resources are being returned
+        valid_resources = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.keys()
+        for resource in result_obj:
+            assert resource in valid_resources
 
     result = APP.get('/hdf5/' + 'invalid_fs/')
     verify_json_result(result, 400)

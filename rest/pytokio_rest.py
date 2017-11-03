@@ -24,20 +24,19 @@ MAX_HDF5_DURATION = datetime.timedelta(days=1)
 
 def format_output(result):
     """
-    Create a Flask response object from a return object
+    Create a Flask response object from a json-serializable Python result object
     """
     APP.logger.debug('accepts json? ' + str(flask.request.accept_mimetypes.accept_json))
     APP.logger.debug('accepts html? ' + str(flask.request.accept_mimetypes.accept_html))
     APP.logger.debug('accepts xhtml? ' + str(flask.request.accept_mimetypes.accept_xhtml))
     APP.logger.debug('accepts: ' + ' '.join([x for x in flask.request.accept_mimetypes.itervalues()]))
-    if flask.request.accept_mimetypes.accept_json:
+    if flask.request.accept_mimetypes.accept_html:
+        APP.logger.debug("Returning html")
+        return flask.render_template('json.html', return_data=result)
+    else: # flask.request.accept_mimetypes.accept_json:
         APP.logger.debug("Returning json")
         return flask.jsonify(result)
-    else: # flask.request.accept_mimetypes.accept_html:
-        APP.logger.debug("Returning html")
-        return flask.render_template(
-            'json.html',
-            return_data=result)
+
 
 @APP.before_first_request
 def init_logging(level=logging.DEBUG):
@@ -73,10 +72,7 @@ def validate_file_system(file_system):
     """
     ### Return list of valid file systems
     if file_system is None:
-        try:
-            response = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
-        except AttributeError:
-            raise
+        response = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
         return format_output(response), response
 
     ### Verify that specified file system is valid
@@ -180,12 +176,12 @@ def file_system_route(file_system):
     ### Validate file_system
     response_json, response = validate_file_system(file_system)
     file_name = response.get('file_name')
-    if file_name is None:
-        return format_output(response)
 
-    ### Return list of valid resources
-    response_json, _ = validate_hdf5_resource(None)
-    return format_output(response)
+    ### If valid file name given, return list of valid resources
+    if file_name is not None:
+        response_json, _ = validate_hdf5_resource(None)
+
+    return response_json
 
 @APP.route('/hdf5')
 def hdf5_index():
@@ -193,8 +189,8 @@ def hdf5_index():
     GET file system time series data resources
     """
     ### Return list of valid file systems
-    response_json, response = validate_file_system(None)
-    return format_output(response)
+    response_json, _ = validate_file_system(None)
+    return response_json
 
 @APP.route('/')
 def index_to_list():
