@@ -75,7 +75,7 @@ def test_file_system_route():
         result_obj = verify_json_result(result)
 
         ### verify that all valid resources are being returned
-        valid_resources = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.keys()
+        valid_resources = tokio.connectors.hdf5.V1_GROUPNAME.keys()
         for resource in result_obj:
             assert resource in valid_resources
 
@@ -98,7 +98,7 @@ def test_hdf5_resource_route():
     rest_options = "?start=%d&end=%d" % (start_time, end_time)
     file_system_name = tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM
 
-    for group_name in tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME:
+    for group_name in tokio.connectors.hdf5.V1_GROUPNAME:
         route = '/'.join(['', 'hdf5', file_system_name, group_name])
         route += rest_options
         print "Testing", route

@@ -10,7 +10,7 @@ from ..config import LMT_TIMESTEP
 
 _NATIVE_VERSION = 1
 
-CONVERT_TO_V1_GROUPNAME = {
+V1_GROUPNAME = {
     'readrates': '/OSTReadGroup/OSTBulkReadDataSet',
     'writerates': '/OSTWriteGroup/OSTBulkWriteDataSet',
     'osscpu': '/OSSCPUGroup/OSSCPUDataSet',

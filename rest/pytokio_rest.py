@@ -19,7 +19,7 @@ import tokio.config
 
 APP = flask.Flask(__name__)
 
-DEFAULT_HDF5_DURATION_SECS = 60 * 15 # by default, retrieve data from last 15 minutes
+DEFAULT_HDF5_DURATION_SECS = 60 * 15 # by default, retrieve data for 15 minutes (of previous hour)
 MAX_HDF5_DURATION = datetime.timedelta(days=1)
 
 def format_output(result):
@@ -89,11 +89,11 @@ def validate_hdf5_resource(resource_name):
     """
     ### Return list of valid file systems
     if resource_name is None:
-        response = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.keys()
+        response = tokio.connectors.hdf5.V1_GROUPNAME.keys()
         return format_output(response), response
 
     ### Verify that specified file system is valid
-    hdf5_resource = tokio.connectors.hdf5.CONVERT_TO_V1_GROUPNAME.get(resource_name, None)
+    hdf5_resource = tokio.connectors.hdf5.V1_GROUPNAME.get(resource_name, None)
     if hdf5_resource is None:
         return rest_error(400, "Unknown HDF5 resource")
 
@@ -150,7 +150,7 @@ def hdf5_resource_route(file_system, resource):
     ### Get start and end time and sanitize input
 
     try:
-        end_time = long(flask.request.args.get('end', time.time()))
+        end_time = long(flask.request.args.get('end', time.time())) - 3600
         start_time = long(flask.request.args.get('start', end_time - DEFAULT_HDF5_DURATION_SECS))
     except ValueError:
         return rest_error(400, "Non-numeric start/end time")
