@@ -104,3 +104,31 @@ def test_hdf5_resource_route():
         print "Testing", route
         result = APP.get(route)
         verify_json_result(result)
+
+@nose.tools.with_setup(setup)
+def test_hdf5_invalid_opts():
+    """
+    HDF5 invalid inputs
+    """
+    global APP
+
+    start_time = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_START_TIME,
+                                            "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_END_TIME,
+                                          "%Y-%m-%d %H:%M:%S")
+    start_time = long(time.mktime(start_time.timetuple()))
+    end_time = long(time.mktime(end_time.timetuple()))
+    ### note: intentionally reversing start/end time
+    fail_tests = [
+        "?start=%d&end=%d" % (end_time, start_time),
+        "?start=%d&end=%d" % (start_time, end_time + 86400),
+    ]
+    file_system_name = tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM
+
+    for group_name in tokio.connectors.hdf5.V1_GROUPNAME:
+        for rest_options in fail_tests:
+            route = '/'.join(['', 'hdf5', file_system_name, group_name])
+            route += rest_options
+            print "Testing", route
+            result = APP.get(route)
+            verify_json_result(result, 400)
