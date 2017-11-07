@@ -150,7 +150,7 @@ def hdf5_resource_route(file_system, resource):
     ### Get start and end time and sanitize input
 
     try:
-        end_time = long(flask.request.args.get('end', time.time())) - 3600
+        end_time = long(flask.request.args.get('end', time.time() - 3600))
         start_time = long(flask.request.args.get('start', end_time - DEFAULT_HDF5_DURATION_SECS))
     except ValueError:
         return rest_error(400, "Non-numeric start/end time")
@@ -158,11 +158,14 @@ def hdf5_resource_route(file_system, resource):
     datetime_start = datetime.datetime.fromtimestamp(start_time)
     datetime_end = datetime.datetime.fromtimestamp(end_time)
     if datetime_start >= datetime_end:
-        return rest_error(400, "Invalid start/end time range")
+        return rest_error(400, "Invalid start/end time range (%s >= %s)" % (
+            datetime_start,
+            datetime_end))
 
     if (datetime_end - datetime_start) > MAX_HDF5_DURATION:
-        return rest_error(400, "Start/end time cannot exceed %s"
-                          % str(MAX_HDF5_DURATION))
+        return rest_error(400, "Start/end time (%d secs) cannot exceed %s" % (
+            (datetime_end - datetime_start).total_seconds(),
+            str(MAX_HDF5_DURATION)))
 
     APP.logger.debug("Querying %s to %s" % (datetime_start, datetime_end))
 
