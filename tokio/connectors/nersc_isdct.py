@@ -315,7 +315,21 @@ class NerscIsdct(dict):
 
                 ### subtract numeric counters
                 else:
-                    diff_value = value - old_isdct[serial_no][counter]
+                    try:
+                        diff_value = value - old_isdct[serial_no][counter]
+                    except TypeError:
+                        ### endurance_analyzer can be either numeric (common
+                        ### case) or an error string (if the drive is brand
+                        ### new); just drop the counter in the non-numeric
+                        ### case
+                        if counter == 'endurance_analyzer':
+                            continue
+                        error = "incompatible numeric types for %s/%s: [%s] vs [%s]" % (
+                            serial_no,
+                            counter,
+                            old_isdct[serial_no][counter],
+                            value)
+                        raise TypeError(error)
                     if report_zeros or diff_value != 0:
                         diff_dict[counter] = diff_value
 
