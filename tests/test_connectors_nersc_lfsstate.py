@@ -6,8 +6,7 @@ Test the NERSC Lustre health data connector
 import os
 import nose
 import tokiotest
-from tokiotest import SAMPLE_OSTMAP_FILE, SAMPLE_OSTFULLNESS_FILE
-import tokio.connectors.nersc_lfsstate
+import tokio.connectors.nersc_lfsstate as nersc_lfsstate
 
 INPUTS = os.path.join(os.getcwd(), 'inputs')
 
@@ -63,14 +62,28 @@ def test_ostmap_from_cache():
     """
     Read OST map from a cache file
     """
-    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE)
     verify_ost(ostmap, input_type='ostmap')
 
 def test_ostfullness_from_cache():
     """
     Read OST fullness from a cache file
     """
-    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE)
+    verify_ost(ostfullness, input_type='ostfullness')
+
+def test_ostmap_from_cache_gz():
+    """
+    Read OST map from a compressed cache file
+    """
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE_GZ)
+    verify_ost(ostmap, input_type='ostmap')
+
+def test_ostfullness_from_cache_gz():
+    """
+    Read OST fullness from a compressed cache file
+    """
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE_GZ)
     verify_ost(ostfullness, input_type='ostfullness')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -79,12 +92,12 @@ def test_ostmap_serializer():
     OST map can deserialize its serialization
     """
     # Read from a cache file
-    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(SAMPLE_OSTMAP_FILE)
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE)
     # Serialize the object, then re-read it and verify it
     print "Caching to %s" % tokiotest.TEMP_FILE.name
     ostmap.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    ostmap = tokio.connectors.nersc_lfsstate.NerscLfsOstMap(tokiotest.TEMP_FILE.name)
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.TEMP_FILE.name)
     tokiotest.TEMP_FILE.close()
     verify_ost(ostmap, input_type='ostmap')
 
@@ -94,11 +107,11 @@ def test_ostfullness_serializer():
     OST fullness can deserialize its serialization
     """
     # Read from a cache file
-    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(SAMPLE_OSTFULLNESS_FILE)
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE)
     # Serialize the object, then re-read it and verify it
     print "Caching to %s" % tokiotest.TEMP_FILE.name
     ostfullness.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
-    ostfullness = tokio.connectors.nersc_lfsstate.NerscLfsOstFullness(tokiotest.TEMP_FILE.name)
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.TEMP_FILE.name)
     tokiotest.TEMP_FILE.close()
     verify_ost(ostfullness, input_type='ostfullness')
