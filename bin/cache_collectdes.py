@@ -4,6 +4,7 @@ Dump a lot of data out of ElasticSearch using the Python API and native
 scrolling support
 """
 
+import os
 import sys
 import copy
 import json
@@ -120,6 +121,7 @@ class TokioTimeSeries(object):
             timestamp += datetime.timedelta(seconds=timestep)
 
         self.timestamps = numpy.array(time_list)
+        print 'last timestamp is ', self.timestamps[-1]
 
     def init_dataset(self, *args, **kwargs):
         """
@@ -148,7 +150,8 @@ class TokioTimeSeries(object):
         self.dataset_name = dataset.name.split('/')[-1]
         self.dataset = dataset[:, :]
         if 'columns' in dataset.attrs:
-            self.columns = dataset['columns']
+            # convert to a list so we can call .index() on it
+            self.columns = list(dataset.attrs['columns'])
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
             self.columns = [''] * dataset.shape[0]
@@ -175,8 +178,9 @@ class TokioTimeSeries(object):
                                      dtype='i8')
             # Copy the in-memory timestamp dataset into the HDF5 file
             hdf5_file[timestamps_dataset_name][:] = self.timestamps[:]
-            time0 = 0
-            timef = time0 + len(self.timestamps[:])
+            time0_idx = 0
+            timef_idx = time0_idx + len(self.timestamps[:])
+            print 'time*_idx(1) = ', time0_idx, timef_idx
         # Otherwise, verify that our dataset will fit into the existing timestamps
         else:
             existing_time0 = hdf5_file[timestamps_dataset_name][0]
@@ -188,16 +192,18 @@ class TokioTimeSeries(object):
                                 % (timestep, self.timestep))
 
             # Calculate where in the existing data set we need to start
-            starting_offset = (self.time0 - existing_time0) / timestep
-            if starting_offset < 0:
+            time0_idx = (self.time0 - existing_time0) / timestep
+            timef_idx = time0_idx + (self.timef - self.time0) / timestep
+            if time0_idx < 0:
                 raise IndexError("Exiting dataset starts at %d, but we start earlier at %d"
                                  % (existing_time0, self.time0))
-            ending_offset = starting_offset + (self.timef - self.time0) / timestep
-            if ending_offset > hdf5_file[timestamps_dataset_name].shape[0]:
-                raise IndexError("Existing dataset ends at %d, but we end later at %d"
-                                 % (hdf5_file[timestamps_dataset_name][-1], self.timef))
-            time0 = starting_offset
-            timef = ending_offset
+            if timef_idx > hdf5_file[timestamps_dataset_name].shape[0]:
+                raise IndexError("Existing dataset ends at %d (%d), but we end later at %d (%d)"
+                                 % (hdf5_file[timestamps_dataset_name].shape[0],
+                                 hdf5_file[timestamps_dataset_name][-1],
+                                 timef_idx,
+                                 self.timef))
+            print 'timef_idx(2) = ', time0_idx, timef_idx
 
         # Create the dataset in the HDF5 file
         if self.dataset_name not in hdf5_file:
@@ -224,16 +230,16 @@ class TokioTimeSeries(object):
         # Copy the in-memory dataset into the HDF5 file.  Note implicit
         # assumption that dataset is 2d
         try:
-            hdf5_file[self.dataset_name][time0:timef, :] = self.dataset[:, :]
+            hdf5_file[self.dataset_name][time0_idx:timef_idx, :] = self.dataset[:, :]
         except TypeError:
             print "Indices in target file: %d to %d (%s - %s)" % (
-                time0,
-                timef,
-                hdf5_file[timestamps_dataset_name][time0],
-                hdf5_file[timestamps_dataset_name][timef])
+                time0_idx,
+                timef_idx,
+                hdf5_file[timestamps_dataset_name][time0_idx],
+                hdf5_file[timestamps_dataset_name][timef_idx])
             print "Indices in dataset: %d to %d (%s - %s)" % (
                 0,
-                self.dataset.shape[0],
+                len(self.timestamps),
                 self.time0,
                 self.timef)
             raise
@@ -347,10 +353,27 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
-    read_dataset = TokioTimeSeries(t_start, t_end, timestep)
-    read_dataset.init_dataset(dataset_name='/bytes/readrates', columns=['']*num_servers)
-    write_dataset = TokioTimeSeries(t_start, t_end, timestep)
-    write_dataset.init_dataset(dataset_name='/bytes/writerates', columns=['']*num_servers)
+
+    output_hdf5 = h5py.File(output_file)
+
+    group_name = '/bytes'
+    if group_name in output_hdf5:
+        target_group = output_hdf5[group_name]
+    else:
+        target_group = None
+
+    datasets = {}
+    for dataset_name in 'readrates', 'writerates':
+        target_dataset_name = group_name + '/' + dataset_name
+        datasets[dataset_name] = TokioTimeSeries(start=t_start,
+                                                 end=t_end,
+                                                 timestep=timestep,
+                                                 group=target_group)
+        if target_dataset_name in output_hdf5:
+            datasets[dataset_name].attach_dataset(dataset=output_hdf5[target_dataset_name])
+        else:
+            datasets[dataset_name].init_dataset(dataset_name=target_dataset_name,
+                                                columns=['']*num_servers)
 
     # Iterate over every cached page.
     progress = 0
@@ -359,19 +382,18 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
         progress += 1
         if tokio.DEBUG:
             print "Processing page %d of %d" % (progress, num_files)
-        update_mem_datasets(page, read_dataset, write_dataset)
+        update_mem_datasets(page, datasets['readrates'], datasets['writerates'])
 
     # Build the list of column names from the retrieved data.  Note implicit assumption that
     # {read,write}_dataset have the same columns
-    for column_name, index in read_dataset.column_map.iteritems():
+    for column_name, index in datasets['readrates'].column_map.iteritems():
         # can't keep it in unicode; numpy doesn't support this
-        read_dataset.columns[index] = str(column_name)
-        write_dataset.columns[index] = str(column_name)
+        for dataset_name in 'readrates', 'writerates':
+            datasets[dataset_name].columns[index] = str(column_name)
 
-    output_hdf5 = h5py.File(output_file)
     ### Write out the final HDF5 file after everything is loaded into memory.
-    read_dataset.commit_dataset(output_hdf5)
-    write_dataset.commit_dataset(output_hdf5)
+    for dataset_name in 'readrates', 'writerates':
+        datasets[dataset_name].commit_dataset(output_hdf5)
 
 def cache_collectd_cli():
     """
@@ -383,8 +405,8 @@ def cache_collectd_cli():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("query_start", type=str, help="start time of query in %s format" % DATE_FMT)
     parser.add_argument("query_end", type=str, help="end time of query in %s format" % DATE_FMT)
-    parser.add_argument('--init-start', type=str, help='min timestamp if creating new output file, in %s format (default: same as start)' % DATE_FMT)
-    parser.add_argument('--init-end', type=str, help='max timestamp if creating new output file, in %s format (default: same as end)' % DATE_FMT)
+    parser.add_argument('--init-start', type=str, default=None, help='min timestamp if creating new output file, in %s format (default: same as start)' % DATE_FMT)
+    parser.add_argument('--init-end', type=str, default=None, help='max timestamp if creating new output file, in %s format (default: same as end)' % DATE_FMT)
     parser.add_argument('--debug', action='store_true', help="produce debug messages")
     parser.add_argument('--num-bbnodes', type=int, default=288, help='number of expected BB nodes (default: 288)')
     parser.add_argument('--timestep', type=int, default=10, help='collection frequency, in seconds (default: 10)')
