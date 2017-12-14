@@ -4,7 +4,6 @@ Dump a lot of data out of ElasticSearch using the Python API and native
 scrolling support
 """
 
-import os
 import sys
 import copy
 import json
@@ -17,12 +16,9 @@ import dateutil.parser # because of how ElasticSearch returns time data
 import h5py
 import numpy
 
-import tokio.connectors.hdf5
 import tokio.connectors.collectd_es
 
 ### constants pertaining to HDF5 ###############################################
-
-COLLECTD_TIMESTEP = 10 ### anticipated ten second polling interval
 
 EPOCH = dateutil.parser.parse('1970-01-01T00:00:00.000Z')
 
@@ -70,6 +66,180 @@ SOURCE_FIELDS = [
     'io_time',
 ]
 
+class TokioTimeSeries(object):
+    """
+    In-memory representation of an HDF5 group in a TokioFile.  Can either
+    initialize with no datasets, or initialize against an existing HDF5
+    group.
+    """
+    def __init__(self, start=None, end=None, timestep=None, group=None):
+        self.timestamps = None
+        self.time0 = None
+        self.timef = None
+        self.timestep = None
+
+        self.dataset = None
+        self.dataset_name = None
+        self.columns = None
+        self.column_map = {}
+
+        if group is None:
+            self.init_group(start, end, timestep)
+        else:
+            if start is None or end is None or timestep is None:
+                raise Exception("Must specify either ({start,end,timestep}|group)")
+            else:
+                self.attach_group(group)
+
+    def attach_group(self, group):
+        """
+        Attach to an existing h5py Group object
+        """
+        if 'timestamps' not in group:
+            raise Exception("Existing dataset contains no timestamps")
+
+        self.timestamps = group['timestamps'][:]
+        self.time0 = self.timestamps[0]
+        self.timef = self.timestamps[-1]
+        self.timestep = self.timestamps[1] - self.timestamps[0]
+
+    def init_group(self, start, end, timestep):
+        """
+        Initialize the object from scratch
+        """
+        if start is None or end is None or timestep is None:
+            raise Exception("Must specify either ({start,end,timestep}|group)")
+        self.time0 = long(time.mktime(start.timetuple()))
+        self.timef = long(time.mktime(end.timetuple()))
+        self.timestep = timestep
+
+        time_list = []
+        timestamp = start
+        while timestamp < end:
+            time_list.append(long(time.mktime(timestamp.timetuple())))
+            timestamp += datetime.timedelta(seconds=timestep)
+
+        self.timestamps = numpy.array(time_list)
+
+    def init_dataset(self, *args, **kwargs):
+        """
+        Dimension-independent wrapper around init_dataset2d
+        """
+        self.init_dataset2d(*args, **kwargs)
+
+    def attach_dataset(self, *args, **kwargs):
+        """
+        Dimension-independent wrapper around attach_dataset2d
+        """
+        self.attach_dataset2d(*args, **kwargs)
+
+    def init_dataset2d(self, dataset_name, columns, default_value=-0.0):
+        """
+        Initialize the dataset from scratch
+        """
+        self.dataset_name = dataset_name
+        self.columns = columns
+        self.dataset = numpy.full((len(self.timestamps), len(columns)), default_value)
+
+    def attach_dataset2d(self, dataset):
+        """
+        Initialize the dataset from an existing h5py Dataset objectg
+        """
+        self.dataset_name = dataset.name.split('/')[-1]
+        self.dataset = dataset[:, :]
+        if 'columns' in dataset.attrs:
+            self.columns = dataset['columns']
+        else:
+            warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
+            self.columns = [''] * dataset.shape[0]
+
+    def commit_dataset(self, *args, **kwargs):
+        """
+        Dimension-independent wrapper around commit_dataset2d
+        """
+        self.commit_dataset2d(*args, **kwargs)
+
+    def commit_dataset2d(self, hdf5_file):
+        """
+        Write contents of this object into an HDF5 file group
+        """
+        # Create the timestamps dataset
+        #'/'.join(h.split('/')[0:-1])
+        group_name = '/'.join(self.dataset_name.split('/')[0:-1])
+        timestamps_dataset_name = group_name + '/' + 'timestamps'
+
+        # If we are creating a new group, first insert the new timestamps
+        if timestamps_dataset_name not in hdf5_file:
+            hdf5_file.create_dataset(name=timestamps_dataset_name,
+                                     shape=self.timestamps.shape,
+                                     dtype='i8')
+            # Copy the in-memory timestamp dataset into the HDF5 file
+            hdf5_file[timestamps_dataset_name][:] = self.timestamps[:]
+            time0 = 0
+            timef = time0 + len(self.timestamps[:])
+        # Otherwise, verify that our dataset will fit into the existing timestamps
+        else:
+            existing_time0 = hdf5_file[timestamps_dataset_name][0]
+            timestep = hdf5_file[timestamps_dataset_name][1] - existing_time0
+            # if the timestep in memory doesn't match the timestep of the existing
+            # dataset, don't try to guess how to align them--just give up
+            if timestep != self.timestep:
+                raise Exception("Timestep in existing dataset %d does not match %d"
+                                % (timestep, self.timestep))
+
+            # Calculate where in the existing data set we need to start
+            starting_offset = (self.time0 - existing_time0) / timestep
+            if starting_offset < 0:
+                raise IndexError("Exiting dataset starts at %d, but we start earlier at %d"
+                                 % (existing_time0, self.time0))
+            ending_offset = starting_offset + (self.timef - self.time0) / timestep
+            if ending_offset > hdf5_file[timestamps_dataset_name].shape[0]:
+                raise IndexError("Existing dataset ends at %d, but we end later at %d"
+                                 % (hdf5_file[timestamps_dataset_name][-1], self.timef))
+            time0 = starting_offset
+            timef = ending_offset
+
+        # Create the dataset in the HDF5 file
+        if self.dataset_name not in hdf5_file:
+            hdf5_file.create_dataset(name=self.dataset_name,
+                                     shape=self.dataset.shape,
+                                     dtype='f8',
+                                     chunks=True,
+                                     compression='gzip')
+
+        # If we're updating an existing, use its column names.  Otherwise sort
+        # the columns before committing them.
+        if 'columns' in hdf5_file[self.dataset_name].attrs:
+            new_columns = hdf5_file[self.dataset_name].attrs['columns']
+        else:
+            new_columns = sorted(self.columns)
+
+        # Rearrange column data to match what's in the HDF5 file
+        for new_index, column in enumerate(new_columns):
+            moved_column = self.dataset[:, new_index]
+            moved_index = self.columns.index(column)
+            self.dataset[:, new_index] = self.dataset[:, moved_index]
+            self.dataset[:, moved_index] = moved_column
+
+        # Copy the in-memory dataset into the HDF5 file.  Note implicit
+        # assumption that dataset is 2d
+        try:
+            hdf5_file[self.dataset_name][time0:timef, :] = self.dataset[:, :]
+        except TypeError:
+            print "Indices in target file: %d to %d (%s - %s)" % (
+                time0,
+                timef,
+                hdf5_file[timestamps_dataset_name][time0],
+                hdf5_file[timestamps_dataset_name][timef])
+            print "Indices in dataset: %d to %d (%s - %s)" % (
+                0,
+                self.dataset.shape[0],
+                self.time0,
+                self.timef)
+            raise
+        hdf5_file[self.dataset_name].attrs['columns'] = new_columns
+        print "Committed %s of shape %s" % (self.dataset_name, self.dataset.shape)
+
 def build_timeseries_query(orig_query, start, end):
     """
     Given a query dict and a start/end datetime object, return a new query
@@ -91,81 +261,18 @@ def build_timeseries_query(orig_query, start, end):
 
     return query
 
-def commit_mem_datasets(hdf5_filename, rows, columns, datasets):
-    """
-    Convert numpy arrays, a list of timestamps, and a list of column headers
-    into groups and datasets within an HDF5 file.
-    """
-    # Create/open the HDF5 file
-    hdf5_file = h5py.File(hdf5_filename)
-
-    # Create the read rate dataset
-    dataset_name = None
-    for dataset_name, dataset in datasets.iteritems():
-        check_create_hdf5_dataset(hdf5_file=hdf5_file,
-                                  name=dataset_name,
-                                  shape=dataset.shape,
-                                  chunks=True,
-                                  compression='gzip',
-                                  dtype='f8')
-
-        ### If we're updating an existing.  Otherwise sort the columns
-        if 'columns' in hdf5_file[dataset_name].attrs['columns']:
-            new_columns = hdf5_file[dataset_name].attrs['columns']
-        else:
-            new_columns = sorted(columns)
-
-        ### Actually rearrange column data
-        for new_index, column in enumerate(new_columns):
-            moved_column = dataset[:, new_index]
-            moved_index = columns.index(column)
-            dataset[:, new_index] = dataset[:, moved_index]
-            dataset[:, moved_index] = moved_column
-
-        ### TODO: should only update the slice of the hdf5 file that needs to be
-        ###       changed; for example, maybe calculate the min/max row and
-        ###       column touched, then use these as slice indices
-
-        if 'columns' not in hdf5_file[dataset_name].attrs and 'timestamps' not in hdf5_file:
-            raise Exception("Existing HDF5 has dataset %s but no timestamps" % dataset_name)
-
-        ### TODO: resume work here.  right now we are trying to implement
-        ### updating an existing HDF5 file, but the mem_dataset is not
-        ### initialized from an hdf5 file if present so the process of merging a
-        ### mem_dataset into an existing hdf5 dataset that isn't a complete
-        ### superset is complicated.  perhaps just initialize the dataset as a mem
-        ### _or_ take whatever is in the target output file and start with that?
-        raise Exception('this code path is currently incomplete')
-
-        # Populate the read rate dataset and set basic metadata
-        hdf5_file[dataset_name][:, :] = dataset
-        hdf5_file[dataset_name].attrs['columns'] = new_columns
-        print "Committed %s of shape %s" % (dataset_name, dataset.shape)
-
-    # Create the dataset that contains the timestamps which correspond to each
-    # row in the read/write datasets
-    if dataset_name is not None:
-        dataset_name = os.path.join(os.path.dirname(dataset_name), 'timestamps')
-        check_create_hdf5_dataset(hdf5_file=hdf5_file,
-                                  name=dataset_name,
-                                  shape=rows.shape,
-                                  dtype='i8')
-
-        hdf5_file[dataset_name][:] = rows
-        print "Committed %s of shape %s" % (dataset_name, dataset.shape)
-    else:
-        warnings.warn("No data to commit; HDF5 is untouched")
-
-def update_mem_datasets(pages, rows, column_map, read_dataset, write_dataset):
+def update_mem_datasets(pages, read_dataset, write_dataset):
     """
     Go through a list of pages and insert their data into a numpy matrix.  In
     the future this should be a flush function attached to the CollectdEs
     connector class.
     """
-    if len(rows) < 2:
-        raise IndexError("Got %d unique timestamps; need at least 2 to calculate timestep" % len(rows))
-    time0 = rows[0] # in seconds since 1/1/1970
-    timestep = rows[1] - rows[0] # in seconds
+
+    if read_dataset.timestep != write_dataset.timestep:
+        raise Exception("read_dataset and write_dataset have different timesteps: %d != %d"
+                        % (read_dataset.timestep, write_dataset.timestep))
+    else:
+        timestep = read_dataset.timestep
 
     data_volume = [0, 0]
     index_errors = 0
@@ -174,70 +281,40 @@ def update_mem_datasets(pages, rows, column_map, read_dataset, write_dataset):
         if '_source' not in doc:
             warnings.warn("No _source in doc")
             print json.dumps(doc, indent=4)
-            print json.dumps(page, indent=4)
             continue
         source = doc['_source']
+
         # check to see if this is from plugin:disk
         if source['plugin'] != 'disk' or 'read' not in source:
             continue
-        timestamp = long((dateutil.parser.parse(source['@timestamp']) - EPOCH).total_seconds())
-        t_index = (timestamp - time0) / timestep
-        s_index = column_map.get(source['hostname'])
-        # if this is a new hostname, create a new column for it
-        if s_index is None:
-            s_index = len(column_map)
-            column_map[source['hostname']] = s_index
+
         # bounds checking
-        if t_index >= read_dataset.shape[0] \
-        or t_index >= write_dataset.shape[0]:
+        timestamp = long((dateutil.parser.parse(source['@timestamp']) - EPOCH).total_seconds())
+        t_index = (timestamp - read_dataset.time0) / timestep
+        if t_index >= read_dataset.timestamps.shape[0] \
+        or t_index >= write_dataset.timestamps.shape[0]:
             index_errors += 1
             continue
-        read_dataset[t_index, s_index] = source['read']
-        write_dataset[t_index, s_index] = source['write']
 
+        # if this is a new hostname, create a new column for it
+        s_index = read_dataset.column_map.get(source['hostname'])
+        if s_index is None:
+            s_index = len(read_dataset.column_map)
+            read_dataset.column_map[source['hostname']] = s_index
+            write_dataset.column_map[source['hostname']] = s_index
+
+        # actually copy the two data points into the datasets
+        read_dataset.dataset[t_index, s_index] = source['read']
+        write_dataset.dataset[t_index, s_index] = source['write']
+
+        # accumulate the total number of bytes processed so far
         data_volume[0] += source['read'] * timestep
         data_volume[1] += source['write'] * timestep
+
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
+
     print "Added %d bytes of read, %d bytes of write" % (data_volume[0], data_volume[1])
-
-def init_mem_dataset(start_time, end_time, timestep=10, num_columns=10000):
-    """
-    Initialize an numpy array based on a start and end time and return a numpy
-    array and a row of timestamps.  Independent of HDF5 to minimize overhead
-    of randomly accessing a file-backed structure.
-    """
-
-    date_range = (end_time - start_time).total_seconds()
-    num_bins = int(date_range / timestep)
-    data_dataset = numpy.full((num_bins, num_columns), -0.0)
-    time_list = []
-    timestamp = start_time
-    while timestamp < end_time:
-        time_list.append(long(time.mktime(timestamp.timetuple())))
-        timestamp += datetime.timedelta(seconds=timestep)
-    rows = numpy.array(time_list)
-
-    return rows, data_dataset
-
-
-def check_create_hdf5_dataset(hdf5_file, name, shape, dtype, **kwargs):
-    """
-    Create a dataset if it does not exist.  If it does exist and has the correct
-    shape, do nothing.
-    """
-    if name not in hdf5_file:
-        hdf5_file.create_dataset(name=name,
-                                 shape=shape,
-                                 dtype=dtype,
-                                 **kwargs)
-### commenting below to allow update-in-place of hdf5 files
-#   else:
-#       if hdf5_file[name].shape != shape:
-#           raise Exception('Dataset %s of shape %s already exists with shape %s' %
-#                           (name,
-#                           shape,
-#                           hdf5_file[name].shape))
 
 def run_disk_query(host, port, index, t_start, t_end):
     """
@@ -270,40 +347,36 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
-    rows, read_dataset = init_mem_dataset(t_start,
-                                          t_end,
-                                          timestep=timestep,
-                                          num_columns=num_servers)
-    rows, write_dataset = init_mem_dataset(t_start,
-                                           t_end,
-                                           timestep=timestep,
-                                           num_columns=num_servers)
+    read_dataset = TokioTimeSeries(t_start, t_end, timestep)
+    read_dataset.init_dataset(dataset_name='/bytes/readrates', columns=['']*num_servers)
+    write_dataset = TokioTimeSeries(t_start, t_end, timestep)
+    write_dataset.init_dataset(dataset_name='/bytes/writerates', columns=['']*num_servers)
 
-    ### Iterate over every cached page.
-    column_map = {}
+    # Iterate over every cached page.
     progress = 0
     num_files = len(pages)
     for page in pages:
         progress += 1
         if tokio.DEBUG:
             print "Processing page %d of %d" % (progress, num_files)
-        update_mem_datasets(page, rows, column_map, read_dataset, write_dataset)
+        update_mem_datasets(page, read_dataset, write_dataset)
 
-    ### Build the list of column names from the retrieved data
-    columns = [None] * len(column_map)
-    for column_name, index in column_map.iteritems():
-        columns[index] = str(column_name) # can't keep it in unicode; numpy doesn't support this
+    # Build the list of column names from the retrieved data.  Note implicit assumption that
+    # {read,write}_dataset have the same columns
+    for column_name, index in read_dataset.column_map.iteritems():
+        # can't keep it in unicode; numpy doesn't support this
+        read_dataset.columns[index] = str(column_name)
+        write_dataset.columns[index] = str(column_name)
 
+    output_hdf5 = h5py.File(output_file)
     ### Write out the final HDF5 file after everything is loaded into memory.
-    commit_mem_datasets(output_file,
-                        rows,
-                        columns,
-                        datasets={
-                            '/bytes/readrates': read_dataset,
-                            '/bytes/writerates': write_dataset
-                        })
+    read_dataset.commit_dataset(output_hdf5)
+    write_dataset.commit_dataset(output_hdf5)
 
 def cache_collectd_cli():
+    """
+    CLI interface for cache_collectdes
+    """
     warnings.simplefilter('always', UserWarning) # One warning per invalid file
 
     # Parse CLI options
