@@ -180,20 +180,20 @@ class TokioTimeSeries(object):
             hdf5_file[timestamps_dataset_name][:] = self.timestamps[:]
             time0_idx = 0
             timef_idx = time0_idx + len(self.timestamps[:])
-            print 'time*_idx(1) = ', time0_idx, timef_idx
         # Otherwise, verify that our dataset will fit into the existing timestamps
         else:
             existing_time0 = hdf5_file[timestamps_dataset_name][0]
             timestep = hdf5_file[timestamps_dataset_name][1] - existing_time0
-            # if the timestep in memory doesn't match the timestep of the existing
-            # dataset, don't try to guess how to align them--just give up
+
+            # If the timestep in memory doesn't match the timestep of the existing
+            # dataset, just give up (don't try to guess how to align them)
             if timestep != self.timestep:
                 raise Exception("Timestep in existing dataset %d does not match %d"
                                 % (timestep, self.timestep))
 
             # Calculate where in the existing data set we need to start
             time0_idx = (self.time0 - existing_time0) / timestep
-            timef_idx = time0_idx + (self.timef - self.time0) / timestep
+            timef_idx = time0_idx + len(self.dataset[:,0])
             if time0_idx < 0:
                 raise IndexError("Exiting dataset starts at %d, but we start earlier at %d"
                                  % (existing_time0, self.time0))
@@ -203,7 +203,6 @@ class TokioTimeSeries(object):
                                  hdf5_file[timestamps_dataset_name][-1],
                                  timef_idx,
                                  self.timef))
-            print 'timef_idx(2) = ', time0_idx, timef_idx
 
         # Create the dataset in the HDF5 file
         if self.dataset_name not in hdf5_file:
@@ -244,7 +243,7 @@ class TokioTimeSeries(object):
                 self.timef)
             raise
         hdf5_file[self.dataset_name].attrs['columns'] = new_columns
-        print "Committed %s of shape %s" % (self.dataset_name, self.dataset.shape)
+#       print "Committed %s of shape %s" % (self.dataset_name, self.dataset.shape)
 
 def build_timeseries_query(orig_query, start, end):
     """
@@ -421,7 +420,7 @@ def cache_collectd_cli():
     if args.debug:
         tokio.DEBUG = True
 
-    ### Convert CLI options into datetime
+    # Convert CLI options into datetime
     try:
         query_start = datetime.datetime.strptime(args.query_start, DATE_FMT)
         query_end = datetime.datetime.strptime(args.query_end, DATE_FMT)
@@ -435,7 +434,7 @@ def cache_collectd_cli():
         sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT)
         raise
 
-    ### Basic input bounds checking
+    # Basic input bounds checking
     if query_start >= query_end:
         raise Exception('query_start >= query_end')
     elif init_start >= init_end:
@@ -443,6 +442,8 @@ def cache_collectd_cli():
     elif args.timestep < 1:
         raise Exception('--timestep must be > 0')
 
+    # Read input from a cached json file (generated previously via the --json
+    # option) or by querying ElasticSearch?
     if args.input_json is None:
         es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end)
         pages = es_obj.scroll_pages
@@ -455,6 +456,7 @@ def cache_collectd_cli():
         if args.debug:
             print "Loaded results from %s" % args.input_json
 
+    # Output as json or the default HDF5 format?
     if args.json:
         output_file = open(args.output, 'w')
         json.dump(pages, output_file)
