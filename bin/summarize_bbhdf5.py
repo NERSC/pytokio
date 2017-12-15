@@ -12,7 +12,22 @@ import argparse
 import numpy
 import h5py
 
-BYTES_TO_TIBS = 1.0 / 2.0 ** 40.0
+DIVISOR = 1024.0 # or 1000.0 for base-10
+
+def humanize_units(byte_count):
+    units = [ "bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" ]
+    result = byte_count
+    index = 0
+    while index < len(units):
+        new_result = result / DIVISOR
+        if new_result < 1.0:
+            break
+        else:
+            index += 1
+            result = new_result
+
+    return result, units[index]
+        
 
 def missing_data(matrix):
     """
@@ -27,8 +42,8 @@ def missing_data(matrix):
 def summarize_bbhdf5(hdf5_filename):
     hdf5_file = h5py.File(hdf5_filename, 'r')
     timestep = hdf5_file['/bytes/timestamps'][1] - hdf5_file['/bytes/timestamps'][0]
-    read_tibs = hdf5_file['/bytes/readrates'][:,:].sum() * BYTES_TO_TIBS * timestep
-    write_tibs = hdf5_file['/bytes/writerates'][:,:].sum() * BYTES_TO_TIBS * timestep
+    read_bytes = hdf5_file['/bytes/readrates'][:,:].sum() * timestep
+    write_bytes = hdf5_file['/bytes/writerates'][:,:].sum() * timestep
 
     # readrates and writerates come via the same collectd message, so if one is
     # missing, both are missing
@@ -37,8 +52,8 @@ def summarize_bbhdf5(hdf5_filename):
     total = values.shape[0] * values.shape[1]
 
     return {
-        'read_tibs': read_tibs,
-        'write_tibs': write_tibs,
+        'read_bytes': read_bytes,
+        'write_bytes': write_bytes,
         'missing_pts': num_missing,
         'total_pts': total,
         'missing_pct': (100.0 * float(num_missing) / total),
@@ -58,11 +73,11 @@ def _summarize_bbhdf5():
     if args.json:
         print json.dumps(results, indent=4, sort_keys=True)
     else:
-        print "Data Read (TiB):      %.1f" % results['read_tibs']
-        print "Data Written (TiB):   %.1f" % results['write_tibs']
-        print "Missing data points:  %d" % results['missing_pts']
-        print "Expected data points: %d" % results['total_pts']
-        print "Percent data missing: %.1f%%" % results['missing_pct']
+        print "Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])
+        print "Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])
+        print "Missing data points:  %9d" % results['missing_pts']
+        print "Expected data points: %9d" % results['total_pts']
+        print "Percent data missing: %8.1f%%" % results['missing_pct']
 
 if __name__ == '__main__':
     _summarize_bbhdf5()
