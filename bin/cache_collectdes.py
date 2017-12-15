@@ -411,6 +411,7 @@ def cache_collectd_cli():
     parser.add_argument('--num-bbnodes', type=int, default=288, help='number of expected BB nodes (default: 288)')
     parser.add_argument('--timestep', type=int, default=10, help='collection frequency, in seconds (default: 10)')
     parser.add_argument('--json', action='store_true', help="output to json instead of HDF5")
+    parser.add_argument('--input-json', type=str, default=None, help="use cached output from previous ES query")
     parser.add_argument("-o", "--output", type=str, default='output.hdf5', help="output file (default: output.hdf5)")
     parser.add_argument('-h', '--host', type=str, default="localhost", help="hostname of ElasticSearch endpoint (default: localhost)")
     parser.add_argument('-p', '--port', type=int, default=9200, help="port of ElasticSearch endpoint (default: 9200)")
@@ -442,14 +443,24 @@ def cache_collectd_cli():
     elif args.timestep < 1:
         raise Exception('--timestep must be > 0')
 
-    es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end)
+    if args.input_json is None:
+        es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end)
+        pages = es_obj.scroll_pages
+        if args.debug:
+            print "Loaded results from %s:%s" % (args.host, args.port)
+    else:
+        input_file = open(args.input_json, 'r')
+        pages = json.load(input_file)
+        input_file.close()
+        if args.debug:
+            print "Loaded results from %s" % args.input_json
 
     if args.json:
         output_file = open(args.output, 'w')
-        json.dump(es_obj.scroll_pages, output_file)
+        json.dump(pages, output_file)
         output_file.close()
     else:
-        pages_to_hdf5(init_start, init_end, es_obj.scroll_pages, args.timestep, args.num_bbnodes, args.output)
+        pages_to_hdf5(init_start, init_end, pages, args.timestep, args.num_bbnodes, args.output)
 
     if args.debug:
         print "Wrote output to %s" % args.output
