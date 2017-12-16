@@ -22,6 +22,7 @@ import tokio.connectors.collectd_es
 ### constants pertaining to HDF5 ###############################################
 
 EPOCH = dateutil.parser.parse('1970-01-01T00:00:00.000Z')
+TSTAMP_KEY = 'timestamps'
 
 ### constants pertaining to collectd ElasticSearch #############################
 
@@ -96,10 +97,10 @@ class TokioTimeSeries(object):
         """
         Attach to an existing h5py Group object
         """
-        if 'timestamps' not in group:
+        if TSTAMP_KEY not in group:
             raise Exception("Existing dataset contains no timestamps")
 
-        self.timestamps = group['timestamps'][:]
+        self.timestamps = group[TSTAMP_KEY][:]
         self.time0 = self.timestamps[0]
         self.timef = self.timestamps[-1]
         self.timestep = self.timestamps[1] - self.timestamps[0]
@@ -121,7 +122,6 @@ class TokioTimeSeries(object):
             timestamp += datetime.timedelta(seconds=timestep)
 
         self.timestamps = numpy.array(time_list)
-        print 'last timestamp is ', self.timestamps[-1]
 
     def init_dataset(self, *args, **kwargs):
         """
@@ -147,7 +147,7 @@ class TokioTimeSeries(object):
         """
         Initialize the dataset from an existing h5py Dataset objectg
         """
-        self.dataset_name = dataset.name.split('/')[-1]
+        self.dataset_name = dataset.name
         self.dataset = dataset[:, :]
         if 'columns' in dataset.attrs:
             # convert to a list so we can call .index() on it
@@ -167,9 +167,8 @@ class TokioTimeSeries(object):
         Write contents of this object into an HDF5 file group
         """
         # Create the timestamps dataset
-        #'/'.join(h.split('/')[0:-1])
         group_name = '/'.join(self.dataset_name.split('/')[0:-1])
-        timestamps_dataset_name = group_name + '/' + 'timestamps'
+        timestamps_dataset_name = group_name + '/' + TSTAMP_KEY
 
         # If we are creating a new group, first insert the new timestamps
         if timestamps_dataset_name not in hdf5_file:
@@ -178,32 +177,11 @@ class TokioTimeSeries(object):
                                      dtype='i8')
             # Copy the in-memory timestamp dataset into the HDF5 file
             hdf5_file[timestamps_dataset_name][:] = self.timestamps[:]
-            time0_idx = 0
-            timef_idx = time0_idx + len(self.timestamps[:])
         # Otherwise, verify that our dataset will fit into the existing timestamps
         else:
-            existing_time0 = hdf5_file[timestamps_dataset_name][0]
-            timestep = hdf5_file[timestamps_dataset_name][1] - existing_time0
-
-            # If the timestep in memory doesn't match the timestep of the existing
-            # dataset, just give up (don't try to guess how to align them)
-            if timestep != self.timestep:
-                raise Exception("Timestep in existing dataset %d does not match %d"
-                                % (timestep, self.timestep))
-
-            # Calculate where in the existing data set we need to start
-            time0_idx = (self.time0 - existing_time0) / timestep
-            timef_idx = time0_idx + len(self.dataset[:,0])
-            if time0_idx < 0:
-                raise IndexError("Exiting dataset starts at %d, but we start earlier at %d"
-                                 % (existing_time0, self.time0))
-            if timef_idx > hdf5_file[timestamps_dataset_name].shape[0]:
-                raise IndexError("Existing dataset ends at %d (%d), but we end later at %d (%d)"
-                                 % (hdf5_file[timestamps_dataset_name].shape[0],
-                                 hdf5_file[timestamps_dataset_name][-1],
-                                 timef_idx,
-                                 self.timef))
-
+            if not numpy.array_equal(self.timestamps, hdf5_file[timestamps_dataset_name][:]):
+                raise Exception("Attempting to commit to a group with different timestamps")
+  
         # Create the dataset in the HDF5 file
         if self.dataset_name not in hdf5_file:
             hdf5_file.create_dataset(name=self.dataset_name,
@@ -229,7 +207,7 @@ class TokioTimeSeries(object):
         # Copy the in-memory dataset into the HDF5 file.  Note implicit
         # assumption that dataset is 2d
         try:
-            hdf5_file[self.dataset_name][time0_idx:timef_idx, :] = self.dataset[:, :]
+            hdf5_file[self.dataset_name][:, :] = self.dataset[:, :]
         except TypeError:
             print "Indices in target file: %d to %d (%s - %s)" % (
                 time0_idx,
@@ -243,7 +221,6 @@ class TokioTimeSeries(object):
                 self.timef)
             raise
         hdf5_file[self.dataset_name].attrs['columns'] = new_columns
-#       print "Committed %s of shape %s" % (self.dataset_name, self.dataset.shape)
 
 def build_timeseries_query(orig_query, start, end):
     """
@@ -393,6 +370,8 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     ### Write out the final HDF5 file after everything is loaded into memory.
     for dataset_name in 'readrates', 'writerates':
         datasets[dataset_name].commit_dataset(output_hdf5)
+
+    output_hdf5.close()
 
 def cache_collectd_cli():
     """
