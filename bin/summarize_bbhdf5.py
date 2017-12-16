@@ -8,6 +8,7 @@ implemented correctly.
 
 import json
 import math
+import datetime
 import argparse
 import numpy
 import h5py
@@ -27,20 +28,21 @@ def humanize_units(byte_count):
             result = new_result
 
     return result, units[index]
-        
 
-def missing_data(matrix):
+def convert_signed_zeroes(matrix, inverse=False):
     """
     Because we initialize datasets with -0.0, we can scan the sign bit of every
     element of an array to determine how many data were never populated.  This
     converts negative zeros to ones and all other data into zeros then count up
     the number of missing elements in the array.
     """
-    converter = numpy.vectorize(lambda x: 1 if math.copysign(1, x) < 0.0 else 0)
-    return converter(matrix).sum()
+    if inverse:
+        converter = numpy.vectorize(lambda x: 0 if math.copysign(1, x) < 0.0 else 1)
+    else:
+        converter = numpy.vectorize(lambda x: 1 if math.copysign(1, x) < 0.0 else 0)
+    return converter(matrix)
 
-def summarize_bbhdf5(hdf5_filename):
-    hdf5_file = h5py.File(hdf5_filename, 'r')
+def summarize_bbhdf5(hdf5_file):
     timestep = hdf5_file['/bytes/timestamps'][1] - hdf5_file['/bytes/timestamps'][0]
     read_bytes = hdf5_file['/bytes/readrates'][:,:].sum() * timestep
     write_bytes = hdf5_file['/bytes/writerates'][:,:].sum() * timestep
@@ -48,8 +50,18 @@ def summarize_bbhdf5(hdf5_filename):
     # readrates and writerates come via the same collectd message, so if one is
     # missing, both are missing
     values = hdf5_file['/bytes/readrates'][:,:]
-    num_missing = missing_data(values)
+    num_missing = convert_signed_zeroes(values).sum()
     total = values.shape[0] * values.shape[1]
+
+    # find the row offset containing the first and last nonzero data
+    first_time_idx = -1
+    last_time_idx = -1
+    nonzero_rows = convert_signed_zeroes(values, inverse=True).sum(axis=1)
+    for index, value in enumerate(nonzero_rows):
+        if first_time_idx < 0 and value > 0:
+            first_time_idx = index
+        if value > 0:
+            last_time_idx = index
 
     return {
         'read_bytes': read_bytes,
@@ -57,7 +69,21 @@ def summarize_bbhdf5(hdf5_filename):
         'missing_pts': num_missing,
         'total_pts': total,
         'missing_pct': (100.0 * float(num_missing) / total),
+        'first_nonzero_idx': first_time_idx,
+        'last_nonzero_idx': last_time_idx,
     }
+
+def print_timesteps(hdf5_file):
+    """
+    Print a summary of read/write bytes for each time step
+    """
+    timestamps = hdf5_file['/bytes/timestamps'][:]
+    timestep = timestamps[1] - timestamps[0]
+    read_bytes = hdf5_file['/bytes/readrates'][:,:].sum(axis=1) * timestep
+    write_bytes = hdf5_file['/bytes/writerates'][:,:].sum(axis=1) * timestep
+
+    for index, timestamp in enumerate(timestamps):
+        print "%s %12.2f read, %12.2f written" % (datetime.datetime.fromtimestamp(timestamp), read_bytes[index], write_bytes[index])
 
 def _summarize_bbhdf5():
     """
@@ -66,9 +92,14 @@ def _summarize_bbhdf5():
     parser = argparse.ArgumentParser()
     parser.add_argument("file", type=str, help="HDF5 file to summarize")
     parser.add_argument('-j', '--json', action='store_true', help='output as json')
+    parser.add_argument('--timesteps', action='store_true', help='print a summary at each timestep')
     args = parser.parse_args()
 
-    results = summarize_bbhdf5(args.file)
+
+    hdf5_file = h5py.File(args.file, 'r')
+    results = summarize_bbhdf5(hdf5_file)
+    if args.timesteps:
+        print_timesteps(hdf5_file)
 
     if args.json:
         print json.dumps(results, indent=4, sort_keys=True)
@@ -78,6 +109,8 @@ def _summarize_bbhdf5():
         print "Missing data points:  %9d" % results['missing_pts']
         print "Expected data points: %9d" % results['total_pts']
         print "Percent data missing: %8.1f%%" % results['missing_pct']
+        print "First non-empty row:  %9d" % results['first_nonzero_idx']
+        print "Last non-empty row:   %9d" % results['last_nonzero_idx']
 
 if __name__ == '__main__':
     _summarize_bbhdf5()
