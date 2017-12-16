@@ -199,10 +199,13 @@ class TokioTimeSeries(object):
 
         # Rearrange column data to match what's in the HDF5 file
         for new_index, column in enumerate(new_columns):
-            moved_column = self.dataset[:, new_index]
-            moved_index = self.columns.index(column)
-            self.dataset[:, new_index] = self.dataset[:, moved_index]
-            self.dataset[:, moved_index] = moved_column
+            if column in self.columns:
+                moved_column = self.dataset[:, new_index]
+                moved_index = self.columns.index(column)
+                self.dataset[:, new_index] = self.dataset[:, moved_index]
+                self.dataset[:, moved_index] = moved_column
+            else:
+                warnings.warn("Column %s from HDF5 is not represented here" % column)
 
         # Copy the in-memory dataset into the HDF5 file.  Note implicit
         # assumption that dataset is 2d

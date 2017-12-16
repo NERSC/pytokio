@@ -95,7 +95,6 @@ def _summarize_bbhdf5():
     parser.add_argument('--timesteps', action='store_true', help='print a summary at each timestep')
     args = parser.parse_args()
 
-
     hdf5_file = h5py.File(args.file, 'r')
     results = summarize_bbhdf5(hdf5_file)
     if args.timesteps:
