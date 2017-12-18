@@ -18,7 +18,7 @@ QUERY_DISK_BYTES_RW = {
 }
 
 class CollectdEs(object):
-    def __init__(self, host, port, index=None, scroll_size='1m', page_size=10000):
+    def __init__(self, host, port, index=None, scroll_size='1m', page_size=10000, timeout=30):
         # retain state of ElasticSearch client
         self.client = None
         self.page = None
@@ -27,7 +27,7 @@ class CollectdEs(object):
         # connection info
         self.connect_host = host
         self.connect_port = port
-        self.connect_timeout = 30
+        self.connect_timeout = timeout
         # for the scroll API
         self.page_size = page_size
         self.scroll_size = scroll_size
