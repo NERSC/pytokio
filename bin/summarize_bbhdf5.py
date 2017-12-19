@@ -83,7 +83,18 @@ def print_timesteps(hdf5_file):
     write_bytes = hdf5_file['/bytes/writerates'][:,:].sum(axis=1) * timestep
 
     for index, timestamp in enumerate(timestamps):
-        print "%s %12.2f read, %12.2f written" % (datetime.datetime.fromtimestamp(timestamp), read_bytes[index], write_bytes[index])
+        print "%12s %14.2f read, %14.2f written" % (datetime.datetime.fromtimestamp(timestamp), read_bytes[index], write_bytes[index])
+
+def print_columns(hdf5_file):
+    """
+    Print a summary of read/write bytes for each device
+    """
+    timestep = hdf5_file['/bytes/timestamps'][1] - hdf5_file['/bytes/timestamps'][0]
+    for index, column_name in enumerate(list(hdf5_file['/bytes/readrates'].attrs['columns'])):
+        print "%12s %14.2f read, %14.2f written" % (
+            column_name,
+            hdf5_file['/bytes/readrates'][:, index].sum() * timestep,
+            hdf5_file['/bytes/writerates'][:, index].sum() * timestep)
 
 def _summarize_bbhdf5():
     """
@@ -93,12 +104,15 @@ def _summarize_bbhdf5():
     parser.add_argument("file", type=str, help="HDF5 file to summarize")
     parser.add_argument('-j', '--json', action='store_true', help='output as json')
     parser.add_argument('--timesteps', action='store_true', help='print a summary at each timestep')
+    parser.add_argument('--columns', action='store_true', help='print a summary of each column')
     args = parser.parse_args()
 
     hdf5_file = h5py.File(args.file, 'r')
     results = summarize_bbhdf5(hdf5_file)
     if args.timesteps:
         print_timesteps(hdf5_file)
+    if args.columns:
+        print_columns(hdf5_file)
 
     if args.json:
         print json.dumps(results, indent=4, sort_keys=True)
