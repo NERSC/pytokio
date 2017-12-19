@@ -88,13 +88,13 @@ class TokioTimeSeries(object):
         self.columns = None
         self.column_map = {}
 
-        if group is None:
-            self.init_group(start, end, timestep)
+        if group is not None:
+            self.attach_group(group)
         else:
             if start is None or end is None or timestep is None:
                 raise Exception("Must specify either ({start,end,timestep}|group)")
             else:
-                self.attach_group(group)
+                self.init_group(start, end, timestep)
 
     def attach_group(self, group):
         """
@@ -161,7 +161,6 @@ class TokioTimeSeries(object):
         self.dataset_name = dataset.name
         self.dataset = dataset[:, :]
         if 'columns' in dataset.attrs:
-            # convert to a list so we can call .index() on it
             self.columns = list(dataset.attrs['columns'])
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
@@ -235,36 +234,46 @@ class TokioTimeSeries(object):
 
     def rearrange_columns(self, new_order):
         """
-        Rearrange the dataset's columnar data by an arbitrary column order
+        Rearrange the dataset's columnar data by an arbitrary column order given
+        as an enumerable list
         """
-        num_shuffles = 0
-        orig_sum = "%.2f" % self.dataset[:,:].sum()
-        orig_cols = self.columns[:]
-        for new_index, column in enumerate(list(new_order)):
-            if column in self.columns:
-                moved_index = self.columns.index(column)
-                if new_index != moved_index:
-                    moved_column = self.dataset[:, new_index].copy()
-                    self.dataset[:, new_index] = self.dataset[:, moved_index]
-                    self.dataset[:, moved_index] = moved_column
-                    num_shuffles += 1
-            else:
-                warnings.warn("Column '%s' in new column order not present in TokioTimeSeries" % column)
+        # validate the new order - new_order must contain at least all of
+        # the elements in self.columns, but may contain more than that
+        for new_key in new_order:
+            if new_key not in self.columns:
+                raise Exception("key %s in new_order not in columns" % new_key)
 
-        # Rebuild column map based on new column ordering
-        self.columns = new_order
-        self.update_column_map()
+        # walk the new column order
+        for new_index, new_column in enumerate(new_order):
+            # new_order can contain elements that don't exist; this happens when
+            # re-ordering a small dataset to be inserted into an existing,
+            # larger dataset
+            if new_column not in self.columns:
+                warnings.warn("Column '%s' in new column order not present in TokioTimeSeries" % new_column)
+                continue
 
-        # verify correctness (TODO: remove this)
-        new_sum = "%.2f" % self.dataset[:,:].sum()
-        if new_sum != orig_sum:
-            print new_sum, orig_sum
-        assert new_sum == orig_sum
-        for col in orig_cols:
-            if col not in self.columns:
-                print "col %s not in %s" % (col, self.columns)
-            assert col in self.columns
- 
+            old_index = self.column_map[new_column]
+            self.swap_columns(old_index, new_index)
+
+    def swap_columns(self, index1, index2):
+        """
+        Swap two columns of the dataset in-place
+        """
+        # save the data from the column we're about to swap
+        saved_column_data = self.dataset[:, index2].copy()
+        saved_column_name = self.columns[index2]
+
+        # swap column data
+        self.dataset[:, index2] = self.dataset[:, index1]
+        self.dataset[:, index1] = saved_column_data[:] 
+
+        # swap column names too
+        self.columns[index2] = self.columns[index1]
+        self.columns[index1] = saved_column_name
+
+        # update the column map
+        self.column_map[self.columns[index2]] = index2
+        self.column_map[self.columns[index1]] = index1
 
 def sorted_nodenames(nodenames):
     """
