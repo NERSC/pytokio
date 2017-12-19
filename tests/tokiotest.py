@@ -75,13 +75,13 @@ SAMPLE_NERSCISDCT_DIFF_MONOTONICS = [ # counters whose values should be bigger t
 SAMPLE_NERSCISDCT_DIFF_ZEROS = ['physical_size'] # diff should always be numeric zero
 SAMPLE_NERSCISDCT_DIFF_EMPTYSTR = ['model_number'] # diff should always be an empty string
 
-SAMPLE_COLLECTDES_FILE = os.path.join(INPUT_DIR, 'sample_collectdes.json.gz')
-SAMPLE_COLLECTDES_NUMNODES = 16
+SAMPLE_COLLECTDES_FILE = os.path.join(INPUT_DIR, 'sample_collectdes-full.json.gz')
+SAMPLE_COLLECTDES_NUMNODES = 64
 SAMPLE_COLLECTDES_TIMESTEP = 10
 SAMPLE_COLLECTDES_START = '2017-12-13T00:00:00' 
 SAMPLE_COLLECTDES_END = '2017-12-13T01:00:00'
 # SAMPLE_COLLECTDES_FILE2 should be a complete subset of SAMPLE_COLLECTDES_FILE
-SAMPLE_COLLECTDES_FILE2 = os.path.join(INPUT_DIR, 'sample_collectdes-2.json.gz')
+SAMPLE_COLLECTDES_FILE2 = os.path.join(INPUT_DIR, 'sample_collectdes-part.json.gz')
 SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00' 
 SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 

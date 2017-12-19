@@ -5,13 +5,16 @@ scrolling support
 """
 
 import os
+import re
 import sys
 import copy
+import gzip
 import json
 import time
 import datetime
 import argparse
 import warnings
+import mimetypes
 
 import dateutil.parser # because of how ElasticSearch returns time data
 import h5py
@@ -123,6 +126,14 @@ class TokioTimeSeries(object):
 
         self.timestamps = numpy.array(time_list)
 
+    def update_column_map(self):
+        """
+        Create the mapping of column names to column indices
+        """
+        self.column_map = {}
+        for index, column_name in enumerate(self.columns):
+            self.column_map[column_name] = index
+
     def init_dataset(self, *args, **kwargs):
         """
         Dimension-independent wrapper around init_dataset2d
@@ -155,6 +166,7 @@ class TokioTimeSeries(object):
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
             self.columns = [''] * dataset.shape[0]
+        self.update_column_map()
 
     def commit_dataset(self, *args, **kwargs):
         """
@@ -190,23 +202,13 @@ class TokioTimeSeries(object):
                                      chunks=True,
                                      compression='gzip')
 
-        # If we're updating an existing, use its column names.  Otherwise sort
-        # the columns before committing them.
+        # If we're updating an existing HDF5, use its column names and ordering.
+        # Otherwise sort the columns before committing them.
         if 'columns' in hdf5_file[self.dataset_name].attrs:
-            new_columns = hdf5_file[self.dataset_name].attrs['columns']
+            self.rearrange_columns(list(hdf5_file[self.dataset_name].attrs['columns']))
         else:
-            new_columns = sorted(self.columns)
-
-        # Rearrange column data to match what's in the HDF5 file
-        for new_index, column in enumerate(new_columns):
-            if column in self.columns:
-                moved_column = self.dataset[:, new_index]
-                moved_index = self.columns.index(column)
-                self.dataset[:, new_index] = self.dataset[:, moved_index]
-                self.dataset[:, moved_index] = moved_column
-            else:
-                warnings.warn("Column %s from HDF5 is not represented here" % column)
-
+            self.sort_columns()
+    
         # Copy the in-memory dataset into the HDF5 file.  Note implicit
         # assumption that dataset is 2d
         try:
@@ -223,7 +225,76 @@ class TokioTimeSeries(object):
                 self.time0,
                 self.timef)
             raise
-        hdf5_file[self.dataset_name].attrs['columns'] = new_columns
+        hdf5_file[self.dataset_name].attrs['columns'] = self.columns
+
+    def sort_columns(self):
+        """
+        Rearrange the dataset's column data by sorting them by their headings
+        """
+        self.rearrange_columns(sorted_nodenames(self.columns))
+
+    def rearrange_columns(self, new_order):
+        """
+        Rearrange the dataset's columnar data by an arbitrary column order
+        """
+        num_shuffles = 0
+        orig_sum = "%.2f" % self.dataset[:,:].sum()
+        orig_cols = self.columns[:]
+        for new_index, column in enumerate(list(new_order)):
+            if column in self.columns:
+                moved_index = self.columns.index(column)
+                if new_index != moved_index:
+                    moved_column = self.dataset[:, new_index].copy()
+                    self.dataset[:, new_index] = self.dataset[:, moved_index]
+                    self.dataset[:, moved_index] = moved_column
+                    num_shuffles += 1
+            else:
+                warnings.warn("Column '%s' in new column order not present in TokioTimeSeries" % column)
+
+        # Rebuild column map based on new column ordering
+        self.columns = new_order
+        self.update_column_map()
+
+        # verify correctness (TODO: remove this)
+        new_sum = "%.2f" % self.dataset[:,:].sum()
+        if new_sum != orig_sum:
+            print new_sum, orig_sum
+        assert new_sum == orig_sum
+        for col in orig_cols:
+            if col not in self.columns:
+                print "col %s not in %s" % (col, self.columns)
+            assert col in self.columns
+ 
+
+def sorted_nodenames(nodenames):
+    """
+    Gnarly routine to sort nodenames naturally.  Required for nodes named things
+    like 'bb23' and 'bb231'.
+    """
+    def extract_int(string):
+        """
+        Convert input into an int if possible; otherwise return unmodified
+        """
+        try:
+            return int(string)
+        except ValueError:
+            return string
+
+    def natural_compare(string):
+        """
+        Tokenize string into alternating strings/ints if possible
+        """
+        return map(extract_int, re.findall(r'(\d+|\D+)', string))
+
+    def natural_comp(a, b):
+        """
+        Cast the parts of a string that look like integers into integers, then
+        sort based on strings and integers rather than only strings
+        """
+        return cmp(natural_compare(a), natural_compare(b))
+
+    return sorted(nodenames, natural_comp)
+
 
 def build_timeseries_query(orig_query, start, end):
     """
@@ -282,11 +353,12 @@ def update_mem_datasets(pages, read_dataset, write_dataset):
             continue
 
         # if this is a new hostname, create a new column for it
-        s_index = read_dataset.column_map.get(source['hostname'])
+        col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
+        s_index = read_dataset.column_map.get(col_name)
         if s_index is None:
             s_index = len(read_dataset.column_map)
-            read_dataset.column_map[source['hostname']] = s_index
-            write_dataset.column_map[source['hostname']] = s_index
+            read_dataset.column_map[col_name] = s_index
+            write_dataset.column_map[col_name] = s_index
 
         # actually copy the two data points into the datasets
         read_dataset.dataset[t_index, s_index] = source['read']
@@ -432,7 +504,11 @@ def cache_collectd_cli():
         if args.debug:
             print "Loaded results from %s:%s" % (args.host, args.port)
     else:
-        input_file = open(args.input_json, 'r')
+        mime_type, encoding = mimetypes.guess_type(args.input_json)
+        if encoding == 'gzip':
+            input_file = gzip.open(args.input_json, 'r')
+        else:
+            input_file = open(args.input_json, 'r')
         pages = json.load(input_file)
         input_file.close()
         if args.debug:
@@ -440,7 +516,11 @@ def cache_collectd_cli():
 
     # Output as json or the default HDF5 format?
     if args.json:
-        output_file = open(args.output, 'w')
+        mime_type, encoding = mimetypes.guess_type(args.output)
+        if encoding == 'gzip':
+            output_file = gzip.open(args.output, 'w')
+        else:
+            output_file = open(args.output, 'w')
         json.dump(pages, output_file)
         output_file.close()
     else:
