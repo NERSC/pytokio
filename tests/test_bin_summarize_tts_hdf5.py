@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
-Test the bin/summarize_bbhdf5.py tool.  This will eventually be incorporated
-into bin/summarize_h5lmt.py
+Test the bin/summarize_tts_hdf5.py tool.
 """
 
 import os
@@ -10,7 +9,7 @@ import subprocess
 import nose
 import tokiotest
 
-BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_bbhdf5.py')
+BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_tts_hdf5.py')
 
 def verify_json(output):
     """
@@ -20,14 +19,13 @@ def verify_json(output):
 
 def test_basic():
     """
-    bin/test_bin_summarize_bbhdf5.py
+    bin/test_bin_summarize_tts_hdf5.py defaults
     """
-    raise NotImplementedError
-    subprocess.check_output([BINARY, tokiotest.SAMPLE_H5LMT_FILE])
+    subprocess.check_output([BINARY, tokiotest.SAMPLE_TOKIOTS_FILE])
 
 def test_json():
     """
-    bin/test_bin_summarize_bbhdf5.py --json
+    bin/test_bin_summarize_tts_hdf5.py --json
     """
     output_str = subprocess.check_output([BINARY, '--json', tokiotest.SAMPLE_TOKIOTS_FILE])
     output_json = json.loads(output_str)
