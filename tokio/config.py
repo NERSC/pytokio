@@ -32,7 +32,7 @@ for _key, _value in _CONFIG.iteritems():
 
 # Check for magic environment variables to override the contents of the config
 # file at runtime
-for _magic_variable in ['H5LMT_BASE_DIR', 'LFSSTATUS_BASE_DIR']:
+for _magic_variable in ['H5LMT_BASE_DIR', 'LFSSTATUS_BASE_DIR', 'LFSSTATUS_FULLNESS_FILE', 'LFSSTATUS_MAP_FILE']:
     _magic_value = os.environ.get("PYTOKIO_" + _magic_variable)
     if _magic_value is not None:
         setattr(sys.modules[__name__], _magic_variable, _magic_value)
