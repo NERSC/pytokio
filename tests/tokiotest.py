@@ -85,6 +85,9 @@ SAMPLE_COLLECTDES_FILE2 = os.path.join(INPUT_DIR, 'sample_collectdes-part.json.g
 SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00' 
 SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 
+SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
+SAMPLE_COLLECTDES_DSET = '/bytes/readrates'
+
 ### Global state
 SKIP_DARSHAN = None
 TEMP_FILE = None
