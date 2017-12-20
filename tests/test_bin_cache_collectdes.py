@@ -5,9 +5,9 @@ TokioTimeSeries class
 """
 
 import os
-import h5py
 import subprocess
 import nose
+import h5py
 import tokiotest
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'cache_collectdes.py')
@@ -15,7 +15,7 @@ BINARY = os.path.join(tokiotest.BIN_DIR, 'cache_collectdes.py')
 #
 #  TESTING APPEND/UPDATE FUNCTIONALITY
 #
-#  The current test strategy is to 
+#  The current test strategy is to
 #
 #  1. initialize a new HDF5 and pull down a large window
 #  2. pull down a complete subset of that window to this newly minted HDF5
@@ -31,7 +31,7 @@ BINARY = os.path.join(tokiotest.BIN_DIR, 'cache_collectdes.py')
 #                           --timestep 10 \
 #                           2017-12-13T00:00:00 2017-12-13T01:00:00
 # ./bin/summarize_bbhdf5.py output.hdf5
-# ./bin/cache_collectdes.py --debug --input-json output.json 2017-12-13T00:15:00 2017-12-13T00:30:00 
+# ./bin/cache_collectdes.py --debug --input-json output.json 2017-12-13T00:15:00 2017-12-13T00:30:00
 # ./bin/summarize_bbhdf5.py output.hdf5
 #
 # Assert that the two instances of summarize_bbhdf5.py return identical results
