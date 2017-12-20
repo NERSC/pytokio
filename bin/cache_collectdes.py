@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """
 Dump a lot of data out of ElasticSearch using the Python API and native
-scrolling support
+scrolling support.  Output either as native json from ElasticSearch or as
+serialized TOKIO TimeSeries (TTS) HDF5 files.
 """
 
 import sys
