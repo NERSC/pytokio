@@ -35,9 +35,6 @@ QUERY_DISK_DATA = {
             "must": {
                 "query_string": {
                     "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
-                    ### doing a catch-all query over large swaths of time (e.g., one hour) seems to
-                    ### lose a lot of information--not sure if there are degenerate document ids or
-                    ### what.  TODO: debug this
                     "analyze_wildcard": True,
                 },
             },
@@ -164,6 +161,7 @@ def run_disk_query(host, port, index, t_start, t_end):
         index=index)
 
     ### Run query
+    t0 = time.time()
     es_obj.query_and_scroll(
         query=query,
         source_filter=SOURCE_FIELDS,
@@ -171,6 +169,8 @@ def run_disk_query(host, port, index, t_start, t_end):
         flush_every=50000,
         flush_function=lambda x: x,
     )
+    if tokio.DEBUG:
+        print "ElasticSearch query took %s seconds" % (time.time() - t0)
 
     return es_obj
 
@@ -207,24 +207,27 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     # Iterate over every cached page.
     progress = 0
     num_files = len(pages)
+    processing_time = 0.0
     for page in pages:
         progress += 1
-        if tokio.DEBUG:
-            print "Processing page %d of %d" % (progress, num_files)
+        t0 = time.time()
         update_mem_datasets(page, datasets['readrates'], datasets['writerates'])
+        tf = time.time()
+        processing_time += tf - t0
+        if tokio.DEBUG:
+            print "Processed page %d of %d in %s seconds" % (progress, num_files, tf - t0)
 
-    # Build the list of column names from the retrieved data.  Note implicit assumption that
-    # {read,write}_dataset have the same columns
-    for column_name, index in datasets['readrates'].column_map.iteritems():
-        # can't keep it in unicode; numpy doesn't support this
-        for dataset_name in 'readrates', 'writerates':
-            datasets[dataset_name].columns[index] = str(column_name)
+    if tokio.DEBUG:
+        print "Processed %d pages in %s seconds" % (progress, processing_time)
 
     ### Write out the final HDF5 file after everything is loaded into memory.
+    t0 = time.time()
     for dataset_name in 'readrates', 'writerates':
         datasets[dataset_name].commit_dataset(output_hdf5)
 
     output_hdf5.close()
+    if tokio.DEBUG:
+        print "Committed data to disk in %s seconds" % (time.time() - t0)
 
 def cache_collectd_cli():
     """

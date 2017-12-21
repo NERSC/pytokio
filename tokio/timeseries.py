@@ -179,7 +179,7 @@ class TimeSeries(object):
         self.column_map[column_name] = index
         if index >= (self.num_columns + 1):
             raise IndexError("index %d exceeds length of columns %d" % (index, self.num_columns))
-        self.columns.append(column_name)
+        self.columns.append(str(column_name)) # convert from unicode to str for numpy
         self.num_columns += 1
         return index
 
