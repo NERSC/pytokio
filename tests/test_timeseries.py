@@ -3,13 +3,12 @@
 tokio.timeseries.TimeSeries methods
 """
 
-import sys
 import random
 import shutil
 import warnings
 import h5py
 import nose
-import numpy 
+import numpy
 import tokio
 import tokiotest
 
@@ -23,7 +22,8 @@ def compare_timeseries(timeseries1, timeseries2, verbose=False):
             col_sum1 = timeseries1.dataset[:, timeseries1_index].sum()
             col_sum2 = timeseries2.dataset[:, timeseries2_index].sum()
             print "%-14s: %.16e vs. %.16e" % (column, col_sum1, col_sum2)
-        assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index], timeseries2.dataset[:, timeseries2_index])
+        assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index],
+                                 timeseries2.dataset[:, timeseries2_index])
 
 def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
     """
@@ -106,20 +106,16 @@ def test_uneven_columns():
     print len(orig_col_names), "==", dataset.shape[1], "?"
     assert len(orig_col_names) == dataset.shape[1]
 
-    # corrupt the columns of a dataset by adding too many column names
+    # test case where there are more column names than shape of dataset
     extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
     dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = extra_columns
-
-    # load the file with its messed up columns and verify
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
     print len(timeseries.columns), "==", timeseries.dataset.shape[1], "?"
     assert len(timeseries.columns) == timeseries.dataset.shape[1]
 
-    # corrupt the columns of a dataset by deleting some names
+    # test cases where column names are incomplete compared to shape of dataset
     fewer_columns = orig_col_names[0:-(3*len(orig_col_names)/4)]
     dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = fewer_columns
-
-    # load the file with its messed up columns and verify
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
-    print len(timeseries.columns), "==", timeseries.dataset.shape[1], "?"
-    assert len(timeseries.columns) == timeseries.dataset.shape[1]
+    print len(timeseries.columns), "<", timeseries.dataset.shape[1], "?"
+    assert len(timeseries.columns) < timeseries.dataset.shape[1]

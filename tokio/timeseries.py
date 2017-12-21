@@ -28,8 +28,8 @@ class TimeSeries(object):
 
         self.dataset = None
         self.dataset_name = None
-        self.columns = None
-        self.num_columns = None
+        self.columns = []
+        self.num_columns = 0
         self.column_map = {}
         self.timestamp_key = timestamp_key
 
@@ -117,18 +117,11 @@ class TimeSeries(object):
                 warnings.warn(
                     "Dataset has %d column names but %d columns; truncating columns %s"
                     % (num_columns, self.dataset.shape[1], ', '.join(truncated)))
-            # handle case where dataset columns than column names via padding
-            elif num_columns < self.dataset.shape[1]:
-                add_columns = (self.dataset.shape[1] - num_columns)
-                warnings.warn("Dataset has %d column names but %d columns; padding %d columns" 
-                              % (len(columns), self.dataset.shape[1], add_columns))
-                columns += [''] * add_columns
-            self.columns = columns
+            # add columns one by one
+            for column in columns:
+                self.add_column(column)
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
-            self.columns = [''] * dataset.shape[0]
-        self.num_columns = len(self.columns)
-        self.update_column_map()
 
     def commit_dataset(self, *args, **kwargs):
         """
@@ -173,12 +166,6 @@ class TimeSeries(object):
 
         # Copy the in-memory dataset into the HDF5 file
         hdf5_file[self.dataset_name][:, :] = self.dataset[:, :]
-
-        # Pad out the column names to be committed to the HDF5 if necessary -
-        # but don't screw with the TimeSeries.columns/TimeSeries.num_columns
-        # so that we can continue to correctly use TimeSeries.add_column() to
-        # this object
-        column_vector = self.columns + [''] * (self.num_columns - len(self.columns))
         hdf5_file[self.dataset_name].attrs[COLUMN_NAME_KEY] = self.columns
 
     def add_column(self, column_name):
