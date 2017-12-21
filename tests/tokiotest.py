@@ -90,6 +90,26 @@ SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/bytes/readrates'
 
+SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_QUERY = {
+    "query": {
+        "bool": {
+            "must": {
+                "query_string": {
+                    "query": "hostname:bb* AND plugin:disk AND collectd_type:disk_octets AND plugin_instance:nvme*",
+                    "analyze_wildcard": True,
+                },
+            },
+            "filter": {
+                "range": {
+                    "@timestamp": {},
+                },
+            },
+        },
+    },
+}
+
+
 ### Global state
 SKIP_DARSHAN = None
 TEMP_FILE = None
