@@ -110,15 +110,11 @@ def test_bin_cache_collectdes():
     summary0 = summarize_hdf5(h5_file)
     h5_file.close()
 
-    subprocess.call(['cp', tokiotest.TEMP_FILE.name, 'debug1.hdf5'])
-
     update_tts(tokiotest.TEMP_FILE.name)
 
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
     summary1 = summarize_hdf5(h5_file)
     h5_file.close()
-
-    subprocess.call(['cp', tokiotest.TEMP_FILE.name, 'debug2.hdf5'])
 
     num_compared = 0
     for metric in 'sums', 'shapes':
