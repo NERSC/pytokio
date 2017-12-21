@@ -29,17 +29,61 @@ EPOCH = dateutil.parser.parse('1970-01-01T00:00:00.000Z')
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
+### Can express the query as a query, but this is actually slow and potentially inexact
+# QUERY_DISK_DATA = {
+#     "query": {
+#         "bool": {
+#             "must": {
+#                 "query_string": {
+#                     "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
+#                     "analyze_wildcard": True,
+#                 },
+#             },
+#             "filter": {
+#                 "range": {
+#                     "@timestamp": {}
+#                 },
+#             },
+#         },
+#     },
+# }
+
 QUERY_DISK_DATA = {
     "query": {
-        "bool": {
-            "must": {
-                "query_string": {
-                    "query": "hostname:bb* AND plugin:disk AND plugin_instance:nvme* AND collectd_type:disk_octets",
-                    "analyze_wildcard": True,
-                },
-            },
-        },
-    },
+        "constant_score": {
+            "filter": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "@timestamp": {}
+                            }
+                        },
+                        {
+                            "prefix": {
+                                "hostname": "bb"
+                            }
+                        },
+                        {
+                            "prefix": {
+                                "plugin_instance": "nvme"
+                            }
+                        },
+                        {
+                            "term": {
+                                "collectd_type": "disk_octets"
+                            }
+                        },
+                        {
+                            "term": {
+                                "plugin": "disk"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
 }
 
 ### Only return the following _source fields
@@ -69,21 +113,47 @@ SOURCE_FIELDS = [
 def build_timeseries_query(orig_query, start, end):
     """
     Given a query dict and a start/end datetime object, return a new query
-    object with the correct time ranges bounded.
+    object with the correct time ranges bounded.  Relies on orig_query
+    containing at least one @timestamp field to indicate where the time ranges
+    should be inserted.
     """
+    def map_item(obj, target_key, map_function):
+        """
+        Recursively walk a hierarchy of dicts and lists, searching for a
+        matching key.  For each match found, apply map_function to that key's
+        value.
+        """
+        if isinstance(obj, list):
+            iterator = enumerate
+            if target_key in obj:
+                return obj[target_key]
+        elif isinstance(obj, dict):
+            iterator = dict.iteritems
+            if target_key in obj:
+                return obj[target_key]
+        else:
+            # hit a dead end without a match
+            return None
+        # if this isn't a dead end, search down each iterable element
+        for _, value in iterator(obj):
+            if isinstance(value, (list, dict)):
+                # dive down any discovered rabbit holes
+                item = map_item(value, target_key, map_function)
+                if item is not None:
+                    map_function(item)
+        return None
+
+    def set_time_range(time_range_obj, time_format="epoch_second"):
+        """
+        Set the upper and lower bounds of a time range
+        """
+        time_range_obj['gte'] = long(time.mktime(start.timetuple()))
+        time_range_obj['lt'] = long(time.mktime(end.timetuple()))
+        time_range_obj['format'] = time_format
+
     query = copy.deepcopy(orig_query)
 
-    # Create the appropriate timeseries filter if it doesn't exist
-    this_node = query
-    for node_name in 'query', 'bool', 'filter', 'range', '@timestamp':
-        if node_name not in this_node:
-            this_node[node_name] = {}
-        this_node = this_node[node_name]
-
-    # Update the timeseries filter
-    this_node['gte'] = long(time.mktime(start.timetuple()))
-    this_node['lt'] = long(time.mktime(end.timetuple()))
-    this_node['format'] = "epoch_second"
+    map_item(query, '@timestamp', set_time_range)
 
     return query
 
@@ -161,7 +231,7 @@ def run_disk_query(host, port, index, t_start, t_end):
         index=index)
 
     ### Run query
-    t0 = time.time()
+    time0 = time.time()
     es_obj.query_and_scroll(
         query=query,
         source_filter=SOURCE_FIELDS,
@@ -170,7 +240,7 @@ def run_disk_query(host, port, index, t_start, t_end):
         flush_function=lambda x: x,
     )
     if tokio.DEBUG:
-        print "ElasticSearch query took %s seconds" % (time.time() - t0)
+        print "ElasticSearch query took %s seconds" % (time.time() - time0)
 
     return es_obj
 
@@ -210,24 +280,24 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     processing_time = 0.0
     for page in pages:
         progress += 1
-        t0 = time.time()
+        time0 = time.time()
         update_mem_datasets(page, datasets['readrates'], datasets['writerates'])
-        tf = time.time()
-        processing_time += tf - t0
+        timef = time.time()
+        processing_time += timef - time0
         if tokio.DEBUG:
-            print "Processed page %d of %d in %s seconds" % (progress, num_files, tf - t0)
+            print "Processed page %d of %d in %s seconds" % (progress, num_files, timef - time0)
 
     if tokio.DEBUG:
         print "Processed %d pages in %s seconds" % (progress, processing_time)
 
     ### Write out the final HDF5 file after everything is loaded into memory.
-    t0 = time.time()
+    time0 = time.time()
     for dataset_name in 'readrates', 'writerates':
         datasets[dataset_name].commit_dataset(output_hdf5)
 
     output_hdf5.close()
     if tokio.DEBUG:
-        print "Committed data to disk in %s seconds" % (time.time() - t0)
+        print "Committed data to disk in %s seconds" % (time.time() - time0)
 
 def cache_collectd_cli():
     """
