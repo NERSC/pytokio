@@ -4,7 +4,6 @@ Test the ElasticSearch collectd connector.  Some of these tests will essentially
 pass only at NERSC because of the assumptions built into the indices.
 """
 
-import time
 import datetime
 import nose.plugins.skip
 import elasticsearch.exceptions
@@ -52,11 +51,10 @@ def test_flush_function_correctness():
     t_start = t_stop - QUERY_WINDOW
 
     # note that strftime("%s") is not standard POSIX; this may not work
-    tokiotest.SAMPLE_COLLECTDES_QUERY['query']['bool']['filter']['range']['@timestamp'] = {
-        'gte': long(time.mktime(t_start.timetuple())),
-        'lt': long(time.mktime(t_stop.timetuple())),
-        'format': "epoch_second",
-    }
+    query = tokio.connectors.collectd_es.build_timeseries_query(
+        tokiotest.SAMPLE_COLLECTDES_QUERY,
+        t_start,
+        t_stop)
 
     # Connect
     try:
@@ -72,7 +70,7 @@ def test_flush_function_correctness():
     # Accumulate results using a flush_function
     ############################################################################
     es_obj.query_and_scroll(
-        query=tokiotest.SAMPLE_COLLECTDES_QUERY,
+        query=query,
         flush_every=PAGE_SIZE,
         flush_function=flush_function
     )
@@ -90,7 +88,7 @@ def test_flush_function_correctness():
     ############################################################################
     # Accumulate results on the object without a flush function
     ############################################################################
-    es_obj.query_and_scroll(tokiotest.SAMPLE_COLLECTDES_QUERY)
+    es_obj.query_and_scroll(query)
 
     ############################################################################
     # Ensure that both return identical hits

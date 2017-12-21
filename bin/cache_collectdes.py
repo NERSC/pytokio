@@ -6,7 +6,6 @@ serialized TOKIO TimeSeries (TTS) HDF5 files.
 """
 
 import sys
-import copy
 import gzip
 import json
 import time
@@ -110,53 +109,6 @@ SOURCE_FIELDS = [
     'io_time',
 ]
 
-def build_timeseries_query(orig_query, start, end):
-    """
-    Given a query dict and a start/end datetime object, return a new query
-    object with the correct time ranges bounded.  Relies on orig_query
-    containing at least one @timestamp field to indicate where the time ranges
-    should be inserted.
-    """
-    def map_item(obj, target_key, map_function):
-        """
-        Recursively walk a hierarchy of dicts and lists, searching for a
-        matching key.  For each match found, apply map_function to that key's
-        value.
-        """
-        if isinstance(obj, list):
-            iterator = enumerate
-            if target_key in obj:
-                return obj[target_key]
-        elif isinstance(obj, dict):
-            iterator = dict.iteritems
-            if target_key in obj:
-                return obj[target_key]
-        else:
-            # hit a dead end without a match
-            return None
-        # if this isn't a dead end, search down each iterable element
-        for _, value in iterator(obj):
-            if isinstance(value, (list, dict)):
-                # dive down any discovered rabbit holes
-                item = map_item(value, target_key, map_function)
-                if item is not None:
-                    map_function(item)
-        return None
-
-    def set_time_range(time_range_obj, time_format="epoch_second"):
-        """
-        Set the upper and lower bounds of a time range
-        """
-        time_range_obj['gte'] = long(time.mktime(start.timetuple()))
-        time_range_obj['lt'] = long(time.mktime(end.timetuple()))
-        time_range_obj['format'] = time_format
-
-    query = copy.deepcopy(orig_query)
-
-    map_item(query, '@timestamp', set_time_range)
-
-    return query
-
 def update_mem_datasets(pages, read_dataset, write_dataset):
     """
     Go through a list of pages and insert their data into a numpy matrix.  In
@@ -218,7 +170,7 @@ def run_disk_query(host, port, index, t_start, t_end):
     """
     Connect to ElasticSearch and execute a query for all disk data
     """
-    query = build_timeseries_query(QUERY_DISK_DATA, t_start, t_end)
+    query = tokio.connectors.collectd_es.build_timeseries_query(QUERY_DISK_DATA, t_start, t_end)
 
     ### Print query
     if tokio.DEBUG:
@@ -241,6 +193,7 @@ def run_disk_query(host, port, index, t_start, t_end):
     )
     if tokio.DEBUG:
         print "ElasticSearch query took %s seconds" % (time.time() - time0)
+    es_obj.close()
 
     return es_obj
 
