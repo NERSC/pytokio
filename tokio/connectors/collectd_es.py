@@ -8,15 +8,6 @@ import datetime
 import gzip
 from elasticsearch import Elasticsearch
 
-QUERY_DISK_BYTES_RW = {
-    "query": {
-        "query_string": {
-            "query": "hostname:bb* AND plugin:disk AND collectd_type:disk_octets AND plugin_instance:nvme*",
-            "analyze_wildcard": True,
-        },
-    },
-}
-
 class CollectdEs(object):
     def __init__(self, host, port, index=None, scroll_size='1m', page_size=10000, timeout=30):
         # retain state of ElasticSearch client
