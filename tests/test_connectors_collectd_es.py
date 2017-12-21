@@ -1,36 +1,25 @@
 #!/usr/bin/env python
+"""
+Test the ElasticSearch collectd connector.  Some of these tests will essentially
+pass only at NERSC because of the assumptions built into the indices.
+"""
 
+import time
 import datetime
 import nose.plugins.skip
 import elasticsearch.exceptions
 import tokio.connectors.collectd_es
+import tokiotest
 # import logging
 
 ### the ElasticSearch python library can be VERY noisy on failures
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
 ### PAGE_SIZE is number of documents to return per page
-PAGE_SIZE = 200 
+PAGE_SIZE = 200
 
 ### QUERY_WINDOW is how long of a time period to search over
 QUERY_WINDOW = datetime.timedelta(seconds=10)
-
-SAMPLE_INDEX = 'cori-collectd-*'
-
-SAMPLE_QUERY = {
-    "query": {
-        "bool": {
-            "must": {
-                "query_string": tokio.connectors.collectd_es.QUERY_DISK_BYTES_RW['query']['query_string'],
-            },
-            "filter": {
-                "range": {
-                    "@timestamp": {},
-                },
-            },
-        },
-    },
-}
 
 FLUSH_STATE = {
     'pages': []
@@ -51,16 +40,6 @@ def flush_function(es_obj):
     ### empty the page buffer
     es_obj.scroll_pages = []
 
-def to_epoch(dt):
-    """
-    could do strftime("%s") but that is not actually explicitly supported by
-    Python standard and may not work on non-Linux systems
-    """
-    epoch_stamp = long((dt - datetime.datetime(1970, 1, 1)).total_seconds())
-    print epoch_stamp
-    return epoch_stamp
-
-
 def test_flush_function_correctness():
     """
     CollectdEs flush function correctness
@@ -69,13 +48,13 @@ def test_flush_function_correctness():
     # Define start/end time.  Because we don't know what's in the remote server,
     # we can't really make this deterministic; just use a five second window
     # ending now.
-    t_stop = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+    t_stop = datetime.datetime.now() - datetime.timedelta(hours=1)
     t_start = t_stop - QUERY_WINDOW
 
-    # note that strftime("%s") is not standard POSIX; this may not work 
-    SAMPLE_QUERY['query']['bool']['filter']['range']['@timestamp'] = {
-        'gte': to_epoch(t_start),
-        'lt': to_epoch(t_stop),
+    # note that strftime("%s") is not standard POSIX; this may not work
+    tokiotest.SAMPLE_COLLECTDES_QUERY['query']['bool']['filter']['range']['@timestamp'] = {
+        'gte': long(time.mktime(t_start.timetuple())),
+        'lt': long(time.mktime(t_stop.timetuple())),
         'format': "epoch_second",
     }
 
@@ -84,16 +63,16 @@ def test_flush_function_correctness():
         es_obj = tokio.connectors.collectd_es.CollectdEs(
             host='localhost',
             port=9200,
-            index=SAMPLE_INDEX,
+            index=tokiotest.SAMPLE_COLLECTDES_INDEX,
             page_size=PAGE_SIZE)
-    except elasticsearch.exceptions.ConnectionError as e:
-        raise nose.plugins.skip.SkipTest(e)
+    except elasticsearch.exceptions.ConnectionError as error:
+        raise nose.plugins.skip.SkipTest(error)
 
     ############################################################################
     # Accumulate results using a flush_function
     ############################################################################
     es_obj.query_and_scroll(
-        query=SAMPLE_QUERY,
+        query=tokiotest.SAMPLE_COLLECTDES_QUERY,
         flush_every=PAGE_SIZE,
         flush_function=flush_function
     )
@@ -111,26 +90,26 @@ def test_flush_function_correctness():
     ############################################################################
     # Accumulate results on the object without a flush function
     ############################################################################
-    es_obj.query_and_scroll(SAMPLE_QUERY)
+    es_obj.query_and_scroll(tokiotest.SAMPLE_COLLECTDES_QUERY)
 
     ############################################################################
     # Ensure that both return identical hits
     ############################################################################
     flush_function_hits = set([])
     for page in FLUSH_STATE['pages']:
-        flush_function_hits |= set([ x['_id'] for x in page['hits']['hits'] ])
+        flush_function_hits |= set([x['_id'] for x in page['hits']['hits']])
     print "flush_function populated %d documents" % len(flush_function_hits)
 
     no_flush_hits = set([])
     for page in es_obj.scroll_pages:
-        no_flush_hits |= set([ x['_id'] for x in page['hits']['hits'] ])
+        no_flush_hits |= set([x['_id'] for x in page['hits']['hits']])
     print "no flush function populated %d documents" % len(no_flush_hits)
 
     # Ensure that our ground-truth query actually returned something
     assert len(no_flush_hits) > 0
 
     # Catch obviously wrong number of returned results
-    assert len(no_flush_hits) == len(flush_function_hits) 
+    assert len(no_flush_hits) == len(flush_function_hits)
 
     # Catch cases where mismatching results are returned
     assert flush_function_hits == no_flush_hits
