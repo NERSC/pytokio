@@ -10,7 +10,8 @@ import datetime
 import warnings
 import numpy
 
-_TIMESTAMP_KEY = 'timestamps'
+TIMESTAMP_KEY = 'timestamps'
+COLUMN_NAME_KEY = 'columns'
 
 class TimeSeries(object):
     """
@@ -19,7 +20,7 @@ class TimeSeries(object):
     group.
     """
     def __init__(self, start=None, end=None, timestep=None, group=None,
-                 timestamp_key=_TIMESTAMP_KEY):
+                 timestamp_key=TIMESTAMP_KEY):
         self.timestamps = None
         self.time0 = None
         self.timef = None
@@ -28,6 +29,7 @@ class TimeSeries(object):
         self.dataset = None
         self.dataset_name = None
         self.columns = None
+        self.num_columns = None
         self.column_map = {}
         self.timestamp_key = timestamp_key
 
@@ -89,25 +91,43 @@ class TimeSeries(object):
         """
         self.attach_dataset2d(*args, **kwargs)
 
-    def init_dataset2d(self, dataset_name, columns, default_value=-0.0):
+    def init_dataset2d(self, dataset_name, num_columns, default_value=-0.0):
         """
         Initialize the dataset from scratch
         """
         self.dataset_name = dataset_name
-        self.columns = columns
-        self.dataset = numpy.full((len(self.timestamps), len(columns)), default_value)
+        self.columns = []
+        self.num_columns = len(self.columns)
+        self.dataset = numpy.full((len(self.timestamps), num_columns), default_value)
+        self.update_column_map()
 
     def attach_dataset2d(self, dataset):
         """
-        Initialize the dataset from an existing h5py Dataset objectg
+        Initialize the dataset from an existing h5py Dataset object
         """
         self.dataset_name = dataset.name
         self.dataset = dataset[:, :]
-        if 'columns' in dataset.attrs:
-            self.columns = list(dataset.attrs['columns'])
+        if COLUMN_NAME_KEY in dataset.attrs:
+            columns = list(dataset.attrs[COLUMN_NAME_KEY])
+            num_columns = len(columns)
+            # handle case where HDF5 has more column names than dataset columns via truncation
+            if num_columns > self.dataset.shape[1]:
+                columns = columns[0:self.dataset.shape[1]]
+                truncated = columns[self.dataset.shape[1]:]
+                warnings.warn(
+                    "Dataset has %d column names but %d columns; truncating columns %s"
+                    % (num_columns, self.dataset.shape[1], ', '.join(truncated)))
+            # handle case where dataset columns than column names via padding
+            elif num_columns < self.dataset.shape[1]:
+                add_columns = (self.dataset.shape[1] - num_columns)
+                warnings.warn("Dataset has %d column names but %d columns; padding %d columns" 
+                              % (len(columns), self.dataset.shape[1], add_columns))
+                columns += [''] * add_columns
+            self.columns = columns
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
             self.columns = [''] * dataset.shape[0]
+        self.num_columns = len(self.columns)
         self.update_column_map()
 
     def commit_dataset(self, *args, **kwargs):
@@ -146,15 +166,35 @@ class TimeSeries(object):
 
         # If we're updating an existing HDF5, use its column names and ordering.
         # Otherwise sort the columns before committing them.
-        if 'columns' in hdf5_file[self.dataset_name].attrs:
-            self.rearrange_columns(list(hdf5_file[self.dataset_name].attrs['columns']))
+        if COLUMN_NAME_KEY in hdf5_file[self.dataset_name].attrs:
+            self.rearrange_columns(list(hdf5_file[self.dataset_name].attrs[COLUMN_NAME_KEY]))
         else:
             self.sort_columns()
 
-        # Copy the in-memory dataset into the HDF5 file.  Note implicit
-        # assumption that dataset is 2d
+        # Copy the in-memory dataset into the HDF5 file
         hdf5_file[self.dataset_name][:, :] = self.dataset[:, :]
-        hdf5_file[self.dataset_name].attrs['columns'] = self.columns
+
+        # Pad out the column names to be committed to the HDF5 if necessary -
+        # but don't screw with the TimeSeries.columns/TimeSeries.num_columns
+        # so that we can continue to correctly use TimeSeries.add_column() to
+        # this object
+        column_vector = self.columns + [''] * (self.num_columns - len(self.columns))
+        hdf5_file[self.dataset_name].attrs[COLUMN_NAME_KEY] = self.columns
+
+    def add_column(self, column_name):
+        """
+        Add a new column and update the column map
+        """
+        index = self.num_columns
+        if column_name in self.column_map:
+            warnings.warn("Adding degenerate column '%s' at %d (exists at %d)"
+                          % (column_name, index, self.column_map[column_name]))
+        self.column_map[column_name] = index
+        if index >= (self.num_columns + 1):
+            raise IndexError("index %d exceeds length of columns %d" % (index, self.num_columns))
+        self.columns.append(column_name)
+        self.num_columns += 1
+        return index
 
     def sort_columns(self):
         """

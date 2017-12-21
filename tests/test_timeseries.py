@@ -5,6 +5,8 @@ tokio.timeseries.TimeSeries methods
 
 import sys
 import random
+import shutil
+import warnings
 import h5py
 import nose
 import numpy 
@@ -81,3 +83,43 @@ def test_commit_dataset():
 
     # Compare the original to the reprocessed
     compare_timeseries(timeseries2, timeseries1, verbose=True)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_uneven_columns():
+    """
+    TimeSeries.attach_dataset2d with uneven columns
+    """
+
+    # We expect to trigger some warnings here
+    warnings.filterwarnings('ignore')
+
+    tokiotest.TEMP_FILE.close()
+    # copy the input file into a new temporary file with which we can tinker
+    with open(tokiotest.SAMPLE_COLLECTDES_HDF5, 'r') as input_file:
+        with open(tokiotest.TEMP_FILE.name, 'w') as output_file:
+            shutil.copyfileobj(input_file, output_file)
+
+    # ensure that the input dataset has even column lengths before we make them uneven
+    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r+')
+    dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
+    orig_col_names = list(dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY])
+    print len(orig_col_names), "==", dataset.shape[1], "?"
+    assert len(orig_col_names) == dataset.shape[1]
+
+    # corrupt the columns of a dataset by adding too many column names
+    extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
+    dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = extra_columns
+
+    # load the file with its messed up columns and verify
+    timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
+    print len(timeseries.columns), "==", timeseries.dataset.shape[1], "?"
+    assert len(timeseries.columns) == timeseries.dataset.shape[1]
+
+    # corrupt the columns of a dataset by deleting some names
+    fewer_columns = orig_col_names[0:-(3*len(orig_col_names)/4)]
+    dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = fewer_columns
+
+    # load the file with its messed up columns and verify
+    timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
+    print len(timeseries.columns), "==", timeseries.dataset.shape[1], "?"
+    assert len(timeseries.columns) == timeseries.dataset.shape[1]

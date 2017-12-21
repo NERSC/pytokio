@@ -127,15 +127,16 @@ def update_mem_datasets(pages, read_dataset, write_dataset):
 
         # if this is a new hostname, create a new column for it
         col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
-        s_index = read_dataset.column_map.get(col_name)
-        if s_index is None:
-            s_index = len(read_dataset.column_map)
-            read_dataset.column_map[col_name] = s_index
-            write_dataset.column_map[col_name] = s_index
+        r_index = read_dataset.column_map.get(col_name)
+        w_index = write_dataset.column_map.get(col_name)
+        if r_index is None:
+            r_index = read_dataset.add_column(col_name)
+        if w_index is None:
+            w_index = write_dataset.add_column(col_name)
 
         # actually copy the two data points into the datasets
-        read_dataset.dataset[t_index, s_index] = source['read']
-        write_dataset.dataset[t_index, s_index] = source['write']
+        read_dataset.dataset[t_index, r_index] = source['read']
+        write_dataset.dataset[t_index, w_index] = source['write']
 
         # accumulate the total number of bytes processed so far
         data_volume[0] += source['read'] * timestep
@@ -201,7 +202,7 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
             datasets[dataset_name].attach_dataset(dataset=output_hdf5[target_dataset_name])
         else:
             datasets[dataset_name].init_dataset(dataset_name=target_dataset_name,
-                                                columns=['']*num_servers)
+                                                num_columns=num_servers)
 
     # Iterate over every cached page.
     progress = 0
