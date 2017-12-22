@@ -50,7 +50,6 @@ class CollectdEs(object):
         Wrapper to close and invalidate the connection context
         """
         if self.client:
-            self.client.close()
             self.client = None
 
     def query(self, query):
