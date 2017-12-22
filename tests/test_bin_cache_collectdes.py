@@ -6,6 +6,7 @@ TokioTimeSeries class
 
 import os
 import subprocess
+import datetime
 import nose
 import h5py
 import tokiotest
@@ -104,18 +105,20 @@ def test_bin_cache_collectdes():
     bin/cache_collectdes.py
     """
     tokiotest.TEMP_FILE.close()
-    generate_tts(tokiotest.TEMP_FILE.name)
 
+    # initialize a new TimeSeries, populate it, and write it out as HDF5
+    generate_tts(tokiotest.TEMP_FILE.name)
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
     summary0 = summarize_hdf5(h5_file)
     h5_file.close()
 
+    # append an overlapping subset of data to the same HDF5
     update_tts(tokiotest.TEMP_FILE.name)
-
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
     summary1 = summarize_hdf5(h5_file)
     h5_file.close()
 
+    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
     num_compared = 0
     for metric in 'sums', 'shapes':
         for key, value in summary0[metric].iteritems():
@@ -125,3 +128,33 @@ def test_bin_cache_collectdes():
             assert summary1[metric][key] == value
 
     assert num_compared > 0
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_bin_cache_collectdes_oob():
+    """
+    bin/cache_collectdes.py with out-of-bounds
+    """
+    tokiotest.TEMP_FILE.close()
+
+    # Calculate new bounds that are a subset of the actual data that will be returned
+    orig_start_dt = datetime.datetime.strptime(tokiotest.SAMPLE_COLLECTDES_START,
+                                               "%Y-%m-%dT%H:%M:%S")
+    orig_end_dt = datetime.datetime.strptime(tokiotest.SAMPLE_COLLECTDES_END,
+                                             "%Y-%m-%dT%H:%M:%S")
+    orig_delta = orig_end_dt - orig_start_dt
+    new_start_dt = orig_start_dt + orig_delta/3
+    new_end_dt = orig_end_dt - orig_delta/3
+
+    cmd = [BINARY,
+           '--init-start', new_start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+           '--init-end', new_end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+           '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
+           '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
+           '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
+           '--output', tokiotest.TEMP_FILE.name,
+           '--debug',
+           tokiotest.SAMPLE_COLLECTDES_START,
+           tokiotest.SAMPLE_COLLECTDES_END]
+    print "Running [%s]" % ' '.join(cmd)
+    stdout = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    assert 'warning' in stdout
