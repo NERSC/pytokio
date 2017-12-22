@@ -15,6 +15,7 @@ import warnings
 import mimetypes
 
 import dateutil.parser # because of how ElasticSearch returns time data
+import dateutil.tz
 import h5py
 
 import tokio
@@ -22,7 +23,6 @@ import tokio.connectors.collectd_es
 
 ### constants pertaining to HDF5 ###############################################
 
-EPOCH = dateutil.parser.parse('1970-01-01T00:00:00.000Z')
 
 ### constants pertaining to collectd ElasticSearch #############################
 
@@ -109,7 +109,7 @@ SOURCE_FIELDS = [
     'io_time',
 ]
 
-def update_mem_datasets(pages, read_dataset, write_dataset):
+def update_bytes(pages, read_dataset, write_dataset):
     """
     Go through a list of pages and insert their data into a numpy matrix.  In
     the future this should be a flush function attached to the CollectdEs
@@ -119,8 +119,6 @@ def update_mem_datasets(pages, read_dataset, write_dataset):
     if read_dataset.timestep != write_dataset.timestep:
         raise Exception("read_dataset and write_dataset have different timesteps: %d != %d"
                         % (read_dataset.timestep, write_dataset.timestep))
-    else:
-        timestep = read_dataset.timestep
 
     data_volume = [0, 0]
     index_errors = 0
@@ -136,30 +134,27 @@ def update_mem_datasets(pages, read_dataset, write_dataset):
         if source['plugin'] != 'disk' or 'read' not in source:
             continue
 
-        # bounds checking
-        timestamp = long((dateutil.parser.parse(source['@timestamp']) - EPOCH).total_seconds())
-        t_index = (timestamp - read_dataset.time0) / timestep
-        if t_index >= read_dataset.timestamps.shape[0] \
-        or t_index >= write_dataset.timestamps.shape[0]:
-            index_errors += 1
-            continue
-
-        # if this is a new hostname, create a new column for it
+        # We jump through these hoops because most of TOKIO uses tz-unaware
+        # local datetimes and we don't want to inject a bunch of dateutil
+        # dependencies elsewhere
+        # timezone-aware string
+        # `-> tz-aware utc datetime
+        #     `-> local datetime
+        #         `-> tz-unaware local datetime
+        timestamp = dateutil.parser.parse(source['@timestamp'])\
+                                          .astimezone(dateutil.tz.tzlocal())\
+                                          .replace(tzinfo=None)
         col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
-        r_index = read_dataset.column_map.get(col_name)
-        w_index = write_dataset.column_map.get(col_name)
-        if r_index is None:
-            r_index = read_dataset.add_column(col_name)
-        if w_index is None:
-            w_index = write_dataset.add_column(col_name)
+        read_ok = read_dataset.insert_element(timestamp, col_name, source['read'])
+        write_ok = write_dataset.insert_element(timestamp, col_name, source['write'])
 
-        # actually copy the two data points into the datasets
-        read_dataset.dataset[t_index, r_index] = source['read']
-        write_dataset.dataset[t_index, w_index] = source['write']
+        data_volume[0] += source['read']
+        data_volume[1] += source['write']
 
-        # accumulate the total number of bytes processed so far
-        data_volume[0] += source['read'] * timestep
-        data_volume[1] += source['write'] * timestep
+        if not read_ok:
+            index_errors += 1
+        if not write_ok:
+            index_errors += 1
 
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
@@ -193,7 +188,6 @@ def run_disk_query(host, port, index, t_start, t_end):
     )
     if tokio.DEBUG:
         print "ElasticSearch query took %s seconds" % (time.time() - time0)
-    es_obj.close()
 
     return es_obj
 
@@ -234,7 +228,7 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
     for page in pages:
         progress += 1
         time0 = time.time()
-        update_mem_datasets(page, datasets['readrates'], datasets['writerates'])
+        update_bytes(page, datasets['readrates'], datasets['writerates'])
         timef = time.time()
         processing_time += timef - time0
         if tokio.DEBUG:

@@ -5,6 +5,7 @@ representation of time series data.
 """
 
 import re
+import math
 import time
 import datetime
 import warnings
@@ -231,6 +232,48 @@ class TimeSeries(object):
         # update the column map
         self.column_map[self.columns[index2]] = index2
         self.column_map[self.columns[index1]] = index1
+
+    def insert_element(self, timestamp, column_name, value, reducer=None):
+        """
+        Given a timestamp (datetime.datetime object) and a column name (string),
+        update an element of the dataset.  If a reducer function is provided,
+        use that function to reconcile any existing values in the element to be
+        updated.
+        """
+        # calculate the timeseries index and check bounds
+        timestamp_epoch = long(time.mktime(timestamp.timetuple()))
+        t_index = (timestamp_epoch - self.time0) / self.timestep
+        if t_index >= self.timestamps.shape[0]:
+            return False
+
+        # if this is a new hostname, create a new column for it
+        c_index = self.column_map.get(column_name)
+        if c_index is None:
+            c_index = self.add_column(column_name)
+
+        # actually copy the two data points into the datasets
+        old_value = self.dataset[t_index, c_index]
+        if self.dataset[t_index, c_index] == 0.0 \
+        and math.copysign(1, old_value) < 0.0 \
+        and reducer is not None:
+            self.dataset[t_index, c_index] = reducer(old_value, value)
+        else:
+            self.dataset[t_index, c_index] = value
+        return True
+
+    def missing_matrix(self, inverse=False):
+        """
+        Because we initialize datasets with -0.0, we can scan the sign bit of every
+        element of an array to determine how many data were never populated.  This
+        converts negative zeros to ones and all other data into zeros then count up
+        the number of missing elements in the array.
+        """
+        if inverse:
+            converter = numpy.vectorize(lambda x: 0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
+        else:
+            converter = numpy.vectorize(lambda x: 1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
+        return converter(self.dataset)
+
 
 def sorted_nodenames(nodenames):
     """
