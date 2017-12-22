@@ -5,6 +5,7 @@ scrolling support.  Output either as native json from ElasticSearch or as
 serialized TOKIO TimeSeries (TTS) HDF5 files.
 """
 
+import os
 import sys
 import gzip
 import json
@@ -191,15 +192,23 @@ def run_disk_query(host, port, index, t_start, t_end):
 
     return es_obj
 
-def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
+def init_datasets(init_start, init_end, timestep, num_columns, output_file, group_name, dataset_names):
     """
-    Take pages from ElasticSearch query and store them in output_file
-    """
+    Given some parameters, establish the datasets corresponding to a dataset.
 
-    output_hdf5 = h5py.File(output_file)
+    init_start/init_end - datetime objects to initialize the datasets (if necessary)
+    timestamp - time between consecutive rows, used to init datasets (if necessary)
+    num_columns - number of columns to reserve for dataset when initializing (if necessary)
+    output_file - the target file name to which we want to bind
+    group_name - parent group of datasets we're loading (e.g., '/bytes')
+    dataset_names - list of dataset names within group_name to create/attach
+    """
+    if os.path.isfile(output_file):
+        output_hdf5 = h5py.File(output_file)
+    else:
+        output_hdf5 = [] # this is filthy, but all subsequences use the `in` operator
 
     # Determine the group of time series we will be populating
-    group_name = '/bytes'
     if group_name in output_hdf5:
         target_group = output_hdf5[group_name]
     else:
@@ -207,23 +216,58 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
 
     # Determine the time series datasets in the group
     datasets = {}
-    for dataset_name in 'readrates', 'writerates':
+    for dataset_name in dataset_names:
         target_dataset_name = group_name + '/' + dataset_name
         # Instantiate the TimeSeries object
-        datasets[dataset_name] = tokio.timeseries.TimeSeries(start=t_start,
-                                                             end=t_end,
+        datasets[dataset_name] = tokio.timeseries.TimeSeries(start=init_start,
+                                                             end=init_end,
                                                              timestep=timestep,
                                                              group=target_group)
+
         # Attach to or initialize the TimeSeries.dataset object
         if target_dataset_name in output_hdf5:
             datasets[dataset_name].attach_dataset(dataset=output_hdf5[target_dataset_name])
         else:
             datasets[dataset_name].init_dataset(dataset_name=target_dataset_name,
-                                                num_columns=num_servers)
+                                                num_columns=num_columns)
 
-    # Iterate over every cached page.
+    if output_hdf5:
+        output_hdf5.close()
+
+    return datasets
+
+def commit_datasets(datasets, output_file):
+    """
+    Store datasets into an HDF5 file.
+
+    datasets - dict keyed by dataset_name and value being a TimeSeries object
+    output_file - file name pointing to HDF5 file to which we should dump data
+    """
+    time0 = time.time()
+    with h5py.File(output_file, 'w') as output_hdf5:
+        for dataset in datasets.itervalues():
+            dataset.commit_dataset(output_hdf5)
+
+    if tokio.DEBUG:
+        print "Committed data to disk in %s seconds" % (time.time() - time0)
+
+def pages_to_hdf5(init_start, init_end, timestep, num_servers, output_file, pages):
+    """
+    Take pages from ElasticSearch query and store them in output_file
+    """
+
+    # Create TimeSeries objects for each dataset to be populated
+    dataset_names = ['readrates', 'writerates']
+    datasets = init_datasets(init_start=init_start,
+                             init_end=init_end,
+                             timestep=timestep,
+                             num_columns=num_servers,
+                             output_file=output_file,
+                             group_name='/bytes',
+                             dataset_names=dataset_names)
+
+    # Iterate over every cached page and commit each to TimeSeries
     progress = 0
-    num_files = len(pages)
     processing_time = 0.0
     for page in pages:
         progress += 1
@@ -232,19 +276,13 @@ def pages_to_hdf5(t_start, t_end, pages, timestep, num_servers, output_file):
         timef = time.time()
         processing_time += timef - time0
         if tokio.DEBUG:
-            print "Processed page %d of %d in %s seconds" % (progress, num_files, timef - time0)
+            print "Processed page %d of %d in %s seconds" % (progress, len(pages), timef - time0)
 
     if tokio.DEBUG:
         print "Processed %d pages in %s seconds" % (progress, processing_time)
 
-    ### Write out the final HDF5 file after everything is loaded into memory.
-    time0 = time.time()
-    for dataset_name in 'readrates', 'writerates':
-        datasets[dataset_name].commit_dataset(output_hdf5)
-
-    output_hdf5.close()
-    if tokio.DEBUG:
-        print "Committed data to disk in %s seconds" % (time.time() - time0)
+    # Write datasets out to HDF5 file
+    commit_datasets(datasets, output_file)
 
 def cache_collectd_cli():
     """
@@ -322,7 +360,7 @@ def cache_collectd_cli():
         json.dump(pages, output_file)
         output_file.close()
     else:
-        pages_to_hdf5(init_start, init_end, pages, args.timestep, args.num_bbnodes, args.output)
+        pages_to_hdf5(init_start, init_end, args.timestep, args.num_bbnodes, args.output, pages)
 
     if args.debug:
         print "Wrote output to %s" % args.output
