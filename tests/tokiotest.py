@@ -4,6 +4,7 @@ Useful helpers that are used throughout the TOKIO test suite
 """
 
 import os
+import gzip
 import errno
 import tempfile
 import subprocess
@@ -159,3 +160,23 @@ def delete_tempfile():
         TEMP_FILE.close()
     if os.path.isfile(TEMP_FILE.name):
         os.unlink(TEMP_FILE.name)
+
+def gunzip(input_filename, output_filename):
+    """
+    To check support for both compressed and uncompressed data streams, create
+    an uncompressed version of an input file on the fly
+    """
+    try_unlink(output_filename)
+    with gzip.open(input_filename, 'rb') as input_file:
+        file_content = input_file.read()
+    with open(output_filename, 'w+b') as output_file:
+        print "Creating %s" % output_filename
+        output_file.write(file_content)
+
+def try_unlink(output_filename):
+    """
+    Destroy a temporarily decompressed input file
+    """
+    if os.path.exists(output_filename):
+        print "Destroying %s" % output_filename
+        os.unlink(output_filename)
