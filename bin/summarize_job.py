@@ -505,15 +505,20 @@ def summarize_job():
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
-        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
-        if len(args.files) > 0:
-            results = retrieve_darshan_data(results, args.files[i])
-        results = retrieve_lmt_data(results, args.file_system)
-        results = retrieve_topology_data(results,
-                                         slurm_cache_file=args.slurm_jobid,
-                                         craysdb_cache_file=args.topology)
-        results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
+        try:
+            # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+            if len(args.files) > 0:
+                results = retrieve_darshan_data(results, args.files[i])
+            results = retrieve_lmt_data(results, args.file_system)
+            results = retrieve_topology_data(results,
+                                             slurm_cache_file=args.slurm_jobid,
+                                             craysdb_cache_file=args.topology)
+            results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
+            results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
+        except:
+            # print out file name to aid debugging when processing multiple logs
+            warnings.warn("Unhandled exception while processing %s" % args.files[i])
+            raise
 
         # don't append empty rows
         if len(results) > 0:
