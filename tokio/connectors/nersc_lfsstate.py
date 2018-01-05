@@ -16,6 +16,7 @@ import os
 import sys
 import gzip
 import re
+import warnings
 import mimetypes
 
 # Only try to match osc/mdc lines; skip mgc/lov/lmv
@@ -80,11 +81,16 @@ class NerscLfsOstMap(dict):
             fp = open(self.cache_file, 'r')
 
         this_timestamp = None
+        degenerate_keys = 0
         for line in fp:
             if line.startswith('BEGIN'):
+                if degenerate_keys > 0:
+                    warnings.warn("%d degenerate keys found for timestamp %d" % (degenerate_keys, this_timestamp))
                 this_timestamp = int(line.split()[1])
-                assert this_timestamp not in self
+                if this_timestamp in self:
+                    warnings.warn("degenerate timestamp %d found" % this_timestamp)
                 self.__setitem__(this_timestamp, {})
+                degenerate_keys = 0
             else:
                 match = _REX_OST_MAP.search(line)
                 if match is not None:
@@ -95,7 +101,7 @@ class NerscLfsOstMap(dict):
 
                     # Duplicates can happen if a file system is doubly mounted
                     if target_name in self[this_timestamp][file_system]:
-                        raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
+                        degenerate_keys += 1
 
                     self[this_timestamp][file_system][target_name] = {
                         'index': int(match.group(1)),
@@ -228,11 +234,16 @@ class NerscLfsOstFullness(dict):
             fp = open(self.cache_file, 'r')
 
         this_timestamp = None
+        degenerate_keys = 0
         for line in fp:
             if line.startswith('BEGIN'):
+                if degenerate_keys > 0:
+                    warnings.warn("%d degenerate keys found for timestamp %d" % (degenerate_keys, this_timestamp))
                 this_timestamp = int(line.split()[1])
-                assert this_timestamp not in self
+                if this_timestamp in self:
+                    warnings.warn("degenerate timestamp %d found" % this_timestamp)
                 self[this_timestamp] = {}
+                degenerate_keys = 0
             else:
                 match = _REX_LFS_DF.search(line)
                 if match is not None:
@@ -243,7 +254,7 @@ class NerscLfsOstFullness(dict):
 
                     # Duplicates can happen if a file system is doubly mounted
                     if target_name in self[this_timestamp][file_system]:
-                        raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
+                        degenerate_keys += 1
 
                     self[this_timestamp][file_system][target_name] = {
                         'total_kib': long(match.group(2)),
