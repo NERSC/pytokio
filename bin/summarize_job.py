@@ -64,23 +64,28 @@ def get_biggest_api(darshan_data):
         biggest_api[api_name] = {
             'write': 0,
             'read': 0,
+            'write_files': 0,
+            'read_files': 0,
         }
-        for file_path in darshan_data['counters'][api_name]:
-            if file_path in ('_perf', '_total'): # only consider file records
+        for file_path, records in darshan_data['counters'][api_name].iteritems():
+            if file_path.startswith('_'):
                 continue
-            for record in darshan_data['counters'][api_name][file_path].itervalues():
+            for record in records.itervalues():
                 bytes_read = record.get('BYTES_READ')
-                if bytes_read is not None:
+                if bytes_read: # bytes_read is not None and bytes_read > 0:
                     biggest_api[api_name]['read'] += bytes_read
+                    biggest_api[api_name]['read_files'] += 1
                 bytes_written = record.get('BYTES_WRITTEN')
-                if bytes_written is not None:
+                if bytes_written: # bytes_written is not None and bytes_read > 0:
                     biggest_api[api_name]['write'] += bytes_written
+                    biggest_api[api_name]['write_files'] += 1
 
     results = {}
     for readwrite in 'read', 'write':
         key = 'biggest_%s_api' % readwrite
         results[key] = max(biggest_api, key=lambda k, rw=readwrite: biggest_api[k][rw])
         results['%s_bytes' % key] = biggest_api[results[key]][readwrite]
+        results['%s_files' % key] = biggest_api[results[key]][readwrite + "_files"]
 
     return results
 
