@@ -142,7 +142,7 @@ def summarize_darshan(darshan_data):
 
     if 'header' in darshan_data:
         d_header = darshan_data['header']
-        for key in 'walltime', 'end_time', 'start_time', 'jobid':
+        for key in 'walltime', 'end_time', 'start_time', 'jobid', 'nprocs':
             results[key] = d_header.get(key)
         if 'exe' in d_header:
             results['app'] = d_header['exe'][0]
