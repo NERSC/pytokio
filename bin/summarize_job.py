@@ -334,7 +334,7 @@ def retrieve_lmt_data(results, file_system):
             '/FSMissingGroup/FSMissingDataSet',
             results['_datetime_start'],
             results['_datetime_end'])))
-    merge_dicts(results, module_results, prefix='lmt_')
+    merge_dicts(results, module_results, prefix='fs_')
 
     return results
 
