@@ -170,10 +170,13 @@ def summarize_byterate_df(dataframe, readwrite, timestep=None):
     results = {}
     results['tot_bytes_%s' % readwrite] = dataframe.sum().sum() * timestep
     results['tot_gibs_%s' % readwrite] = results['tot_bytes_%s' % readwrite] / 2.0**30
-    results['ave_bytes_%s_per_timestep' % readwrite] = \
-        (dataframe.sum(axis=1) / dataframe.columns.shape[0]).mean() * timestep
-    results['ave_gibs_%s_per_timestep' % readwrite] = \
-        results['ave_bytes_%s_per_timestep' % readwrite] / 2.0**30
+    results['ave_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).mean()
+    results['ave_gibs_%s_per_sec' % readwrite] = results['ave_bytes_%s_per_sec' % readwrite] / 2.0**30
+    results['max_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).max()
+    results['max_gibs_%s_per_sec' % readwrite] = results['max_bytes_%s_per_sec' % readwrite] / 2.0**30
+    results['min_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).min()
+    results['min_gibs_%s_per_sec' % readwrite] = results['min_bytes_%s_per_sec' % readwrite] / 2.0**30
+
     results['frac_zero_%s' % readwrite] = \
         float((dataframe == 0.0).sum().sum()) / float((dataframe.shape[0]*dataframe.shape[1]))
     return results
@@ -200,6 +203,37 @@ def summarize_missing_df(dataframe):
         'frac_missing': float((dataframe != 0.0).sum().sum()) \
                         / float((dataframe.shape[0]*dataframe.shape[1]))
     }
+    return results
+
+def summarize_mds_ops_df(dataframe, timestep=None):
+    """
+    Summarize various metadata op counts over a time range
+    """
+    mds_ops = [
+        'open',
+        'close',
+        'mknod',
+        'link',
+        'unlink',
+        'mkdir',
+        'rmdir',
+        'rename',
+        'getxattr',
+        'statfs',
+        'setattr',
+        'getattr',
+    ]
+    if timestep is None:
+        if dataframe.shape[0] < 2:
+            raise Exception("must specify timestep for single-row dataframe")
+        timestep = (dataframe.index[1].to_pydatetime() \
+                    - dataframe.index[0].to_pydatetime()).total_seconds()
+    results = {}
+    for opname in mds_ops:
+        results['tot_%s_ops' % opname] = dataframe[opname].sum() * timestep
+        results['ave_%s_ops_per_sec' % opname] = dataframe[opname].mean()
+        results['max_%s_ops_per_sec' % opname] = dataframe[opname].max()
+        results['min_%s_ops_per_sec' % opname] = dataframe[opname].min()
     return results
 
 def merge_dicts(dict1, dict2, assertion=True, prefix=None):
@@ -309,7 +343,7 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_end']),
         'written'
     ))
-    # Oss cpu loads
+    # OSS cpu loads
     module_results.update(summarize_cpu_df(
         tokio.tools.hdf5.get_dataframe_from_time_range(
             h5lmt_file,
@@ -318,7 +352,7 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_end']),
         'oss'
     ))
-    # Mds cpu loads
+    # MDS cpu loads
     module_results.update(summarize_cpu_df(
         tokio.tools.hdf5.get_dataframe_from_time_range(
             h5lmt_file,
@@ -326,6 +360,14 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_start'],
             results['_datetime_end']),
         'mds'
+    ))
+    # MDS op rates
+    module_results.update(summarize_mds_ops_df(
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/MDSOpsGroup/MDSOpsDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
     ))
     # Missing data
     module_results.update(summarize_missing_df(
