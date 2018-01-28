@@ -8,11 +8,6 @@ import datetime
 import argparse
 import tokio.connectors.lmtdb
 
-_DB_HOST = os.environ.get('PYTOKIO_LMTDB_HOST', 'localhost')
-_DB_USER = os.environ.get('PYTOKIO_LMTDB_USER', 'root')
-_DB_PASSWORD = os.environ.get('PYTOKIO_LMTDB_PASSWORD', '')
-_DB_DBNAME = os.environ.get('PYTOKIO_LMTDB_DBNAME', 'testdb')
-
 def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
     """
     Given a start and end time, retrieve and cache all of the relevant contents
@@ -57,6 +52,10 @@ def cache_lmtdb():
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     parser.add_argument("-l", "--limit", type=int, default=None,
                         help="restrict number of records returned per table")
+    parser.add_argument("--host", type=str, default=None, help="database hostname")
+    parser.add_argument("--user", type=str, default=None, help="database user")
+    parser.add_argument("--password", type=str, default=None, help="database password")
+    parser.add_argument("--database", type=str, default=None, help="database name")
     args = parser.parse_args()
 
     start = datetime.datetime.strptime(args.start, "%Y-%m-%dT%H:%M:%S")
@@ -70,10 +69,10 @@ def cache_lmtdb():
         lmtdb = tokio.connectors.lmtdb.LmtDb(cache_file=args.input)
     else:
         lmtdb = tokio.connectors.lmtdb.LmtDb(
-            dbhost=_DB_HOST,
-            dbuser=_DB_USER,
-            dbpassword=_DB_PASSWORD,
-            dbname=_DB_DBNAME)
+            dbhost=args.host,
+            dbuser=args.user,
+            dbpassword=args.password,
+            dbname=args.database)
 
     retrieve_tables(lmtdb, start, end, args.limit)
 
