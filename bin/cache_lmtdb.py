@@ -6,7 +6,7 @@ Retrieve the contents of an LMT database and cache it locally.
 import os
 import datetime
 import argparse
-import tokio.connectors.cachingdb
+import tokio.connectors.lmtdb
 
 _DB_HOST = os.environ.get('PYTOKIO_LMTDB_HOST', 'localhost')
 _DB_USER = os.environ.get('PYTOKIO_LMTDB_USER', 'root')
@@ -64,12 +64,12 @@ def cache_lmtdb():
 
     cache_file = args.output
 
-    ### Unlike nersc_jobsdb connector, CachingDb does not look for any
+    ### Unlike nersc_jobsdb connector, LmtDb does not look for any
     ### environment variables intrinsically
     if args.input is not None:
-        lmtdb = tokio.connectors.cachingdb.CachingDb(cache_file=args.input)
+        lmtdb = tokio.connectors.lmtdb.LmtDb(cache_file=args.input)
     else:
-        lmtdb = tokio.connectors.cachingdb.CachingDb(
+        lmtdb = tokio.connectors.lmtdb.LmtDb(
             dbhost=_DB_HOST,
             dbuser=_DB_USER,
             dbpassword=_DB_PASSWORD,
