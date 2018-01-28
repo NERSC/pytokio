@@ -152,6 +152,10 @@ class CachingDb(object):
         ### Commit each table we've retained in memory
         drop_caches = set([])
         for table, table_info in self.saved_results.iteritems():
+            if len(self.saved_results[table]['rows']) < 1:
+                warnings.warn("table %s has no rows" % table)
+                continue
+
             num_fields = None
             ### Verify and preprocess each saved row
             for index, row in enumerate(self.saved_results[table]['rows']):
