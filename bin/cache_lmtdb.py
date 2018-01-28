@@ -13,16 +13,8 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
     Given a start and end time, retrieve and cache all of the relevant contents
     of an LMT database.
     """
-    # First figure out the timestamp range
-    query_str = "SELECT MIN(TS_ID), MAX(TS_ID) FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
-    query_variables = (
-        datetime_start.strftime("%Y-%m-%d %H:%M:%S"),
-        datetime_end.strftime("%Y-%m-%d %H:%M:%S"))
 
-    result = lmtdb.query(query_str=query_str,
-                         query_variables=query_variables)
-
-    min_ts_id, max_ts_id = result[0]
+    min_ts_id, max_ts_id = lmtdb.get_ts_ids(datetime_start, datetime_end)
 
     for lmtdb_table, table_schema in tokio.connectors.lmtdb.LMTDB_TABLES.iteritems():
         query_str = 'SELECT * from %s' % lmtdb_table
