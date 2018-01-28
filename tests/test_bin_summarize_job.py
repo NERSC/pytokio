@@ -87,7 +87,7 @@ def test_json():
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
 
 @tokiotest.needs_darshan
 def test_csv():
@@ -102,7 +102,7 @@ def test_csv():
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_csv(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_csv(output_str, key='fs_tot_gibs_written')
 
 @tokiotest.needs_darshan
 def test_darshan_summaries():
@@ -118,7 +118,7 @@ def test_darshan_summaries():
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
+    assert verify_output_csv(output_str, key='fs_tot_gibs_written', expected_rows=2)
 
 @tokiotest.needs_darshan
 def test_bogus_darshans():
@@ -139,7 +139,7 @@ def test_bogus_darshans():
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_csv(output_str, key='lmt_tot_gibs_written', expected_rows=2)
+    assert verify_output_csv(output_str, key='fs_tot_gibs_written', expected_rows=2)
 
 @tokiotest.needs_darshan
 def test_with_topology():
@@ -160,7 +160,7 @@ def test_with_topology():
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='topology_job_max_radius')
 
 @tokiotest.needs_darshan
@@ -181,7 +181,7 @@ def test_with_lfsstatus():
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
 
 @tokiotest.needs_darshan
@@ -200,7 +200,7 @@ def test_with_nersc_jobsdb():
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
 
 def test_without_darshan():
@@ -214,7 +214,7 @@ def test_without_darshan():
         '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
         '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
         '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,])
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
 
 def test_most_without_darshan():
     """
@@ -236,7 +236,7 @@ def test_most_without_darshan():
         '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
 
         '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,])
-    assert verify_output_json(output_str, key='lmt_tot_gibs_written')
+    assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')
     assert verify_output_json(output_str, key='topology_job_max_radius')
