@@ -136,39 +136,6 @@ LMTDB_TABLES = {
     },
 }
 
-# Find the most recent timestamp for each OST before a given time range.  This
-# is to calculate the first row of diffs for a time range.  There is an
-# implicit assumption that there will be at least one valid data point for
-# each OST in the 24 hours preceding t_start.  If this is not the case, not
-# every OST will be represented in the output of this query.
-_QUERY_FIRST_OST_DATA = """
-SELECT
-    UNIX_TIMESTAMP(TIMESTAMP_INFO.`TIMESTAMP`),
-    OST_INFO.OST_NAME,
-    OST_DATA.READ_BYTES,
-    OST_DATA.WRITE_BYTES
-FROM
-    (
-        SELECT
-            OST_DATA.OST_ID AS ostid,
-            MAX(OST_DATA.TS_ID) AS newest_tsid
-        FROM
-            OST_DATA
-        INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = OST_DATA.TS_ID
-        WHERE
-            TIMESTAMP_INFO.`TIMESTAMP` < '{datetime}'
-        AND TIMESTAMP_INFO.`TIMESTAMP` > SUBTIME(
-            '{datetime}',
-            '{lookbehind}'
-        )
-        GROUP BY
-            OST_DATA.OST_ID
-    ) AS last_ostids
-INNER JOIN OST_DATA ON last_ostids.newest_tsid = OST_DATA.TS_ID AND last_ostids.ostid = OST_DATA.OST_ID
-INNER JOIN OST_INFO on OST_INFO.OST_ID = last_ostids.ostid
-INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = last_ostids.newest_tsid
-"""
-
 class LmtDb(cachingdb.CachingDb):
     ### TODO: this needs a unit test
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
@@ -235,9 +202,9 @@ class LmtDb(cachingdb.CachingDb):
     ### TODO: this needs a unit test
     def get_timeseries_data(self, table, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
         """
-        Wrapper for _get_timeseries_data that breaks a single large query into
-        smaller queries over smaller time ranges.  This is an optimization to
-        avoid the O(N*M) scaling of the JOINs in the underlying SQL query.
+        Break a timeseries query into smaller queries over smaller time ranges.
+        This is an optimization to avoid the O(N*M) scaling of the JOINs in the
+        underlying SQL query.
         """
         table_schema = LMTDB_TABLES.get(table.upper())
         if table_schema is None:
@@ -269,49 +236,3 @@ class LmtDb(cachingdb.CachingDb):
             chunk_start += timechunk
 
         return self.saved_results[table]['rows'][index0:]
-
-    ### TODO: 9/28/2017 - this needs to be reviewed and kept/abandoned
-    def get_last_rw_data_before(self, t, lookbehind=None):
-        """
-        Get the last datum reported by each OST before the given timestamp t.
-        Useful for calculating the change in bytes for the very first row
-        returned by a query.
-
-        Input:
-            1. t is a datetime.datetime before which we want to find data
-            2. lookbehind is a datetime.timedelta is how far back we're willing
-               to look for valid data for each OST.  The larger this is, the
-               slower the query
-        Output is a tuple of:
-            1. buf_r - a matrix of size (1, N) with the last read byte value for
-               each of N OSTs
-            2. buf_w - a matrix of size (1, N) with the last write byte value
-               for each of N OSTs
-            3. buf_t - a matrix of size (1, N) with the timestamp from which
-               each buf_r and buf_w row datum was found
-        """
-        if lookbehind is None:
-            lookbehind = datetime.timedelta(hours=1)
-
-        lookbehind_str = "%d %02d:%02d:%02d" % (
-            lookbehind.days,
-            lookbehind.seconds / 3600,
-            lookbehind.seconds % 3600 / 60,
-            lookbehind.seconds % 60 )
-
-        ost_ct = len(self.ost_names)
-        buf_r = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='f8')
-        buf_w = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='f8')
-        buf_t = np.full(shape=(1, ost_ct), fill_value=-0.0, dtype='i8')
-
-        query_str = _QUERY_FIRST_OST_DATA.format(datetime=t.strftime(_DATE_FMT), lookbehind=lookbehind_str)
-        for tup in self._query_mysql(query_str):
-            try:
-                tidx = self.ost_names.index(tup[1])
-            except ValueError:
-                raise ValueError("unknown OST [%s] not present in %s" % (tup[1], self.ost_names))
-            buf_r[0, tidx] = tup[2]
-            buf_w[0, tidx] = tup[3]
-            buf_t[0, tidx] = tup[0]
-
-        return (buf_r, buf_w, buf_t)
