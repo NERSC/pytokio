@@ -14,7 +14,10 @@ This infrastructure is deployed at NERSC.
 
 import os
 import sys
+import gzip
 import re
+import warnings
+import mimetypes
 
 # Only try to match osc/mdc lines; skip mgc/lov/lmv
 # 351 UP osc snx11025-OST0007-osc-ffff8875ac1e7c00 3f30f170-90e6-b332-b141-a6d4a94a1829 5 10.100.100.12@o2ib1
@@ -71,35 +74,47 @@ class NerscLfsOstMap(dict):
         failover situation)
         
         """
+        _, encoding = mimetypes.guess_type(self.cache_file)
+        if encoding == 'gzip':
+            fp = gzip.open(self.cache_file, 'r')
+        else:
+            fp = open(self.cache_file, 'r')
+
         this_timestamp = None
-        with open( self.cache_file, 'r' ) as fp:
-            for line in fp:
-                if line.startswith('BEGIN'):
-                    this_timestamp = int(line.split()[1])
-                    assert this_timestamp not in self
-                    self.__setitem__(this_timestamp, {})
-                else:
-                    match = _REX_OST_MAP.search(line)
-                    if match is not None:
-                        file_system, target_name = (match.group(4).split('-')[0:2])
-    
-                        if file_system not in self[this_timestamp]:
-                            self[this_timestamp][file_system] = {}
-    
-                        # Duplicates can happen if a file system is doubly mounted
-                        if target_name in self[this_timestamp][file_system]:
-                            raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
-    
-                        self[this_timestamp][file_system][target_name] = {
-                            'index': int(match.group(1)),
-                            'status': match.group(2).lower(),
-                            'role': match.group(3).lower(),
-                            'role_id': match.group(4),
-                            'uuid': match.group(5),
-                            'ref_count': int(match.group(6)),
-                            'target_ip': match.group(7).split('@')[0],
-                            'nid': match.group(7),
-                        }
+        degenerate_keys = 0
+        for line in fp:
+            if line.startswith('BEGIN'):
+                if degenerate_keys > 0:
+                    warnings.warn("%d degenerate keys found for timestamp %d" % (degenerate_keys, this_timestamp))
+                this_timestamp = int(line.split()[1])
+                if this_timestamp in self:
+                    warnings.warn("degenerate timestamp %d found" % this_timestamp)
+                self.__setitem__(this_timestamp, {})
+                degenerate_keys = 0
+            else:
+                match = _REX_OST_MAP.search(line)
+                if match is not None:
+                    file_system, target_name = (match.group(4).split('-')[0:2])
+
+                    if file_system not in self[this_timestamp]:
+                        self[this_timestamp][file_system] = {}
+
+                    # Duplicates can happen if a file system is doubly mounted
+                    if target_name in self[this_timestamp][file_system]:
+                        degenerate_keys += 1
+
+                    self[this_timestamp][file_system][target_name] = {
+                        'index': int(match.group(1)),
+                        'status': match.group(2).lower(),
+                        'role': match.group(3).lower(),
+                        'role_id': match.group(4),
+                        'uuid': match.group(5),
+                        'ref_count': int(match.group(6)),
+                        'target_ip': match.group(7).split('@')[0],
+                        'nid': match.group(7),
+                    }
+
+        fp.close()
 
     def save_cache(self, output_file=None):
         """
@@ -212,33 +227,45 @@ class NerscLfsOstFullness(dict):
         dump directory.
 
         """
+        _, encoding = mimetypes.guess_type(self.cache_file)
+        if encoding == 'gzip':
+            fp = gzip.open(self.cache_file, 'r')
+        else:
+            fp = open(self.cache_file, 'r')
+
         this_timestamp = None
-        with open(self.cache_file, 'r') as fp:
-            for line in fp:
-                if line.startswith('BEGIN'):
-                    this_timestamp = int(line.split()[1])
-                    assert this_timestamp not in self
-                    self[this_timestamp] = {}
-                else:
-                    match = _REX_LFS_DF.search(line)
-                    if match is not None:
-                        file_system, target_name = re.findall('[^-_]+', match.group(1))[0:2]
-    
-                        if file_system not in self[this_timestamp]:
-                            self[this_timestamp][file_system] = {}
-    
-                        # Duplicates can happen if a file system is doubly mounted
-                        if target_name in self[this_timestamp][file_system]:
-                            raise KeyError("%s already found in timestamp %d" % (target_name, this_timestamp))
-    
-                        self[this_timestamp][file_system][target_name] = {
-                            'total_kib': long(match.group(2)),
-                            'used_kib': long(match.group(3)),
-                            'remaining_kib': long(match.group(4)),
-                            'mount_pt': match.group(6),
-                            'role': match.group(7).lower(),
-                            'target_index': int(match.group(8)),
-                        }
+        degenerate_keys = 0
+        for line in fp:
+            if line.startswith('BEGIN'):
+                if degenerate_keys > 0:
+                    warnings.warn("%d degenerate keys found for timestamp %d" % (degenerate_keys, this_timestamp))
+                this_timestamp = int(line.split()[1])
+                if this_timestamp in self:
+                    warnings.warn("degenerate timestamp %d found" % this_timestamp)
+                self[this_timestamp] = {}
+                degenerate_keys = 0
+            else:
+                match = _REX_LFS_DF.search(line)
+                if match is not None:
+                    file_system, target_name = re.findall('[^-_]+', match.group(1))[0:2]
+
+                    if file_system not in self[this_timestamp]:
+                        self[this_timestamp][file_system] = {}
+
+                    # Duplicates can happen if a file system is doubly mounted
+                    if target_name in self[this_timestamp][file_system]:
+                        degenerate_keys += 1
+
+                    self[this_timestamp][file_system][target_name] = {
+                        'total_kib': long(match.group(2)),
+                        'used_kib': long(match.group(3)),
+                        'remaining_kib': long(match.group(4)),
+                        'mount_pt': match.group(6),
+                        'role': match.group(7).lower(),
+                        'target_index': int(match.group(8)),
+                    }
+
+        fp.close()
 
     def save_cache(self, output_file=None):
         """

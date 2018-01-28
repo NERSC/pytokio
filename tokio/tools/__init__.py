@@ -7,6 +7,22 @@ incorporated into the formal TOKIO package API.
 """
 
 ### Subpackages to include in the tokio.tools.* namespace
-from hdf5 import *
-import topology
-import lfsstatus
+try:
+    import hdf5
+except ImportError:
+    pass
+
+try:
+    import topology
+except ImportError:
+    pass
+
+try:
+    import lfsstatus
+except ImportError:
+    pass
+
+try:
+    import umami
+except ImportError:
+    pass

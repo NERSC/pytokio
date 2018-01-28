@@ -64,23 +64,28 @@ def get_biggest_api(darshan_data):
         biggest_api[api_name] = {
             'write': 0,
             'read': 0,
+            'write_files': 0,
+            'read_files': 0,
         }
-        for file_path in darshan_data['counters'][api_name]:
-            if file_path in ('_perf', '_total'): # only consider file records
+        for file_path, records in darshan_data['counters'][api_name].iteritems():
+            if file_path.startswith('_'):
                 continue
-            for record in darshan_data['counters'][api_name][file_path].itervalues():
+            for record in records.itervalues():
                 bytes_read = record.get('BYTES_READ')
-                if bytes_read is not None:
+                if bytes_read: # bytes_read is not None and bytes_read > 0:
                     biggest_api[api_name]['read'] += bytes_read
+                    biggest_api[api_name]['read_files'] += 1
                 bytes_written = record.get('BYTES_WRITTEN')
-                if bytes_written is not None:
+                if bytes_written: # bytes_written is not None and bytes_read > 0:
                     biggest_api[api_name]['write'] += bytes_written
+                    biggest_api[api_name]['write_files'] += 1
 
     results = {}
     for readwrite in 'read', 'write':
         key = 'biggest_%s_api' % readwrite
         results[key] = max(biggest_api, key=lambda k, rw=readwrite: biggest_api[k][rw])
         results['%s_bytes' % key] = biggest_api[results[key]][readwrite]
+        results['%s_files' % key] = biggest_api[results[key]][readwrite + "_files"]
 
     return results
 
@@ -137,7 +142,7 @@ def summarize_darshan(darshan_data):
 
     if 'header' in darshan_data:
         d_header = darshan_data['header']
-        for key in 'walltime', 'end_time', 'start_time', 'jobid':
+        for key in 'walltime', 'end_time', 'start_time', 'jobid', 'nprocs':
             results[key] = d_header.get(key)
         if 'exe' in d_header:
             results['app'] = d_header['exe'][0]
@@ -165,10 +170,13 @@ def summarize_byterate_df(dataframe, readwrite, timestep=None):
     results = {}
     results['tot_bytes_%s' % readwrite] = dataframe.sum().sum() * timestep
     results['tot_gibs_%s' % readwrite] = results['tot_bytes_%s' % readwrite] / 2.0**30
-    results['ave_bytes_%s_per_timestep' % readwrite] = \
-        (dataframe.sum(axis=1) / dataframe.columns.shape[0]).mean() * timestep
-    results['ave_gibs_%s_per_timestep' % readwrite] = \
-        results['ave_bytes_%s_per_timestep' % readwrite] / 2.0**30
+    results['ave_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).mean()
+    results['ave_gibs_%s_per_sec' % readwrite] = results['ave_bytes_%s_per_sec' % readwrite] / 2.0**30
+    results['max_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).max()
+    results['max_gibs_%s_per_sec' % readwrite] = results['max_bytes_%s_per_sec' % readwrite] / 2.0**30
+    results['min_bytes_%s_per_sec' % readwrite] = (dataframe.sum(axis=1)).min()
+    results['min_gibs_%s_per_sec' % readwrite] = results['min_bytes_%s_per_sec' % readwrite] / 2.0**30
+
     results['frac_zero_%s' % readwrite] = \
         float((dataframe == 0.0).sum().sum()) / float((dataframe.shape[0]*dataframe.shape[1]))
     return results
@@ -195,6 +203,37 @@ def summarize_missing_df(dataframe):
         'frac_missing': float((dataframe != 0.0).sum().sum()) \
                         / float((dataframe.shape[0]*dataframe.shape[1]))
     }
+    return results
+
+def summarize_mds_ops_df(dataframe, timestep=None):
+    """
+    Summarize various metadata op counts over a time range
+    """
+    mds_ops = [
+        'open',
+        'close',
+        'mknod',
+        'link',
+        'unlink',
+        'mkdir',
+        'rmdir',
+        'rename',
+        'getxattr',
+        'statfs',
+        'setattr',
+        'getattr',
+    ]
+    if timestep is None:
+        if dataframe.shape[0] < 2:
+            raise Exception("must specify timestep for single-row dataframe")
+        timestep = (dataframe.index[1].to_pydatetime() \
+                    - dataframe.index[0].to_pydatetime()).total_seconds()
+    results = {}
+    for opname in mds_ops:
+        results['tot_%s_ops' % opname] = dataframe[opname].sum() * timestep
+        results['ave_%s_ops_per_sec' % opname] = dataframe[opname].mean()
+        results['max_%s_ops_per_sec' % opname] = dataframe[opname].max()
+        results['min_%s_ops_per_sec' % opname] = dataframe[opname].min()
     return results
 
 def merge_dicts(dict1, dict2, assertion=True, prefix=None):
@@ -304,7 +343,7 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_end']),
         'written'
     ))
-    # Oss cpu loads
+    # OSS cpu loads
     module_results.update(summarize_cpu_df(
         tokio.tools.hdf5.get_dataframe_from_time_range(
             h5lmt_file,
@@ -313,7 +352,7 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_end']),
         'oss'
     ))
-    # Mds cpu loads
+    # MDS cpu loads
     module_results.update(summarize_cpu_df(
         tokio.tools.hdf5.get_dataframe_from_time_range(
             h5lmt_file,
@@ -322,6 +361,14 @@ def retrieve_lmt_data(results, file_system):
             results['_datetime_end']),
         'mds'
     ))
+    # MDS op rates
+    module_results.update(summarize_mds_ops_df(
+        tokio.tools.hdf5.get_dataframe_from_time_range(
+            h5lmt_file,
+            '/MDSOpsGroup/MDSOpsDataSet',
+            results['_datetime_start'],
+            results['_datetime_end']),
+    ))
     # Missing data
     module_results.update(summarize_missing_df(
         tokio.tools.hdf5.get_dataframe_from_time_range(
@@ -329,7 +376,7 @@ def retrieve_lmt_data(results, file_system):
             '/FSMissingGroup/FSMissingDataSet',
             results['_datetime_start'],
             results['_datetime_end'])))
-    merge_dicts(results, module_results, prefix='lmt_')
+    merge_dicts(results, module_results, prefix='fs_')
 
     return results
 
@@ -473,9 +520,9 @@ def summarize_job():
                         + " (req'd w/ --topology, --concurrentjobs, or if no darshan log provided)")
     parser.add_argument("--jobhost", type=str, default=None,
                         help="host on which job ran (used with --concurrentjobs)")
-    parser.add_argument("--ost-fullness", type=str, default=None,
+    parser.add_argument("--ost-fullness", type=str, default=None, nargs="?",
                         help="path to an ost fullness file (lfs df)")
-    parser.add_argument("--ost-map", type=str, default=None,
+    parser.add_argument("--ost-map", type=str, default=None, nargs="?",
                         help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None,
                         help="darshan logs to process")
@@ -505,15 +552,20 @@ def summarize_job():
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
-        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
-        if len(args.files) > 0:
-            results = retrieve_darshan_data(results, args.files[i])
-        results = retrieve_lmt_data(results, args.file_system)
-        results = retrieve_topology_data(results,
-                                         slurm_cache_file=args.slurm_jobid,
-                                         craysdb_cache_file=args.topology)
-        results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
+        try:
+            # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+            if len(args.files) > 0:
+                results = retrieve_darshan_data(results, args.files[i])
+            results = retrieve_lmt_data(results, args.file_system)
+            results = retrieve_topology_data(results,
+                                             slurm_cache_file=args.slurm_jobid,
+                                             craysdb_cache_file=args.topology)
+            results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
+            results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
+        except:
+            # print out file name to aid debugging when processing multiple logs
+            warnings.warn("Unhandled exception while processing %s" % args.files[i])
+            raise
 
         # don't append empty rows
         if len(results) > 0:

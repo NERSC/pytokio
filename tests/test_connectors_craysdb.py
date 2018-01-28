@@ -3,6 +3,7 @@
 Test the CraySDB connector
 """
 
+import os
 import errno
 import nose
 import tokiotest
@@ -23,9 +24,23 @@ def verify_craysdbproc(craysdbproc):
         for key in tmp:
             assert record[key] >= 0
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_craysdbproc_from_cache():
     """
-    Initialize CraySdb from cache
+    Initialize CraySdb from decompressed cache
+    """
+    # Create an uncompressed cache file
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_XTDB2PROC_FILE, tokiotest.TEMP_FILE.name)
+    print "Decompressed %s to %s" % (tokiotest.SAMPLE_XTDB2PROC_FILE, tokiotest.TEMP_FILE.name)
+
+    # Read from a cache file
+    craysdbproc = tokio.connectors.craysdb.CraySdbProc(tokiotest.TEMP_FILE.name)
+    verify_craysdbproc(craysdbproc)
+
+def test_craysdbproc_from_gz_cache():
+    """
+    Initialize CraySdb from compressed cache
     """
     # Read from a cache file
     craysdbproc = tokio.connectors.craysdb.CraySdbProc(tokiotest.SAMPLE_XTDB2PROC_FILE)

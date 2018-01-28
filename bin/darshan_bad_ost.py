@@ -168,10 +168,11 @@ def darshan_bad_ost():
                 filtered_results.append(result)
         print json.dumps(filtered_results, indent=4, sort_keys=True)
     else:
+        print "%-10s %12s %10s" % ("OST Name", "Correlation", "P-Value")
         for result in sorted(results, key=lambda k: k['coefficient']):
             if result['p-value'] < args.p_threshold \
             and abs(result['coefficient']) > args.c_threshold:
-                print "%(ost_name)-12s %(coefficient)10.6f %(p-value)10.4g" % result
+                print "%(ost_name)-10s %(coefficient)12.3f %(p-value)10.4g" % result
 
 if __name__ == "__main__":
     darshan_bad_ost()

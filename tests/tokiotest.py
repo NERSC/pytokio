@@ -4,6 +4,7 @@ Useful helpers that are used throughout the TOKIO test suite
 """
 
 import os
+import gzip
 import errno
 import tempfile
 import subprocess
@@ -28,11 +29,13 @@ SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
 ### pass.
 SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
+SAMPLE_OSTMAP_FILE_GZ = SAMPLE_OSTMAP_FILE + ".gz"
 SAMPLE_OSTMAP_START = 1489998203
 SAMPLE_OSTMAP_END = 1489998203
 SAMPLE_OSTMAP_OVERLOAD_OSS = 1
 SAMPLE_OSTMAP_OST_PER_OSS = 1
 SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
+SAMPLE_OSTFULLNESS_FILE_GZ = SAMPLE_OSTFULLNESS_FILE + ".gz"
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
 
@@ -45,8 +48,9 @@ SAMPLE_NERSCJOBSDB_HOST = 'edison'
 SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'sample_lmtdb.sqlite3')
 SAMPLE_LMTDB_START = 1506182400
 SAMPLE_LMTDB_END = 1506182430
-SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc')
+SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
+SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 
 ### The following SLURM_CACHE_* all correspond to SLURM_CACHE_FILE; if you
 ### change one, you must change them all.
@@ -73,6 +77,39 @@ SAMPLE_NERSCISDCT_DIFF_MONOTONICS = [ # counters whose values should be bigger t
 ]
 SAMPLE_NERSCISDCT_DIFF_ZEROS = ['physical_size'] # diff should always be numeric zero
 SAMPLE_NERSCISDCT_DIFF_EMPTYSTR = ['model_number'] # diff should always be an empty string
+
+SAMPLE_COLLECTDES_FILE = os.path.join(INPUT_DIR, 'sample_collectdes-full.json.gz')
+SAMPLE_COLLECTDES_NUMNODES = 64
+SAMPLE_COLLECTDES_TIMESTEP = 10
+SAMPLE_COLLECTDES_START = '2017-12-13T00:00:00' 
+SAMPLE_COLLECTDES_END = '2017-12-13T01:00:00'
+# SAMPLE_COLLECTDES_FILE2 should be a complete subset of SAMPLE_COLLECTDES_FILE
+SAMPLE_COLLECTDES_FILE2 = os.path.join(INPUT_DIR, 'sample_collectdes-part.json.gz')
+SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00' 
+SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
+
+SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
+SAMPLE_COLLECTDES_DSET = '/bytes/readrates'
+
+SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_QUERY = {
+    "query": {
+        "bool": {
+            "must": {
+                "query_string": {
+                    "query": "hostname:bb* AND plugin:disk AND collectd_type:disk_octets AND plugin_instance:nvme*",
+                    "analyze_wildcard": True,
+                },
+            },
+            "filter": {
+                "range": {
+                    "@timestamp": {},
+                },
+            },
+        },
+    },
+}
+
 
 ### Global state
 SKIP_DARSHAN = None
@@ -123,3 +160,23 @@ def delete_tempfile():
         TEMP_FILE.close()
     if os.path.isfile(TEMP_FILE.name):
         os.unlink(TEMP_FILE.name)
+
+def gunzip(input_filename, output_filename):
+    """
+    To check support for both compressed and uncompressed data streams, create
+    an uncompressed version of an input file on the fly
+    """
+    try_unlink(output_filename)
+    with gzip.open(input_filename, 'rb') as input_file:
+        file_content = input_file.read()
+    with open(output_filename, 'w+b') as output_file:
+        print "Creating %s" % output_filename
+        output_file.write(file_content)
+
+def try_unlink(output_filename):
+    """
+    Destroy a temporarily decompressed input file
+    """
+    if os.path.exists(output_filename):
+        print "Destroying %s" % output_filename
+        os.unlink(output_filename)

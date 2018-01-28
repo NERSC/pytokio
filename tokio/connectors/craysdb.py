@@ -6,9 +6,11 @@ node's configuration within the network fabric.
 
 import os
 import sys
+import gzip
 import errno
 import collections
 import subprocess
+import mimetypes
 
 class CraySdbProc(dict):
     """
@@ -43,9 +45,13 @@ class CraySdbProc(dict):
             self._parse_xtdb2proc_table(sdb.splitlines())
         else:
             # Load a cached copy of the service database xtdb2proc table
-            with open(self.cache_file, 'r') as fp:
-                self._parse_xtdb2proc_table(fp)
-
+            _, encoding = mimetypes.guess_type(self.cache_file)
+            if encoding == 'gzip':
+                fp = gzip.open(self.cache_file, 'r')
+            else:
+                fp = open(self.cache_file, 'r')
+            self._parse_xtdb2proc_table(fp)
+            fp.close()
 
     def __repr__(self):
         """

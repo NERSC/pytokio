@@ -4,7 +4,6 @@ Test the ISDCT connector
 """
 
 import os
-import gzip
 import tarfile
 import json
 import shutil
@@ -84,9 +83,9 @@ def test_tar_input():
     """
     Load NerscIsdct from .tar input files (no compression)
     """
-    gunzip(SAMPLE_TGZ_INPUT, SAMPLE_TAR_INPUT)
+    tokiotest.gunzip(SAMPLE_TGZ_INPUT, SAMPLE_TAR_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_TAR_INPUT)
-    try_unlink(SAMPLE_TAR_INPUT)
+    tokiotest.try_unlink(SAMPLE_TAR_INPUT)
     validate_object(isdct_data)
 
 def test_unpacked_input():
@@ -109,9 +108,9 @@ def test_json_input():
     """
     Load NerscIsdct from uncompressed serialized json
     """
-    gunzip(SAMPLE_JSON_GZ_INPUT, SAMPLE_JSON_INPUT)
+    tokiotest.gunzip(SAMPLE_JSON_GZ_INPUT, SAMPLE_JSON_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_JSON_INPUT)
-    try_unlink(SAMPLE_JSON_INPUT)
+    tokiotest.try_unlink(SAMPLE_JSON_INPUT)
     validate_object(isdct_data)
 
 def test_to_dataframe():
@@ -179,23 +178,3 @@ def cleanup_untar(input_filename):
                 shutil.rmtree(fq_name)
             else:
                 os.unlink(fq_name)
-
-def gunzip(input_filename, output_filename):
-    """
-    To check support for both compressed and uncompressed data streams, create
-    an uncompressed version of an input file on the fly
-    """
-    try_unlink(output_filename)
-    with gzip.open(input_filename, 'rb') as input_file:
-        file_content = input_file.read()
-    with open(output_filename, 'w+b') as output_file:
-        print "Creating %s" % output_filename
-        output_file.write(file_content)
-
-def try_unlink(output_filename):
-    """
-    Destroy a temporarily decompressed input file
-    """
-    if os.path.exists(output_filename):
-        print "Destroying %s" % output_filename
-        os.unlink(output_filename)
