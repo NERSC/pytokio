@@ -162,7 +162,7 @@ def update_bytes(pages, read_dataset, write_dataset):
 
     print "Added %d bytes of read, %d bytes of write" % (data_volume[0], data_volume[1])
 
-def run_disk_query(host, port, index, t_start, t_end):
+def run_disk_query(host, port, index, t_start, t_end, timeout=None):
     """
     Connect to ElasticSearch and execute a query for all disk data
     """
@@ -173,10 +173,17 @@ def run_disk_query(host, port, index, t_start, t_end):
         print json.dumps(query, indent=4)
 
     ### Try to connect
-    es_obj = tokio.connectors.collectd_es.CollectdEs(
-        host=host,
-        port=port,
-        index=index)
+    if timeout is None:
+        es_obj = tokio.connectors.collectd_es.CollectdEs(
+            host=host,
+            port=port,
+            index=index)
+    else:
+        es_obj = tokio.connectors.collectd_es.CollectdEs(
+            host=host,
+            port=port,
+            index=index,
+            timeout=timeout)
 
     ### Run query
     time0 = time.time()
@@ -299,6 +306,7 @@ def cache_collectd_cli():
     parser.add_argument('--debug', action='store_true', help="produce debug messages")
     parser.add_argument('--num-bbnodes', type=int, default=288, help='number of expected BB nodes (default: 288)')
     parser.add_argument('--timestep', type=int, default=10, help='collection frequency, in seconds (default: 10)')
+    parser.add_argument('--timeout', type=int, default=30, help='ElasticSearch timeout time (default: 30)')
     parser.add_argument('--json', action='store_true', help="output to json instead of HDF5")
     parser.add_argument('--input-json', type=str, default=None, help="use cached output from previous ES query")
     parser.add_argument("-o", "--output", type=str, default='output.hdf5', help="output file (default: output.hdf5)")
@@ -335,7 +343,7 @@ def cache_collectd_cli():
     # Read input from a cached json file (generated previously via the --json
     # option) or by querying ElasticSearch?
     if args.input_json is None:
-        es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end)
+        es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end, timeout=args.timeout)
         pages = es_obj.scroll_pages
         if args.debug:
             print "Loaded results from %s:%s" % (args.host, args.port)
