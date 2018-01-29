@@ -210,7 +210,7 @@ def init_datasets(init_start, init_end, timestep, num_columns, output_file, grou
     group_name - parent group of datasets we're loading (e.g., '/bytes')
     dataset_names - list of dataset names within group_name to create/attach
     """
-    if os.path.isfile(output_file):
+    if output_file and os.path.isfile(output_file):
         output_hdf5 = h5py.File(output_file)
     else:
         output_hdf5 = [] # this is filthy, but all subsequences use the `in` operator
