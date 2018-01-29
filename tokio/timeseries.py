@@ -24,7 +24,6 @@ class TimeSeries(object):
                  timestamp_key=TIMESTAMP_KEY):
         self.timestamps = None
         self.time0 = None
-        self.timef = None
         self.timestep = None
 
         self.dataset = None
@@ -53,7 +52,6 @@ class TimeSeries(object):
 
         self.timestamps = group[self.timestamp_key][:]
         self.time0 = self.timestamps[0]
-        self.timef = self.timestamps[-1]
         self.timestep = self.timestamps[1] - self.timestamps[0]
         for key, value in group.attrs.iteritems():
             self.group_metadata[key] = value
@@ -65,7 +63,6 @@ class TimeSeries(object):
         if start is None or end is None or timestep is None:
             raise Exception("Must specify either ({start,end,timestep}|group)")
         self.time0 = long(time.mktime(start.timetuple()))
-        self.timef = long(time.mktime(end.timetuple()))
         self.timestep = timestep
 
         time_list = []
@@ -185,6 +182,14 @@ class TimeSeries(object):
         # Insert/update dataset metadata
         for key, value in self.dataset_metadata.iteritems():
             hdf5_file[self.dataset_name].attrs[key] = value
+
+    def set_columns(self, column_names):
+        """
+        Set the list of column names
+        """
+        self.columns = column_names
+        self.num_columns = len(self.columns)
+        self.update_column_map()
 
     def add_column(self, column_name):
         """
