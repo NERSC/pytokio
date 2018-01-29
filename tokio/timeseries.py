@@ -32,6 +32,8 @@ class TimeSeries(object):
         self.columns = []
         self.num_columns = 0
         self.column_map = {}
+        self.group_metadata = {}
+        self.dataset_metadata = {}
         self.timestamp_key = timestamp_key
 
         if group is not None:
@@ -53,6 +55,8 @@ class TimeSeries(object):
         self.time0 = self.timestamps[0]
         self.timef = self.timestamps[-1]
         self.timestep = self.timestamps[1] - self.timestamps[0]
+        for key, value in group.attrs.iteritems():
+            self.group_metadata[key] = value
 
     def init_group(self, start, end, timestep):
         """
@@ -124,6 +128,9 @@ class TimeSeries(object):
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
 
+        for key, value in dataset.attrs.iteritems():
+            self.dataset_metadata[key] = value
+
     def commit_dataset(self, *args, **kwargs):
         """
         Dimension-independent wrapper around commit_dataset2d
@@ -150,6 +157,10 @@ class TimeSeries(object):
             if not numpy.array_equal(self.timestamps, hdf5_file[timestamps_dataset_name][:]):
                 raise Exception("Attempting to commit to a group with different timestamps")
 
+        # Insert/update group metadata
+        for key, value in self.group_metadata.iteritems():
+            hdf5_file[group_name].attrs[key] = value
+
         # Create the dataset in the HDF5 file
         if self.dataset_name not in hdf5_file:
             hdf5_file.create_dataset(name=self.dataset_name,
@@ -167,7 +178,13 @@ class TimeSeries(object):
 
         # Copy the in-memory dataset into the HDF5 file
         hdf5_file[self.dataset_name][:, :] = self.dataset[:, :]
-        hdf5_file[self.dataset_name].attrs[COLUMN_NAME_KEY] = self.columns
+
+        # Copy column names into metadata before committing metadata
+        self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
+
+        # Insert/update dataset metadata
+        for key, value in self.dataset_metadata.iteritems():
+            hdf5_file[self.dataset_name].attrs[key] = value
 
     def add_column(self, column_name):
         """
@@ -273,7 +290,6 @@ class TimeSeries(object):
         else:
             converter = numpy.vectorize(lambda x: 1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
         return converter(self.dataset)
-
 
 def sorted_nodenames(nodenames):
     """
