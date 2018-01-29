@@ -203,7 +203,6 @@ class LmtDb(cachingdb.CachingDb):
         ### TODO: make sure this works (it's templated down in test_bin_cache_lmtdb.py)
         return min(ts_ids), max(ts_ids)
 
-    ### TODO: this needs a unit test
     def get_timeseries_data(self, table, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
         """
         Break a timeseries query into smaller queries over smaller time ranges.
@@ -213,8 +212,10 @@ class LmtDb(cachingdb.CachingDb):
         table_schema = LMTDB_TABLES.get(table.upper())
         if table_schema is None:
             raise KeyError("Table '%s' is not valid" % table)
+        else:
+            result_columns = ['TIMESTAMP'] + table_schema['columns']
         format_dict = {
-            'schema': ', '.join(table_schema['columns']).replace("TS_ID,", "TIMESTAMP_INFO.TS_ID,"),
+            'schema': ', '.join(result_columns).replace("TS_ID,", "TIMESTAMP_INFO.TS_ID,"),
             'table': table,
         }
 
@@ -244,4 +245,4 @@ class LmtDb(cachingdb.CachingDb):
             if timechunk is not None:
                 chunk_start += timechunk
 
-        return self.saved_results[table]['rows'][index0:]
+        return self.saved_results[table]['rows'][index0:], result_columns
