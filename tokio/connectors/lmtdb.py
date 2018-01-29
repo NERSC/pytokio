@@ -228,8 +228,9 @@ class LmtDb(cachingdb.CachingDb):
                 chunk_end = chunk_start + timechunk
             if chunk_end > datetime_end:
                 chunk_end = datetime_end
-            start_stamp = long(time.mktime(chunk_start.timetuple()))
-            end_stamp = long(time.mktime(chunk_end.timetuple()))
+            start_stamp = chunk_start.strftime("%Y-%m-%d %H:%M:%S")
+            end_stamp = chunk_end.strftime("%Y-%m-%d %H:%M:%S")
+
             query_str = """SELECT
                                %(schema)s
                            FROM
