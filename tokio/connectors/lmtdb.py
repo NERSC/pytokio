@@ -137,8 +137,13 @@ LMTDB_TABLES = {
 }
 
 class LmtDb(cachingdb.CachingDb):
-    ### TODO: this needs a unit test
+    """
+    Class to wrap the connection to an LMT MySQL database or SQLite database
+    """
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
+        """
+        Initialize LmtDb with either a MySQL or SQLite backend
+        """
         # Get database parameters
         if dbhost is None:
             dbhost = os.environ.get('PYTOKIO_LMT_HOST')
@@ -181,14 +186,13 @@ class LmtDb(cachingdb.CachingDb):
             self.mds_op_names.append(row[0])
         self.mds_op_names = tuple(self.mds_op_names)
 
-    ### TODO: this needs a unit test
     def get_ts_ids(self, datetime_start, datetime_end):
         """
         Given a starting and ending time, return the lowest and highest ts_id
         values that encompass those dates, inclusive.
         """
         # First figure out the timestamp range
-        query_str = "SELECT TS_ID FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
+        query_str = "SELECT TIMESTAMP_INFO.TS_ID FROM TIMESTAMP_INFO WHERE TIMESTAMP >= %(ps)s AND TIMESTAMP <= %(ps)s"
         query_variables = (
             datetime_start.strftime("%Y-%m-%d %H:%M:%S"),
             datetime_end.strftime("%Y-%m-%d %H:%M:%S"))
@@ -210,7 +214,7 @@ class LmtDb(cachingdb.CachingDb):
         if table_schema is None:
             raise KeyError("Table '%s' is not valid" % table)
         format_dict = {
-            'schema': ', '.join(table_schema['columns']),
+            'schema': ', '.join(table_schema['columns']).replace("TS_ID,", "TIMESTAMP_INFO.TS_ID,"),
             'table': table,
         }
 
@@ -218,7 +222,10 @@ class LmtDb(cachingdb.CachingDb):
         chunk_start = datetime_start
         ts_id_start, ts_id_end = self.get_ts_ids(datetime_start, datetime_end)
         while chunk_start < datetime_end:
-            chunk_end = chunk_start + timechunk
+            if timechunk is None:
+                chunk_end = datetime_end
+            else:
+                chunk_end = chunk_start + timechunk
             if chunk_end > datetime_end:
                 chunk_end = datetime_end
             start_stamp = long(time.mktime(chunk_start.timetuple()))
@@ -226,13 +233,14 @@ class LmtDb(cachingdb.CachingDb):
             query_str = """SELECT
                                %(schema)s
                            FROM
-                               %(table)s as t
+                               %(table)s
                            INNER JOIN TIMESTAMP_INFO ON TIMESTAMP_INFO.TS_ID = %(table)s.TS_ID
                            WHERE
                                TIMESTAMP_INFO.TIMESTAMP >= %%(ps)s
                                AND TIMESTAMP_INFO.TIMESTAMP < %%(ps)s
                            """ % format_dict
             self.query(query_str, (start_stamp, end_stamp), table=table, table_schema=table_schema)
-            chunk_start += timechunk
+            if timechunk is not None:
+                chunk_start += timechunk
 
         return self.saved_results[table]['rows'][index0:]
