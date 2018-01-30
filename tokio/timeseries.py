@@ -21,7 +21,7 @@ class TimeSeries(object):
     group.
     """
     def __init__(self, start=None, end=None, timestep=None, group=None,
-                 timestamp_key=TIMESTAMP_KEY):
+                 timestamp_key=TIMESTAMP_KEY, sort_hex=False):
         self.timestamps = None
         self.time0 = None
         self.timestep = None
@@ -34,6 +34,7 @@ class TimeSeries(object):
         self.group_metadata = {}
         self.dataset_metadata = {}
         self.timestamp_key = timestamp_key
+        self.sort_hex = sort_hex
 
         if group is not None:
             self.attach_group(group)
@@ -210,7 +211,7 @@ class TimeSeries(object):
         """
         Rearrange the dataset's column data by sorting them by their headings
         """
-        self.rearrange_columns(sorted_nodenames(self.columns))
+        self.rearrange_columns(sorted_nodenames(self.columns, sort_hex=self.sort_hex))
 
     def rearrange_columns(self, new_order):
         """
@@ -296,7 +297,37 @@ class TimeSeries(object):
             converter = numpy.vectorize(lambda x: 1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
         return converter(self.dataset)
 
-def sorted_nodenames(nodenames):
+    def convert_to_deltas(self):
+        """
+        Subtract every row of the dataset from the row that precedes it to
+        convert a matrix of monotonically increasing rows into deltas.  Replaces
+        self.dataset with a matrix with the same number of columns but one fewer
+        row (taken off the bottom of the matrix).  Also adjusts the timestamps
+        dataset.
+        """
+        base_matrix = self.dataset[0:-1, :]
+        matrix_plusplus = self.dataset[1:, :]
+        diff_matrix = matrix_plusplus - base_matrix
+
+        # Correct missing data and replace with -0.0
+        for irow in range(1, self.dataset.shape[0]):
+            for icol in range(0, self.dataset.shape[1]):
+                if self.dataset[irow-1, icol] > self.dataset[irow, icol]:
+    #               print "Replacing (%d, %d) = %d with -0.0" % (
+    #                   irow - 1, icol, diff_matrix[irow - 1, icol])
+                    diff_matrix[irow - 1, icol] = -0.0
+
+        self.dataset = diff_matrix
+        self.timestamps = self.timestamps[0:-1]
+
+    def trim_rows(self, num_rows=1):
+        """
+        Trim some rows off the end of self.dataset and self.timestamps
+        """
+        self.dataset = self.dataset[0:-1*num_rows]
+        self.timestamps = self.timestamps[0:-1*num_rows]
+
+def sorted_nodenames(nodenames, sort_hex=False):
     """
     Gnarly routine to sort nodenames naturally.  Required for nodes named things
     like 'bb23' and 'bb231'.
@@ -306,7 +337,10 @@ def sorted_nodenames(nodenames):
         Convert input into an int if possible; otherwise return unmodified
         """
         try:
-            return int(string)
+            if sort_hex:
+                return int(string, 16)
+            else:
+                return int(string)
         except ValueError:
             return string
 
@@ -316,6 +350,14 @@ def sorted_nodenames(nodenames):
         """
         return map(extract_int, re.findall(r'(\d+|\D+)', string))
 
+    def natural_hex_compare(string):
+        """
+        Tokenize string into alternating strings/ints if possible.  Also
+        recognizes hex, so be careful with ambiguous nodenames like "bb234",
+        which is valid hex.
+        """
+        return map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string))
+
     def natural_comp(arg1, arg2):
         """
         Cast the parts of a string that look like integers into integers, then
@@ -323,4 +365,16 @@ def sorted_nodenames(nodenames):
         """
         return cmp(natural_compare(arg1), natural_compare(arg2))
 
-    return sorted(nodenames, natural_comp)
+    def natural_hex_comp(arg1, arg2):
+        """
+        Cast the parts of a string that look like hex into integers, then
+        sort based on strings and integers rather than only strings.
+        """
+        return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
+
+    if sort_hex:
+        print "Sorting with hex"
+        return sorted(nodenames, natural_hex_comp)
+    else:
+        print "Sorting without hex"
+        return sorted(nodenames, natural_comp)
