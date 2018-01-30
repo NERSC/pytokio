@@ -4,6 +4,7 @@ Retrieve the contents of an LMT database and cache it locally.
 """
 
 import os
+import sys
 import datetime
 import argparse
 import h5py
@@ -65,21 +66,21 @@ def archive_ost_data(lmtdb, init_start, init_end, timestep, output_file, query_s
         ost_id_map[result[0]] = result[1]
 
     # Initialize raw datasets - extend query by one extra timestep so we can calculate deltas
-    query_end_plusplus = query_end + datetime.timedelta(seconds=timestep)
-    datasets = cache_collectdes.init_datasets(init_start=query_start,
-                                              init_end=query_end_plusplus,
+    init_end_plusplus = init_end + datetime.timedelta(seconds=timestep)
+    datasets = cache_collectdes.init_datasets(init_start=init_start,
+                                              init_end=init_end_plusplus,
                                               timestep=timestep,
                                               num_columns=len(columns),
                                               output_file=None,
                                               dataset_names=dataset_names)
 
-    print datasets.keys()
-
     # Set column names
     for dataset in datasets.itervalues():
         dataset.set_columns(columns)
+        dataset.sort_hex = True # because Sonexion nodenames are hex-encoded
 
     # Now query the OST_DATA table to get byte counts over the query time range
+    query_end_plusplus = query_end + datetime.timedelta(seconds=timestep)
     results, columns = lmtdb.get_timeseries_data('OST_DATA', query_start, query_end_plusplus)
 
     # Index the columns before building the Timeseries objects
@@ -113,31 +114,14 @@ def archive_ost_data(lmtdb, init_start, init_end, timestep, output_file, query_s
 
     # Convert some datasets from absolute byte counts to deltas
     for dataset_name in 'datatargets/readbytes', 'datatargets/writebytes':
-        datasets[schema[dataset_name]].dataset = matrix_to_rates(datasets[schema[dataset_name]].dataset)
-        print datasets[schema[dataset_name]].dataset_name
+        datasets[schema[dataset_name]].convert_to_deltas()
+
+    # Trim off the last row from the non-delta datasets to compensate for our
+    # initial over-sizing of the time range by an extra timestamp
+    for dataset_name in 'fullness/bytes', 'fullness/inodes', 'fullness/bytestotal', 'fullness/inodestotal':
+        datasets[schema[dataset_name]].trim_rows(1)
 
     return datasets
-
-def matrix_to_rates(matrix):
-    """
-    Subtract every row of a matrix from the row that precedes it to convert a
-    matrix of monotonically increasing rows into deltas.  Returns an array with
-    the same number of columns but one fewer row (taken off the bottom of the
-    matrix)
-    """
-    base_matrix = matrix[0:-1, :]
-    matrix_plusplus = matrix[1:, :]
-    diff_matrix = matrix_plusplus - base_matrix
-
-    # Correct missing data and replace with -0.0
-    for irow in range(1, matrix.shape[0]):
-        for icol in range(0, matrix.shape[1]):
-            if matrix[irow-1, icol] > matrix[irow, icol]:
-#               print "Replacing (%d, %d) = %d with -0.0" % (
-#                   irow - 1, icol, diff_matrix[irow - 1, icol])
-                diff_matrix[irow - 1, icol] = -0.0
-
-    return diff_matrix
 
 def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end):
     """
