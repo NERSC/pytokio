@@ -199,7 +199,7 @@ def run_disk_query(host, port, index, t_start, t_end, timeout=None):
 
     return es_obj
 
-def init_datasets(init_start, init_end, timestep, num_columns, output_file, group_name, dataset_names):
+def init_datasets(init_start, init_end, timestep, num_columns, output_file, dataset_names):
     """
     Given some parameters, establish the datasets corresponding to a dataset.
 
@@ -207,24 +207,24 @@ def init_datasets(init_start, init_end, timestep, num_columns, output_file, grou
     timestamp - time between consecutive rows, used to init datasets (if necessary)
     num_columns - number of columns to reserve for dataset when initializing (if necessary)
     output_file - the target file name to which we want to bind
-    group_name - parent group of datasets we're loading (e.g., '/bytes')
     dataset_names - list of dataset names within group_name to create/attach
     """
     if output_file and os.path.isfile(output_file):
         output_hdf5 = h5py.File(output_file)
     else:
-        output_hdf5 = [] # this is filthy, but all subsequences use the `in` operator
-
-    # Determine the group of time series we will be populating
-    if group_name in output_hdf5:
-        target_group = output_hdf5[group_name]
-    else:
-        target_group = None
+        output_hdf5 = None
 
     # Determine the time series datasets in the group
     datasets = {}
     for dataset_name in dataset_names:
-        target_dataset_name = group_name + '/' + dataset_name
+        group_name = '/'.join(dataset_name.split('/')[0:-1])
+
+        # Determine the group of time series we will be populating
+        if output_hdf5 and group_name in output_hdf5:
+            target_group = output_hdf5[group_name]
+        else:
+            target_group = None
+
         # Instantiate the TimeSeries object
         datasets[dataset_name] = tokio.timeseries.TimeSeries(start=init_start,
                                                              end=init_end,
@@ -232,10 +232,10 @@ def init_datasets(init_start, init_end, timestep, num_columns, output_file, grou
                                                              group=target_group)
 
         # Attach to or initialize the TimeSeries.dataset object
-        if target_dataset_name in output_hdf5:
-            datasets[dataset_name].attach_dataset(dataset=output_hdf5[target_dataset_name])
+        if output_hdf5 and dataset_name in output_hdf5:
+            datasets[dataset_name].attach_dataset(dataset=output_hdf5[dataset_name])
         else:
-            datasets[dataset_name].init_dataset(dataset_name=target_dataset_name,
+            datasets[dataset_name].init_dataset(dataset_name=dataset_name,
                                                 num_columns=num_columns)
 
     if output_hdf5:
@@ -264,13 +264,12 @@ def pages_to_hdf5(init_start, init_end, timestep, num_servers, output_file, page
     """
 
     # Create TimeSeries objects for each dataset to be populated
-    dataset_names = ['readrates', 'writerates']
+    dataset_names = ['/bytes/readrates', '/bytes/writerates']
     datasets = init_datasets(init_start=init_start,
                              init_end=init_end,
                              timestep=timestep,
                              num_columns=num_servers,
                              output_file=output_file,
-                             group_name='/bytes',
                              dataset_names=dataset_names)
 
     # Iterate over every cached page and commit each to TimeSeries
@@ -279,7 +278,7 @@ def pages_to_hdf5(init_start, init_end, timestep, num_servers, output_file, page
     for page in pages:
         progress += 1
         time0 = time.time()
-        update_bytes(page, datasets['readrates'], datasets['writerates'])
+        update_bytes(page, datasets['/bytes/readrates'], datasets['/bytes/writerates'])
         timef = time.time()
         processing_time += timef - time0
         if tokio.DEBUG:
