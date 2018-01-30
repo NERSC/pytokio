@@ -48,7 +48,7 @@ class TimeSeries(object):
         Attach to an existing h5py Group object
         """
         if self.timestamp_key not in group:
-            raise Exception("Existing dataset contains no timestamps")
+            raise Exception("Existing group contains no timestamps")
 
         self.timestamps = group[self.timestamp_key][:]
         self.time0 = self.timestamps[0]
