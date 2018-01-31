@@ -10,8 +10,8 @@ from ..config import LMT_TIMESTEP
 
 SCHEMA = {
     "1": {
-        "datatargets/readbytes": "/datatarget/readbytes",
-        "datatargets/writebytes": "/datatarget/writebytes",
+        "datatargets/readbytes": "/datatargets/readbytes",
+        "datatargets/writebytes": "/datatargets/writebytes",
         "mdtargets/open": "/mdtarget/open",
         "mdtargets/open": "/mdtarget/open",
         "mdtargets/close": "/mdtarget/close",
