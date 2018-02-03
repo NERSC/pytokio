@@ -34,8 +34,7 @@ def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
     target_dset_name = tokiotest.SAMPLE_COLLECTDES_DSET
     target_group_name = '/'.join(tokiotest.SAMPLE_COLLECTDES_DSET.split('/')[0:-1])
     target_group = output_hdf5[target_group_name]
-    timeseries = tokio.timeseries.TimeSeries(group=target_group)
-    timeseries.attach_dataset(dataset=output_hdf5[target_dset_name])
+    timeseries = tokio.timeseries.TimeSeries(dataset_name=target_dset_name, hdf5_file=output_hdf5)
     return timeseries
 
 def test_rearrange():
@@ -68,7 +67,7 @@ def test_timeseries_deltas():
     """
     TimeSeries.timeseries_deltas()
     """
-    
+
     MAX_DELTA = 9
     NUM_COLS = 16
     NUM_ROWS = 20
@@ -226,7 +225,7 @@ def test_commit_dataset():
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_uneven_columns():
     """
-    TimeSeries.attach_dataset2d with uneven columns
+    TimeSeries.attach_dataset with uneven columns
     """
 
     # We expect to trigger some warnings here
@@ -238,23 +237,34 @@ def test_uneven_columns():
         with open(tokiotest.TEMP_FILE.name, 'w') as output_file:
             shutil.copyfileobj(input_file, output_file)
 
-    # ensure that the input dataset has even column lengths before we make them uneven
+    print "Ensure that the input dataset has even column lengths before we make them uneven"
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r+')
     dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
     orig_col_names = list(dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY])
-    print len(orig_col_names), "==", dataset.shape[1], "?"
-    assert len(orig_col_names) == dataset.shape[1]
+    result = len(orig_col_names) == dataset.shape[1]
+    print "%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result)
+    assert result 
 
-    # test case where there are more column names than shape of dataset
+    print "Test case where there are more column names than shape of dataset"
     extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
-    dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = extra_columns
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
-    print len(timeseries.columns), "==", timeseries.dataset.shape[1], "?"
-    assert len(timeseries.columns) == timeseries.dataset.shape[1]
+    timeseries.set_columns(extra_columns)
+    result = len(timeseries.columns) == timeseries.dataset.shape[1]
+    print "%-3d == %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result)
+    assert result
+    for icol in range(timeseries.dataset.shape[1]):
+        print "%-15s == %15s? %s" % (extra_columns[icol], timeseries.columns[icol],
+                                extra_columns[icol] == timeseries.columns[icol])
+        assert extra_columns[icol] == timeseries.columns[icol]
 
-    # test cases where column names are incomplete compared to shape of dataset
+    print "Test cases where column names are incomplete compared to shape of dataset"
     fewer_columns = orig_col_names[0:-(3*len(orig_col_names)/4)]
-    dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY] = fewer_columns
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
-    print len(timeseries.columns), "<", timeseries.dataset.shape[1], "?"
-    assert len(timeseries.columns) < timeseries.dataset.shape[1]
+    timeseries.set_columns(fewer_columns)
+    result = len(timeseries.columns) < timeseries.dataset.shape[1]
+    print "%-3d < %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result)
+    assert result
+    for icol in range(len(fewer_columns)):
+        print "%-15s == %15s? %s" % (fewer_columns[icol], timeseries.columns[icol],
+                                fewer_columns[icol] == timeseries.columns[icol])
+        assert fewer_columns[icol] == timeseries.columns[icol]
