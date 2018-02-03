@@ -12,6 +12,7 @@ import warnings
 import numpy
 
 TIMESTAMP_KEY = 'timestamps'
+DEFAULT_TIMESTAMP_DATASET = 'timestamps'
 COLUMN_NAME_KEY = 'columns'
 
 class TimeSeries(object):
@@ -20,51 +21,54 @@ class TimeSeries(object):
     initialize with no datasets, or initialize against an existing HDF5
     group.
     """
-    def __init__(self, start=None, end=None, timestep=None, group=None,
-                 timestamp_key=TIMESTAMP_KEY, sort_hex=False):
-        self.timestamps = None
-        self.time0 = None
-        self.timestep = None
+    def __init__(self, dataset_name=None,
+                 start=None, end=None, timestep=None, num_columns=None,
+                 column_names=None, timestamp_key=DEFAULT_TIMESTAMP_DATASET,
+                 hdf5_file=None, sort_hex=False):
 
+        # numpy.ndarray of timestamp measurements
+        self.timestamps = None
+
+        # time between consecutive timestamps
+        self.timestep = None
+        # numpy.ndarray of the timeseries data itself
         self.dataset = None
+        # string containing fully qualified dataset name+path
         self.dataset_name = None
+        # list of strings serving as column headings
         self.columns = []
-        self.num_columns = 0
+        # map between strings in self.columns and its corresponding column index in self.dataset
         self.column_map = {}
+        # key-value of metadata to be stored in HDF5 group.attrs
         self.group_metadata = {}
+        # key-value of metadata to be stored in HDF5 dataset.attrs
         self.dataset_metadata = {}
+        # path corresponding to self.timestamps dataset in HDF5 file
         self.timestamp_key = timestamp_key
+        # True = natural sort columns assuming hex-encoded numbers; False = only recognize decimals
         self.sort_hex = sort_hex
 
-        if group is not None:
-            self.attach_group(group)
-        else:
-            if start is None or end is None or timestep is None:
-                raise Exception("Must specify either ({start,end,timestep}|group)")
-            else:
-                self.init_group(start, end, timestep)
+        # attempt to init/attach the object if requested
+        if dataset_name is not None:
+            if hdf5_file is not None:
+                self.attach(hdf5_file, dataset_name)
+            elif start and end and timestep and num_columns:
+                if column_names is None:
+                    column_names = []
+                self.init(start, end, timestep, num_columns, dataset_name, column_names,
+                          timestamp_key)
 
-    def attach_group(self, group):
+    def init(self, start, end, timestep, num_columns, dataset_name,
+             column_names=None, timestamp_key=DEFAULT_TIMESTAMP_DATASET):
         """
-        Attach to an existing h5py Group object
-        """
-        if self.timestamp_key not in group:
-            raise Exception("Existing group contains no timestamps")
+        Create a new TimeSeries dataset object
 
-        self.timestamps = group[self.timestamp_key][:]
-        print "Attached to existing group with timestamps of shape", self.timestamps.shape
-        self.time0 = self.timestamps[0]
-        self.timestep = self.timestamps[1] - self.timestamps[0]
-        for key, value in group.attrs.iteritems():
-            self.group_metadata[key] = value
+        Responsible for setting self.timestep, self.timestamp_key, and self.timestamps
+        """
+        if column_names is None:
+            column_names = []
 
-    def init_group(self, start, end, timestep):
-        """
-        Initialize the object from scratch
-        """
-        if start is None or end is None or timestep is None:
-            raise Exception("Must specify either ({start,end,timestep}|group)")
-        self.time0 = long(time.mktime(start.timetuple()))
+        # Attach the timestep dataset
         self.timestep = timestep
 
         time_list = []
@@ -75,6 +79,107 @@ class TimeSeries(object):
 
         self.timestamps = numpy.array(time_list)
 
+        # Attach the dataset itself
+        self.dataset_name = dataset_name
+        self.set_columns(column_names)
+        self.dataset = numpy.full((len(self.timestamps), num_columns), -0.0)
+
+        # Root the timestamp_key at the same parent as the dataset
+        self.timestamp_key = self.dataset.parent.name + '/' + timestamp_key
+
+    def attach(self, hdf5_file, dataset_name):
+        """
+        Populate a TimeSeries dataset object with the data from an existing HDF5 dataset.
+
+        Responsible for setting self.dataset_name, self.columns, self.dataset,
+        self.dataset_metadata, self.group_metadata, self.timestamp_key
+        """
+        self.dataset_name = dataset_name
+
+        if dataset_name in hdf5_file:
+            dataset = hdf5_file[dataset_name]
+        else:
+            raise KeyError("dataset_name %s not in %s; use init() instead" %
+                           (dataset_name, hdf5_file.name))
+
+        # copy dataset into memory
+        self.dataset = dataset[:, :]
+
+        # copy columns into memory
+        if COLUMN_NAME_KEY in dataset.attrs:
+            columns = list(dataset.attrs[COLUMN_NAME_KEY])
+            self.set_columns(columns)
+        else:
+            warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
+
+        # copy metadata into memory
+        for key, value in dataset.attrs.iteritems():
+            self.dataset_metadata[key] = value
+        for key, value in dataset.parent.attrs.iteritems():
+            self.group_metadata[key] = value
+
+        # identify the dataset containing timestamps for this dataset
+        if TIMESTAMP_KEY in self.dataset_metadata:
+            self.timestamp_key = self.dataset_metadata[TIMESTAMP_KEY]
+        else:
+            self.timestamp_key = self.dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
+
+        # Load timestamps dataset into memory
+        if self.timestamp_key not in self.dataset.parent:
+            raise KeyError("timestamp_key %s does not exist" % self.timestamp_key)
+        self.timestamps = hdf5_file[self.timestamp_key][:]
+        self.timestep = self.timestamps[1] - self.timestamps[0]
+
+    def commit_dataset(self, hdf5_file, **kwargs):
+        """
+        Write contents of this object into an HDF5 file group
+        """
+        extra_dataset_args = {'dtype': 'f8'}.update(kwargs)
+        # If we are creating a new group, first insert the new timestamps
+        if self.timestamp_key not in hdf5_file:
+            timestamps_hdf5 = hdf5_file.create_dataset(name=self.timestamp_key,
+                                                       shape=self.timestamps.shape,
+                                                       dtype='i8')
+            # Copy the in-memory timestamp dataset into the HDF5 file
+            timestamps_hdf5[:] = self.timestamps[:]
+
+        # Otherwise, verify that our dataset will fit into the existing timestamps
+        else:
+            if not numpy.array_equal(self.timestamps, timestamps_hdf5[:]):
+                print 'we have shape', self.timestamps.shape
+                print 'but we need to fit into shape', timestamps_hdf5.shape
+                raise Exception("Attempting to commit to a group with different timestamps")
+
+        # Create the dataset in the HDF5 file
+        if self.dataset_name in hdf5_file:
+            dataset_hdf5 = hdf5_file[self.dataset_name]
+        else:
+            dataset_hdf5 = hdf5_file.create_dataset(name=self.dataset_name,
+                                                    shape=self.dataset.shape,
+                                                    **extra_dataset_args)
+
+        # If we're updating an existing HDF5, use its column names and ordering.
+        # Otherwise sort the columns before committing them.
+        if COLUMN_NAME_KEY in dataset_hdf5.attrs:
+            self.rearrange_columns(list(dataset_hdf5.attrs[COLUMN_NAME_KEY]))
+        else:
+            self.sort_columns()
+
+        # Copy the in-memory dataset into the HDF5 file
+        dataset_hdf5[:, :] = self.dataset[:, :]
+
+        # Copy column names into metadata before committing metadata
+        self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
+        self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
+
+        # Insert/update dataset metadata
+        for key, value in self.dataset_metadata.iteritems():
+            dataset_hdf5.attrs[key] = value
+
+        # Insert/update group metadata
+        for key, value in self.group_metadata.iteritems():
+            dataset_hdf5.parent.attrs[key] = value
+
     def update_column_map(self):
         """
         Create the mapping of column names to column indices
@@ -83,132 +188,34 @@ class TimeSeries(object):
         for index, column_name in enumerate(self.columns):
             self.column_map[column_name] = index
 
-    def init_dataset(self, *args, **kwargs):
-        """
-        Dimension-independent wrapper around init_dataset2d
-        """
-        self.init_dataset2d(*args, **kwargs)
-
-    def attach_dataset(self, *args, **kwargs):
-        """
-        Dimension-independent wrapper around attach_dataset2d
-        """
-        self.attach_dataset2d(*args, **kwargs)
-
-    def init_dataset2d(self, dataset_name, num_columns, default_value=-0.0):
-        """
-        Initialize the dataset from scratch
-        """
-        self.dataset_name = dataset_name
-        self.columns = []
-        self.num_columns = len(self.columns)
-        self.dataset = numpy.full((len(self.timestamps), num_columns), default_value)
-        self.update_column_map()
-
-    def attach_dataset2d(self, dataset):
-        """
-        Initialize the dataset from an existing h5py Dataset object
-        """
-        self.dataset_name = dataset.name
-        self.dataset = dataset[:, :]
-        if COLUMN_NAME_KEY in dataset.attrs:
-            columns = list(dataset.attrs[COLUMN_NAME_KEY])
-            num_columns = len(columns)
-            # handle case where HDF5 has more column names than dataset columns via truncation
-            if num_columns > self.dataset.shape[1]:
-                columns = columns[0:self.dataset.shape[1]]
-                truncated = columns[self.dataset.shape[1]:]
-                warnings.warn(
-                    "Dataset has %d column names but %d columns; truncating columns %s"
-                    % (num_columns, self.dataset.shape[1], ', '.join(truncated)))
-            # add columns one by one
-            for column in columns:
-                self.add_column(column)
-        else:
-            warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
-
-        for key, value in dataset.attrs.iteritems():
-            self.dataset_metadata[key] = value
-
-    def commit_dataset(self, *args, **kwargs):
-        """
-        Dimension-independent wrapper around commit_dataset2d
-        """
-        self.commit_dataset2d(*args, **kwargs)
-
-    def commit_dataset2d(self, hdf5_file):
-        """
-        Write contents of this object into an HDF5 file group
-        """
-        # Create the timestamps dataset
-        group_name = '/'.join(self.dataset_name.split('/')[0:-1])
-        timestamps_dataset_name = group_name + '/' + self.timestamp_key
-
-        # If we are creating a new group, first insert the new timestamps
-        if timestamps_dataset_name not in hdf5_file:
-            hdf5_file.create_dataset(name=timestamps_dataset_name,
-                                     shape=self.timestamps.shape,
-                                     dtype='i8')
-            # Copy the in-memory timestamp dataset into the HDF5 file
-            hdf5_file[timestamps_dataset_name][:] = self.timestamps[:]
-        # Otherwise, verify that our dataset will fit into the existing timestamps
-        else:
-            if not numpy.array_equal(self.timestamps, hdf5_file[timestamps_dataset_name][:]):
-                print 'we have shape', self.timestamps.shape
-                print 'but we need to fit into shape', hdf5_file[timestamps_dataset_name].shape
-                raise Exception("Attempting to commit to a group with different timestamps")
-
-        # Insert/update group metadata
-        for key, value in self.group_metadata.iteritems():
-            hdf5_file[group_name].attrs[key] = value
-
-        # Create the dataset in the HDF5 file
-        if self.dataset_name not in hdf5_file:
-            hdf5_file.create_dataset(name=self.dataset_name,
-                                     shape=self.dataset.shape,
-                                     dtype='f8',
-                                     chunks=True,
-                                     compression='gzip')
-
-        # If we're updating an existing HDF5, use its column names and ordering.
-        # Otherwise sort the columns before committing them.
-        if COLUMN_NAME_KEY in hdf5_file[self.dataset_name].attrs:
-            self.rearrange_columns(list(hdf5_file[self.dataset_name].attrs[COLUMN_NAME_KEY]))
-        else:
-            self.sort_columns()
-
-        # Copy the in-memory dataset into the HDF5 file
-        hdf5_file[self.dataset_name][:, :] = self.dataset[:, :]
-
-        # Copy column names into metadata before committing metadata
-        self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
-        self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
-
-        # Insert/update dataset metadata
-        for key, value in self.dataset_metadata.iteritems():
-            hdf5_file[self.dataset_name].attrs[key] = value
-
     def set_columns(self, column_names):
         """
         Set the list of column names
         """
+        num_columns = len(column_names)
+        # handle case where HDF5 has more column names than dataset columns via truncation
+        if num_columns > self.dataset.shape[1]:
+            column_names = self.columns[0:self.dataset.shape[1]]
+            truncated = self.columns[self.dataset.shape[1]:]
+            warnings.warn(
+                "Dataset has %d column names but %d columns; dropping columns %s"
+                % (num_columns, self.dataset.shape[1], ', '.join(truncated)))
         self.columns = column_names
-        self.num_columns = len(self.columns)
         self.update_column_map()
 
     def add_column(self, column_name):
         """
         Add a new column and update the column map
         """
-        index = self.num_columns
+        index = len(self.columns)
         if column_name in self.column_map:
             warnings.warn("Adding degenerate column '%s' at %d (exists at %d)"
                           % (column_name, index, self.column_map[column_name]))
         self.column_map[column_name] = index
-        if index >= (self.num_columns + 1):
-            raise IndexError("index %d exceeds length of columns %d" % (index, self.num_columns))
+        if index >= (self.dataset.shape[1]):
+            raise IndexError("index %d exceeds number of columns %d"
+                             % (index, self.dataset.shape[1]))
         self.columns.append(str(column_name)) # convert from unicode to str for numpy
-        self.num_columns += 1
         return index
 
     def sort_columns(self):
@@ -267,13 +274,12 @@ class TimeSeries(object):
         use that function to reconcile any existing values in the element to be
         updated.
         """
-        # calculate the timeseries index and check bounds
         timestamp_epoch = long(time.mktime(timestamp.timetuple()))
-        t_index = (timestamp_epoch - self.time0) / self.timestep
-        if t_index >= self.timestamps.shape[0]:
-            return False
+        t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
+        if t_index >= self.timestamps.shape[0]: # check bounds
+            return False                        # out of bounds element is non-fatal
 
-        # if this is a new hostname, create a new column for it
+        # create a new column label if necessary
         c_index = self.column_map.get(column_name)
         if c_index is None:
             c_index = self.add_column(column_name)
@@ -296,9 +302,11 @@ class TimeSeries(object):
         the number of missing elements in the array.
         """
         if inverse:
-            converter = numpy.vectorize(lambda x: 0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
+            converter = numpy.vectorize(lambda x:
+                                        0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
         else:
-            converter = numpy.vectorize(lambda x: 1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
+            converter = numpy.vectorize(lambda x:
+                                        1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
         return converter(self.dataset)
 
     def convert_to_deltas(self):
@@ -330,8 +338,7 @@ def sorted_nodenames(nodenames, sort_hex=False):
         try:
             if sort_hex:
                 return int(string, 16)
-            else:
-                return int(string)
+            return int(string)
         except ValueError:
             return string
 
@@ -365,8 +372,7 @@ def sorted_nodenames(nodenames, sort_hex=False):
 
     if sort_hex:
         return sorted(nodenames, natural_hex_comp)
-    else:
-        return sorted(nodenames, natural_comp)
+    return sorted(nodenames, natural_comp)
 
 def timeseries_deltas(dataset):
     """
