@@ -122,10 +122,10 @@ class TimeSeries(object):
         if TIMESTAMP_KEY in self.dataset_metadata:
             self.timestamp_key = self.dataset_metadata[TIMESTAMP_KEY]
         else:
-            self.timestamp_key = self.dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
+            self.timestamp_key = dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
 
         # Load timestamps dataset into memory
-        if self.timestamp_key not in self.dataset.parent:
+        if self.timestamp_key not in dataset.parent:
             raise KeyError("timestamp_key %s does not exist" % self.timestamp_key)
         self.timestamps = hdf5_file[self.timestamp_key][:]
         self.timestep = self.timestamps[1] - self.timestamps[0]
@@ -134,7 +134,9 @@ class TimeSeries(object):
         """
         Write contents of this object into an HDF5 file group
         """
-        extra_dataset_args = {'dtype': 'f8'}.update(kwargs)
+        extra_dataset_args = {'dtype': 'f8'}
+        extra_dataset_args.update(kwargs)
+
         # If we are creating a new group, first insert the new timestamps
         if self.timestamp_key not in hdf5_file:
             timestamps_hdf5 = hdf5_file.create_dataset(name=self.timestamp_key,
