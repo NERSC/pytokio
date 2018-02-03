@@ -52,6 +52,7 @@ class TimeSeries(object):
             raise Exception("Existing group contains no timestamps")
 
         self.timestamps = group[self.timestamp_key][:]
+        print "Attached to existing group with timestamps of shape", self.timestamps.shape
         self.time0 = self.timestamps[0]
         self.timestep = self.timestamps[1] - self.timestamps[0]
         for key, value in group.attrs.iteritems():
@@ -153,6 +154,8 @@ class TimeSeries(object):
         # Otherwise, verify that our dataset will fit into the existing timestamps
         else:
             if not numpy.array_equal(self.timestamps, hdf5_file[timestamps_dataset_name][:]):
+                print 'we have shape', self.timestamps.shape
+                print 'but we need to fit into shape', hdf5_file[timestamps_dataset_name].shape
                 raise Exception("Attempting to commit to a group with different timestamps")
 
         # Insert/update group metadata
@@ -179,6 +182,7 @@ class TimeSeries(object):
 
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
+        self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
 
         # Insert/update dataset metadata
         for key, value in self.dataset_metadata.iteritems():
@@ -360,10 +364,8 @@ def sorted_nodenames(nodenames, sort_hex=False):
         return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
 
     if sort_hex:
-        print "Sorting with hex"
         return sorted(nodenames, natural_hex_comp)
     else:
-        print "Sorting without hex"
         return sorted(nodenames, natural_comp)
 
 def timeseries_deltas(dataset):
