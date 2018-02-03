@@ -64,6 +64,145 @@ def test_sort():
     timeseries2.sort_columns()
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
+def test_timeseries_deltas():
+    """
+    TimeSeries.timeseries_deltas()
+    """
+    
+    MAX_DELTA = 9
+    NUM_COLS = 16
+    NUM_ROWS = 20
+
+    numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format})
+    random.seed(0)
+
+    # Create an array of random deltas as our ground truth
+    actual_deltas = numpy.random.random(size=(NUM_ROWS, NUM_COLS)) * MAX_DELTA
+    first_row = numpy.random.random(size=(1, NUM_COLS)) * MAX_DELTA
+#   actual_deltas = numpy.full((NUM_ROWS, NUM_COLS), 2.0)
+#   first_row = numpy.full((1, NUM_COLS), 2.0)
+
+    # Calculate the monotonically increasing dataset that would result in these deltas
+    monotonic_values = actual_deltas.copy()
+    monotonic_values = numpy.vstack((first_row, actual_deltas)).copy()
+    for irow in range(1, monotonic_values.shape[0]):
+        monotonic_values[irow, :] += monotonic_values[irow - 1, :]
+
+    print "Actual monotonic values:"
+    print monotonic_values
+    print
+
+    print "Actual deltas:"
+    print actual_deltas
+    print
+
+    # Delete some data from our sample monotonically increasing dataset
+    # Columns 0-3 are hand-picked to exercise all edge cases
+    delete_data = [
+        ( 1,  0),
+        ( 2,  0),
+        ( 5,  0),
+        ( 0,  1),
+        ( 1,  1),
+        ( 1,  2),
+        ( 3,  2),
+        (-1,  2),
+        (-2,  2),
+        ( 0,  3),
+        (-1,  3),
+    ]
+    # Columns 4-7 are low density errors
+    for _ in range(int(NUM_COLS * NUM_ROWS / 4)):
+        delete_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(4, 8)))
+
+    # Columns 8-11 are high density errors
+    for _ in range(int(3 * NUM_COLS * NUM_ROWS / 4)):
+        delete_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(8, 12)))
+
+    # Columns 12-15 are nonzero but non-monotonic flips
+    START_FLIP = 12
+    flip_data = []
+    for _ in range(int(3 * NUM_COLS * NUM_ROWS / 4)):
+        flip_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(12, 16)))
+
+    for coordinates in delete_data:
+        monotonic_values[coordinates] = 0.0
+
+    print "Matrix after introducing data loss:"
+    print monotonic_values
+    print
+
+    for irow, icol in flip_data:
+        if irow == 0:
+            irow_complement = irow + 1
+        else:
+            irow_complement = irow - 1
+        temp = monotonic_values[irow, icol]
+        monotonic_values[irow, icol] = monotonic_values[irow_complement, icol]
+        monotonic_values[irow_complement, icol] = temp
+
+    print "Matrix after flipping data order:"
+    print monotonic_values
+    print
+
+    # Call the routine being tested to regenerate the deltas matrix
+    calculated_deltas = tokio.timeseries.timeseries_deltas(monotonic_values)
+
+    # Check to make sure that the total data moved according to our function
+    # matches the logical total obtained by subtracting the largest absolute
+    # measurement from the smallest
+    print "Checking each column's sum (missing data)"
+    for icol in range(START_FLIP):
+        truth = actual_deltas[:, icol].sum()
+        calculated = calculated_deltas[:, icol].sum()
+        total_delta = monotonic_values[:, icol].max() - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
+        print 'truth=', truth, \
+              'from piecewise deltas=', calculated, \
+              'from total delta=', total_delta
+        assert numpy.isclose(calculated, total_delta)
+
+        # Calculated delta should either be equal to (no data loss) or less than
+        # (data lost) than ground truth.  It should never reflect MORE total
+        # than the ground truth.
+        assert numpy.isclose(truth - calculated, 0.0) or ((truth - calculated) > 0)
+
+    print "Checking each column's sum (flipped data)"
+    for icol in range(START_FLIP, actual_deltas.shape[1]):
+        truth = actual_deltas[:, icol].sum()
+        calculated = calculated_deltas[:, icol].sum()
+        total_delta = monotonic_values[:, icol].max() - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
+        print 'truth=', truth, \
+              'from piecewise deltas=', calculated, \
+              'from total delta=', total_delta
+        assert numpy.isclose(calculated, total_delta) or ((total_delta - calculated) > 0)
+        assert numpy.isclose(truth, calculated) or ((truth - calculated) > 0)
+
+
+    # Now do an element-by-element comparison
+    close_matrix = numpy.isclose(calculated_deltas, actual_deltas)
+    print "Is each calculated delta close to the ground-truth deltas?"
+    print close_matrix
+    print
+
+    # Some calculated values will _not_ be the same because the data loss we
+    # induced, well, loses data.  However we can account for known differences
+    # and ensure that nothing unexpected is different.
+    fix_matrix = numpy.full(close_matrix.shape, False)
+    for irow, icol in delete_data + flip_data:
+        fix_matrix[irow, icol] = True
+        if irow - 1 >= 0:
+            fix_matrix[irow - 1, icol] = True
+
+    for irow, icol in flip_data:
+        if irow == 0:
+            fix_matrix[irow + 1, icol] = True
+
+    print "Matrix of known deviations from the ground truth:"
+    print fix_matrix
+    print
+    assert (close_matrix | fix_matrix).all()
+
+
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_commit_dataset():
     """

@@ -299,25 +299,12 @@ class TimeSeries(object):
 
     def convert_to_deltas(self):
         """
-        Subtract every row of the dataset from the row that precedes it to
-        convert a matrix of monotonically increasing rows into deltas.  Replaces
+        Convert a matrix of monotonically increasing rows into deltas.  Replaces
         self.dataset with a matrix with the same number of columns but one fewer
         row (taken off the bottom of the matrix).  Also adjusts the timestamps
         dataset.
         """
-        base_matrix = self.dataset[0:-1, :]
-        matrix_plusplus = self.dataset[1:, :]
-        diff_matrix = matrix_plusplus - base_matrix
-
-        # Correct missing data and replace with -0.0
-        for irow in range(1, self.dataset.shape[0]):
-            for icol in range(0, self.dataset.shape[1]):
-                if self.dataset[irow-1, icol] > self.dataset[irow, icol]:
-    #               print "Replacing (%d, %d) = %d with -0.0" % (
-    #                   irow - 1, icol, diff_matrix[irow - 1, icol])
-                    diff_matrix[irow - 1, icol] = -0.0
-
-        self.dataset = diff_matrix
+        self.dataset = timeseries_deltas(self.dataset)
         self.timestamps = self.timestamps[0:-1]
 
     def trim_rows(self, num_rows=1):
@@ -378,3 +365,36 @@ def sorted_nodenames(nodenames, sort_hex=False):
     else:
         print "Sorting without hex"
         return sorted(nodenames, natural_comp)
+
+def timeseries_deltas(dataset):
+    """
+    Subtract every row of the dataset from the row that precedes it to
+    convert a matrix of monotonically increasing rows into deltas.  This is a
+    lossy process because the deltas for the final measurement of the time
+    series cannot be calculated.
+    """
+    diff_matrix = numpy.full((dataset.shape[0] - 1, dataset.shape[1]), -0.0)
+
+    prev_nonzero = [None] * dataset.shape[1] # the last known valid measurement
+    searching = [True] * dataset.shape[1] # are we spanning a gap in data?
+    for irow in range(dataset.shape[0]):
+        for icol in range(dataset.shape[1]):
+            this_element = dataset[irow, icol]
+
+            if irow == 0:
+                if this_element != 0.0:
+                    prev_nonzero[icol] = this_element
+            elif searching[icol]:
+                if this_element != 0.0:
+                    if prev_nonzero[icol] is not None:
+                        diff_matrix[irow - 1, icol] = this_element - prev_nonzero[icol]
+                        searching[icol] = False
+                    prev_nonzero[icol] = this_element
+            else:
+                if this_element < dataset[irow - 1, icol]: # found a missing data point
+                    searching[icol] = True
+                else:
+                    diff_matrix[irow - 1, icol] = this_element - dataset[irow - 1, icol]
+                    prev_nonzero[icol] = this_element
+
+    return diff_matrix
