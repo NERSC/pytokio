@@ -91,6 +91,7 @@ SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 
 SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/bytes/readrates'
+SAMPLE_COLLECTDES_DSET2 = '/bytes/writerates'
 
 SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
 SAMPLE_COLLECTDES_QUERY = {

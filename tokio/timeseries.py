@@ -159,6 +159,8 @@ class TimeSeries(object):
             timestamps_hdf5[:] = self.timestamps[:]
             t_start = 0
             t_end = self.timestamps.shape[0]
+            start_timestamp = self.timestamps[0]
+            end_timestamp = self.timestamps[-1] + self.timestep
         else:
             existing_timestamps, _ = extract_timestamps(hdf5_file, self.dataset_name)
             t_start, t_end = get_insert_indices(self.timestamps, existing_timestamps)
@@ -169,6 +171,23 @@ class TimeSeries(object):
             or t_end > len(existing_timestamps):
                 raise IndexError("cannot commit dataset that is not a subset of existing data")
 
+            start_timestamp = existing_timestamps[0]
+            end_timestamp = existing_timestamps[-1] + self.timestep
+
+        # Make sure that the start/end timestamps are consistent with the HDF5
+        # file's global time range
+        if 'start' not in hdf5_file.attrs:
+            hdf5_file.attrs['start'] = start_timestamp
+            hdf5_file.attrs['end'] = end_timestamp
+        else:
+            if hdf5_file.attrs['start'] != start_timestamp \
+            or hdf5_file.attrs['end'] != end_timestamp:
+#               warnings.warn(
+                raise IndexError(
+                    "Mismatched start or end values:  %d != %d or %d != %d" % (
+                    start_timestamp, hdf5_file.attrs['start'],
+                    end_timestamp, hdf5_file.attrs['end']))
+
         # If we're updating an existing HDF5, use its column names and ordering.
         # Otherwise sort the columns before committing them.
         if COLUMN_NAME_KEY in dataset_hdf5.attrs:
@@ -178,7 +197,6 @@ class TimeSeries(object):
 
         # Copy the in-memory dataset into the HDF5 file
         dataset_hdf5[t_start:t_end, :] = self.dataset[:, :]
-        print "Inserting data between %d and %d" % (t_start, t_end)
 
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
@@ -192,7 +210,6 @@ class TimeSeries(object):
         # Insert/update group metadata
         for key, value in self.group_metadata.iteritems():
             dataset_hdf5.parent.attrs[key] = value
-
 
     def update_column_map(self):
         """
@@ -333,6 +350,19 @@ class TimeSeries(object):
         """
         self.dataset = self.dataset[0:-1*num_rows]
         self.timestamps = self.timestamps[0:-1*num_rows]
+
+    def add_rows(self, num_rows=1):
+        """
+        Add additional rows to the end of self.dataset and self.timestamps
+        """
+        new_dataset_rows = numpy.full((num_rows, self.dataset.shape[1]), -0.0)
+        new_timestamps = []
+        for index in range(num_rows):
+            new_timestamps.append(self.timestamps[-1] + (index + 1) * self.timestep)
+        new_timestamp_rows = numpy.array(new_timestamps)
+
+        self.dataset = numpy.vstack((self.dataset, new_dataset_rows))
+        self.timestamps = numpy.hstack((self.timestamps, new_timestamp_rows))
 
 def sorted_nodenames(nodenames, sort_hex=False):
     """

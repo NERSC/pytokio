@@ -25,13 +25,14 @@ def compare_timeseries(timeseries1, timeseries2, verbose=False):
         assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index],
                                  timeseries2.dataset[:, timeseries2_index])
 
-def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
+def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5,
+                        dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET):
     """
     Return a TimeSeries object that's initialized against the tokiotest sample
     input
     """
     output_hdf5 = h5py.File(file_name, 'r')
-    timeseries = tokio.timeseries.TimeSeries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET,
+    timeseries = tokio.timeseries.TimeSeries(dataset_name=dataset_name,
                                              hdf5_file=output_hdf5)
     return timeseries
 
@@ -152,6 +153,9 @@ def test_timeseries_deltas():
         monotonic_values[irow, icol] = monotonic_values[irow_complement, icol]
         monotonic_values[irow_complement, icol] = temp
 
+    print "Flipping the following:"
+    print flip_data
+    print
     print "Matrix after flipping data order:"
     print monotonic_values
     print
@@ -211,6 +215,10 @@ def test_timeseries_deltas():
     print "Matrix of known deviations from the ground truth:"
     print fix_matrix
     print
+
+    print "Non-missing and known-missing data (everything should be True):"
+    print (close_matrix | fix_matrix)
+    print
     assert (close_matrix | fix_matrix).all()
 
 
@@ -234,6 +242,93 @@ def test_commit_dataset():
     # Compare the original to the reprocessed
     print "Comparing before/after read/write/read"
     compare_timeseries(timeseries2, timeseries1, verbose=True)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_commit_dataset_bad_bounds():
+    """
+    TimeSeries.commit_dataset() with out-of-bounds
+    """
+    tokiotest.TEMP_FILE.close()
+
+    # Connect to the sample input file
+    timeseries1 = generate_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET)
+    timeseries2 = generate_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET2)
+
+    # Write the output as a new HDF5 file (should work like normal)
+    with h5py.File(tokiotest.TEMP_FILE.name, 'w') as hdf5_file:
+        timeseries1.commit_dataset(hdf5_file)
+
+    # Now trim down the dataset so it no longer spans the same range as the
+    # existing HDF5 file - this should work, because the HDF5 will simply retain
+    # its start/end since the new data being committed is a complete subset
+    print "Attempting trimmed down dataset"
+    timeseries1.trim_rows(3)
+    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+        timeseries1.commit_dataset(hdf5_file)
+
+    # Add back the rows we took off, and then some - this should NOT work
+    # because the data now goes beyond the original maximum timestamp for the
+    # file
+    print "Attempting bloated existing dataset"
+    timeseries1.add_rows(12)
+    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+        print 'Global start:', hdf5_file.attrs.get('start')
+        print 'Global end:  ', hdf5_file.attrs.get('end')
+        caught = False
+        try:
+            timeseries1.commit_dataset(hdf5_file)
+        except IndexError:
+            caught = True
+        assert caught
+
+    # Now commit a completely new dataset that doesn't fit - this should throw
+    # a warning (or should we make it throw an exception?)
+    print "Attempting bloated non-existent dataset"
+    timeseries2.add_rows(12)
+    timeseries2.dataset_name = '/blah/blah'
+    timeseries2.timestamp_key = '/blah/timestamps'
+    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+        print 'Global start:', hdf5_file.attrs.get('start')
+        print 'Global end:  ', hdf5_file.attrs.get('end')
+        caught = False
+        try:
+            timeseries2.commit_dataset(hdf5_file)
+        except IndexError:
+            caught = True
+#       with warnings.catch_warnings(record=True) as warn:
+#           caught = True
+#           # cause all warnings to always be triggered
+#           warnings.simplefilter("always")
+#           timeseries2.commit_dataset(hdf5_file)
+#           print len(warn)
+#           assert len(warn) == 1
+#           print warn[-1].category, type(warn[-1].category)
+#           assert issubclass(warn[-1].category, UserWarning)
+#           assert "some warning message" in str(warn[-1].message)
+        assert caught
+
+def test_add_rows():
+    """
+    TimeSeries.add_rows()
+    """
+    ADD_ROWS = 5
+    timeseries = generate_timeseries()
+    orig_row = timeseries.timestamps.copy()
+    orig_row_count = timeseries.timestamps.shape[0]
+    timeseries.add_rows(ADD_ROWS)
+
+    prev_deltim = None
+    for index in range(1, timeseries.dataset.shape[0]):
+        new_deltim = timeseries.timestamps[index] - timeseries.timestamps[index - 1]
+        if prev_deltim is not None:
+            assert new_deltim == prev_deltim
+        prev_deltim = new_deltim
+
+    print "Orig timestamps:", orig_row[-5: -1]
+    print "Now timestamps: ", timeseries.timestamps[-5 - ADD_ROWS: -1]
+    assert prev_deltim > 0
+    assert timeseries.timestamps.shape[0] == timeseries.dataset.shape[0]
+    assert (timeseries.timestamps.shape[0] - ADD_ROWS) == orig_row_count
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_uneven_columns():
