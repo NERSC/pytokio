@@ -47,6 +47,8 @@ class TimeSeries(object):
         self.timestamp_key = timestamp_key
         # True = natural sort columns assuming hex-encoded numbers; False = only recognize decimals
         self.sort_hex = sort_hex
+        # string describing schema version
+        self.version = None
 
         # attempt to attach the object if requested.
         if dataset_name is not None:
@@ -114,6 +116,8 @@ class TimeSeries(object):
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
 
+        self.schema = dataset.attrs.get('version')
+
         # copy metadata into memory
         for key, value in dataset.attrs.iteritems():
             self.dataset_metadata[key] = value
@@ -179,6 +183,7 @@ class TimeSeries(object):
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
         self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
+        self.dataset_metadata['version'] = str(self.version)
 
         # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
         for key, value in self.dataset_metadata.iteritems():
