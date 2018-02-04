@@ -162,10 +162,14 @@ class LmtDb(cachingdb.CachingDb):
             cache_file=cache_file)
 
         # The list of OST names is an immutable property of a database, so
-        # fetch and cache it here
+        # fetch and cache it here.  Also maintain a mapping of OST_ID to
+        # OST_NAME so we don't have to do JOINs in SQL; this will not scale
+        # to gargantuan Lustre clusters though.
         self.ost_names = []
-        for row in self.query('SELECT DISTINCT OST_NAME FROM OST_INFO ORDER BY OST_NAME;'):
-            self.ost_names.append(row[0])
+        self.ost_id_map = {}
+        for row in self.query('SELECT OST_ID, OST_NAME FROM OST_INFO'):
+            self.ost_names.append(row[1])
+            self.ost_id_map[row[0]] = row[1]
         self.ost_names = tuple(self.ost_names)
 
         # Do the same for OSSes
