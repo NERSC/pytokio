@@ -48,6 +48,7 @@ SAMPLE_NERSCJOBSDB_HOST = 'edison'
 SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'sample_lmtdb.sqlite3')
 SAMPLE_LMTDB_START = 1517126400
 SAMPLE_LMTDB_END = 1517126700
+SAMPLE_LMTDB_TIMESTEP = 5
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
