@@ -31,10 +31,8 @@ def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
     input
     """
     output_hdf5 = h5py.File(file_name, 'r')
-    target_dset_name = tokiotest.SAMPLE_COLLECTDES_DSET
-    target_group_name = '/'.join(tokiotest.SAMPLE_COLLECTDES_DSET.split('/')[0:-1])
-    target_group = output_hdf5[target_group_name]
-    timeseries = tokio.timeseries.TimeSeries(dataset_name=target_dset_name, hdf5_file=output_hdf5)
+    timeseries = tokio.timeseries.TimeSeries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET,
+                                             hdf5_file=output_hdf5)
     return timeseries
 
 def test_rearrange():
@@ -51,6 +49,7 @@ def test_rearrange():
     print new_col_order
     timeseries2.rearrange_columns(new_col_order)
 
+    print "Comparing before/after rearrange_columns()"
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 def test_sort():
@@ -61,6 +60,7 @@ def test_sort():
     timeseries2 = generate_timeseries()
 
     timeseries2.sort_columns()
+    print "Comparing before/after sort_columns()"
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 def test_timeseries_deltas():
@@ -220,6 +220,7 @@ def test_commit_dataset():
     timeseries2 = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
 
     # Compare the original to the reprocessed
+    print "Comparing before/after read/write/read"
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -268,3 +269,31 @@ def test_uneven_columns():
         print "%-15s == %15s? %s" % (fewer_columns[icol], timeseries.columns[icol],
                                 fewer_columns[icol] == timeseries.columns[icol])
         assert fewer_columns[icol] == timeseries.columns[icol]
+
+def test_negative_zero_matrix():
+    """
+    timeseries.negative_zero_matrix()
+    """
+    NUM_COLS = 40 
+    NUM_ROWS = 800
+    NUM_MISSING = NUM_COLS * NUM_ROWS / 4
+
+    random.seed(0)
+    dataset = numpy.random.random(size=(NUM_ROWS, NUM_COLS)) + 0.1
+    inverse = numpy.full((NUM_ROWS, NUM_COLS), False)
+    
+    remove_list = set([])
+    for _ in range(NUM_MISSING):
+        irow = numpy.random.randint(0, NUM_ROWS)
+        icol = numpy.random.randint(0, NUM_COLS)
+        remove_list.add((irow, icol))
+
+    for irow, icol in remove_list:
+        dataset[irow, icol] = -0.0
+        inverse[irow, icol] = True
+
+    missing_matrix = tokio.timeseries.negative_zero_matrix(dataset)
+
+    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list), missing_matrix.sum())
+    assert len(remove_list)== missing_matrix.sum()
+    assert ((missing_matrix == 0.0) | inverse).all()
