@@ -12,6 +12,8 @@ SCHEMA = {
     "1": {
         "datatargets/readbytes": "/datatargets/readbytes",
         "datatargets/writebytes": "/datatargets/writebytes",
+        "datatargets/readrates": "/datatargets/readrates",
+        "datatargets/writerates": "/datatargets/writerates",
         "mdtargets/open": "/mdtarget/open",
         "mdtargets/open": "/mdtarget/open",
         "mdtargets/close": "/mdtarget/close",
