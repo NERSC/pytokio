@@ -158,7 +158,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
     datasets = archive_ost_data(lmtdb, query_start, query_end, timestep, output_file)
 
     with h5py.File(output_file) as hdf5_file:
-        hdf5_file['/'].attrs['version'] = SCHEMA_VERSION
+        hdf5_file.attrs['version'] = SCHEMA_VERSION
 
         init_hdf5_file(datasets, init_start, init_end, hdf5_file)
 
