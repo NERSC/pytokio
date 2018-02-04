@@ -12,9 +12,11 @@ import pandas
 from .. import config
 from _hdf5 import *
 
-NO_SCHEMA_VERSION = -1
-
 SCHEMA = {
+    None: {
+        "datatargets/readrates": "/OSTReadGroup/OSTBulkReadDataSet",
+        "datatargets/writerates": "/OSTWriteGroup/OSTBulkWriteDataSet",
+    },
     "1": {
         "datatargets/readbytes": "/datatargets/readbytes",
         "datatargets/writebytes": "/datatargets/writebytes",
@@ -63,6 +65,22 @@ SCHEMA = {
 # calculated from datasets that _do_ exist to the functions that do these
 # conversions
 SCHEMA_DATASET_PROVIDERS = {
+    None: {
+        "datatargets/readbytes": { 
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'OSTReadGroup/OSTBulkReadDataSet',
+                'to_rates': False,
+            },
+        },
+        "datatargets/writebytes": {
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'OSTWriteGroup/OSTBulkWriteDataSet',
+                'to_rates': False,
+            },
+        },
+    },
     "1": {
         "datatargets/readbytes": { 
             'func': convert_bytes_rates,
@@ -111,18 +129,18 @@ class Hdf5(h5py.File):
         """
         super(Hdf5, self).__init__(*args, **kwargs)
 
-        self.version = self.attrs.get('version', NO_SCHEMA_VERSION)
+        self.version = self.attrs.get('version')
 
         # Connect the schema map to this object
-        if self.version == NO_SCHEMA_VERSION:
-            self.schema = {}
-        elif self.version in SCHEMA:
+        if self.version in SCHEMA:
             self.schema = SCHEMA[self.version]
+        elif self.version == None:
+            self.schema = {}
         else:
             raise KeyError("Unknown schema version %s" % self.version)
 
         # Connect the schema dataset providers to this object
-        if self.version in SCHEMA:
+        if self.version in SCHEMA_DATASET_PROVIDERS:
             self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self.version]
         else:
             self.dataset_providers = {}
@@ -138,23 +156,22 @@ class Hdf5(h5py.File):
         try:
             # If the dataset exists in the underlying HDF5 file, just return it
             return super(Hdf5, self).__getitem__(key)
+
         except KeyError:
-            # If there is a straight mapping between the key and a dataset...
+            # Straight mapping between the key and a dataset
             key = key.lstrip('/') if isinstance(key, basestring) else key
             if key in self.schema:
-                hdf5_key = self.schema[key]
-
-                # If that mapped key exists in the underlying HDF5, use it
+                hdf5_key = self.schema.get(key)
                 if super(Hdf5, self).__contains__(hdf5_key):
                     return super(Hdf5, self).__getitem__(hdf5_key)
 
-                # If that mapped key can be used to generate the requested dataset, generate it
-                elif key in self.dataset_providers:
-                    provider_func = self.dataset_providers[key]['func']
-                    provider_args = self.dataset_providers[key]['args']
-                    return provider_func(self, **provider_args)
-            else:
-                raise
+            # Key maps to a transformation
+            if key in self.dataset_providers:
+                provider_func = self.dataset_providers[key]['func']
+                provider_args = self.dataset_providers[key]['args']
+                return provider_func(self, **provider_args)
+
+            raise
 
     def get_index(self, target_datetime):
         """
@@ -245,6 +262,9 @@ def extract_timestamps(hdf5_file, dataset_name):
     if hdf5_dataset is None:
         return None, None
 
+    if hdf5_file.attrs.get('version') is None:
+        return _extract_timestamps_legacy(hdf5_file, dataset_name)
+
     # Identify the dataset containing timestamps for this dataset
     if TIMESTAMP_KEY in hdf5_dataset.attrs:
         timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
@@ -258,3 +278,10 @@ def extract_timestamps(hdf5_file, dataset_name):
     timestamps = hdf5_file[timestamp_key]
 
     return timestamps, timestamp_key
+
+def _extract_timestamps_legacy(hdf5_file, dataset_name):
+    """
+    Retrieve timestamps for an old pylmt-style HDF5 file
+    """
+    key = '/FSStepsGroup/FSStepsDataSet'
+    return hdf5_file[key], key
