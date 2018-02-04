@@ -11,15 +11,18 @@ import math
 import datetime
 import argparse
 import numpy
-import h5py
+import tokio.connectors.hdf5
 
 DIVISOR = 1024.0 # or 1000.0 for base-10
 
 def humanize_units(byte_count):
-    units = [ "bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" ]
+    """
+    Convert a raw byte count into human-readable base2 units
+    """
+    units = ["bytes", "KiB", "MiB", "GiB", "TiB"]
     result = byte_count
     index = 0
-    while index < len(units):
+    while index < len(units) - 1:
         new_result = result / DIVISOR
         if new_result < 1.0:
             break
@@ -43,13 +46,15 @@ def convert_signed_zeroes(matrix, inverse=False):
     return converter(matrix)
 
 def summarize_tts_hdf5(hdf5_file):
-    timestep = hdf5_file['/bytes/timestamps'][1] - hdf5_file['/bytes/timestamps'][0]
-    read_bytes = hdf5_file['/bytes/readrates'][:,:].sum() * timestep
-    write_bytes = hdf5_file['/bytes/writerates'][:,:].sum() * timestep
+    """
+    Generate summary data based on the contents of TOKIO timeseries HDF5 file
+    """
+    read_bytes = hdf5_file['/datatargets/readbytes'][:, :].sum()
+    write_bytes = hdf5_file['/datatargets/writebytes'][:, :].sum()
 
     # readrates and writerates come via the same collectd message, so if one is
     # missing, both are missing
-    values = hdf5_file['/bytes/readrates'][:,:]
+    values = hdf5_file['/datatargets/readbytes'][:, :]
     num_missing = convert_signed_zeroes(values).sum()
     total = values.shape[0] * values.shape[1]
 
@@ -77,24 +82,24 @@ def print_timesteps(hdf5_file):
     """
     Print a summary of read/write bytes for each time step
     """
-    timestamps = hdf5_file['/bytes/timestamps'][:]
-    timestep = timestamps[1] - timestamps[0]
-    read_bytes = hdf5_file['/bytes/readrates'][:,:].sum(axis=1) * timestep
-    write_bytes = hdf5_file['/bytes/writerates'][:,:].sum(axis=1) * timestep
+    timestamps = hdf5_file['/datatargets/timestamps'][:]
+    read_bytes = hdf5_file['/datatargets/readbytes'][:, :].sum(axis=1)
+    write_bytes = hdf5_file['/datatargets/writebytes'][:, :].sum(axis=1)
 
     for index, timestamp in enumerate(timestamps):
-        print "%12s %14.2f read, %14.2f written" % (datetime.datetime.fromtimestamp(timestamp), read_bytes[index], write_bytes[index])
+        print "%12s %14.2f read, %14.2f written" % (datetime.datetime.fromtimestamp(timestamp),
+                                                    read_bytes[index],
+                                                    write_bytes[index])
 
 def print_columns(hdf5_file):
     """
     Print a summary of read/write bytes for each device
     """
-    timestep = hdf5_file['/bytes/timestamps'][1] - hdf5_file['/bytes/timestamps'][0]
-    for index, column_name in enumerate(list(hdf5_file['/bytes/readrates'].attrs['columns'])):
+    for index, column_name in enumerate(list(hdf5_file['/datatargets/readbytes'].attrs['columns'])):
         print "%12s %14.2f read, %14.2f written" % (
             column_name,
-            hdf5_file['/bytes/readrates'][:, index].sum() * timestep,
-            hdf5_file['/bytes/writerates'][:, index].sum() * timestep)
+            hdf5_file['/datatargets/readbytes'][:, index].sum(),
+            hdf5_file['/datatargets/writebytes'][:, index].sum())
 
 def _summarize_tts_hdf5():
     """
@@ -107,7 +112,7 @@ def _summarize_tts_hdf5():
     parser.add_argument('--columns', action='store_true', help='print a summary of each column')
     args = parser.parse_args()
 
-    hdf5_file = h5py.File(args.file, 'r')
+    hdf5_file = tokio.connectors.hdf5.Hdf5(args.file, 'r')
     results = summarize_tts_hdf5(hdf5_file)
     if args.timesteps:
         print_timesteps(hdf5_file)
