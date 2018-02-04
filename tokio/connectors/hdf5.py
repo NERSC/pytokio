@@ -10,7 +10,6 @@ import datetime
 import h5py
 import pandas
 from .. import config
-from .. import timeseries
 from _hdf5 import *
 
 NO_SCHEMA_VERSION = -1
@@ -95,6 +94,10 @@ SCHEMA_DATASET_PROVIDERS = {
         },
     },
 }
+
+TIMESTAMP_KEY = 'timestamps'
+DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
+COLUMN_NAME_KEY = 'columns'
 
 class Hdf5(h5py.File):
     """
@@ -227,3 +230,31 @@ class Hdf5(h5py.File):
                                 index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
                                 columns=col_header)
 
+    def extract_timestamps(self, dataset_name):
+        """
+        Return timestamps dataset corresponding to given dataset name
+        """
+        return extract_timestamps(self, dataset_name)
+
+def extract_timestamps(hdf5_file, dataset_name):
+    """
+    Reach into an HDF5 file and extract the timestamps dataset for a given dataset name
+    """
+    # Get dataset out of HDF5 file
+    hdf5_dataset = hdf5_file.get(dataset_name)
+    if hdf5_dataset is None:
+        return None, None
+
+    # Identify the dataset containing timestamps for this dataset
+    if TIMESTAMP_KEY in hdf5_dataset.attrs:
+        timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
+    else:
+        timestamp_key = hdf5_dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
+
+    # Load timestamps dataset into memory
+    if timestamp_key not in hdf5_file:
+        raise KeyError("timestamp_key %s does not exist" % timestamp_key)
+
+    timestamps = hdf5_file[timestamp_key]
+
+    return timestamps, timestamp_key

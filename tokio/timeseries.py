@@ -10,10 +10,8 @@ import time
 import datetime
 import warnings
 import numpy
+import tokio.connectors.hdf5
 
-TIMESTAMP_KEY = 'timestamps'
-DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
-COLUMN_NAME_KEY = 'columns'
 
 class TimeSeries(object):
     """
@@ -88,7 +86,8 @@ class TimeSeries(object):
 
         # Root the timestamp_key at the same parent as the dataset
         if self.timestamp_key is None:
-            self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] + [DEFAULT_TIMESTAMP_DATASET])
+            self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] \
+                                 + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
 
     def attach(self, hdf5_file, dataset_name, light=False):
         """
@@ -110,8 +109,8 @@ class TimeSeries(object):
         self.dataset = dataset if light else dataset[:, :]
 
         # copy columns into memory
-        if COLUMN_NAME_KEY in dataset.attrs:
-            columns = list(dataset.attrs[COLUMN_NAME_KEY])
+        if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset.attrs:
+            columns = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
             self.set_columns(columns)
         else:
             warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
@@ -124,7 +123,7 @@ class TimeSeries(object):
         for key, value in dataset.parent.attrs.iteritems():
             self.group_metadata[key] = value
 
-        self.timestamps, self.timestamp_key = extract_timestamps(hdf5_file, dataset_name)
+        self.timestamps, self.timestamp_key = tokio.connectors.hdf5.extract_timestamps(hdf5_file, dataset_name)
         self.timestamps = self.timestamps if light else self.timestamps[:]
 
         self.timestep = self.timestamps[1] - self.timestamps[0]
@@ -162,7 +161,7 @@ class TimeSeries(object):
             start_timestamp = self.timestamps[0]
             end_timestamp = self.timestamps[-1] + self.timestep
         else:
-            existing_timestamps, _ = extract_timestamps(hdf5_file, self.dataset_name)
+            existing_timestamps, _ = tokio.connectors.hdf5.extract_timestamps(hdf5_file, self.dataset_name)
             t_start, t_end = get_insert_indices(self.timestamps, existing_timestamps)
 
             if t_start < 0 \
@@ -190,8 +189,8 @@ class TimeSeries(object):
 
         # If we're updating an existing HDF5, use its column names and ordering.
         # Otherwise sort the columns before committing them.
-        if COLUMN_NAME_KEY in dataset_hdf5.attrs:
-            self.rearrange_columns(list(dataset_hdf5.attrs[COLUMN_NAME_KEY]))
+        if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset_hdf5.attrs:
+            self.rearrange_columns(list(dataset_hdf5.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY]))
         else:
             self.sort_columns()
 
@@ -199,7 +198,7 @@ class TimeSeries(object):
         dataset_hdf5[t_start:t_end, :] = self.dataset[:, :]
 
         # Copy column names into metadata before committing metadata
-        self.dataset_metadata[COLUMN_NAME_KEY] = self.columns
+        self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
         self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
         self.dataset_metadata['version'] = str(self.version)
 
@@ -459,29 +458,6 @@ def negative_zero_matrix(dataset, inverse=False):
         converter = numpy.vectorize(lambda x:
                                     1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
     return converter(dataset)
-
-def extract_timestamps(hdf5_file, dataset_name):
-    """
-    Reach into an HDF5 file and extract the timestamps dataset for a given dataset name
-    """
-    # Get dataset out of HDF5 file
-    hdf5_dataset = hdf5_file.get(dataset_name)
-    if hdf5_dataset is None:
-        return None, None
-
-    # Identify the dataset containing timestamps for this dataset
-    if TIMESTAMP_KEY in hdf5_dataset.attrs:
-        timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
-    else:
-        timestamp_key = hdf5_dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
-
-    # Load timestamps dataset into memory
-    if timestamp_key not in hdf5_file:
-        raise KeyError("timestamp_key %s does not exist" % timestamp_key)
-
-    timestamps = hdf5_file[timestamp_key]
-
-    return timestamps, timestamp_key
 
 def get_insert_indices(my_timestamps, existing_timestamps):
     """

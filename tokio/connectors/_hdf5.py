@@ -40,7 +40,7 @@ def multiply_by_timestep(return_value, parent_dataset, divide=False):
     """
     hdf5_file = parent_dataset.file
     dataset_name = parent_dataset.name
-    timestamps, _ = tokio.timeseries.extract_timestamps(hdf5_file, dataset_name)
+    timestamps, _ = tokio.connectors.hdf5.extract_timestamps(hdf5_file, dataset_name)
 
     if timestamps is None:
         errmsg = "Could not find timestamps for %s in %s" % (dataset_name, hdf5_file.filename)

@@ -348,7 +348,7 @@ def test_uneven_columns():
     print "Ensure that the input dataset has even column lengths before we make them uneven"
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r+')
     dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
-    orig_col_names = list(dataset.attrs[tokio.timeseries.COLUMN_NAME_KEY])
+    orig_col_names = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
     result = len(orig_col_names) == dataset.shape[1]
     print "%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result)
     assert result 
