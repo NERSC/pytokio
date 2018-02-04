@@ -35,6 +35,18 @@ def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
                                              hdf5_file=output_hdf5)
     return timeseries
 
+def generate_light_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
+    """
+    Return a TimeSeries object that's initialized against the tokiotest sample
+    input.  Uses light=True when attaching to prevent loading the entire dataset
+    into memory.
+    """
+    output_hdf5 = h5py.File(file_name, 'r')
+    timeseries = tokio.timeseries.TimeSeries()
+
+    timeseries.attach(output_hdf5, dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET, light=True)
+    return timeseries
+
 def test_rearrange():
     """
     TimeSeries.rearrange_columns()
@@ -269,6 +281,16 @@ def test_uneven_columns():
         print "%-15s == %15s? %s" % (fewer_columns[icol], timeseries.columns[icol],
                                 fewer_columns[icol] == timeseries.columns[icol])
         assert fewer_columns[icol] == timeseries.columns[icol]
+
+def test_light_attach():
+    """
+    TimeSeries.attach_dataset with light attach
+    """
+    tokiotest.TEMP_FILE.close()
+
+    full = generate_timeseries()
+    light = generate_light_timeseries()
+    compare_timeseries(light, full, verbose=True)
 
 def test_negative_zero_matrix():
     """
