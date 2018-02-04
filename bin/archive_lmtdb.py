@@ -15,10 +15,6 @@ DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
 
 SCHEMA_VERSION = "1"
-OST_DATA_VERSION = "1"
-OSS_DATA_VERSION = "1"
-MDS_OPS_DATA_VERSION = "1"
-MDS_DATA_VERSION = "1"
 
 def archive_mds_data(lmtdb, datetime_start, datetime_end):
     """
@@ -114,12 +110,12 @@ def archive_ost_data(lmtdb, query_start, query_end, timestep, output_file):
         datasets[dataset_name].trim_rows(1)
 
     # Dataset metadata
-    datasets['datatargets/readbytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
-    datasets['datatargets/writebytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
-    datasets['fullness/bytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
-    datasets['fullness/inodes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'inodes'})
-    datasets['fullness/bytestotal'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
-    datasets['fullness/inodestotal'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'inodes'})
+    datasets['datatargets/readbytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
+    datasets['datatargets/writebytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
+    datasets['fullness/bytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
+    datasets['fullness/inodes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'inodes'})
+    datasets['fullness/bytestotal'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
+    datasets['fullness/inodestotal'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'inodes'})
 
     # Group metadata
     datasets['datatargets/readbytes'].group_metadata.update({'source': 'lmt'})
