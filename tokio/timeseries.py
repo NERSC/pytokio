@@ -130,7 +130,11 @@ class TimeSeries(object):
         """
         Write contents of this object into an HDF5 file group
         """
-        extra_dataset_args = {'dtype': 'f8'}
+        extra_dataset_args = {
+            'dtype': 'f8',
+            'chunks': True,
+            'compression': 'gzip',
+        }
         extra_dataset_args.update(kwargs)
 
         # Create the dataset in the HDF5 file (if necessary)
@@ -306,13 +310,7 @@ class TimeSeries(object):
         converts negative zeros to ones and all other data into zeros then count up
         the number of missing elements in the array.
         """
-        if inverse:
-            converter = numpy.vectorize(lambda x:
-                                        0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
-        else:
-            converter = numpy.vectorize(lambda x:
-                                        1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
-        return converter(self.dataset)
+        return negative_zero_matrix(self.dataset)
 
     def convert_to_deltas(self):
         """
@@ -411,6 +409,21 @@ def timeseries_deltas(dataset):
                     prev_nonzero[icol] = this_element
 
     return diff_matrix
+
+def negative_zero_matrix(dataset, inverse=False):
+    """
+    Because we initialize datasets with -0.0, we can scan the sign bit of every
+    element of an array to determine how many data were never populated.  This
+    converts negative zeros to ones and all other data into zeros then count up
+    the number of missing elements in the array.
+    """
+    if inverse:
+        converter = numpy.vectorize(lambda x:
+                                    0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
+    else:
+        converter = numpy.vectorize(lambda x:
+                                    1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
+    return converter(dataset)
 
 def extract_timestamps(hdf5_file, dataset_name):
     """
