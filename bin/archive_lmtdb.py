@@ -8,13 +8,17 @@ import sys
 import datetime
 import argparse
 import h5py
-import cache_collectdes
+import tokio.timeseries
 import tokio.connectors.lmtdb
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
 
-VERSION = "1"
+SCHEMA_VERSION = "1"
+OST_DATA_VERSION = "1"
+OSS_DATA_VERSION = "1"
+MDS_OPS_DATA_VERSION = "1"
+MDS_DATA_VERSION = "1"
 
 def archive_mds_data(lmtdb, datetime_start, datetime_end):
     """
@@ -34,53 +38,41 @@ def archive_oss_data(lmtdb, datetime_start, datetime_end):
     """
     pass
 
-def archive_ost_data(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end):
+def archive_ost_data(lmtdb, query_start, query_end, timestep, output_file):
     """
     Extract and encode data from LMT's OST_DATA table (read/write bytes)
     """
-    schema = tokio.connectors.hdf5.SCHEMA.get(VERSION)
+    schema = tokio.connectors.hdf5.SCHEMA.get(SCHEMA_VERSION)
     if schema is None:
-        raise KeyError("Schema version %d is not known by connectors.hdf5" % VERSION)
+        raise KeyError("Schema version %d is not known by connectors.hdf5" % SCHEMA_VERSION)
+
     dataset_names = [
-        schema['datatargets/readbytes'],
-        schema['datatargets/writebytes'],
-        schema['fullness/bytes'],
-        schema['fullness/bytestotal'],
-        schema['fullness/inodes'],
-        schema['fullness/inodestotal'],
+        'datatargets/readbytes',
+        'datatargets/writebytes',
+        'fullness/bytes',
+        'fullness/bytestotal',
+        'fullness/inodes',
+        'fullness/inodestotal',
     ]
 
-    # Pluck out group name from dataset names
-    group_names = set([])
-    for dataset_name in dataset_names:
-        group_names.add(os.path.dirname(dataset_name))
-
-    # Get number of columns
-    results = lmtdb.query("SELECT OST_ID, OST_NAME FROM OST_INFO")
-    columns = [ str(x[1]) for x in results ]
-
-    # Load the entire OST_ID map into memory.  This won't scale to gargantuan
-    # Lustre clusters, but it is faster than joining in SQL.
-    ost_id_map = {}
-    for result in results:
-        ost_id_map[result[0]] = result[1]
-
     # Initialize raw datasets - extend query by one extra timestep so we can calculate deltas
-    init_end_plusplus = init_end + datetime.timedelta(seconds=timestep)
-    datasets = cache_collectdes.init_datasets(init_start=init_start,
-                                              init_end=init_end_plusplus,
-                                              timestep=timestep,
-                                              num_columns=len(columns),
-                                              output_file=None,
-                                              dataset_names=dataset_names)
-
-    # Set column names
-    for dataset in datasets.itervalues():
-        dataset.set_columns(columns)
-        dataset.sort_hex = True # because Sonexion nodenames are hex-encoded
+    query_end_plusplus = query_end + datetime.timedelta(seconds=timestep)
+    datasets = {}
+    for dataset_name in dataset_names:
+        hdf5_dataset_name = schema.get(dataset_name)
+        if hdf5_dataset_name is None:
+            warnings.warn("Skipping %s (not in schema)" % dataset_name)
+        else:
+            datasets[dataset_name] = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                                 start=query_start,
+                                                                 end=query_end_plusplus,
+                                                                 timestep=timestep,
+                                                                 num_columns=len(lmtdb.ost_names),
+                                                                 column_names=lmtdb.ost_names,
+                                                                 hdf5_file=None,
+                                                                 sort_hex=True)
 
     # Now query the OST_DATA table to get byte counts over the query time range
-    query_end_plusplus = query_end + datetime.timedelta(seconds=timestep)
     results, columns = lmtdb.get_timeseries_data('OST_DATA', query_start, query_end_plusplus)
 
     # Index the columns before building the Timeseries objects
@@ -104,37 +96,79 @@ def archive_ost_data(lmtdb, init_start, init_end, timestep, output_file, query_s
         else:
             # MySQL timestamps are automatically converted to datetime.datetime
             timestamp = row[idx_timestamp]
-        col_name = ost_id_map[row[idx_ostid]]
-        datasets[schema['datatargets/readbytes']].insert_element(timestamp, col_name, row[idx_readbytes])
-        datasets[schema['datatargets/writebytes']].insert_element(timestamp, col_name, row[idx_writebytes])
-        datasets[schema['fullness/bytes']].insert_element(timestamp, col_name, row[idx_kbused])
-        datasets[schema['fullness/inodes']].insert_element(timestamp, col_name, row[idx_inodesused])
-        datasets[schema['fullness/bytestotal']].insert_element(timestamp, col_name, row[idx_kbused] + row[idx_kbfree])
-        datasets[schema['fullness/inodestotal']].insert_element(timestamp, col_name, row[idx_inodesused] + row[idx_inodesfree])
+        col_name = lmtdb.ost_id_map[row[idx_ostid]]
+        datasets['datatargets/readbytes'].insert_element(timestamp, col_name, row[idx_readbytes])
+        datasets['datatargets/writebytes'].insert_element(timestamp, col_name, row[idx_writebytes])
+        datasets['fullness/bytes'].insert_element(timestamp, col_name, row[idx_kbused])
+        datasets['fullness/inodes'].insert_element(timestamp, col_name, row[idx_inodesused])
+        datasets['fullness/bytestotal'].insert_element(timestamp, col_name, row[idx_kbused] + row[idx_kbfree])
+        datasets['fullness/inodestotal'].insert_element(timestamp, col_name, row[idx_inodesused] + row[idx_inodesfree])
 
     # Convert some datasets from absolute byte counts to deltas
     for dataset_name in 'datatargets/readbytes', 'datatargets/writebytes':
-        datasets[schema[dataset_name]].convert_to_deltas()
+        datasets[dataset_name].convert_to_deltas()
 
     # Trim off the last row from the non-delta datasets to compensate for our
     # initial over-sizing of the time range by an extra timestamp
     for dataset_name in 'fullness/bytes', 'fullness/inodes', 'fullness/bytestotal', 'fullness/inodestotal':
-        datasets[schema[dataset_name]].trim_rows(1)
+        datasets[dataset_name].trim_rows(1)
+
+    # Dataset metadata
+    datasets['datatargets/readbytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
+    datasets['datatargets/writebytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
+    datasets['fullness/bytes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
+    datasets['fullness/inodes'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'inodes'})
+    datasets['fullness/bytestotal'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'bytes'})
+    datasets['fullness/inodestotal'].dataset_metadata.update({'version': OST_DATA_VERSION, 'units': 'inodes'})
+
+    # Group metadata
+    datasets['datatargets/readbytes'].group_metadata.update({'source': 'lmt'})
+    datasets['datatargets/writebytes'].group_metadata.update({'source': 'lmt'})
+    datasets['fullness/bytes'].group_metadata.update({'source': 'lmt'})
+    datasets['fullness/inodes'].group_metadata.update({'source': 'lmt'})
+    datasets['fullness/bytestotal'].group_metadata.update({'source': 'lmt'})
+    datasets['fullness/inodestotal'].group_metadata.update({'source': 'lmt'})
 
     return datasets
+
+def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
+    """
+    Initialize the datasets at full dimensions in the HDF5 file if necessary
+    """
+    schema = tokio.connectors.hdf5.SCHEMA.get(SCHEMA_VERSION)
+    for dataset_name, dataset in datasets.iteritems():
+        hdf5_dataset_name = schema.get(dataset_name)
+        if hdf5_dataset_name is None:
+            warnings.warn("Dataset key %s is not in schema" % dataset_name)
+            continue
+        if hdf5_dataset_name not in hdf5_file:
+            new_dataset = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                      start=init_start,
+                                                      end=init_end,
+                                                      timestep=dataset.timestep,
+                                                      num_columns=dataset.dataset.shape[1],
+                                                      hdf5_file=hdf5_file)
+            new_dataset.commit_dataset(hdf5_file)
+            print "Initialized %s in %s with size %s" % (
+                hdf5_dataset_name,
+                hdf5_file.name,
+                new_dataset.dataset.shape)
 
 def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end):
     """
     Given a start and end time, retrieve all of the relevant contents of an LMT
     database.
     """
-    datasets = archive_ost_data(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end)
+    datasets = archive_ost_data(lmtdb, query_start, query_end, timestep, output_file)
 
-    output_hdf5 = h5py.File(output_file)
-    for dataset in datasets.itervalues():
-        print "Writing out %s" % dataset.dataset_name
-        dataset.commit_dataset(output_hdf5)
-    output_hdf5.close()
+    with h5py.File(output_file) as hdf5_file:
+        hdf5_file['/'].attrs['version'] = SCHEMA_VERSION
+
+        init_hdf5_file(datasets, init_start, init_end, hdf5_file)
+
+        for dataset in datasets.itervalues():
+            print "Writing out %s" % dataset.dataset_name
+            dataset.commit_dataset(hdf5_file)
 
     if tokio.DEBUG:
         print "Wrote output to %s" % output_file
@@ -149,7 +183,7 @@ def _archive_lmtdb():
     parser.add_argument('--init-start', type=str, default=None, help='min timestamp if creating new output file, in %s format (default: same as start)' % DATE_FMT_PRINT)
     parser.add_argument('--init-end', type=str, default=None, help='max timestamp if creating new output file, in %s format (default: same as end)' % DATE_FMT_PRINT)
     parser.add_argument('--debug', action='store_true', help="produce debug messages")
-    parser.add_argument('--timestep', type=int, default=10, help='collection frequency, in seconds (default: 10)')
+    parser.add_argument('--timestep', type=int, default=5, help='collection frequency, in seconds (default: 5)')
     parser.add_argument("--host", type=str, default=None, help="database hostname")
     parser.add_argument("--user", type=str, default=None, help="database user")
     parser.add_argument("--password", type=str, default=None, help="database password")
