@@ -26,10 +26,6 @@ SCHEMA_VERSION = "1"
 DATASET_NAMES = [
     'datatargets/readrates',
     'datatargets/writerates',
-    'fullness/bytes',
-    'fullness/bytestotal',
-    'fullness/inodes',
-    'fullness/inodestotal',
 ]
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -139,6 +135,12 @@ def process_page(pages, datasets):
             index_errors += 1
         if not write_ok:
             index_errors += 1
+
+    # Metadata
+    datasets['datatargets/readrates'].dataset_metadata.update({'units': 'bytes/sec'})
+    datasets['datatargets/writerates'].dataset_metadata.update({'units': 'bytes/sec'})
+    datasets['datatargets/readrates'].group_metadata.update({'source': 'collectd_disk'})
+    datasets['datatargets/writerates'].group_metadata.update({'source': 'collectd_disk'})
 
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
