@@ -86,7 +86,7 @@ SCHEMA_DATASET_PROVIDERS = {
             },
         },
         "datatargets/writerates": {
-            'funct': map_and_transpose,
+            'func': map_and_transpose,
             'args': {
                 'from_key': "/OSTWriteGroup/OSTBulkWriteDataSet",
             },
@@ -175,23 +175,56 @@ class Hdf5(h5py.File):
         if resolved_key:
             return super(Hdf5, self).__getitem__(resolved_key)
         elif provider:
-            provider_func = provider['func']
-            provider_args = provider['args']
-            return provider_func(self, **provider_args)
+            provider_func = provider.get('func')
+            provider_args = provider.get('args', {})
+            if provider_func is None:
+                errmsg = "No provider function for %s" % key
+                raise KeyError(errmsg)
+            else:
+                return provider_func(self, **provider_args)
         else:
             # this should never be hit based on the possible outputs of _resolve_schema_key
             errmsg = "_resolve_schema_key: undefined output from %s" % key
+            raise KeyError(errmsg)
+
+    def _resolve_schema_key(self, key):
+        """
+        Given a key, either return a key that can be used to index self
+        directly, or return a provider function and arguments to generate the
+        dataset dynamically
+        """
+        print "looking for %s in %s" % (key, self.filename)
+        try:
+            # If the dataset exists in the underlying HDF5 file, just return it
+            super(Hdf5, self).__getitem__(key)
+            return key, None
+
+        except KeyError:
+            # Straight mapping between the key and a dataset
+            key = key.lstrip('/') if isinstance(key, basestring) else key
+            if key in self.schema:
+                hdf5_key = self.schema.get(key)
+                if super(Hdf5, self).__contains__(hdf5_key):
+                    return hdf5_key, None
+
+            # Key maps to a transformation
+            if key in self.dataset_providers:
+                return None, self.dataset_providers[key]
+
+            errmsg = "Unknown key %s in %s" % (key, self.filename)
             raise KeyError(errmsg)
 
     def get_columns(self, dataset_name):
         """
         Get the column names of a dataset
         """
+        # retrieve the dataset to resolve the schema key or get MappedDataset
+        dataset = self.__getitem__(dataset_name)
 
         if self.version is None:
-            dataset_name = dataset_name.lstrip('/')
+            dataset_name = dataset.name.lstrip('/')
             if dataset_name in H5LMT_COLUMN_ATTRS:
-                return self[dataset_name].attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+                return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
             else:
                 return []
         else:
@@ -220,6 +253,12 @@ class Hdf5(h5py.File):
             time0 = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
 
         return int((target_datetime - time0).total_seconds()) / int(self.timestep)
+
+    def get_timestamps(self, dataset_name):
+        """
+        Return timestamps dataset corresponding to given dataset name
+        """
+        return get_timestamps(self, dataset_name)
 
     def to_dataframe(self, dataset_name=None):
         """
@@ -270,38 +309,6 @@ class Hdf5(h5py.File):
         return pandas.DataFrame(data=values,
                                 index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
                                 columns=col_header)
-
-    def get_timestamps(self, dataset_name):
-        """
-        Return timestamps dataset corresponding to given dataset name
-        """
-        return get_timestamps(self, dataset_name)
-
-    def _resolve_schema_key(self, key):
-        """
-        Given a key, either return a key that can be used to index self
-        directly, or return a provider function and arguments to generate the
-        dataset dynamically
-        """
-        try:
-            # If the dataset exists in the underlying HDF5 file, just return it
-            super(Hdf5, self).__getitem__(key)
-            return key, None
-
-        except KeyError:
-            # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isinstance(key, basestring) else key
-            if key in self.schema:
-                hdf5_key = self.schema.get(key)
-                if super(Hdf5, self).__contains__(hdf5_key):
-                    return hdf5_key, None
-
-            # Key maps to a transformation
-            if key in self.dataset_providers:
-                return None, self.dataset_providers[key]
-
-            errmsg = "Unknown key %s in %s" % (key, self.filename)
-            raise KeyError(errmsg)
 
 def get_timestamps_key(hdf5_file, dataset_name):
     """
