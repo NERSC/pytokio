@@ -7,10 +7,8 @@ converge.
 """
 
 import json
-import math
 import datetime
 import argparse
-import numpy
 import tokio.timeseries
 import tokio.connectors.hdf5
 
@@ -64,28 +62,70 @@ def summarize_tts_hdf5(hdf5_file):
         'last_nonzero_idx': last_time_idx,
     }
 
-def print_timesteps(hdf5_file):
+def print_tts_hdf5_summary(results):
     """
-    Print a summary of read/write bytes for each time step
+    Format and print the summary data calculated by summarize_tts_hdf5()
     """
-    timestamps = hdf5_file['/datatargets/timestamps'][:]
-    read_bytes = hdf5_file['/datatargets/readbytes'][:, :].sum(axis=1)
-    write_bytes = hdf5_file['/datatargets/writebytes'][:, :].sum(axis=1)
+    print "Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])
+    print "Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])
+    print "Missing data points:  %9d" % results['missing_pts']
+    print "Expected data points: %9d" % results['total_pts']
+    print "Percent data missing: %8.1f%%" % results['missing_pct']
+    print "First non-empty row:  %9d" % results['first_nonzero_idx']
+    print "Last non-empty row:   %9d" % results['last_nonzero_idx']
 
-    for index, timestamp in enumerate(timestamps):
-        print "%12s %14.2f read, %14.2f written" % (datetime.datetime.fromtimestamp(timestamp),
-                                                    read_bytes[index],
-                                                    write_bytes[index])
+def summarize_timesteps(hdf5_file):
+    """
+    Summarize read/write bytes for each time step using the raw HDF5 interface
+    rather than casting into a DataFrame or TimeSeries
+    """
+    results = {}
+    for dataset_name in '/datatargets/writebytes', '/datatargets/readbytes':
+        timestamps = hdf5_file.get_timestamps(dataset_name)[:]
+        sum_bytes = hdf5_file[dataset_name][:, :].sum(axis=1)
+        for index, timestamp in enumerate(timestamps):
+            output_key = 'read_bytes' if 'read' in dataset_name else 'write_bytes'
+            output_val = sum_bytes[index]
+            results[str(timestamp)] = {output_key: output_val}
 
-def print_columns(hdf5_file):
+    return results
+
+def print_timestep_summary(summary):
     """
-    Print a summary of read/write bytes for each device
+    Format and print the summary data calculated by summarize_timesteps()
     """
+    for timestamp, values in summary.iteritems():
+        print "%12s %14.2f read, %14.2f written" % (
+            datetime.datetime.fromtimestamp(float(timestamp)),
+            values.get('read_bytes', 0),
+            values.get('write_bytes', 0))
+
+def summarize_columns(hdf5_file):
+    """
+    Summarize read/write bytes for each column
+    """
+    results = {}
     for index, column_name in enumerate(list(hdf5_file.get_columns('/datatargets/readbytes'))):
+        if column_name not in results:
+            results[column_name] = {}
+        results[column_name]['read_bytes'] = hdf5_file['/datatargets/readbytes'][:, index].sum()
+
+    for index, column_name in enumerate(list(hdf5_file.get_columns('/datatargets/writebytes'))):
+        if column_name not in results:
+            results[column_name] = {}
+        results[column_name]['write_bytes'] = hdf5_file['/datatargets/writebytes'][:, index].sum()
+
+    return results
+
+def print_column_summary(results):
+    """
+    Format and print the summary data calculated by summarize_columns()
+    """
+    for column_name, values in results.iteritems():
         print "%12s %14.2f read, %14.2f written" % (
             column_name,
-            hdf5_file['/datatargets/readbytes'][:, index].sum(),
-            hdf5_file['/datatargets/writebytes'][:, index].sum())
+            values.get('read_bytes', 0),
+            values.get('write_bytes', 0))
 
 def _summarize_tts_hdf5():
     """
@@ -99,22 +139,23 @@ def _summarize_tts_hdf5():
     args = parser.parse_args()
 
     hdf5_file = tokio.connectors.hdf5.Hdf5(args.file, 'r')
-    results = summarize_tts_hdf5(hdf5_file)
+    results = {
+        'total': summarize_tts_hdf5(hdf5_file),
+    }
+
     if args.timesteps:
-        print_timesteps(hdf5_file)
+        results['timesteps'] = summarize_timesteps(hdf5_file)
     if args.columns:
-        print_columns(hdf5_file)
+        results['columns'] = summarize_columns(hdf5_file)
 
     if args.json:
         print json.dumps(results, indent=4, sort_keys=True)
     else:
-        print "Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])
-        print "Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])
-        print "Missing data points:  %9d" % results['missing_pts']
-        print "Expected data points: %9d" % results['total_pts']
-        print "Percent data missing: %8.1f%%" % results['missing_pct']
-        print "First non-empty row:  %9d" % results['first_nonzero_idx']
-        print "Last non-empty row:   %9d" % results['last_nonzero_idx']
+        print_tts_hdf5_summary(results['total'])
+        if 'timesteps' in results:
+            print_timestep_summary(results['timesteps'])
+        if 'columns' in results:
+            print_column_summary(results['columns'])
 
 if __name__ == '__main__':
     _summarize_tts_hdf5()
