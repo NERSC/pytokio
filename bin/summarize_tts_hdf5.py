@@ -11,11 +11,10 @@ import math
 import datetime
 import argparse
 import numpy
+import tokio.timeseries
 import tokio.connectors.hdf5
 
-DIVISOR = 1024.0 # or 1000.0 for base-10
-
-def humanize_units(byte_count):
+def humanize_units(byte_count, divisor=1024.0):
     """
     Convert a raw byte count into human-readable base2 units
     """
@@ -23,7 +22,7 @@ def humanize_units(byte_count):
     result = byte_count
     index = 0
     while index < len(units) - 1:
-        new_result = result / DIVISOR
+        new_result = result / divisor
         if new_result < 1.0:
             break
         else:
@@ -31,19 +30,6 @@ def humanize_units(byte_count):
             result = new_result
 
     return result, units[index]
-
-def convert_signed_zeroes(matrix, inverse=False):
-    """
-    Because we initialize datasets with -0.0, we can scan the sign bit of every
-    element of an array to determine how many data were never populated.  This
-    converts negative zeros to ones and all other data into zeros then count up
-    the number of missing elements in the array.
-    """
-    if inverse:
-        converter = numpy.vectorize(lambda x: 0 if math.copysign(1, x) < 0.0 else 1)
-    else:
-        converter = numpy.vectorize(lambda x: 1 if math.copysign(1, x) < 0.0 else 0)
-    return converter(matrix)
 
 def summarize_tts_hdf5(hdf5_file):
     """
@@ -55,13 +41,13 @@ def summarize_tts_hdf5(hdf5_file):
     # readrates and writerates come via the same collectd message, so if one is
     # missing, both are missing
     values = hdf5_file['/datatargets/readbytes'][:, :]
-    num_missing = convert_signed_zeroes(values).sum()
+    num_missing = tokio.timeseries.negative_zero_matrix(values).sum()
     total = values.shape[0] * values.shape[1]
 
     # find the row offset containing the first and last nonzero data
     first_time_idx = -1
     last_time_idx = -1
-    nonzero_rows = convert_signed_zeroes(values, inverse=True).sum(axis=1)
+    nonzero_rows = tokio.timeseries.negative_zero_matrix(values, inverse=True).sum(axis=1)
     for index, value in enumerate(nonzero_rows):
         if first_time_idx < 0 and value > 0:
             first_time_idx = index
@@ -95,7 +81,7 @@ def print_columns(hdf5_file):
     """
     Print a summary of read/write bytes for each device
     """
-    for index, column_name in enumerate(list(hdf5_file['/datatargets/readbytes'].attrs['columns'])):
+    for index, column_name in enumerate(list(hdf5_file.get_columns('/datatargets/readbytes'))):
         print "%12s %14.2f read, %14.2f written" % (
             column_name,
             hdf5_file['/datatargets/readbytes'][:, index].sum(),
