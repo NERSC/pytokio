@@ -77,7 +77,7 @@ def map_and_transpose(hdf5_file, from_key):
     return MappedDataset(bind=hdf5_file[from_key].id,
                          map_function=None,
                          map_kwargs={},
-                         transpose=transpose)
+                         transpose=True)
 
 def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
     """
