@@ -52,6 +52,10 @@ SAMPLE_LMTDB_TIMESTEP = 5
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
+SAMPLE_TIMESERIES_FILES = {
+    "TOKIO HDF5": SAMPLE_TOKIOTS_FILE,
+    "pylmt HDF5": SAMPLE_H5LMT_FILE,
+}
 
 ### The following SLURM_CACHE_* all correspond to SLURM_CACHE_FILE; if you
 ### change one, you must change them all.

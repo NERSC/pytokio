@@ -22,7 +22,7 @@ def test_h5lmt():
     """
     connectors.hdf5.Hdf5() h5lmt support
     """
-    hdf5_file = tokio.connectors.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
     # Make sure group_name=None works
     assert len(hdf5_file.to_dataframe().index)
@@ -61,12 +61,41 @@ def test_tts():
     """
     connectors.hdf5.Hdf5() TOKIO Time Series support
     """
-    hdf5_file = tokio.connectors.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
 
 def test_mapped_dataset():
     """
-    connectors.hdf5 mapped dataset
+    connectors.hdf5 mapped dataset correctness
     """
-    hdf5_file = tokio.connectors.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
-    _ = hdf5_file['datatargets/readbytes']
-    _ = hdf5_file['datatargets/readrates']
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+        func = compare_bytes_and_rates
+        func.description = "connectors.hdf5 mapped dataset correctness (%s)" % input_type
+        yield func, input_file
+
+def compare_bytes_and_rates(input_file):
+    """
+    Load two views of the same data set (rates and bytes) and ensure that they
+    are being correctly calculated.
+    """
+    numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
+                           edgeitems=5,
+                           linewidth=100)
+    print "Testing %s" % input_file
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    readbytes = hdf5_file['datatargets/readbytes']
+    readrates = hdf5_file['datatargets/readrates']
+    timestamps = hdf5_file.get_timestamps('datatargets/readbytes')[0:2]
+    timestep = timestamps[1] - timestamps[0]
+
+    print "Timestep appears to be", timestep
+    print "readbytes is"
+    print readbytes[:, :]
+    print
+    print "readrates is"
+    print readrates[:, :] * timestep
+    print
+    print "Are readrates a factor of %.2f away from readbytes?" % timestep
+
+    equivalency = numpy.isclose(readrates[:, :] * timestep, readbytes[:, :])
+    print (readrates[:, :] * timestep) - readbytes[:, :]
+    assert equivalency.all()

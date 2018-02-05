@@ -11,10 +11,6 @@ import tokiotest
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_tts_hdf5.py')
 
-INPUT_TYPES = {
-    "TOKIO HDF5": tokiotest.SAMPLE_TOKIOTS_FILE,
-    "pylmt HDF5": tokiotest.SAMPLE_H5LMT_FILE,
-}
 INPUT_ARGS = [
     [],
     ["--json"],
@@ -34,7 +30,7 @@ def test_tts():
     """
     bin/summarize_tts_hdf5.py
     """
-    for input_type, input_file in INPUT_TYPES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
         for args in INPUT_ARGS:
             func = exec_cmd
             func.description = "bin/summarize_tts_hdf5.py %s (%s)" % (" ".join(args), input_type)
