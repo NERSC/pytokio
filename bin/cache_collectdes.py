@@ -191,10 +191,14 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
     datasets = {}
     hdf5_file = h5py.File(output_file)
 
-    schema_version = hdf5_file.attrs.get('schema', SCHEMA_VERSION)
+    schema_version = hdf5_file.attrs.get('version', SCHEMA_VERSION)
     schema = tokio.connectors.hdf5.SCHEMA.get(schema_version)
     if schema is None:
         raise KeyError("Schema version %d is not known by connectors.hdf5" % SCHEMA_VERSION)
+
+    # Immediately write back the version so that tokio.timeseries can detect it
+    # when it commits data
+    hdf5_file.attrs['version'] = SCHEMA_VERSION
 
     # Initialize datasets
     for dataset_name in DATASET_NAMES:

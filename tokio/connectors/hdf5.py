@@ -113,6 +113,13 @@ SCHEMA_DATASET_PROVIDERS = {
     },
 }
 
+H5LMT_COLUMN_ATTRS = {
+    'MDSOpsGroup/MDSOpsDataSet': 'OpNames',
+    'OSTReadGroup/OSTBulkReadDataSet': 'OSTNames',
+    'OSTWriteGroup/OSTBulkWriteDataSet': 'OSTNames',
+    'OSSCPUGroup/OSSCPUDataSet': 'OSSNames',
+}
+
 TIMESTAMP_KEY = 'timestamps'
 DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
 COLUMN_NAME_KEY = 'columns'
@@ -153,25 +160,31 @@ class Hdf5(h5py.File):
                    numpy.ndarray if key maps to a provider function that can
                                  calculate the requested data
         """
-        try:
-            # If the dataset exists in the underlying HDF5 file, just return it
-            return super(Hdf5, self).__getitem__(key)
+        resolved_key, provider = self._resolve_schema_key(key)
+        if resolved_key:
+            return super(Hdf5, self).__getitem__(resolved_key)
+        elif provider:
+            provider_func = provider['func']
+            provider_args = provider['args']
+            return provider_func(self, **provider_args)
+        else:
+            # this should never be hit based on the possible outputs of _resolve_schema_key
+            errmsg = "_resolve_schema_key: undefined output from %s" % key
+            raise KeyError(errmsg)
 
-        except KeyError:
-            # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isinstance(key, basestring) else key
-            if key in self.schema:
-                hdf5_key = self.schema.get(key)
-                if super(Hdf5, self).__contains__(hdf5_key):
-                    return super(Hdf5, self).__getitem__(hdf5_key)
+    def get_columns(self, dataset_name):
+        """
+        Get the column names of a dataset
+        """
 
-            # Key maps to a transformation
-            if key in self.dataset_providers:
-                provider_func = self.dataset_providers[key]['func']
-                provider_args = self.dataset_providers[key]['args']
-                return provider_func(self, **provider_args)
-
-            raise
+        if self.version is None:
+            dataset_name = dataset_name.lstrip('/')
+            if dataset_name in H5LMT_COLUMN_ATTRS:
+                return self[dataset_name].attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+            else:
+                return []
+        else:
+            return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
     def get_index(self, target_datetime):
         """
@@ -253,6 +266,31 @@ class Hdf5(h5py.File):
         """
         return extract_timestamps(self, dataset_name)
 
+    def _resolve_schema_key(self, key):
+        """
+        Given a key, either return a key that can be used to index self
+        directly, or return a provider function and arguments to generate the
+        dataset dynamically
+        """
+        try:
+            # If the dataset exists in the underlying HDF5 file, just return it
+            super(Hdf5, self).__getitem__(key)
+            return key, None
+
+        except KeyError:
+            # Straight mapping between the key and a dataset
+            key = key.lstrip('/') if isinstance(key, basestring) else key
+            if key in self.schema:
+                hdf5_key = self.schema.get(key)
+                if super(Hdf5, self).__contains__(hdf5_key):
+                    return key, None
+
+            # Key maps to a transformation
+            if key in self.dataset_providers:
+                return None, self.dataset_providers[key]
+
+            raise
+
 def extract_timestamps(hdf5_file, dataset_name):
     """
     Reach into an HDF5 file and extract the timestamps dataset for a given dataset name
@@ -262,7 +300,7 @@ def extract_timestamps(hdf5_file, dataset_name):
     if hdf5_dataset is None:
         return None, None
 
-    if hdf5_file.attrs.get('version') is None:
+    if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
         return _extract_timestamps_legacy(hdf5_file, dataset_name)
 
     # Identify the dataset containing timestamps for this dataset
