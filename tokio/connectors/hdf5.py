@@ -193,7 +193,6 @@ class Hdf5(h5py.File):
         directly, or return a provider function and arguments to generate the
         dataset dynamically
         """
-        print "looking for %s in %s" % (key, self.filename)
         try:
             # If the dataset exists in the underlying HDF5 file, just return it
             super(Hdf5, self).__getitem__(key)

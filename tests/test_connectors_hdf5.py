@@ -3,6 +3,7 @@
 Test the HDF5 connector
 """
 
+import nose.plugins.skip
 import numpy
 import tokiotest
 import tokio.connectors
@@ -68,11 +69,11 @@ def test_mapped_dataset():
     connectors.hdf5 mapped dataset correctness
     """
     for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
-        func = compare_bytes_and_rates
+        func = _test_mapped_dataset
         func.description = "connectors.hdf5 mapped dataset correctness (%s)" % input_type
         yield func, input_file
 
-def compare_bytes_and_rates(input_file):
+def _test_mapped_dataset(input_file):
     """
     Load two views of the same data set (rates and bytes) and ensure that they
     are being correctly calculated.
@@ -99,3 +100,41 @@ def compare_bytes_and_rates(input_file):
     equivalency = numpy.isclose(readrates[:, :] * timestep, readbytes[:, :])
     print (readrates[:, :] * timestep) - readbytes[:, :]
     assert equivalency.all()
+
+def test_get_index():
+    """
+    connectors.hdf5.Hdf5.get_index()
+    """
+    raise nose.SkipTest("not implemented yet")
+
+def test_get_columns():
+    """
+    connectors.hdf5.Hdf5.get_columns()
+    """
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+        func = _test_get_columns
+        func.description = "connectors.hdf5.Hdf5.get_columns() with %s" % input_type
+        yield func, input_file
+
+def _test_get_columns(input_file):
+    """
+    Ensure that get_columns() returns valid results
+    """
+    numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
+                           edgeitems=5,
+                           linewidth=100)
+    print "Testing %s" % input_file
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        print "Getting %s from %s" % (dataset_name, hdf5_file.filename)
+        result = hdf5_file.get(dataset_name)
+        print 'result:', result
+        assert result is not None
+        column_names = hdf5_file.get_columns(dataset_name)
+        assert len(column_names) > 0
+
+def test_get_timestamps():
+    """
+    connectors.hdf5.Hdf5.get_timestamps()
+    """
+    raise nose.SkipTest("not implemented yet")
