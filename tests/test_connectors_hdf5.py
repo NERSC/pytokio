@@ -105,7 +105,35 @@ def test_get_index():
     """
     connectors.hdf5.Hdf5.get_index()
     """
-    raise nose.SkipTest("not implemented yet")
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+        func = _test_get_columns
+        func.description = "connectors.hdf5.Hdf5.get_index() with %s" % input_type
+        yield func, input_file
+
+def _test_get_index(input_file):
+    """
+    Ensure that get_index() returns valid results
+    """
+    print "Testing %s" % input_file
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        assert hdf5_file.get(dataset_name) is not None
+
+        timestamps = hdf5_file.get_timestamps(dataset_name)
+        timestep = timestamps[1] - timestamps[0]
+        num_stamps = len(timestamps)
+        target_indices = [0, num_stamps/4, num_stamps/2, 3*num_stamps/4, num_stamps-1]
+
+        for target_index in target_indices:
+            for fuzz in range(timestep):
+                target_datetime = datetime.datetime.fromtimestamp(timestamps[target_index]) \
+                                  + datetime.timedelta(seconds=fuzz)
+                new_index = hdf5_file.get_index(dataset_name, target_datetime)
+                new_timestamp = timestamps[new_index]
+                assert index == new_index
+                assert dataset[new_index] == dataset[target_index]
+
+        assert len(column_names) > 0
 
 def test_get_columns():
     """
@@ -120,9 +148,6 @@ def _test_get_columns(input_file):
     """
     Ensure that get_columns() returns valid results
     """
-    numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
-                           edgeitems=5,
-                           linewidth=100)
     print "Testing %s" % input_file
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
@@ -137,4 +162,26 @@ def test_get_timestamps():
     """
     connectors.hdf5.Hdf5.get_timestamps()
     """
-    raise nose.SkipTest("not implemented yet")
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+        func = _test_get_columns
+        func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s" % input_type
+        yield func, input_file
+
+def _test_get_timestamps(input_file):
+    """
+    Ensure that get_timestamps() returns valid results
+    """
+    print "Testing %s" % input_file
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        assert hdf5_file.get(dataset_name) is not None
+        timestamps = hdf5_file.get_timestamps(dataset_name)
+        assert len(timestamps[:]) > 0
+
+        # ensure that every timestamp is equidistant
+        prev_delta = None
+        for index in range(1, len(timestamps[:])):
+            delta = timestamps[index] - timestamps[index - 1]
+            if prev_delta is not None:
+                assert prev_delta == delta
+            prev_delta = delta
