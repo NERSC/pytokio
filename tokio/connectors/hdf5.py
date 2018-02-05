@@ -229,29 +229,16 @@ class Hdf5(h5py.File):
         else:
             return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
-    def get_index(self, target_datetime):
+    def get_index(self, dataset_name, target_datetime):
         """
         Turn a datetime object into an integer that can be used to reference
         specific times in datasets.
-
         """
-        # Initialize our timestep if we don't already have this
-        if self.timestep is None:
-            if 'timestep' in self.attrs:
-                self.timestep = self.attrs['timestep']
-            elif 'FSStepsGroup/FSStepsDataSet' in self \
-            and len(self['FSStepsGroup/FSStepsDataSet']) > 1:
-                self.timestep = self['FSStepsGroup/FSStepsDataSet'][1] \
-                    - self['FSStepsGroup/FSStepsDataSet'][0]
-            else:
-                self.timestep = config.LMT_TIMESTEP
-
-        if 'first_timestamp' in self.attrs:
-            time0 = datetime.datetime.fromtimestamp(self.attrs['first_timestamp'])
-        else:
-            time0 = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
-
-        return int((target_datetime - time0).total_seconds()) / int(self.timestep)
+        dataset = self.__getitem__(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[0:2]
+        timestep = timestamps[1] - timestamps[0]
+        t_start = datetime.datetime.fromtimestamp(timestamps[0])
+        return long((target_datetime - t_start).total_seconds() / timestep)
 
     def get_timestamps(self, dataset_name):
         """
