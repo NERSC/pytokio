@@ -2,8 +2,10 @@
 Helper classes and functions used by the HDF5 connector
 """
 
-import tokio
+import numpy
 import h5py
+
+import tokio
 
 class MappedDataset(h5py.Dataset):
     """
@@ -11,7 +13,7 @@ class MappedDataset(h5py.Dataset):
     before returning the data.  Intended to dynamically generate certain
     datasets that are simple derivatives of others.
     """
-    def __init__(self, map_function, map_kwargs, *args, **kwargs):
+    def __init__(self, map_function, map_kwargs, transpose=False, *args, **kwargs):
         """
         Attach a map function and arguments to be fed into that map function
         whenever this object gets sliced
@@ -20,14 +22,25 @@ class MappedDataset(h5py.Dataset):
 
         self.map_function = map_function
         self.map_kwargs = map_kwargs
+        self.transpose = transpose
 
     def __getitem__(self, key):
         """
         Apply the map function to the result of the parent class and return that
-        transformed result instead
+        transformed result instead.  Transpose is very ugly, but required for
+        h5lmt support.
         """
-        result = super(MappedDataset, self).__getitem__(key)
-        return self.map_function(result, **self.map_kwargs)
+        if self.transpose:
+            array_buf = numpy.zeros(shape=self.shape, dtype=self.dtype)
+            self.read_direct(array_buf)
+            result = array_buf.T.__getitem__(key)
+        else:
+            result = super(MappedDataset, self).__getitem__(key)
+
+        if self.map_function:
+            return self.map_function(result, **self.map_kwargs)
+        else:
+            return result
 
 def multiply_by_timestep(return_value, parent_dataset, divide=False):
     """
@@ -40,7 +53,7 @@ def multiply_by_timestep(return_value, parent_dataset, divide=False):
     """
     hdf5_file = parent_dataset.file
     dataset_name = parent_dataset.name
-    timestamps, _ = tokio.connectors.hdf5.extract_timestamps(hdf5_file, dataset_name)
+    timestamps = tokio.connectors.hdf5.get_timestamps(hdf5_file, dataset_name)
 
     if timestamps is None:
         errmsg = "Could not find timestamps for %s in %s" % (dataset_name, hdf5_file.filename)
@@ -53,7 +66,20 @@ def multiply_by_timestep(return_value, parent_dataset, divide=False):
     else:
         return return_value * timestep
 
-def convert_bytes_rates(hdf5_file, from_key, to_rates):
+def map_and_transpose(hdf5_file, from_key):
+    """
+    Retrieve a dataset from an HDF5 and simply set the transpose bit on it.
+    """
+    if from_key not in hdf5_file:
+        errmsg = "Could not find dataset_name %s in %s" % (from_key, hdf5_file.filename)
+        raise KeyError(errmsg)
+
+    return MappedDataset(bind=hdf5_file[from_key].id,
+                         map_function=None,
+                         map_kwargs={},
+                         transpose=transpose)
+
+def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
     """
     Retrieve a dataset from an HDF5 file, convert it to a MappedDataset, and
     attach a multiply/divide function to it so that subsequent slices return
@@ -68,11 +94,7 @@ def convert_bytes_rates(hdf5_file, from_key, to_rates):
         raise KeyError(errmsg)
 
     dataset = hdf5_file[from_key]
-    dataset.__class__ = MappedDataset
-    dataset.map_function = multiply_by_timestep
-    dataset.map_kwargs = {
-        'parent_dataset': dataset,
-        'divide': to_rates,
-    }
-
-    return dataset
+    return MappedDataset(bind=dataset.id,
+                         map_function=multiply_by_timestep,
+                         map_kwargs={'parent_dataset': dataset, 'divide': to_rates},
+                         transpose=transpose)

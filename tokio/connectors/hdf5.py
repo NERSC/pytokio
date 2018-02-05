@@ -13,10 +13,7 @@ from .. import config
 from _hdf5 import *
 
 SCHEMA = {
-    None: {
-        "datatargets/readrates": "/OSTReadGroup/OSTBulkReadDataSet",
-        "datatargets/writerates": "/OSTWriteGroup/OSTBulkWriteDataSet",
-    },
+    None: {},
     "1": {
         "datatargets/readbytes": "/datatargets/readbytes",
         "datatargets/writebytes": "/datatargets/writebytes",
@@ -71,6 +68,7 @@ SCHEMA_DATASET_PROVIDERS = {
             'args': {
                 'from_key': 'OSTReadGroup/OSTBulkReadDataSet',
                 'to_rates': False,
+                'transpose': True,
             },
         },
         "datatargets/writebytes": {
@@ -78,6 +76,19 @@ SCHEMA_DATASET_PROVIDERS = {
             'args': {
                 'from_key': 'OSTWriteGroup/OSTBulkWriteDataSet',
                 'to_rates': False,
+                'transpose': True,
+            },
+        },
+        "datatargets/readrates": {
+            'func': map_and_transpose,
+            'args': {
+                'from_key': "/OSTReadGroup/OSTBulkReadDataSet",
+            },
+        },
+        "datatargets/writerates": {
+            'funct': map_and_transpose,
+            'args': {
+                'from_key': "/OSTWriteGroup/OSTBulkWriteDataSet",
             },
         },
     },
@@ -260,11 +271,11 @@ class Hdf5(h5py.File):
                                 index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
                                 columns=col_header)
 
-    def extract_timestamps(self, dataset_name):
+    def get_timestamps(self, dataset_name):
         """
         Return timestamps dataset corresponding to given dataset name
         """
-        return extract_timestamps(self, dataset_name)
+        return get_timestamps(self, dataset_name)
 
     def _resolve_schema_key(self, key):
         """
@@ -283,17 +294,19 @@ class Hdf5(h5py.File):
             if key in self.schema:
                 hdf5_key = self.schema.get(key)
                 if super(Hdf5, self).__contains__(hdf5_key):
-                    return key, None
+                    return hdf5_key, None
 
             # Key maps to a transformation
             if key in self.dataset_providers:
                 return None, self.dataset_providers[key]
 
-            raise
+            errmsg = "Unknown key %s in %s" % (key, self.filename)
+            raise KeyError(errmsg)
 
-def extract_timestamps(hdf5_file, dataset_name):
+def get_timestamps_key(hdf5_file, dataset_name):
     """
-    Reach into an HDF5 file and extract the timestamps dataset for a given dataset name
+    Read into an HDF5 file and extract the name of the dataset containing the
+    timestamps correspond to the given dataset_name
     """
     # Get dataset out of HDF5 file
     hdf5_dataset = hdf5_file.get(dataset_name)
@@ -301,7 +314,7 @@ def extract_timestamps(hdf5_file, dataset_name):
         return None, None
 
     if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
-        return _extract_timestamps_legacy(hdf5_file, dataset_name)
+        return '/FSStepsGroup/FSStepsDataSet'
 
     # Identify the dataset containing timestamps for this dataset
     if TIMESTAMP_KEY in hdf5_dataset.attrs:
@@ -313,13 +326,10 @@ def extract_timestamps(hdf5_file, dataset_name):
     if timestamp_key not in hdf5_file:
         raise KeyError("timestamp_key %s does not exist" % timestamp_key)
 
-    timestamps = hdf5_file[timestamp_key]
+    return timestamp_key
 
-    return timestamps, timestamp_key
-
-def _extract_timestamps_legacy(hdf5_file, dataset_name):
+def get_timestamps(hdf5_file, dataset_name):
     """
-    Retrieve timestamps for an old pylmt-style HDF5 file
+    Return the timestamps dataset for a given dataset name
     """
-    key = '/FSStepsGroup/FSStepsDataSet'
-    return hdf5_file[key], key
+    return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]

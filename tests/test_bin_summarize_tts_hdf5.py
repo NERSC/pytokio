@@ -11,22 +11,46 @@ import tokiotest
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_tts_hdf5.py')
 
+INPUT_TYPES = {
+    "TOKIO HDF5": tokiotest.SAMPLE_TOKIOTS_FILE,
+    "pylmt HDF5": tokiotest.SAMPLE_H5LMT_FILE,
+}
+INPUT_ARGS = [
+    [],
+    ["--json"],
+    ["--columns"],
+    ["--timesteps"],
+    ["--columns", "--json"],
+    ["--timesteps", "--json"],
+]
+
 def verify_json(output):
     """
-    Verify the contents of summarize_h5lmt.py when encoded as json
+    Verify the validity of json
     """
     assert output
 
-def test_basic():
+def test_tts():
     """
-    bin/test_bin_summarize_tts_hdf5.py defaults
+    bin/summarize_tts_hdf5.py
     """
-    subprocess.check_output([BINARY, tokiotest.SAMPLE_TOKIOTS_FILE])
+    for input_type, input_file in INPUT_TYPES.iteritems():
+        for args in INPUT_ARGS:
+            func = exec_cmd
+            func.description = "bin/summarize_tts_hdf5.py %s (%s)" % (" ".join(args), input_type)
+            full_args = args + [input_file]
+            yield func, full_args
 
-def test_json():
+def exec_cmd(args):
     """
-    bin/test_bin_summarize_tts_hdf5.py --json
+    Execute the command with some arguments
     """
-    output_str = subprocess.check_output([BINARY, '--json', tokiotest.SAMPLE_TOKIOTS_FILE])
-    output_json = json.loads(output_str)
-    verify_json(output_json)
+    full_cmd = [BINARY] + args
+    print "Executing", " ".join(full_cmd)
+    output_str = subprocess.check_output(full_cmd)
+
+    assert len(output_str) > 0
+
+    if 'json' in ''.join(args):
+        output_json = json.loads(output_str)
+        verify_json(output_json)

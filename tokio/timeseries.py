@@ -123,7 +123,8 @@ class TimeSeries(object):
         for key, value in dataset.parent.attrs.iteritems():
             self.group_metadata[key] = value
 
-        self.timestamps, self.timestamp_key = tokio.connectors.hdf5.extract_timestamps(hdf5_file, dataset_name)
+        self.timestamp_key = tokio.connectors.hdf5.get_timestamps_key(hdf5_file, dataset_name)
+        self.timestamps = hdf5_file[self.timestamp_key]
         self.timestamps = self.timestamps if light else self.timestamps[:]
 
         self.timestep = self.timestamps[1] - self.timestamps[0]
@@ -161,7 +162,7 @@ class TimeSeries(object):
             start_timestamp = self.timestamps[0]
             end_timestamp = self.timestamps[-1] + self.timestep
         else:
-            existing_timestamps, _ = tokio.connectors.hdf5.extract_timestamps(hdf5_file, self.dataset_name)
+            existing_timestamps = tokio.connectors.hdf5.get_timestamps(hdf5_file, self.dataset_name)
             t_start, t_end = get_insert_indices(self.timestamps, existing_timestamps)
 
             if t_start < 0 \
