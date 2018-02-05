@@ -42,7 +42,7 @@ class MappedDataset(h5py.Dataset):
         else:
             return result
 
-def multiply_by_timestep(return_value, parent_dataset, divide=False):
+def _convert_bytes_rates(return_value, parent_dataset, divide=False):
     """
     Transform the data returned when slicing a h5py.Dataset object by
     multiplying or dividing it by that dataset's timestep.
@@ -66,19 +66,6 @@ def multiply_by_timestep(return_value, parent_dataset, divide=False):
     else:
         return return_value * timestep
 
-def map_and_transpose(hdf5_file, from_key):
-    """
-    Retrieve a dataset from an HDF5 and simply set the transpose bit on it.
-    """
-    if from_key not in hdf5_file:
-        errmsg = "Could not find dataset_name %s in %s" % (from_key, hdf5_file.filename)
-        raise KeyError(errmsg)
-
-    return MappedDataset(bind=hdf5_file[from_key].id,
-                         map_function=None,
-                         map_kwargs={},
-                         transpose=True)
-
 def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
     """
     Retrieve a dataset from an HDF5 file, convert it to a MappedDataset, and
@@ -95,6 +82,20 @@ def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
 
     dataset = hdf5_file[from_key]
     return MappedDataset(bind=dataset.id,
-                         map_function=multiply_by_timestep,
+                         map_function=_convert_bytes_rates,
                          map_kwargs={'parent_dataset': dataset, 'divide': to_rates},
                          transpose=transpose)
+
+def map_and_transpose(hdf5_file, from_key):
+    """
+    Retrieve a dataset from an HDF5 and simply set the transpose bit on it.
+    """
+    print "map_and_transpose:", from_key, hdf5_file.filename
+    if from_key not in hdf5_file:
+        errmsg = "Could not find dataset_name %s in %s" % (from_key, hdf5_file.filename)
+        raise KeyError(errmsg)
+
+    return MappedDataset(bind=hdf5_file[from_key].id,
+                         map_function=None,
+                         map_kwargs={},
+                         transpose=True)
