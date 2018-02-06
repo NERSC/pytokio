@@ -90,7 +90,6 @@ def map_and_transpose(hdf5_file, from_key):
     """
     Retrieve a dataset from an HDF5 and simply set the transpose bit on it.
     """
-    print "map_and_transpose:", from_key, hdf5_file.filename
     if from_key not in hdf5_file:
         errmsg = "Could not find dataset_name %s in %s" % (from_key, hdf5_file.filename)
         raise KeyError(errmsg)
