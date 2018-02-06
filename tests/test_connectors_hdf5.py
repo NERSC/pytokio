@@ -78,6 +78,10 @@ def test_mapped_dataset():
         func.description = "connectors.hdf5 mapped dataset correctness (%s)" % input_type
         yield func, input_file
 
+    func = _test_transpose_mapping
+    func.description = "connectors.hdf5 transpose mapping"
+    yield func, tokiotest.SAMPLE_H5LMT_FILE
+
 def _test_mapped_dataset(input_file):
     """
     Load two views of the same data set (rates and bytes) and ensure that they
@@ -104,6 +108,21 @@ def _test_mapped_dataset(input_file):
 
     equivalency = numpy.isclose(readrates[:, :] * timestep, readbytes[:, :])
     print (readrates[:, :] * timestep) - readbytes[:, :]
+    assert equivalency.all()
+
+def _test_transpose_mapping(input_file):
+    """
+    Load the same dataset using two different interfaces
+    """
+    numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
+                           edgeitems=5,
+                           linewidth=100)
+    print "Testing %s" % input_file
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    interpreted = hdf5_file['datatargets/readrates'][:, :]
+    raw = hdf5_file['OSTReadGroup/OSTBulkReadDataSet'][:, :].T
+
+    equivalency = numpy.isclose(interpreted, raw)
     assert equivalency.all()
 
 def test_get_index():
