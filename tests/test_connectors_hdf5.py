@@ -8,11 +8,16 @@ import numpy
 import tokiotest
 import tokio.connectors
 
-DATASETS_1D = ['FSStepsGroup/FSStepsDataSet', 'MDSCPUGroup/MDSCPUDataSet']
+DATASETS_1D = [
+    'FSStepsGroup/FSStepsDataSet',
+    'MDSCPUGroup/MDSCPUDataSet'
+]
 DATASETS_2D = [
-    'FSMissingGroup/FSMissingDataSet', 'MDSOpsGroup/MDSOpsDataSet',
-    'OSSCPUGroup/OSSCPUDataSet', 'OSTReadGroup/OSTBulkReadDataSet',
-    'OSTWriteGroup/OSTBulkWriteDataSet'
+    'FSMissingGroup/FSMissingDataSet',
+    'MDSOpsGroup/MDSOpsDataSet',
+    'OSSCPUGroup/OSSCPUDataSet',
+    'OSTReadGroup/OSTBulkReadDataSet',
+    'OSTWriteGroup/OSTBulkWriteDataSet',
 ]
 POSITIVE_2D = [
     'MDSOpsGroup/MDSOpsDataSet', 'OSSCPUGroup/OSSCPUDataSet',
