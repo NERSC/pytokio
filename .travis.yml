@@ -1,0 +1,7 @@
+language: python
+install:
+    - pip install numpy pandas h5py matplotlib
+    - python setup.py install
+before_script:
+    - export TZ=America/Los_Angeles
+script: cd tests && nosetests
