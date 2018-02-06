@@ -5,12 +5,13 @@ pass only at NERSC because of the assumptions built into the indices.
 """
 
 import datetime
-import nose.plugins.skip
+import nose
 try:
     import elasticsearch.exceptions
+    import tokio.connectors.collectd_es
+    _HAVE_ELASTICSEARCH = True
 except ImportError:
-    pass
-import tokio.connectors.collectd_es
+    _HAVE_ELASTICSEARCH = False
 import tokiotest
 # import logging
 
@@ -46,10 +47,8 @@ def test_flush_function_correctness():
     """
     CollectdEs flush function correctness
     """
-    try:
-        elasticsearch
-    except NameError as error:
-        raise nose.SkipTest(error)
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
 
     # Define start/end time.  Because we don't know what's in the remote server,
     # we can't really make this deterministic; just use a five second window

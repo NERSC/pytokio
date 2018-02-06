@@ -9,6 +9,12 @@ import subprocess
 import datetime
 import nose
 import h5py
+try:
+    import elasticsearch
+    _HAVE_ELASTICSEARCH = True
+except ImportError:
+    _HAVE_ELASTICSEARCH = False
+    pass
 import tokiotest
 
 BINARY = os.path.join(tokiotest.BIN_DIR, 'cache_collectdes.py')
@@ -104,6 +110,8 @@ def test_bin_cache_collectdes():
     """
     bin/cache_collectdes.py
     """
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
     tokiotest.TEMP_FILE.close()
 
     # initialize a new TimeSeries, populate it, and write it out as HDF5
@@ -134,6 +142,9 @@ def test_bin_cache_collectdes_oob():
     """
     bin/cache_collectdes.py with out-of-bounds
     """
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
+
     tokiotest.TEMP_FILE.close()
 
     # Calculate new bounds that are a subset of the actual data that will be returned
