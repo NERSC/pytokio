@@ -5,9 +5,13 @@ pass only at NERSC because of the assumptions built into the indices.
 """
 
 import datetime
-import nose.plugins.skip
-import elasticsearch.exceptions
-import tokio.connectors.collectd_es
+import nose
+try:
+    import elasticsearch.exceptions
+    import tokio.connectors.collectd_es
+    _HAVE_ELASTICSEARCH = True
+except ImportError:
+    _HAVE_ELASTICSEARCH = False
 import tokiotest
 # import logging
 
@@ -43,6 +47,8 @@ def test_flush_function_correctness():
     """
     CollectdEs flush function correctness
     """
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
 
     # Define start/end time.  Because we don't know what's in the remote server,
     # we can't really make this deterministic; just use a five second window
@@ -64,7 +70,7 @@ def test_flush_function_correctness():
             index=tokiotest.SAMPLE_COLLECTDES_INDEX,
             page_size=PAGE_SIZE)
     except elasticsearch.exceptions.ConnectionError as error:
-        raise nose.plugins.skip.SkipTest(error)
+        raise nose.SkipTest(error)
 
     ############################################################################
     # Accumulate results using a flush_function
@@ -82,7 +88,7 @@ def test_flush_function_correctness():
     assert len(FLUSH_STATE['pages']) > 0
 
     if not len(FLUSH_STATE['pages']) > 2:
-        raise nose.plugins.skip.SkipTest("time range only got %d pages; cannot test flush function"
+        raise nose.SkipTest("time range only got %d pages; cannot test flush function"
                                          % len(FLUSH_STATE['pages']))
 
     ############################################################################

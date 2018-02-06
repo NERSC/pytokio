@@ -157,12 +157,18 @@ def test_remote_db():
     """
     Verify functionality when connecting to a remote database
     """
+    try: 
+        tokio.connectors.cachingdb.MySQLdb
+    except AttributeError as error:
+        raise nose.SkipTest(error)
+
     try:
         test_db = tokio.connectors.cachingdb.CachingDb(
             dbhost=_DB_HOST,
             dbuser=_DB_USER,
             dbpassword=_DB_PASSWORD,
             dbname=_DB_DBNAME)
+
     except tokio.connectors.cachingdb.MySQLdb.OperationalError as error:
         raise nose.SkipTest(error)
 
