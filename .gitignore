@@ -1,5 +1,6 @@
 *.pyc
 .ipynb_checkpoints
+.coverage
 
 build/
 dist/

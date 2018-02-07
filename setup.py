@@ -14,7 +14,7 @@
 from distutils.core import setup
 
 setup(
-    name='tokio',
+    name='pytokio',
     description= 'Total Knowledge of I/O',
     version='0.9',
     author='Glenn K. Lockwood',
