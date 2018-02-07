@@ -225,7 +225,7 @@ def run_disk_query(host, port, index, t_start, t_end, timeout=None):
 
     return es_obj
 
-def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_devices):
+def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_devices, threads=1):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
@@ -255,15 +255,20 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
                                                                  hdf5_file=hdf5_file)
     # Process all pages retrieved (this is computationally expensive)
     _time0 = time.time()
-#   updates = multiprocessing.Pool(1).map(process_page, pages)
     updates = []
-    for page in pages:
-        updates.append(process_page(page))
+    num_elements = 0
+    if threads > 1:
+#       updates = multiprocessing.Pool(16).map(process_page, pages)
+        for update in multiprocessing.Pool(threads).imap_unordered(process_page, pages):
+            updates.append(update)
+    else:
+        for page in pages:
+            updates.append(process_page(page))
     _timef = time.time()
     _extract_time = _timef - _time0
     if tokio.DEBUG:
         print "Extracted %d elements from %d pages in %.4f seconds" \
-            % (len(updates), len(pages), _extract_time)
+            % (sum([len(x) for x in updates]), len(pages), _extract_time)
 
     # Take the processed list of data to insert and actually insert them
     _time0 = time.time()
@@ -273,7 +278,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
     _update_time = _timef - _time0
     if tokio.DEBUG:
         print "Inserted %d elements from %d pages in %.4f seconds" % (len(updates), len(pages), _update_time)
-        print "Processed %d pages in %.4f seconds" % (progress, _extract_time + _update_time)
+        print "Processed %d pages in %.4f seconds" % (len(pages), _extract_time + _update_time)
 
     # Write datasets out to HDF5 file
     _time0 = time.time()
@@ -309,6 +314,8 @@ def cache_collectd_cli():
                         help='collection frequency, in seconds (default: 10)')
     parser.add_argument('--timeout', type=int, default=30,
                         help='ElasticSearch timeout time (default: 30)')
+    parser.add_argument('--threads', type=int, default=1,
+                        help='parallel threads for document extraction (default: 1)')
     parser.add_argument('--json', action='store_true',
                         help="output to json instead of HDF5")
     parser.add_argument('--input-json', type=str, default=None,
@@ -378,7 +385,7 @@ def cache_collectd_cli():
         json.dump(pages, output_file)
         output_file.close()
     else:
-        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes)
+        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
 
     if args.debug:
         print "Wrote output to %s" % args.output
