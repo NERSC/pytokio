@@ -22,6 +22,7 @@ Then simply
     $ pip install -r requirements.txt
 
 or
+
     $ python setup.py install --prefix=/path/to/installdir
 
 To create an egg file,
