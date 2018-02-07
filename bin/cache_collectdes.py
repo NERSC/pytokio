@@ -141,7 +141,7 @@ def process_page(pages, datasets):
                 write_rate = source.get('write')
                 if read_rate is not None and write_rate is not None:
                     read_ok = datasets['datatargets/readoprates'].insert_element(timestamp, col_name, read_rate)
-                    write_ok = datasets['datatargets/writerates'].insert_element(timestamp, col_name, write_rate)
+                    write_ok = datasets['datatargets/writeoprates'].insert_element(timestamp, col_name, write_rate)
                     data_volume[2] += read_rate
                     data_volume[3] += write_rate
             if match:
