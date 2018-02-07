@@ -69,17 +69,18 @@ def test_flush_function_correctness():
             port=9200,
             index=tokiotest.SAMPLE_COLLECTDES_INDEX,
             page_size=PAGE_SIZE)
+        ############################################################################
+        # Accumulate results using a flush_function
+        ############################################################################
+        es_obj.query_and_scroll(
+            query=query,
+            flush_every=PAGE_SIZE,
+            flush_function=flush_function
+        )
     except elasticsearch.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    ############################################################################
-    # Accumulate results using a flush_function
-    ############################################################################
-    es_obj.query_and_scroll(
-        query=query,
-        flush_every=PAGE_SIZE,
-        flush_function=flush_function
-    )
+
     # Run flush function on the last page
     if len(es_obj.scroll_pages) > 0:
         flush_function(es_obj)
