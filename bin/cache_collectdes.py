@@ -26,6 +26,8 @@ SCHEMA_VERSION = "1"
 DATASET_NAMES = [
     'datatargets/readrates',
     'datatargets/writerates',
+    'datatargets/readoprates',
+    'datatargets/writeoprates',
 ]
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -52,8 +54,8 @@ QUERY_DISK_DATA = {
                             }
                         },
                         {
-                            "term": {
-                                "collectd_type": "disk_octets"
+                            "regexp": {
+                                "collectd_type": "disk_(octets|ops)"
                             }
                         },
                         {
@@ -99,7 +101,7 @@ def process_page(pages, datasets):
     connector class.
     """
 
-    data_volume = [0, 0]
+    data_volume = [0.0, 0.0, 0.0, 0.0]
     index_errors = 0
     for doc in pages:
         # basic validity checking
@@ -110,42 +112,62 @@ def process_page(pages, datasets):
         source = doc['_source']
 
         # check to see if this is from plugin:disk
-        if source['plugin'] != 'disk' or 'read' not in source:
-            continue
+        if source['plugin'] == 'disk':
+            # We jump through these hoops because most of TOKIO uses tz-unaware
+            # local datetimes and we don't want to inject a bunch of dateutil
+            # dependencies elsewhere
+            # timezone-aware string
+            # `-> tz-aware utc datetime
+            #     `-> local datetime
+            #         `-> tz-unaware local datetime
+            timestamp = dateutil.parser.parse(source['@timestamp'])\
+                                              .astimezone(dateutil.tz.tzlocal())\
+                                              .replace(tzinfo=None)
+            col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
 
-        # We jump through these hoops because most of TOKIO uses tz-unaware
-        # local datetimes and we don't want to inject a bunch of dateutil
-        # dependencies elsewhere
-        # timezone-aware string
-        # `-> tz-aware utc datetime
-        #     `-> local datetime
-        #         `-> tz-unaware local datetime
-        timestamp = dateutil.parser.parse(source['@timestamp'])\
-                                          .astimezone(dateutil.tz.tzlocal())\
-                                          .replace(tzinfo=None)
-        col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
-
-        read_ok = datasets['datatargets/readrates'].insert_element(timestamp, col_name, source['read'])
-        write_ok = datasets['datatargets/writerates'].insert_element(timestamp, col_name, source['write'])
-
-        data_volume[0] += source['read']
-        data_volume[1] += source['write']
-
-        if not read_ok:
-            index_errors += 1
-        if not write_ok:
-            index_errors += 1
+            match = False
+            if source['collectd_type'] == 'disk_octets':
+                match = True
+                read_rate = source.get('read')
+                write_rate = source.get('write')
+                if read_rate is not None and write_rate is not None:
+                    read_ok = datasets['datatargets/readrates'].insert_element(timestamp, col_name, read_rate)
+                    write_ok = datasets['datatargets/writerates'].insert_element(timestamp, col_name, write_rate)
+                    data_volume[0] += read_rate
+                    data_volume[1] += write_rate
+            elif source['collectd_type'] == 'disk_ops':
+                match = True
+                read_rate = source.get('read')
+                write_rate = source.get('write')
+                if read_rate is not None and write_rate is not None:
+                    read_ok = datasets['datatargets/readoprates'].insert_element(timestamp, col_name, read_rate)
+                    write_ok = datasets['datatargets/writerates'].insert_element(timestamp, col_name, write_rate)
+                    data_volume[2] += read_rate
+                    data_volume[3] += write_rate
+            if match:
+                if not read_ok:
+                    index_errors += 1
+                if not write_ok:
+                    index_errors += 1
 
     # Metadata
     datasets['datatargets/readrates'].dataset_metadata.update({'units': 'bytes/sec'})
     datasets['datatargets/writerates'].dataset_metadata.update({'units': 'bytes/sec'})
+    datasets['datatargets/readoprates'].dataset_metadata.update({'units': 'ops/sec'})
+    datasets['datatargets/writeoprates'].dataset_metadata.update({'units': 'ops/sec'})
     datasets['datatargets/readrates'].group_metadata.update({'source': 'collectd_disk'})
     datasets['datatargets/writerates'].group_metadata.update({'source': 'collectd_disk'})
+    datasets['datatargets/readoprates'].group_metadata.update({'source': 'collectd_disk'})
+    datasets['datatargets/writeoprates'].group_metadata.update({'source': 'collectd_disk'})
 
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
 
-    print "Added %d bytes of read, %d bytes of write" % (data_volume[0], data_volume[1])
+    print "Added %d bytes/%d ops of read, %d bytes/%d ops of write" % (
+        data_volume[0] * datasets['datatargets/readrates'].timestep,
+        data_volume[2] * datasets['datatargets/readoprates'].timestep,
+        data_volume[1] * datasets['datatargets/writerates'].timestep,
+        data_volume[3] * datasets['datatargets/writeoprates'].timestep)
 
 def run_disk_query(host, port, index, t_start, t_end, timeout=None):
     """
