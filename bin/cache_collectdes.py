@@ -13,6 +13,7 @@ import datetime
 import argparse
 import warnings
 import mimetypes
+import multiprocessing
 
 import dateutil.parser # because of how ElasticSearch returns time data
 import dateutil.tz
@@ -94,16 +95,16 @@ SOURCE_FIELDS = [
     'io_time',
 ]
 
-def process_page(pages, datasets):
+def process_page(page):
     """
-    Go through a list of pages and insert their data into a numpy matrix.  In
+    Go through a list of docs and insert their data into a numpy matrix.  In
     the future this should be a flush function attached to the CollectdEs
     connector class.
     """
 
-    data_volume = [0.0, 0.0, 0.0, 0.0]
-    index_errors = 0
-    for doc in pages:
+    _time0 = time.time()
+    inserts = []
+    for doc in page:
         # basic validity checking
         if '_source' not in doc:
             warnings.warn("No _source in doc")
@@ -125,49 +126,67 @@ def process_page(pages, datasets):
                                               .replace(tzinfo=None)
             col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
 
-            match = False
             if source['collectd_type'] == 'disk_octets':
-                match = True
                 read_rate = source.get('read')
                 write_rate = source.get('write')
                 if read_rate is not None and write_rate is not None:
-                    read_ok = datasets['datatargets/readrates'].insert_element(timestamp, col_name, read_rate)
-                    write_ok = datasets['datatargets/writerates'].insert_element(timestamp, col_name, write_rate)
-                    data_volume[0] += read_rate
-                    data_volume[1] += write_rate
+                    inserts.append(('datatargets/readrates', timestamp, col_name, read_rate))
+                    inserts.append(('datatargets/writerates', timestamp, col_name, write_rate))
             elif source['collectd_type'] == 'disk_ops':
-                match = True
                 read_rate = source.get('read')
                 write_rate = source.get('write')
                 if read_rate is not None and write_rate is not None:
-                    read_ok = datasets['datatargets/readoprates'].insert_element(timestamp, col_name, read_rate)
-                    write_ok = datasets['datatargets/writeoprates'].insert_element(timestamp, col_name, write_rate)
-                    data_volume[2] += read_rate
-                    data_volume[3] += write_rate
-            if match:
-                if not read_ok:
-                    index_errors += 1
-                if not write_ok:
-                    index_errors += 1
+                    inserts.append(('datatargets/readoprates', timestamp, col_name, read_rate))
+                    inserts.append(('datatargets/writeoprates', timestamp, col_name, write_rate))
 
-    # Metadata
-    datasets['datatargets/readrates'].dataset_metadata.update({'units': 'bytes/sec'})
-    datasets['datatargets/writerates'].dataset_metadata.update({'units': 'bytes/sec'})
-    datasets['datatargets/readoprates'].dataset_metadata.update({'units': 'ops/sec'})
-    datasets['datatargets/writeoprates'].dataset_metadata.update({'units': 'ops/sec'})
-    datasets['datatargets/readrates'].group_metadata.update({'source': 'collectd_disk'})
-    datasets['datatargets/writerates'].group_metadata.update({'source': 'collectd_disk'})
-    datasets['datatargets/readoprates'].group_metadata.update({'source': 'collectd_disk'})
-    datasets['datatargets/writeoprates'].group_metadata.update({'source': 'collectd_disk'})
+    _timef = time.time()
+    if tokio.DEBUG:
+        print "Extracted %d inserts in %.4f seconds" % (len(inserts), _timef - _time0)
+    return inserts
 
+def update_datasets(inserts, datasets):
+    """
+    Given a list of tuples to insert into a dataframe, insert those data serially
+    """
+    units = {
+        'datatargets/readrates': 'bytes/sec',
+        'datatargets/writerates': 'bytes/sec',
+        'datatargets/readoprates': 'ops/sec',
+        'datatargets/writeoprates': 'ops/sec',
+    }
+
+    data_volume = {}
+    errors = {}
+    for key in datasets.keys():
+        data_volume[key] = 0.0
+        errors[key] = 0
+
+    for insert in inserts:
+        try:
+            (dataset_name, timestamp, col_name, rate) = insert
+        except ValueError:
+            print insert
+            raise
+        if datasets[dataset_name].insert_element(timestamp, col_name, rate):
+            data_volume[dataset_name] += rate
+        else:
+            errors[dataset_name] += 1
+
+    # Update dataset metadata
+    for key in datasets.keys():
+        unit = units.get(key, "unknown")
+        datasets[key].dataset_metadata.update({'units': unit})
+        datasets[key].group_metadata.update({'source': 'collectd_disk'})
+
+    index_errors = sum(errors.itervalues())
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
 
-    print "Added %d bytes/%d ops of read, %d bytes/%d ops of write" % (
-        data_volume[0] * datasets['datatargets/readrates'].timestep,
-        data_volume[2] * datasets['datatargets/readoprates'].timestep,
-        data_volume[1] * datasets['datatargets/writerates'].timestep,
-        data_volume[3] * datasets['datatargets/writeoprates'].timestep)
+    for key in data_volume.keys():
+        data_volume[key] *= datasets[key].timestep
+    update_str = "Added %(datatargets/readrates)d bytes/%(datatargets/readoprates)d ops of read," \
+        + " %(datatargets/writerates)d bytes/%(datatargets/writeoprates)d ops of write"
+    print update_str % data_volume
 
 def run_disk_query(host, port, index, t_start, t_end, timeout=None):
     """
@@ -234,29 +253,35 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
                                                                  timestep=timestep,
                                                                  num_columns=num_devices,
                                                                  hdf5_file=hdf5_file)
-
-    # Process all pages retrieved
-    progress = 0
-    processing_time = 0.0
+    # Process all pages retrieved (this is computationally expensive)
+    _time0 = time.time()
+#   updates = multiprocessing.Pool(1).map(process_page, pages)
+    updates = []
     for page in pages:
-        progress += 1
-        time0 = time.time()
-        process_page(page, datasets)
-        timef = time.time()
-        processing_time += timef - time0
-        if tokio.DEBUG:
-            print "Processed page %d of %d in %s seconds" % (progress, len(pages), timef - time0)
-
+        updates.append(process_page(page))
+    _timef = time.time()
+    _extract_time = _timef - _time0
     if tokio.DEBUG:
-        print "Processed %d pages in %s seconds" % (progress, processing_time)
+        print "Extracted %d elements from %d pages in %.4f seconds" \
+            % (len(updates), len(pages), _extract_time)
+
+    # Take the processed list of data to insert and actually insert them
+    _time0 = time.time()
+    for update in updates:
+        update_datasets(update, datasets)
+    _timef = time.time()
+    _update_time = _timef - _time0
+    if tokio.DEBUG:
+        print "Inserted %d elements from %d pages in %.4f seconds" % (len(updates), len(pages), _update_time)
+        print "Processed %d pages in %.4f seconds" % (progress, _extract_time + _update_time)
 
     # Write datasets out to HDF5 file
-    time0 = time.time()
+    _time0 = time.time()
     for dataset in datasets.itervalues():
         dataset.commit_dataset(hdf5_file)
 
     if tokio.DEBUG:
-        print "Committed data to disk in %s seconds" % (time.time() - time0)
+        print "Committed data to disk in %.4f seconds" % (time.time() - _time0)
 
 def cache_collectd_cli():
     """
@@ -266,20 +291,36 @@ def cache_collectd_cli():
 
     # Parse CLI options
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("query_start", type=str, help="start time of query in %s format" % DATE_FMT)
-    parser.add_argument("query_end", type=str, help="end time of query in %s format" % DATE_FMT)
-    parser.add_argument('--init-start', type=str, default=None, help='min timestamp if creating new output file, in %s format (default: same as start)' % DATE_FMT)
-    parser.add_argument('--init-end', type=str, default=None, help='max timestamp if creating new output file, in %s format (default: same as end)' % DATE_FMT)
-    parser.add_argument('--debug', action='store_true', help="produce debug messages")
-    parser.add_argument('--num-bbnodes', type=int, default=288, help='number of expected BB nodes (default: 288)')
-    parser.add_argument('--timestep', type=int, default=10, help='collection frequency, in seconds (default: 10)')
-    parser.add_argument('--timeout', type=int, default=30, help='ElasticSearch timeout time (default: 30)')
-    parser.add_argument('--json', action='store_true', help="output to json instead of HDF5")
-    parser.add_argument('--input-json', type=str, default=None, help="use cached output from previous ES query")
-    parser.add_argument("-o", "--output", type=str, default='output.hdf5', help="output file (default: output.hdf5)")
-    parser.add_argument('-h', '--host', type=str, default="localhost", help="hostname of ElasticSearch endpoint (default: localhost)")
-    parser.add_argument('-p', '--port', type=int, default=9200, help="port of ElasticSearch endpoint (default: 9200)")
-    parser.add_argument('-i', '--index', type=str, default='cori-collectd-*', help='ElasticSearch index to query (default:cori-collectd-*)')
+    parser.add_argument("query_start", type=str,
+                        help="start time of query in %s format" % DATE_FMT)
+    parser.add_argument("query_end", type=str,
+                        help="end time of query in %s format" % DATE_FMT)
+    parser.add_argument('--init-start', type=str, default=None,
+                        help='min timestamp if creating new output file, in %s format' % DATE_FMT
+                        + ' (default: same as start)')
+    parser.add_argument('--init-end', type=str, default=None,
+                        help='max timestamp if creating new output file, in %s format' % DATE_FMT
+                        + ' (default: same as end)')
+    parser.add_argument('--debug', action='store_true',
+                        help="produce debug messages")
+    parser.add_argument('--num-bbnodes', type=int, default=288,
+                        help='number of expected BB nodes (default: 288)')
+    parser.add_argument('--timestep', type=int, default=10,
+                        help='collection frequency, in seconds (default: 10)')
+    parser.add_argument('--timeout', type=int, default=30,
+                        help='ElasticSearch timeout time (default: 30)')
+    parser.add_argument('--json', action='store_true',
+                        help="output to json instead of HDF5")
+    parser.add_argument('--input-json', type=str, default=None,
+                        help="use cached output from previous ES query")
+    parser.add_argument("-o", "--output", type=str, default='output.hdf5',
+                        help="output file (default: output.hdf5)")
+    parser.add_argument('-h', '--host', type=str, default="localhost",
+                        help="hostname of ElasticSearch endpoint (default: localhost)")
+    parser.add_argument('-p', '--port', type=int, default=9200,
+                        help="port of ElasticSearch endpoint (default: 9200)")
+    parser.add_argument('-i', '--index', type=str, default='cori-collectd-*',
+                        help='ElasticSearch index to query (default:cori-collectd-*)')
     args = parser.parse_args()
 
     if args.debug:
@@ -310,7 +351,12 @@ def cache_collectd_cli():
     # Read input from a cached json file (generated previously via the --json
     # option) or by querying ElasticSearch?
     if args.input_json is None:
-        es_obj = run_disk_query(args.host, args.port, args.index, query_start, query_end, timeout=args.timeout)
+        es_obj = run_disk_query(args.host,
+                                args.port,
+                                args.index,
+                                query_start,
+                                query_end,
+                                timeout=args.timeout)
         pages = es_obj.scroll_pages
         if args.debug:
             print "Loaded results from %s:%s" % (args.host, args.port)
