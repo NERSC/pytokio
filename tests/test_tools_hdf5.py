@@ -38,7 +38,7 @@ TIME_OFFSETS = [
      datetime.timedelta(days=0, hours=12, minutes=0, seconds=0)),
 ]
 
-def check_get_files_and_indices(start_offset, duration):
+def check_get_files_and_indices(dataset_name, start_offset, duration):
     """
     Enumerate input files from time range
     """
@@ -48,6 +48,7 @@ def check_get_files_and_indices(start_offset, duration):
     assert (end_time.date() - start_time.date()).days == 1
 
     files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_H5LMT_FILE_BN,
+                                                               dataset_name,
                                                                start_time,
                                                                end_time)
     for (file_name, istart, iend) in files_and_indices:
@@ -78,10 +79,11 @@ def test():
     Correctness of tools.hdf5 edge cases
     """
     for (description, start_offset, duration) in TIME_OFFSETS:
-        func = check_get_files_and_indices
-        func.description = "tools.hdf5 (files): " + description
-        yield func, start_offset, duration
         for dataset_name in DATASETS_1D + DATASETS_2D:
+            func = check_get_files_and_indices
+            func.description = "tools.hdf5.get_files_and_indices(%s): %s" % (dataset_name, description)
+            yield func, dataset_name, start_offset, duration
+
             func = check_get_df_from_time_range
-            func.description = "tools.hdf5 (dataframe): " + description
+            func.description = "tools.hdf5.get_df_from_time_range(%s): %s" % (dataset_name, description)
             yield func, dataset_name, start_offset, duration

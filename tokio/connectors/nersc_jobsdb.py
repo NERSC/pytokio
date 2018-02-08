@@ -28,10 +28,10 @@ except ImportError:
     pass
 import cachingdb
 
-CACHE_TABLE_SCHEMA = """
-create table if not exists
-    summary(stepid primary key, hostname, start integer, completion integer, numnodes integer)
-"""
+NERSC_JOBSDB_SCHEMA = {
+    'columns': [ 'STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES' ],
+    'primary_key': [ 'STEPID' ],
+}
 
 HIT_MEMORY   = 0
 HIT_CACHE_DB = 1
@@ -154,7 +154,7 @@ class NerscJobsDb(cachingdb.CachingDb):
                 query_str,
                 query_variables,
                 table='summary',
-                table_schema=CACHE_TABLE_SCHEMA)
+                table_schema=NERSC_JOBSDB_SCHEMA)
             index_end = len(self.saved_results['summary']['rows'])
             if not nocache:
                 self.cached_queries[cache_key] = (index_start, index_end)

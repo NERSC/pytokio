@@ -5,6 +5,7 @@ contains immutable data.  Can use a local caching database (sqlite3) to allow
 for reanalysis on platforms that cannot access the original remote database.
 """
 
+import json
 import warnings
 try:
     import pymysql
@@ -17,11 +18,6 @@ except ImportError:
     pass
 
 import sqlite3
-
-CACHE_TABLE_SCHEMA = """
-create table if not exists
-    summary(stepid primary key, hostname, start integer, completion integer, numnodes integer)
-"""
 
 HIT_CACHE_DB = 1
 HIT_REMOTE_DB = 2
@@ -107,8 +103,6 @@ class CachingDb(object):
             self.cache_db = sqlite3.connect(cache_file)
             self.cache_file = cache_file
             self.cache_db_ps = get_paramstyle_symbol(sqlite3.paramstyle)
-            ### TODO: Ensure that the correct table/schema exists
-#           self.cache_db.execute(CACHE_TABLE_SCHEMA)
 
     def close_cache(self):
         """
@@ -158,6 +152,10 @@ class CachingDb(object):
         ### Commit each table we've retained in memory
         drop_caches = set([])
         for table, table_info in self.saved_results.iteritems():
+            if len(self.saved_results[table]['rows']) < 1:
+                warnings.warn("table %s has no rows" % table)
+                continue
+
             num_fields = None
             ### Verify and preprocess each saved row
             for index, row in enumerate(self.saved_results[table]['rows']):
@@ -183,13 +181,15 @@ class CachingDb(object):
             ###   (1) the table doesn't already exist in the cache database, or
             ###   (2) 'schema' isn't set correctly by the downstream application
             if table_info['schema'] is not None:
-                self.cache_db.execute(table_info['schema'])
+                self.cache_db.execute(
+                    "CREATE TABLE IF NOT EXISTS %s (%s, PRIMARY KEY(%s))" %
+                    (table,
+                    ', '.join(table_info['schema']['columns']),
+                    ', '.join(table_info['schema']['primary_key'])))
 
             ### INSERT OR REPLACE so that the cache db never wins if a duplicate
             ### primary key is detected
-            query_str = "insert or replace into %s values (%s)" % (
-                table,
-                ','.join(['?'] * num_fields))
+            query_str = "insert or replace into %s values (%s)" % (table, ','.join(['?'] * num_fields))
             self.cache_db.executemany(
                 query_str,
                 table_info['rows'])

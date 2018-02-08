@@ -80,7 +80,7 @@ def compare_config_to_runtime(config_file):
 @nose.tools.with_setup(flush_env)
 def test_default_config():
     """
-    Load config file from default location
+    tokio.config: Load config file from default location
     """
     # Reload the module to force reinitialization from config
     reload(tokio.config)
@@ -91,7 +91,7 @@ def test_default_config():
 @nose.tools.with_setup(flush_env)
 def test_configfile_env():
     """
-    Load config file from PYTOKIO_CONFIG
+    tokio.config: Load config file from PYTOKIO_CONFIG
     """
     config_file = os.path.join(tokiotest.INPUT_DIR, 'sample_config.json')
 
@@ -107,7 +107,7 @@ def test_configfile_env():
 @nose.tools.with_setup(flush_env)
 def test_config_magic_variable():
     """
-    Use of magic overriding variable
+    tokio.config: Use of magic overriding variable
     """
     # Ensure that each magic environment variable is picked up correctly
     for variable, value in MAGIC_VARIABLES.iteritems():
@@ -117,7 +117,7 @@ def test_config_magic_variable():
 @nose.tools.with_setup(flush_env)
 def test_no_env_effects_post_load():
     """
-    Magic variables don't affect runtime post-load
+    tokio.config: Magic variables don't affect runtime post-load
     """
     # First load and verify the default config
     test_default_config()
@@ -135,7 +135,7 @@ def test_no_env_effects_post_load():
 @nose.tools.with_setup(flush_env)
 def test_config_post_load_by_env():
     """
-    Change tokio configuration after it is loaded (scalars)
+    tokio.config: Change tokio configuration after it is loaded (scalars)
     """
     # First load and verify the default config
     test_default_config()
@@ -150,7 +150,7 @@ def test_config_post_load_by_env():
 @nose.tools.with_setup(flush_env)
 def test_config_post_load_from_file():
     """
-    Change tokio configuration after it is loaded (scalars+dicts)
+    tokio.config: Change tokio configuration after it is loaded (scalars+dicts)
     """
     # First load and verify the default config
     test_default_config()

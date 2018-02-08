@@ -76,8 +76,7 @@ def test_get_biggest_api():
 @tokiotest.needs_darshan
 def test_json():
     """
-    Baseline integration of darshan and LMT data (json)
-
+    bin/summarize_job.py: darshan and LMT data (json)
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -92,8 +91,7 @@ def test_json():
 @tokiotest.needs_darshan
 def test_csv():
     """
-    Baseline integration of darshan and LMT data (csv)
-
+    bin/summarize_job.py: darshan and LMT data (csv)
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -107,8 +105,7 @@ def test_csv():
 @tokiotest.needs_darshan
 def test_darshan_summaries():
     """
-    Correctly handle multiple Darshan logs (csv)
-
+    bin/summarize_job.py: multiple Darshan logs (csv)
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -123,8 +120,7 @@ def test_darshan_summaries():
 @tokiotest.needs_darshan
 def test_bogus_darshans():
     """
-    Correctly handle mix of valid and invalid Darshan logs
-
+    bin/summarize_job.py: mix of valid and invalid Darshan logs
     """
     tokiotest.check_darshan()
     with open(os.devnull, 'w') as devnull:
@@ -144,11 +140,10 @@ def test_bogus_darshans():
 @tokiotest.needs_darshan
 def test_with_topology():
     """
-    Integration of topology (CraySDB + Slurm)
+    bin/summarize_job.py --topology --slurm-jobid
 
     requires either an SDB cache file or access to xtdb2proc
     requires either access to Slurm or a Slurm job cache file (to map jobid to node list)
-
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -166,8 +161,7 @@ def test_with_topology():
 @tokiotest.needs_darshan
 def test_with_lfsstatus():
     """
-    Integration of tools.lfsstatus
-
+    bin/summarize_job.py --ost --ost-fullness --ost-map
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -187,7 +181,7 @@ def test_with_lfsstatus():
 @tokiotest.needs_darshan
 def test_with_nersc_jobsdb():
     """
-    Integration of NerscJobsDb
+    bin/summarize_job.py --concurrentjobs --jobhost
     """
     tokiotest.check_darshan()
     output_str = subprocess.check_output([
@@ -205,7 +199,7 @@ def test_with_nersc_jobsdb():
 
 def test_without_darshan():
     """
-    LMT-only functionality when no darshan log is present
+    bin/summarize_job.py sans Darshan log (h5lmt-only)
     """
     output_str = subprocess.check_output([
         BINARY,
@@ -218,7 +212,7 @@ def test_without_darshan():
 
 def test_most_without_darshan():
     """
-    Most functionality when no darshan log is present
+    bin/summarize_job.py sans Darshan log (most functionality)
     """
     output_str = subprocess.check_output([
         BINARY,

@@ -46,11 +46,20 @@ SAMPLE_NERSCJOBSDB_START = 1489872299
 SAMPLE_NERSCJOBSDB_END = 1490167256
 SAMPLE_NERSCJOBSDB_HOST = 'edison'
 SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'sample_lmtdb.sqlite3')
-SAMPLE_LMTDB_START = 1506182400
-SAMPLE_LMTDB_END = 1506182430
+SAMPLE_LMTDB_START = 1517126400
+SAMPLE_LMTDB_END = 1517126700
+SAMPLE_LMTDB_TIMESTEP = 5
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
+SAMPLE_TIMESERIES_FILES = {
+    "TOKIO HDF5": SAMPLE_TOKIOTS_FILE,
+    "pylmt HDF5": SAMPLE_H5LMT_FILE,
+}
+SAMPLE_TIMESERIES_DATASETS = [
+    "datatargets/readbytes",
+    "datatargets/writerates"
+]
 
 ### The following SLURM_CACHE_* all correspond to SLURM_CACHE_FILE; if you
 ### change one, you must change them all.
@@ -89,7 +98,8 @@ SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00'
 SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 
 SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
-SAMPLE_COLLECTDES_DSET = '/bytes/readrates'
+SAMPLE_COLLECTDES_DSET = '/datatargets/readrates'
+SAMPLE_COLLECTDES_DSET2 = '/datatargets/writerates'
 
 SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
 SAMPLE_COLLECTDES_QUERY = {

@@ -1,225 +1,276 @@
 #!/usr/bin/env python
+"""
+Provide a TOKIO-aware HDF5 class that knows how to interpret schema versions
+encoded in a TOKIO HDF5 file and translate a universal schema into file-specific
+schemas.  Also supports dynamically mapping static HDF5 datasets into new
+derived datasets dynamically.
+"""
 
-import time
 import datetime
 import h5py
-import numpy as np
-import pandas as pd
-from ..debug import debug_print as _debug_print
-from ..config import LMT_TIMESTEP
+import pandas
+from .. import config
+from _hdf5 import *
 
-_NATIVE_VERSION = 1
+SCHEMA = {
+    None: {},
+    "1": {
+        "datatargets/readbytes": "/datatargets/readbytes",
+        "datatargets/writebytes": "/datatargets/writebytes",
+        "datatargets/readrates": "/datatargets/readrates",
+        "datatargets/writerates": "/datatargets/writerates",
+        "datatargets/readops": "/datatargets/readops",
+        "datatargets/writeops": "/datatargets/writeops",
+        "datatargets/readoprates": "/datatargets/readoprates",
+        "datatargets/writeoprates": "/datatargets/writeoprates",
+        "mdtargets/open": "/mdtargets/open",
+        "mdtargets/close": "/mdtargets/close",
+        "mdtargets/mknod": "/mdtargets/mknod",
+        "mdtargets/link": "/mdtargets/link",
+        "mdtargets/unlink": "/mdtargets/unlink",
+        "mdtargets/mkdir": "/mdtargets/mkdir",
+        "mdtargets/rmdir": "/mdtargets/rmdir",
+        "mdtargets/rename": "/mdtargets/rename",
+        "mdtargets/getxattr": "/mdtargets/getxattr",
+        "mdtargets/statfs": "/mdtargets/statfs",
+        "mdtargets/setattr": "/mdtargets/setattr",
+        "mdtargets/getattr": "/mdtargets/getattr",
+        "mdservers/cpuuser": "/mdservers/cpuuser",
+        "mdservers/cpusys": "/mdservers/cpusys",
+        "mdservers/cpuidle": "/mdservers/cpuidle",
+        "mdservers/cpuload": "/mdservers/cpuload",
+        "mdservers/memfree": "/mdservers/memfree",
+        "mdservers/memused": "/mdservers/memused",
+        "mdservers/memcached": "/mdservers/memcached",
+        "mdservers/memslab": "/mdservers/memslab",
+        "mdservers/memslab_unrecl": "/mdservers/memslab_unrecl",
+        "mdservers/memtotal": "/mdservers/memtotal",
+        "dataservers/cpuuser": "/dataservers/cpuuser",
+        "dataservers/cpusys": "/dataservers/cpusys",
+        "dataservers/cpuidle": "/dataservers/cpuidle",
+        "dataservers/cpuload": "/dataservers/cpuload",
+        "dataservers/memfree": "/dataservers/memfree",
+        "dataservers/memused": "/dataservers/memused",
+        "dataservers/memcached": "/dataservers/memcached",
+        "dataservers/memslab": "/dataservers/memslab",
+        "dataservers/memslab_unrecl": "/dataservers/memslab_unrecl",
+        "dataservers/memtotal": "/dataservers/memtotal",
+        "fullness/bytes": "/fullness/bytes",
+        "fullness/bytestotal": "/fullness/bytestotal",
+        "fullness/inodes": "/fullness/inodes",
+        "fullness/inodestotal": "/fullness/inodestotal",
+        "failover/datatargets": "/failover/datatargets",
+        "failover/mdtargets": "/failover/mdtargets",
+    },
+}
+
+# Map keys which don't exist as datasets in the underlying HDF5 but can be
+# calculated from datasets that _do_ exist to the functions that do these
+# conversions
+SCHEMA_DATASET_PROVIDERS = {
+    None: {
+        "datatargets/readbytes": { 
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'OSTReadGroup/OSTBulkReadDataSet',
+                'to_rates': False,
+                'transpose': True,
+            },
+        },
+        "datatargets/writebytes": {
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'OSTWriteGroup/OSTBulkWriteDataSet',
+                'to_rates': False,
+                'transpose': True,
+            },
+        },
+        "datatargets/readrates": {
+            'func': map_and_transpose,
+            'args': {
+                'from_key': "/OSTReadGroup/OSTBulkReadDataSet",
+            },
+        },
+        "datatargets/writerates": {
+            'func': map_and_transpose,
+            'args': {
+                'from_key': "/OSTWriteGroup/OSTBulkWriteDataSet",
+            },
+        },
+        "dataservers/cpuload": {
+            'func': map_and_transpose,
+            'args': {
+                'from_key': "/OSSCPUGroup/OSSCPUDataSet",
+            },
+        },
+    },
+    "1": {
+        "datatargets/readbytes": { 
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'datatargets/readrates',
+                'to_rates': False,
+            },
+        },
+        "datatargets/writebytes": {
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'datatargets/writerates',
+                'to_rates': False,
+            },
+        },
+        "datatargets/readrates": {
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'datatargets/readbytes',
+                'to_rates': True,
+            },
+        },
+        "datatargets/writerates": {
+            'func': convert_bytes_rates,
+            'args': {
+                'from_key': 'datatargets/writebytes',
+                'to_rates': True,
+            },
+        },
+    },
+}
+
+H5LMT_COLUMN_ATTRS = {
+    'MDSOpsGroup/MDSOpsDataSet': 'OpNames',
+    'OSTReadGroup/OSTBulkReadDataSet': 'OSTNames',
+    'OSTWriteGroup/OSTBulkWriteDataSet': 'OSTNames',
+    'OSSCPUGroup/OSSCPUDataSet': 'OSSNames',
+}
+
+TIMESTAMP_KEY = 'timestamps'
+DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
+COLUMN_NAME_KEY = 'columns'
 
 class Hdf5(h5py.File):
     """
-    Create a parsed Hdf5 file class 
+    Create a parsed Hdf5 file class
     """
     def __init__(self, *args, **kwargs):
-        super(Hdf5,self).__init__(*args, **kwargs)
+        """
+        This is just an HDF5 file object; the magic is in the additional methods
+        and indexing that are provided by the TOKIO Time Series-specific HDF5
+        object.
+        """
+        super(Hdf5, self).__init__(*args, **kwargs)
 
-        # Timestanp that will help to sort hdf5 files  
-        if 'FSStepsGroup/FSStepsDataSet' in self:
-            self.first_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
-            self.last_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][-1])
+        self.version = self.attrs.get('version')
+
+        # Connect the schema map to this object
+        if self.version in SCHEMA:
+            self.schema = SCHEMA[self.version]
+        elif self.version == None:
+            self.schema = {}
         else:
-            self.first_timestamp = None
-            self.last_timestamp = None
+            raise KeyError("Unknown schema version %s" % self.version)
 
-        # Timestep saving 
-        self.timestep = self['/'].attrs.get('timestep')
-        if self.timestep is None:
-            self.timestep = LMT_TIMESTEP
-        
-        # Define the version format of the object
-        if self['/'].attrs.get('version') is None:
-            self.version = _NATIVE_VERSION
+        # Connect the schema dataset providers to this object
+        if self.version in SCHEMA_DATASET_PROVIDERS:
+            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self.version]
         else:
-            self.version = self.attrs.get('version')
-    
-    #=================================================#
-         
-    def init_datasets(self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown'):
+            self.dataset_providers = {}
+
+    def __getitem__(self, key):
         """
-        Create datasets if they do not exist, and set the appropriate attributes
-       
+        Return the h5py.Dataset if key is a literal dataset name
+                   h5py.Dataset if key maps directly to a literal dataset name
+                                given the file schema version
+                   numpy.ndarray if key maps to a provider function that can
+                                 calculate the requested data
         """
-        ### Notes:
-        ### 1. We do square chunking here because there are times when we
-        ###    want to both iterate over time (rows), such as when collecting
-        ###    aggregate file system metrics, as well as iterate over STs,
-        ###    such as when trying to subselect STs participating in a
-        ###    specific job.
-        ### 2. v1 has num_timesteps+1 for reasons unknown.  Strict v1 leaves
-        ###    the first timestep zero and includes the first timestep from
-        ###    the following day as the (num_timesteps+1)th row, but we
-        ###    simply leave the (num_timesteps+1)th zero and correctly populate
-        ###    the first datapoints of the day instead.
-        num_osses = len(oss_names)
-        num_osts = len(ost_names)
-        num_mds_ops = len(mds_op_names)
-        _V1_SCHEMA = {
-            '/FSMissingGroup/FSMissingDataSet' : {
-                'shape': (num_osses, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'i4',
-            },
-            '/FSStepsGroup/FSStepsDataSet' : {
-                'shape': (num_timesteps+1,),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'i4',
-            },
-            '/MDSCPUGroup/MDSCPUDataSet' : {
-                'shape': (num_timesteps+1,),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/MDSOpsGroup/MDSOpsDataSet' : {
-                'shape': (num_mds_ops,num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSSCPUGroup/OSSCPUDataSet' : {
-                'shape': (num_osses, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSTReadGroup/OSTBulkReadDataSet' : {
-                'shape': (num_osts, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSTWriteGroup/OSTBulkWriteDataSet' : {
-                'shape': (num_osts, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-        }
+        resolved_key, provider = self._resolve_schema_key(key)
+        if resolved_key:
+            return super(Hdf5, self).__getitem__(resolved_key)
+        elif provider:
+            provider_func = provider.get('func')
+            provider_args = provider.get('args', {})
+            if provider_func is None:
+                errmsg = "No provider function for %s" % key
+                raise KeyError(errmsg)
+            else:
+                return provider_func(self, **provider_args)
+        else:
+            # this should never be hit based on the possible outputs of _resolve_schema_key
+            errmsg = "_resolve_schema_key: undefined output from %s" % key
+            raise KeyError(errmsg)
 
-        # Version 1 format - datasets
-        for dset_name, dset_params in _V1_SCHEMA.iteritems():
-            if dset_name not in self:
-                hard_name = '/version1/' + dset_name
-                self.create_dataset(name=hard_name,**dset_params)
-                self[dset_name] = h5py.SoftLink(hard_name)
-                _debug_print( "creating softlink %s -> %s" % ( dset_name, hard_name ) )
-
-        # Version 1 format - metadata
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['fs'] = filesystem
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['host'] = host
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['day'] = ""
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = ""
-        self['/MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'] = mds_op_names
-        self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames'] = oss_names
-        self['/OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'] = ost_names
-        self['/OSTWriteGroup/OSTBulkWriteDataSet'].attrs['OSTNames'] = ost_names
-
-        # Version 2 format
-        for x in ['ost_bytes_read', 'ost_bytes_written']:
-            if x not in self:
-                self.create_dataset(name=x, shape=(num_timesteps, num_osts),
-                                    chunks=True, compression="gzip", dtype='f8')
-        self.attrs['host'] = host
-        self.attrs['filesystem'] = filesystem
-
-    def init_timestamps(self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None):
+    def _resolve_schema_key(self, key):
         """
-        Initialize timestamps for the whole Hdf5 file.  Version 1 populates an
-        entire dataset with equally spaced epoch timestamps, while version 2
-        only sets a global timestamp for the first row of each dataset and a
-        timestep thereafter.
-        
+        Given a key, either return a key that can be used to index self
+        directly, or return a provider function and arguments to generate the
+        dataset dynamically
         """
-        t0_day = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
-        t0_epoch = time.mktime(t0_day.timetuple()) # truncate t_start
-        ts_ct = int((t_stop - t_start).total_seconds() / timestep)
+        try:
+            # If the dataset exists in the underlying HDF5 file, just return it
+            super(Hdf5, self).__getitem__(key)
+            return key, None
 
-        # Version 1 format - create a full dataset of timestamps
-        ts_map = np.empty(shape=(ts_ct+1,), dtype='i8')
-        for t in range( ts_ct ):
-            ts_map[t] = t0_epoch + t * timestep
-        ts_map[ts_ct] = t0_epoch + ts_ct * timestep # for the final extraneous v1 point...
-        self['/FSStepsGroup/FSStepsDataSet'][:] = ts_map[:]
-        del ts_map ### free the array from memory
+        except KeyError:
+            # Straight mapping between the key and a dataset
+            key = key.lstrip('/') if isinstance(key, basestring) else key
+            if key in self.schema:
+                hdf5_key = self.schema.get(key)
+                if super(Hdf5, self).__contains__(hdf5_key):
+                    return hdf5_key, None
 
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['day'] = t_start.strftime("%Y-%m-%d")
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = (t0_day + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+            # Key maps to a transformation
+            if key in self.dataset_providers:
+                return None, self.dataset_providers[key]
 
-        # Version 2 format - just store the first timestamp and the timestep
-        self.first_timestamp = int(t0_epoch)
-        self.attrs['first_timestamp'] = self.first_timestamp
-        self.timestep = timestep
-        self.attrs['timestep'] = self.timestep
-        self.last_timestamp = self.first_timestamp + self.timestep * ts_ct
+            errmsg = "Unknown key %s in %s" % (key, self.filename)
+            raise KeyError(errmsg)
 
-
-    def get_ost_data(self, t_start, t_stop):
+    def get_columns(self, dataset_name):
         """
-        Return a generator that produces tuples of (timestamp, read_bytes,
-        write_bytes) between t_start (inclusive) and t_stop (exclusive)
-        
+        Get the column names of a dataset
         """
-        idx0 = self.get_index(t_start)
-        idxf = self.get_index(t_stop)
-        assert(idx0 <= idxf)
+        # retrieve the dataset to resolve the schema key or get MappedDataset
+        dataset = self.__getitem__(dataset_name)
 
-        # Load the entire output slice into memory to avoid doing a lot of
-        # tiny I/Os.  May have to optimize this for memory later on down the
-        # road.
-        ts_array = self['FSStepsGroup/FSStepsDataSet'][idx0:idxf]
-        r_array = self['OSTReadGroup/OSTBulkReadDataSet'][:, idx0:idxf]
-        w_array = self['OSTWriteGroup/OSTBulkWriteDataSet'][:, idx0:idxf]
-        assert(r_array.shape[0] == w_array.shape[0])
-        
-        # Generator core
-        for t_idx in range( 0, idxf - idx0 ):
-            for ost_idx in range(r_array.shape[0]):
-                yield (ts_array[t_idx], 
-                       r_array[ost_idx,t_idx] * self.timestep, 
-                       w_array[ost_idx,t_idx] * self.timestep)
+        if self.version is None:
+            dataset_name = dataset.name.lstrip('/')
+            if dataset_name in H5LMT_COLUMN_ATTRS:
+                return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+            else:
+                return []
+        else:
+            return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
-    def get_index(self, t, safe=False):
+    def get_index(self, dataset_name, target_datetime):
         """
         Turn a datetime object into an integer that can be used to reference
         specific times in datasets.
-        
         """
-        # Initialize our timestep if we don't already have this
-        if self.timestep is None:
-            if 'timestep' in self.attrs: 
-                self.timestep = self.attrs['timestep']
-            elif 'FSStepsGroup/FSStepsDataSet' in self and len(self['FSStepsGroup/FSStepsDataSet']) > 1:
-                self.timestep = self['FSStepsGroup/FSStepsDataSet'][1] - self['FSStepsGroup/FSStepsDataSet'][0]
-            else:
-                self.timestep = LMT_TIMESTEP
-        
-        if 'first_timestamp' in self.attrs: 
-            t0 = datetime.datetime.fromtimestamp(self.attrs['first_timestamp'])
-        else:
-            t0 = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
+        dataset = self.__getitem__(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[0:2]
+        timestep = timestamps[1] - timestamps[0]
+        t_start = datetime.datetime.fromtimestamp(timestamps[0])
+        return long((target_datetime - t_start).total_seconds() / timestep)
 
-        return int((t - t0).total_seconds()) / int(self.timestep)
+    def get_timestamps(self, dataset_name):
+        """
+        Return timestamps dataset corresponding to given dataset name
+        """
+        return get_timestamps(self, dataset_name)
 
     def to_dataframe(self, dataset_name=None):
         """
-        Convert the hdf5 class in a pandas dataframe 
+        Convert the hdf5 class in a pandas dataframe
         """
         # Convenience:may put in lower case
-        _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'
         if dataset_name is None:
-            dataset_name = _INDEX_DATASET_NAME
+            dataset_name = '/FSStepsGroup/FSStepsDataSet'
         # Normalize to absolute path
         if not dataset_name.startswith('/'):
             dataset_name = '/' + dataset_name
 
         if dataset_name in ('/OSTReadGroup/OSTBulkReadDataSet',
-                          '/OSTWriteGroup/OSTBulkWriteDataSet'):
+                            '/OSTWriteGroup/OSTBulkWriteDataSet'):
             col_header_key = 'OSTNames'
         elif dataset_name == '/MDSOpsGroup/MDSOpsDataSet':
             col_header_key = 'OpNames'
@@ -227,7 +278,7 @@ class Hdf5(h5py.File):
             col_header_key = 'OSSNames'
         else:
             col_header_key = None
-        
+
         # Get column header from col_header_key
         if col_header_key is not None:
             col_header = self[dataset_name].attrs[col_header_key]
@@ -239,20 +290,51 @@ class Hdf5(h5py.File):
             col_header = None
 
         # Retrieve timestamp indexes
-        index = self[_INDEX_DATASET_NAME][:]
+        index = self['/FSStepsGroup/FSStepsDataSet'][:]
 
         # Retrieve hdf5 values
-        if dataset_name == _INDEX_DATASET_NAME:
+        if dataset_name == '/FSStepsGroup/FSStepsDataSet':
             values = None
         else:
             num_dims = len(self[dataset_name].shape)
             if num_dims == 1:
                 values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[dataset_name][:,:].T
+                values = self[dataset_name][:, :].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
-        return pd.DataFrame(data=values,
-                            index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
-                            columns=col_header)
+        return pandas.DataFrame(data=values,
+                                index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
+                                columns=col_header)
+
+def get_timestamps_key(hdf5_file, dataset_name):
+    """
+    Read into an HDF5 file and extract the name of the dataset containing the
+    timestamps correspond to the given dataset_name
+    """
+    # Get dataset out of HDF5 file
+    hdf5_dataset = hdf5_file.get(dataset_name)
+    if hdf5_dataset is None:
+        return None, None
+
+    if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
+        return '/FSStepsGroup/FSStepsDataSet'
+
+    # Identify the dataset containing timestamps for this dataset
+    if TIMESTAMP_KEY in hdf5_dataset.attrs:
+        timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
+    else:
+        timestamp_key = hdf5_dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
+
+    # Load timestamps dataset into memory
+    if timestamp_key not in hdf5_file:
+        raise KeyError("timestamp_key %s does not exist" % timestamp_key)
+
+    return timestamp_key
+
+def get_timestamps(hdf5_file, dataset_name):
+    """
+    Return the timestamps dataset for a given dataset name
+    """
+    return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]

@@ -19,14 +19,14 @@ def verify_json(output):
 
 def test_basic():
     """
-    Basic functionality of default settings
+    bin/summarize_h5lmt.py
     """
     subprocess.check_output([BINARY, tokiotest.SAMPLE_H5LMT_FILE])
 
 @nose.SkipTest
 def test_json():
     """
-    Basic functionality of json output--NOT YET IMPLEMENTED
+    bin/summarize_h5lmt.py --json
     """
     output_str = subprocess.check_output([BINARY, '--json', tokiotest.SAMPLE_H5LMT_FILE])
     output_json = json.loads(output_str)
