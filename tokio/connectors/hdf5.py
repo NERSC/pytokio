@@ -160,6 +160,7 @@ class Hdf5(h5py.File):
         super(Hdf5, self).__init__(*args, **kwargs)
 
         self.version = self.attrs.get('version')
+        self._timesteps = {}
 
         # Connect the schema map to this object
         if self.version in SCHEMA:
@@ -241,6 +242,16 @@ class Hdf5(h5py.File):
         else:
             return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
+    def get_timestep(self, dataset_name, timestamps=None):
+        """
+        Cache or calculate the timestep for a dataset
+        """
+        if dataset_name not in self._timesteps:
+            if timestamps is None:
+                timestamps = self.get_timestamps(dataset_name)[0:2]
+            self._timesteps[dataset_name] = timestamps[1] - timestamps[0]
+        return self._timesteps[dataset_name]
+
     def get_index(self, dataset_name, target_datetime):
         """
         Turn a datetime object into an integer that can be used to reference
@@ -248,7 +259,7 @@ class Hdf5(h5py.File):
         """
         dataset = self.__getitem__(dataset_name)
         timestamps = self.get_timestamps(dataset_name)[0:2]
-        timestep = timestamps[1] - timestamps[0]
+        timestep = self.get_timestep(dataset_name, timestamps)
         t_start = datetime.datetime.fromtimestamp(timestamps[0])
         return long((target_datetime - t_start).total_seconds() / timestep)
 
