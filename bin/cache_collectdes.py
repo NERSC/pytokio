@@ -175,7 +175,7 @@ def update_datasets(inserts, datasets):
     # Update dataset metadata
     for key in datasets.keys():
         unit = units.get(key, "unknown")
-        datasets[key].dataset_metadata.update({'units': unit})
+        datasets[key].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': unit})
         datasets[key].group_metadata.update({'source': 'collectd_disk'})
 
     index_errors = sum(errors.itervalues())
