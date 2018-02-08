@@ -42,19 +42,41 @@ def archive_ost_data(lmtdb, query_start, query_end, timestep, output_file):
     if schema is None:
         raise KeyError("Schema version %d is not known by connectors.hdf5" % SCHEMA_VERSION)
 
-    dataset_names = [
-        'datatargets/readbytes',
-        'datatargets/writebytes',
-        'fullness/bytes',
-        'fullness/bytestotal',
-        'fullness/inodes',
-        'fullness/inodestotal',
-    ]
+    dataset_config = {
+        'datatargets/readbytes': {
+            "units": "bytes/sec",
+            "delta": True,
+            "column": "READ_BYTES",
+        },
+        'datatargets/writebytes': {
+            "units": "bytes/sec",
+            "delta": True,
+            "column": "WRITE_BYTES",
+        },
+        'fullness/bytes': {
+            "units": "KiB",
+            "delta": False,
+            "column": "KBYTES_USED",
+        },
+        'fullness/bytestotal': {
+            "units": "KiB",
+            "delta": False,
+        },
+        'fullness/inodes': {
+            "units": "inodes",
+            "delta": False,
+            "column": "INODES_USED",
+        },
+        'fullness/inodestotal': {
+            "units": "inodes",
+            "delta": False,
+        },
+    }
 
     # Initialize raw datasets - extend query by one extra timestep so we can calculate deltas
     query_end_plusplus = query_end + datetime.timedelta(seconds=timestep)
     datasets = {}
-    for dataset_name in dataset_names:
+    for dataset_name in dataset_config.keys():
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
             warnings.warn("Skipping %s (not in schema)" % dataset_name)
@@ -73,57 +95,58 @@ def archive_ost_data(lmtdb, query_start, query_end, timestep, output_file):
 
     # Index the columns before building the Timeseries objects
     try:
-        idx_timestamp = columns.index('TIMESTAMP')
-        idx_ostid = columns.index('OST_ID')
-        idx_readbytes = columns.index('READ_BYTES')
-        idx_writebytes = columns.index('WRITE_BYTES')
-        idx_kbused = columns.index('KBYTES_USED')
-        idx_kbfree = columns.index('KBYTES_FREE')
-        idx_inodesused = columns.index('INODES_USED')
-        idx_inodesfree = columns.index('INODES_FREE')
+        col_map = {
+            'TIMESTAMP': columns.index('TIMESTAMP'),
+            'OST_ID': columns.index('OST_ID'),
+            'READ_BYTES': columns.index('READ_BYTES'),
+            'WRITE_BYTES': columns.index('WRITE_BYTES'),
+            'KBYTES_USED': columns.index('KBYTES_USED'),
+            'KBYTES_FREE': columns.index('KBYTES_FREE'),
+            'INODES_USED': columns.index('INODES_USED'),
+            'INODES_FREE': columns.index('INODES_FREE'),
+        }
     except ValueError:
         raise ValueError("LMT database schema does not match expectation")
 
     # Loop through all the results of the timeseries query
     for row in results:
-        if isinstance(row[idx_timestamp], basestring):
+        if isinstance(row[col_map['TIMESTAMP']], basestring):
             # SQLite stores timestamps as a unicode string
-            timestamp = datetime.datetime.strptime(row[idx_timestamp], "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']], "%Y-%m-%d %H:%M:%S")
         else:
             # MySQL timestamps are automatically converted to datetime.datetime
-            timestamp = row[idx_timestamp]
-        col_name = lmtdb.ost_id_map[row[idx_ostid]]
-        datasets['datatargets/readbytes'].insert_element(timestamp, col_name, row[idx_readbytes])
-        datasets['datatargets/writebytes'].insert_element(timestamp, col_name, row[idx_writebytes])
-        datasets['fullness/bytes'].insert_element(timestamp, col_name, row[idx_kbused])
-        datasets['fullness/inodes'].insert_element(timestamp, col_name, row[idx_inodesused])
-        datasets['fullness/bytestotal'].insert_element(timestamp, col_name, row[idx_kbused] + row[idx_kbfree])
-        datasets['fullness/inodestotal'].insert_element(timestamp, col_name, row[idx_inodesused] + row[idx_inodesfree])
+            timestamp = row[col_map['TIMESTAMP']]
+        col_name = lmtdb.ost_id_map[row[col_map['OST_ID']]]
+        for dataset_name, config in dataset_config.iteritems():
+            target_col = config.get('column')
+            if target_col is not None:
+                datasets[dataset_name].insert_element(timestamp, col_name, row[col_map[target_col]])
+            elif dataset_name == 'fullness/bytestotal':
+                datasets[dataset_name].insert_element(
+                    timestamp, col_name, row[col_map['KBYTES_USED']] + row[col_map['KBYTES_FREE']])
+            elif dataset_name == 'fullness/inodestotal':
+                datasets[dataset_name].insert_element(
+                    timestamp, col_name, row[col_map['INODES_USED']] + row[col_map['INODES_FREE']])
+            else:
+                errmsg = "%s in dataset_config but missing target_col" % dataset_name
+                raise KeyError(errmsg)
 
     # Convert some datasets from absolute byte counts to deltas
-    for dataset_name in 'datatargets/readbytes', 'datatargets/writebytes':
+    for dataset_name in [x for x in dataset_config if dataset_config[x]['delta']]:
         datasets[dataset_name].convert_to_deltas()
 
     # Trim off the last row from the non-delta datasets to compensate for our
     # initial over-sizing of the time range by an extra timestamp
-    for dataset_name in 'fullness/bytes', 'fullness/inodes', 'fullness/bytestotal', 'fullness/inodestotal':
+    for dataset_name in [x for x in dataset_config if not dataset_config[x]['delta']]:
         datasets[dataset_name].trim_rows(1)
 
-    # Dataset metadata
-    datasets['datatargets/readbytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
-    datasets['datatargets/writebytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
-    datasets['fullness/bytes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
-    datasets['fullness/inodes'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'inodes'})
-    datasets['fullness/bytestotal'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'bytes'})
-    datasets['fullness/inodestotal'].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': 'inodes'})
-
-    # Group metadata
-    datasets['datatargets/readbytes'].group_metadata.update({'source': 'lmt'})
-    datasets['datatargets/writebytes'].group_metadata.update({'source': 'lmt'})
-    datasets['fullness/bytes'].group_metadata.update({'source': 'lmt'})
-    datasets['fullness/inodes'].group_metadata.update({'source': 'lmt'})
-    datasets['fullness/bytestotal'].group_metadata.update({'source': 'lmt'})
-    datasets['fullness/inodestotal'].group_metadata.update({'source': 'lmt'})
+    # Dataset and group-wide metadata
+    for dataset_name, config in dataset_config.iteritems():
+        datasets[dataset_name].dataset_metadata.update({
+            'version': SCHEMA_VERSION,
+            'units': config['units']
+        })
+        datasets[dataset_name].group_metadata.update({'source': 'lmt'})
 
     return datasets
 
