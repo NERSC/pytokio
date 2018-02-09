@@ -59,6 +59,74 @@ class DatasetDict(dict):
                 "units": "inodes",
                 "delta": False,
             },
+            'dataservers/cpuload': {
+                "units": "%",
+                "delta": False,
+                "column": "PCT_CPU",
+            },
+            'dataservers/memused': {
+                "units": "%",
+                "delta": False,
+                "column": "PCT_MEMORY",
+            },
+            'mdservers/cpuload': {
+                "units": "%",
+                "delta": False,
+                "column": "PCT_CPU",
+            },
+            'mdservers/memused': {
+                "units": "%",
+                "delta": False,
+                "column": "PCT_MEMORY",
+            },
+            'mdtargets/open': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/close': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/mknod': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/link': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/unlink': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/mkdir': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/rmdir': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/rename': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/getxattr': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/statfs': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/setattr': {
+                "units": "ops",
+                "delta": False,
+            },
+            'mdtargets/getattr': {
+                "units": "ops",
+                "delta": False,
+            },
         }
 
         # Initialize raw datasets - extend query by one extra timestep so we can calculate deltas
@@ -66,6 +134,8 @@ class DatasetDict(dict):
         if self.schema is None:
             raise KeyError("Schema version %d is not known by connectors.hdf5" % SCHEMA_VERSION)
 
+        # We need to query past the intended query range in order to calculate
+        # the differences between each row its following row
         self.query_end_plusplus = self.query_end + datetime.timedelta(seconds=timestep)
 
     def init_datasets(self, dataset_names, columns):
@@ -116,13 +186,14 @@ class DatasetDict(dict):
                 the datasets to be converted/corrected
         """
         for dataset_name in dataset_names:
-            if self.config[dataset_name].get('delta'):
-                # Convert some datasets from absolute byte counts to deltas
-                self[dataset_name].convert_to_deltas()
-            else:
-                # Trim off the last row from the non-delta datasets to compensate
-                # for initial over-sizing of the time range by an extra timestamp
-                self[dataset_name].trim_rows(1)
+            if dataset_name in self:
+                if self.config[dataset_name].get('delta'):
+                    # Convert some datasets from absolute byte counts to deltas
+                    self[dataset_name].convert_to_deltas()
+                else:
+                    # Trim off the last row from the non-delta datasets to compensate
+                    # for initial over-sizing of the time range by an extra timestamp
+                    self[dataset_name].trim_rows(1)
 
     def set_metadata(self, dataset_names):
         """Set metadata constants (version, units, etc) on datasets and groups
@@ -132,12 +203,12 @@ class DatasetDict(dict):
                 the datasets whose metadata should be set
         """
         for dataset_name in dataset_names:
-            self[dataset_name].dataset_metadata.update({
-                'version': SCHEMA_VERSION,
-                'units': self.config[dataset_name]['units']
-            })
-            self[dataset_name].group_metadata.update({'source': 'lmt'})
-
+            if dataset_name in self:
+                self[dataset_name].dataset_metadata.update({
+                    'version': SCHEMA_VERSION,
+                    'units': self.config[dataset_name]['units']
+                })
+                self[dataset_name].group_metadata.update({'source': 'lmt'})
 
     def archive_mds_data(self, lmtdb):
         """
@@ -152,10 +223,56 @@ class DatasetDict(dict):
         pass
 
     def archive_oss_data(self, lmtdb):
+        """Extract and encode data from LMT's OSS_DATA table
+
+        Queries the LMT database, interprets resulting rows, and populates a
+        dictionary of TimeSeries objects with those values.
+
+        Args:
+            lmtdb (LmtDb): database object
         """
-        Extract and encode data from LMT's OSS_DATA table (CPU loads)
-        """
-        pass
+
+        dataset_names = [
+            'dataservers/cpuload',
+            'dataservers/memused',
+        ]
+
+        self.init_datasets(dataset_names, lmtdb.oss_names)
+
+        # Now query the OSS_DATA table to get byte counts over the query time range
+        results, columns = lmtdb.get_timeseries_data('OSS_DATA',
+                                                     self.query_start,
+                                                     self.query_end_plusplus)
+
+        # Index the columns to speed up insertion of data
+        col_map = {}
+        try:
+            for db_col in ['TIMESTAMP', 'OSS_ID', 'PCT_CPU', 'PCT_MEMORY']:
+                col_map[db_col] = columns.index(db_col)
+        except ValueError:
+            raise ValueError("LMT database schema does not match expectation")
+
+        # Loop through all the results of the timeseries query
+        for row in results:
+            if isinstance(row[col_map['TIMESTAMP']], basestring):
+                # SQLite stores timestamps as a unicode string
+                timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
+                                                       "%Y-%m-%d %H:%M:%S")
+            else:
+                # MySQL timestamps are automatically converted to datetime.datetime
+                timestamp = row[col_map['TIMESTAMP']]
+            target_name = lmtdb.oss_id_map[row[col_map['OSS_ID']]]
+            for dataset_name in dataset_names:
+                target_dbcol = self.config[dataset_name].get('column')
+                # target_dbcol=PCT_CPU, target_name=snx11025n022
+                if target_dbcol is not None:
+                    self[dataset_name].insert_element(
+                        timestamp,
+                        target_name,
+                        row[col_map[target_dbcol]])
+                else:
+                    errmsg = "%s in self.config but missing 'column' setting" % dataset_name
+                    raise KeyError(errmsg)
 
     def archive_ost_data(self, lmtdb):
         """Extract and encode data from LMT's OST_DATA table
@@ -165,9 +282,6 @@ class DatasetDict(dict):
 
         Args:
             lmtdb (LmtDb): database object
-
-        Returns:
-            dict: TimeSeries objects keyed by dataset name
         """
 
         dataset_names = [
@@ -187,17 +301,12 @@ class DatasetDict(dict):
                                                      self.query_end_plusplus)
 
         # Index the columns to speed up insertion of data
+        col_map = {}
         try:
-            col_map = {
-                'TIMESTAMP': columns.index('TIMESTAMP'),
-                'OST_ID': columns.index('OST_ID'),
-                'READ_BYTES': columns.index('READ_BYTES'),
-                'WRITE_BYTES': columns.index('WRITE_BYTES'),
-                'KBYTES_USED': columns.index('KBYTES_USED'),
-                'KBYTES_FREE': columns.index('KBYTES_FREE'),
-                'INODES_USED': columns.index('INODES_USED'),
-                'INODES_FREE': columns.index('INODES_FREE'),
-            }
+            for db_col in ['TIMESTAMP', 'OST_ID', 'READ_BYTES',
+                           'WRITE_BYTES', 'KBYTES_USED', 'KBYTES_FREE',
+                           'INODES_USED', 'INODES_FREE']:
+                col_map[db_col] = columns.index(db_col)
         except ValueError:
             raise ValueError("LMT database schema does not match expectation")
 
@@ -210,26 +319,26 @@ class DatasetDict(dict):
             else:
                 # MySQL timestamps are automatically converted to datetime.datetime
                 timestamp = row[col_map['TIMESTAMP']]
-            col_name = lmtdb.ost_id_map[row[col_map['OST_ID']]]
-            for dataset_name, config in self.config.iteritems():
-                target_col = config.get('column')
-                if target_col is not None:
+            target_name = lmtdb.ost_id_map[row[col_map['OST_ID']]]
+            for dataset_name in dataset_names:
+                target_dbcol = self.config[dataset_name].get('column')
+                if target_dbcol is not None:
                     self[dataset_name].insert_element(
                         timestamp,
-                        col_name,
-                        row[col_map[target_col]])
+                        target_name,
+                        row[col_map[target_dbcol]])
                 elif dataset_name == 'fullness/bytestotal':
                     self[dataset_name].insert_element(
                         timestamp,
-                        col_name,
+                        target_name,
                         row[col_map['KBYTES_USED']] + row[col_map['KBYTES_FREE']])
                 elif dataset_name == 'fullness/inodestotal':
                     self[dataset_name].insert_element(
                         timestamp,
-                        col_name,
+                        target_name,
                         row[col_map['INODES_USED']] + row[col_map['INODES_FREE']])
                 else:
-                    errmsg = "%s in self.config but missing target_col" % dataset_name
+                    errmsg = "%s in self.config but missing 'column' setting" % dataset_name
                     raise KeyError(errmsg)
 
 def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
@@ -263,6 +372,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
     datasets = DatasetDict(query_start, query_end, timestep)
 
     datasets.archive_ost_data(lmtdb)
+    datasets.archive_oss_data(lmtdb)
 
     datasets.finalize()
 

@@ -174,20 +174,26 @@ class LmtDb(cachingdb.CachingDb):
 
         # Do the same for OSSes
         self.oss_names = []
-        for row in self.query('SELECT DISTINCT HOSTNAME FROM OSS_INFO ORDER BY HOSTNAME;'):
-            self.oss_names.append(row[0])
+        self.oss_id_map = {}
+        for row in self.query('SELECT OSS_ID, HOSTNAME FROM OSS_INFO'):
+            self.oss_names.append(row[1])
+            self.oss_id_map[row[0]] = row[1]
         self.oss_names = tuple(self.oss_names)
 
         # Do the same for MDSes
         self.mds_names = []
-        for row in self.query('SELECT DISTINCT MDS_NAME FROM MDS_INFO ORDER BY MDS_NAME;'):
-            self.mds_names.append(row[0])
+        self.mds_id_map = {}
+        for row in self.query('SELECT MDS_ID, HOSTNAME FROM MDS_INFO'):
+            self.mds_names.append(row[1])
+            self.mds_id_map[row[0]] = row[1]
         self.mds_names = tuple(self.mds_names)
 
         # Do the same for MDS operations
         self.mds_op_names = []
-        for row in self.query('SELECT DISTINCT OPERATION_NAME FROM OPERATION_INFO ORDER BY OPERATION_ID;'):
-            self.mds_op_names.append(row[0])
+        self.mds_op_id_map = {}
+        for row in self.query('SELECT OPERATION_ID, OPERATION_NAME FROM OPERATION_INFO'):
+            self.mds_op_names.append(row[1])
+            self.mds_op_id_map[row[0]] = row[1]
         self.mds_op_names = tuple(self.mds_op_names)
 
     def get_ts_ids(self, datetime_start, datetime_end):
