@@ -8,14 +8,15 @@ import json
 import StringIO
 import pandas
 import tokiotest
+import tokio.config
 import tokiobin.summarize_job
+
+### For tokio.tools.hdf5, which is used by summarize_job.py
+tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 ### For tests that base all tests off of the sample Darshan log
 SAMPLE_DARSHAN_LOG_2 = os.path.join(tokiotest.INPUT_DIR, 'sample-2.darshan')
-
-### For tokio.tools.hdf5, which is used by summarize_job.py
-os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 def verify_output_json(output_str, key=None, value=None):
     """

@@ -10,6 +10,7 @@ import StringIO
 import datetime
 import pandas
 import nose
+import tokio.config
 import tokiotest
 import tokiobin.cache_isdct
 import tokiobin.cache_darshan
@@ -20,8 +21,8 @@ import tokiobin.cache_nersc_jobsdb
 import tokiobin.cache_lmtdb
 
 # For cache_lfsstatus.py
-os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
-os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
+tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
+tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def verify_sqlite(output_str):
