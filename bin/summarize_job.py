@@ -493,7 +493,7 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
         results['jobsdb_concurrent_nodehrs'] = concurrent_job_info['nodehrs']
     return results
 
-def summarize_job():
+def main(argv=None):
     """
     CLI wrapper around process that pulls in data from a variety of connectors
     and reports a summary of data from all connectors for a time range of
@@ -526,7 +526,7 @@ def summarize_job():
                         help="path to an ost map file (lctl dl -t)")
     parser.add_argument("files", nargs='*', default=None,
                         help="darshan logs to process")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     json_rows = []
     records_to_process = 0
 
@@ -580,4 +580,4 @@ def summarize_job():
         print tmp_df.to_csv()
 
 if __name__ == "__main__":
-    summarize_job()
+    main()

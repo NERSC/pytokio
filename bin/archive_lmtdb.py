@@ -169,7 +169,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
     if tokio.DEBUG:
         print "Wrote output to %s" % output_file
 
-def _archive_lmtdb():
+def main(argv=None):
     """
     Verify functionality when connecting to a remote database
     """
@@ -186,7 +186,7 @@ def _archive_lmtdb():
     parser.add_argument("--database", type=str, default=None, help="database name")
     parser.add_argument("query_start", type=str, help="start time in %s format" % DATE_FMT_PRINT)
     parser.add_argument("query_end", type=str, help="end time in %s format" % DATE_FMT_PRINT)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.debug:
         tokio.DEBUG = True
@@ -231,4 +231,4 @@ def _archive_lmtdb():
                   query_end=query_end)
 
 if __name__ == "__main__":
-    _archive_lmtdb()
+    main()

@@ -7,7 +7,7 @@ import os
 import argparse
 import tokio.connectors.slurm
 
-def cache_slurm():
+def main(argv=None):
     """
     CLI wrapper around the tokio.connectors.slurm.Slurm's serialization functions
     """
@@ -18,7 +18,7 @@ def cache_slurm():
     parser.add_argument("-j", "--json", action="store_true", help="return output in JSON format")
     parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     jobid = args.slurm_jobid
 
@@ -58,4 +58,4 @@ def cache_slurm():
             raise Exception("No output format specified")
 
 if __name__ == "__main__":
-    cache_slurm()
+    main()

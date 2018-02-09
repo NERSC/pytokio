@@ -81,7 +81,7 @@ def print_top(categorized_data, max_show=10):
             print "%2d. %20.20s %20d %20d" % (displayed, winner, rankings[winner]['read_bytes'], rankings[winner]['write_bytes'])
         categories += 1
 
-def _process_darshan_perfs():
+def main(argv=None):
     """
     CLI wrapper around process_darshan_perfs()
     """
@@ -89,7 +89,7 @@ def _process_darshan_perfs():
     parser.add_argument("summaryjson", type=str, help="json output of darshan_per_fs_bytes.py")
     parser.add_argument("--json", action='store_true', help="output in json format")
     parser.add_argument("--max-show", type=int, default=10, help="show top N users, apps, file systems")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     results = process_darshan_perfs(args.summaryjson)
     if args.json:
@@ -98,4 +98,4 @@ def _process_darshan_perfs():
         print_top(results, max_show=args.max_show)
 
 if __name__ == "__main__":
-    _process_darshan_perfs()
+    main()

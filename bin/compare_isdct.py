@@ -157,9 +157,37 @@ def discover_errors(diff_dict):
 
     return errors
 
-def compare_nersc_isdct():
+def print_summary(old_isdctfile, new_isdctfile, diff_dict):
+    """Print a human-readable summary of diff_dict
     """
-    Parse command line arguments and dispatch analysis
+    reduced_diff = reduce_diff(diff_dict)
+    diff_buf = summarize_reduced_diffs(reduced_diff)
+    err_buf = summarize_errors(diff_dict, new_isdctfile)
+
+    print "=== ISDCT Summary: %s - %s ===" % (
+        datetime.datetime.fromtimestamp(old_isdctfile.itervalues().next()['timestamp']),
+        datetime.datetime.fromtimestamp(new_isdctfile.itervalues().next()['timestamp']))
+
+    if len(err_buf) > 0:
+        print "\n*** Errors Detected! ***"
+        print err_buf
+
+    if len(diff_dict['removed_devices']) > 0:
+        print "\n=== Devices Removed ==="
+        for dev in diff_dict['removed_devices']:
+            print "%s %s" % (old_isdctfile[dev]['node_name'], dev)
+
+    if len(diff_dict['added_devices']) > 0:
+        print "\n=== Devices Installed ==="
+        for dev in diff_dict['added_devices']:
+            print "%s %s" % (new_isdctfile[dev]['node_name'], dev)
+
+    if len(diff_buf) > 0:
+        print "\n=== Workload Statistics ==="
+        print diff_buf
+
+def main(argv=None):
+    """Parse command line arguments and dispatch analysis
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--all", action='store_true',
@@ -172,7 +200,7 @@ def compare_nersc_isdct():
                         help='include counters that do not change')
     parser.add_argument("old_isdctfile", help="older ISDCT dump file")
     parser.add_argument("new_isdctfile", help="newer ISDCT dump file")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     old_isdctfile = tokio.connectors.nersc_isdct.NerscIsdct(args.old_isdctfile)
     new_isdctfile = tokio.connectors.nersc_isdct.NerscIsdct(args.new_isdctfile)
@@ -181,39 +209,13 @@ def compare_nersc_isdct():
     if args.gibs:
         diff_dict = convert_byte_keys(diff_dict)
 
-    reduced_diff = reduce_diff(diff_dict)
     if args.summary:
-        diff_buf = summarize_reduced_diffs(reduced_diff)
-        err_buf = summarize_errors(diff_dict, new_isdctfile)
-        print "=== ISDCT Summary: %s - %s ===" % (
-            datetime.datetime.fromtimestamp(old_isdctfile.itervalues().next()['timestamp']),
-            datetime.datetime.fromtimestamp(new_isdctfile.itervalues().next()['timestamp']))
-
-        ### print errors if any are detected
-        if len(err_buf) > 0:
-            print "\n*** Errors Detected! ***"
-            print err_buf
-
-        ### print newly removed devices if applicable
-        if len(diff_dict['removed_devices']) > 0:
-            print "\n=== Devices Removed ==="
-            for dev in diff_dict['removed_devices']:
-                print "%s %s" % (old_isdctfile[dev]['node_name'], dev)
-
-        ### print newly added devices if applicable
-        if len(diff_dict['added_devices']) > 0:
-            print "\n=== Devices Installed ==="
-            for dev in diff_dict['added_devices']:
-                print "%s %s" % (new_isdctfile[dev]['node_name'], dev)
-
-        ### print general workload stats last
-        if len(diff_buf) > 0:
-            print "\n=== Workload Statistics ==="
-            print diff_buf
+        print_summary(old_isdctfile, new_isdctfile, diff_dict)
     elif args.all:
         print json.dumps(diff_dict, indent=4, sort_keys=True)
     else:
+        reduced_diff = reduce_diff(diff_dict)
         print json.dumps(reduced_diff, indent=4, sort_keys=True)
 
 if __name__ == "__main__":
-    compare_nersc_isdct()
+    main()

@@ -145,7 +145,7 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
 
     return pandas.DataFrame(pre_dataframe)
 
-def darshan_bad_ost():
+def main(argv=None):
     """
     Parse command line arguments and dispatch analysis
     """
@@ -156,7 +156,7 @@ def darshan_bad_ost():
     parser.add_argument("-c", "--c-threshold", type=float, default=0.0,
                         help="coefficient below which abs(correlations) will not be displayed")
     parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     results = correlate_ost_performance(args.darshanlogs)
 
@@ -175,4 +175,4 @@ def darshan_bad_ost():
                 print "%(ost_name)-10s %(coefficient)12.3f %(p-value)10.4g" % result
 
 if __name__ == "__main__":
-    darshan_bad_ost()
+    main()
