@@ -6,18 +6,17 @@ Test the bin/summarize_job.py tool
 import os
 import json
 import StringIO
-import subprocess
 import pandas
 import tokiotest
+import tokio.config
+import tokiobin.summarize_job
+
+### For tokio.tools.hdf5, which is used by summarize_job.py
+tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
+tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 ### For tests that base all tests off of the sample Darshan log
 SAMPLE_DARSHAN_LOG_2 = os.path.join(tokiotest.INPUT_DIR, 'sample-2.darshan')
-
-### For tokio.tools.hdf5, which is used by summarize_job.py
-os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-os.environ['PYTOKIO_LFSSTATUS_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-
-BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_job.py')
 
 def verify_output_json(output_str, key=None, value=None):
     """
@@ -55,10 +54,8 @@ def test_get_biggest_fs():
     summarize_job.get_biggest_fs() functionality
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        tokiotest.SAMPLE_DARSHAN_LOG])
+    argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
 
 @tokiotest.needs_darshan
@@ -67,10 +64,8 @@ def test_get_biggest_api():
     summarize_job.get_biggest_api() functionality
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        tokiotest.SAMPLE_DARSHAN_LOG])
+    argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
 
 @tokiotest.needs_darshan
@@ -79,10 +74,8 @@ def test_json():
     bin/summarize_job.py: darshan and LMT data (json)
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        tokiotest.SAMPLE_DARSHAN_LOG])
+    argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
@@ -94,9 +87,8 @@ def test_csv():
     bin/summarize_job.py: darshan and LMT data (csv)
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        tokiotest.SAMPLE_DARSHAN_LOG])
+    argv = [tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
@@ -108,10 +100,8 @@ def test_darshan_summaries():
     bin/summarize_job.py: multiple Darshan logs (csv)
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        tokiotest.SAMPLE_DARSHAN_LOG,
-        SAMPLE_DARSHAN_LOG_2])
+    argv = [tokiotest.SAMPLE_DARSHAN_LOG, SAMPLE_DARSHAN_LOG_2]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
@@ -123,15 +113,12 @@ def test_bogus_darshans():
     bin/summarize_job.py: mix of valid and invalid Darshan logs
     """
     tokiotest.check_darshan()
-    with open(os.devnull, 'w') as devnull:
-        output_str = subprocess.check_output([
-            BINARY,
-            tokiotest.SAMPLE_DARSHAN_LOG,      # valid log
-            tokiotest.SAMPLE_XTDB2PROC_FILE,   # not valid log
-            SAMPLE_DARSHAN_LOG_2,    # valid log
-            'garbagefile'            # file doesn't exist
-            ], stderr=devnull)
-    # subprocess.check_output will throw exception if returncode != 0
+    argv = ['--silent-errors',
+            tokiotest.SAMPLE_DARSHAN_LOG,       # valid log
+            tokiotest.SAMPLE_XTDB2PROC_FILE,    # not valid log
+            SAMPLE_DARSHAN_LOG_2,               # valid log
+            'garbagefile']                      # file doesn't exist
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
     assert verify_output_csv(output_str, key='darshan_biggest_read_fs')
@@ -146,12 +133,11 @@ def test_with_topology():
     requires either access to Slurm or a Slurm job cache file (to map jobid to node list)
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,
-        '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
-        '--json',
-        tokiotest.SAMPLE_DARSHAN_LOG])
+    argv = ['--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,
+            '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
+            '--json',
+            tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
@@ -164,14 +150,12 @@ def test_with_lfsstatus():
     bin/summarize_job.py --ost --ost-fullness --ost-map
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        '--ost',
-        '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
-        '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
-        tokiotest.SAMPLE_DARSHAN_LOG])
-    print output_str
+    argv = ['--json',
+            '--ost',
+            '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
+            '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
+            tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
@@ -184,13 +168,11 @@ def test_with_nersc_jobsdb():
     bin/summarize_job.py --concurrentjobs --jobhost
     """
     tokiotest.check_darshan()
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
-        '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
-        tokiotest.SAMPLE_DARSHAN_LOG])
-    print output_str
+    argv = ['--json',
+            '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
+            '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
+            tokiotest.SAMPLE_DARSHAN_LOG]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
@@ -201,35 +183,33 @@ def test_without_darshan():
     """
     bin/summarize_job.py sans Darshan log (h5lmt-only)
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        '--slurm-jobid', tokiotest.SAMPLE_DARSHAN_JOBID,
-        '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
-        '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
-        '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,])
+    argv = ['--json',
+            '--slurm-jobid', tokiotest.SAMPLE_DARSHAN_JOBID,
+            '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
+            '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
+            '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='fs_tot_gibs_written')
 
 def test_most_without_darshan():
     """
     bin/summarize_job.py sans Darshan log (most functionality)
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--json',
-        '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
-        '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
-        '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
-        '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,
+    argv = ['--json',
+            '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
+            '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
+            '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
+            '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM,
 
-        '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
-        '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
+            '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
+            '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
 
-        '--ost',
-        '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
-        '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
+            '--ost',
+            '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
+            '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
 
-        '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE,])
+            '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE]
+    output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')
     assert verify_output_json(output_str, key='fshealth_ost_overloaded_pct')

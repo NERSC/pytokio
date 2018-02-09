@@ -90,7 +90,7 @@ def test_flush_function_correctness():
 
     if not len(FLUSH_STATE['pages']) > 2:
         raise nose.SkipTest("time range only got %d pages; cannot test flush function"
-                                         % len(FLUSH_STATE['pages']))
+                            % len(FLUSH_STATE['pages']))
 
     ############################################################################
     # Accumulate results on the object without a flush function

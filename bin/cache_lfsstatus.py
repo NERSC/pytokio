@@ -8,7 +8,7 @@ import datetime
 import json
 import tokio.tools.lfsstatus as lfsstatus
 
-def cache_lfsstatus():
+def main(argv=None):
     """
     CLI wrapper around the tools.lfsstatus I/O methods
     """
@@ -21,7 +21,7 @@ def cache_lfsstatus():
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     parser.add_argument("filesystem", help="file system identifier (e.g., snx11168)")
     parser.add_argument("datetime", help="date and time of interest in YYYY-MM-DDTHH:MM:SS format")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     target_datetime = datetime.datetime.strptime(args.datetime, "%Y-%m-%dT%H:%M:%S")
     if args.failure is not None:
@@ -48,4 +48,4 @@ def cache_lfsstatus():
         json.dump(results, open(cache_file, 'w'))
 
 if __name__ == "__main__":
-    cache_lfsstatus()
+    main()

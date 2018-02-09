@@ -74,7 +74,7 @@ def query_without_saving(test_db):
     """
     cachingdb does not save results when table=None
     """
-    for test_table in TEST_TABLES.keys():
+    for test_table in TEST_TABLES:
         limit = 10
         result = test_db.query(
             query_str='SELECT * from %s LIMIT %d' % (test_table, limit))
@@ -157,7 +157,7 @@ def test_remote_db():
     """
     Verify functionality when connecting to a remote database
     """
-    try: 
+    try:
         tokio.connectors.cachingdb.MySQLdb
     except AttributeError as error:
         raise nose.SkipTest(error)

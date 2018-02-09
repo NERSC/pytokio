@@ -208,7 +208,7 @@ def reduce_h5lmt(h5_file, num_bins=24):
 
     return bin_data
 
-def summarize_h5lmt():
+def main(argv=None):
     """
     CLI tool to summarize the contents of an H5LMT file
     """
@@ -232,7 +232,7 @@ def summarize_h5lmt():
                         help="date/time to end in YYYY-MM-DD HH:MM:SS format")
     parser.add_argument('--json', dest='json', action='store_true',
                         help='return json output')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.bytes:
         units='byte'
@@ -284,4 +284,4 @@ def summarize_h5lmt():
             sys.stdout.write(print_data_summary(all_binned_data, use_json=args.json, units=units))
 
 if __name__ == '__main__':
-    summarize_h5lmt()
+    main()

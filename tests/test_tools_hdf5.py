@@ -81,9 +81,11 @@ def test():
     for (description, start_offset, duration) in TIME_OFFSETS:
         for dataset_name in DATASETS_1D + DATASETS_2D:
             func = check_get_files_and_indices
-            func.description = "tools.hdf5.get_files_and_indices(%s): %s" % (dataset_name, description)
+            func.description = "tools.hdf5.get_files_and_indices(%s): %s" % (dataset_name,
+                                                                             description)
             yield func, dataset_name, start_offset, duration
 
             func = check_get_df_from_time_range
-            func.description = "tools.hdf5.get_df_from_time_range(%s): %s" % (dataset_name, description)
+            func.description = "tools.hdf5.get_df_from_time_range(%s): %s" % (dataset_name,
+                                                                              description)
             yield func, dataset_name, start_offset, duration

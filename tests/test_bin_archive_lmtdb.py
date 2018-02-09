@@ -5,23 +5,12 @@ Test the archive_lmtdb.py tool
 
 import os
 import time
-import subprocess
 import datetime
 import nose
 import h5py
 import tokiotest
+import tokiobin.archive_lmtdb
 
-BINARY = os.path.join(tokiotest.BIN_DIR, 'archive_lmtdb.py')
-
-#
-#  TESTING APPEND/UPDATE FUNCTIONALITY
-#
-#  The current test strategy is to
-#
-#  1. initialize a new HDF5 and pull down a large window
-#  2. pull down a complete subset of that window to this newly minted HDF5
-#  3. ensure that the hdf5 between #1 and #2 doesn't change
-#
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
 TEST_RANGES = [
@@ -37,17 +26,16 @@ def generate_tts(output_file):
     """
     init_start = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_START).strftime(DATE_FMT)
     init_end = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_END).strftime(DATE_FMT)
-    cmd = [BINARY,
-           '--init-start', init_start,
-           '--init-end', init_end,
-           '--input', tokiotest.SAMPLE_LMTDB_FILE,
-           '--timestep', str(tokiotest.SAMPLE_LMTDB_TIMESTEP),
-           '--output', output_file,
-           '--debug',
-           init_start,
-           init_end]
-    print "Running [%s]" % ' '.join(cmd)
-    subprocess.check_output(cmd)
+    argv = ['--init-start', init_start,
+            '--init-end', init_end,
+            '--input', tokiotest.SAMPLE_LMTDB_FILE,
+            '--timestep', str(tokiotest.SAMPLE_LMTDB_TIMESTEP),
+            '--output', output_file,
+            '--debug',
+            init_start,
+            init_end]
+    print "Running [%s]" % ' '.join(argv)
+    tokiobin.archive_lmtdb.main(argv)
     print "Created", output_file
 
 def update_tts(output_file, q_start, q_end):
@@ -56,15 +44,14 @@ def update_tts(output_file, q_start, q_end):
     """
     assert os.path.isfile(output_file) # must update an existing file
 
-    cmd = [BINARY,
-           '--input', tokiotest.SAMPLE_LMTDB_FILE,
-           '--output', output_file,
-           '--debug',
-           q_start.strftime(DATE_FMT),
-           q_end.strftime(DATE_FMT)]
+    argv = ['--input', tokiotest.SAMPLE_LMTDB_FILE,
+            '--output', output_file,
+            '--debug',
+            q_start.strftime(DATE_FMT),
+            q_end.strftime(DATE_FMT)]
 
-    print "Running [%s]" % ' '.join(cmd)
-    subprocess.check_output(cmd)
+    print "Running [%s]" % ' '.join(argv)
+    tokiobin.archive_lmtdb.main(argv)
     print "Updated", output_file
 
 def summarize_hdf5(hdf5_file):
@@ -123,6 +110,10 @@ def compare_hdf5(summary0, summary1):
 def test_bin_archive_lmtdb():
     """
     bin/archive_lmtdb.py
+
+    1. initialize a new HDF5 and pull down a large window
+    2. pull down a complete subset of that window to this newly minted HDF5
+    3. ensure that the hdf5 between #1 and #2 doesn't change
     """
     tokiotest.TEMP_FILE.close()
 
@@ -150,5 +141,6 @@ def test_bin_archive_lmtdb():
 
         func = compare_hdf5
         func.description = ("bin/archive_lmtdb.py overlap %s" % str(test_range))
+# yield doesn't work because tokiotest.TEMP_FILE doesn't propagate
 #       yield func, summary0, summary1
         func(summary0, summary1)

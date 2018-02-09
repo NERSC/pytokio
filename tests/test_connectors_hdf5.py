@@ -3,7 +3,7 @@
 Test the HDF5 connector
 """
 
-import nose.plugins.skip
+import datetime
 import numpy
 import tokiotest
 import tokio.connectors
@@ -67,7 +67,7 @@ def test_tts():
     """
     connectors.hdf5.Hdf5() TOKIO Time Series support
     """
-    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    assert tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
 
 def test_mapped_dataset():
     """
@@ -130,7 +130,7 @@ def test_get_index():
     connectors.hdf5.Hdf5.get_index()
     """
     for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
-        func = _test_get_columns
+        func = _test_get_index
         func.description = "connectors.hdf5.Hdf5.get_index() with %s" % input_type
         yield func, input_file
 
@@ -138,10 +138,10 @@ def _test_get_index(input_file):
     """
     Ensure that get_index() returns valid results
     """
-    print "Testing %s" % input_file
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
-        assert hdf5_file.get(dataset_name) is not None
+        dataset = hdf5_file.get(dataset_name)
+        assert dataset is not None
 
         timestamps = hdf5_file.get_timestamps(dataset_name)
         timestep = timestamps[1] - timestamps[0]
@@ -153,11 +153,9 @@ def _test_get_index(input_file):
                 target_datetime = datetime.datetime.fromtimestamp(timestamps[target_index]) \
                                   + datetime.timedelta(seconds=fuzz)
                 new_index = hdf5_file.get_index(dataset_name, target_datetime)
-                new_timestamp = timestamps[new_index]
-                assert index == new_index
-                assert dataset[new_index] == dataset[target_index]
-
-        assert len(column_names) > 0
+                print "%d == %d? %s" % (target_index, new_index, target_index == new_index)
+                assert target_index == new_index
+                assert (dataset[new_index] == dataset[target_index]).all()
 
 def test_get_columns():
     """

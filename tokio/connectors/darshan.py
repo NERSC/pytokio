@@ -5,6 +5,7 @@ to a Python dict (or json).  Ideally this will eventually use a native Darshan
 parsing library (like darshan-ruby does).
 """
 
+import os
 import re
 import sys
 import json
@@ -15,10 +16,11 @@ import subprocess
 DARSHAN_PARSER_BIN = 'darshan-parser'
 
 class Darshan(dict):
-    def __init__(self, log_file=None, cache_file=None):
+    def __init__(self, log_file=None, cache_file=None, silent_errors=False):
         super(Darshan,self).__init__(self)
         self.cache_file = cache_file
         self.log_file = log_file
+        self.silent_errors = silent_errors
         self.load()
     
     def __repr__(self):
@@ -135,8 +137,14 @@ class Darshan(dict):
             darshan_flag = "--" + counter_flag.lower()
         else:
             darshan_flag = ""
+
+        cmd = [DARSHAN_PARSER_BIN, darshan_flag, self.log_file]
         try:
-            output_str = subprocess.check_output([DARSHAN_PARSER_BIN, darshan_flag, self.log_file])
+            if self.silent_errors:
+                with open(os.devnull, 'w') as devnull:
+                    output_str = subprocess.check_output(cmd, stderr=devnull)
+            else:
+                output_str = subprocess.check_output(cmd)
         except subprocess.CalledProcessError as error:
             warnings.warn("darshan-parser returned nonzero exit code (%d)" % error.returncode)
             output_str = error.output

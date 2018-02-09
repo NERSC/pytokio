@@ -288,7 +288,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
     if tokio.DEBUG:
         print "Committed data to disk in %.4f seconds" % (time.time() - _time0)
 
-def cache_collectd_cli():
+def main(argv=None):
     """
     CLI interface for cache_collectdes
     """
@@ -328,7 +328,7 @@ def cache_collectd_cli():
                         help="port of ElasticSearch endpoint (default: 9200)")
     parser.add_argument('-i', '--index', type=str, default='cori-collectd-*',
                         help='ElasticSearch index to query (default:cori-collectd-*)')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.debug:
         tokio.DEBUG = True
@@ -391,4 +391,4 @@ def cache_collectd_cli():
         print "Wrote output to %s" % args.output
 
 if __name__ == '__main__':
-    cache_collectd_cli()
+    main()

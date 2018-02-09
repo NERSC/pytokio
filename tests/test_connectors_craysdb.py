@@ -3,7 +3,6 @@
 Test the CraySDB connector
 """
 
-import os
 import errno
 import nose
 import tokiotest

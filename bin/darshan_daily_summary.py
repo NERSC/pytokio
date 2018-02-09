@@ -19,7 +19,7 @@ def process_log(darshan_log):
     """
     result = {}
     try:
-        darshan_data = tokio.connectors.darshan.Darshan(darshan_log)
+        darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
         darshan_data.darshan_parser_base()
     except:
         errmsg = "Unable to open or parse %s" % darshan_log
@@ -95,7 +95,7 @@ def darshan_bytes_per_fs(log_list, threads=1):
 
     return global_results
 
-def _darshan_bytes_per_fs():
+def main(argv=None):
     """
     CLI wrapper around darshan_bytes_per_fs
     """
@@ -104,7 +104,7 @@ def _darshan_bytes_per_fs():
     parser.add_argument('-t', '--threads', default=1, type=int,
                         help="Number of concurrent processes")
     parser.add_argument('-o', '--output', type=str, default=None, help="Name of output file")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     global_results = darshan_bytes_per_fs(args.darshanlogs, args.threads)
     if args.output is None:
@@ -115,4 +115,4 @@ def _darshan_bytes_per_fs():
             print "Wrote output to %s" % output_file
 
 if __name__ == "__main__":
-    _darshan_bytes_per_fs()
+    main()

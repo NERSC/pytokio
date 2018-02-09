@@ -33,7 +33,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
             table=lmtdb_table,
             table_schema=table_schema)
 
-def cache_lmtdb():
+def main(argv=None):
     """
     Verify functionality when connecting to a remote database
     """
@@ -48,7 +48,7 @@ def cache_lmtdb():
     parser.add_argument("--user", type=str, default=None, help="database user")
     parser.add_argument("--password", type=str, default=None, help="database password")
     parser.add_argument("--database", type=str, default=None, help="database name")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     start = datetime.datetime.strptime(args.start, "%Y-%m-%dT%H:%M:%S")
     end = datetime.datetime.strptime(args.end, "%Y-%m-%dT%H:%M:%S")
@@ -80,4 +80,4 @@ def cache_lmtdb():
     lmtdb.save_cache(cache_file)
 
 if __name__ == "__main__":
-    cache_lmtdb()
+    main()

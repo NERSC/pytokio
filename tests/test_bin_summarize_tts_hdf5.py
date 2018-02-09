@@ -3,13 +3,9 @@
 Test the bin/summarize_tts_hdf5.py tool.
 """
 
-import os
 import json
-import subprocess
-import nose
 import tokiotest
-
-BINARY = os.path.join(tokiotest.BIN_DIR, 'summarize_tts_hdf5.py')
+import tokiobin.summarize_tts_hdf5
 
 INPUT_ARGS = [
     [],
@@ -37,16 +33,15 @@ def test_tts():
             full_args = args + [input_file]
             yield func, full_args
 
-def exec_cmd(args):
+def exec_cmd(argv):
     """
     Execute the command with some arguments
     """
-    full_cmd = [BINARY] + args
-    print "Executing", " ".join(full_cmd)
-    output_str = subprocess.check_output(full_cmd)
+    print "Executing", " ".join(argv)
+    output_str = tokiotest.run_bin(tokiobin.summarize_tts_hdf5, argv)
 
     assert len(output_str) > 0
 
-    if 'json' in ''.join(args):
+    if 'json' in ''.join(argv):
         output_json = json.loads(output_str)
         verify_json(output_json)
