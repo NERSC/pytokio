@@ -5,8 +5,8 @@ TokioTimeSeries class
 """
 
 import os
-import subprocess
 import datetime
+import warnings
 import nose
 import h5py
 try:
@@ -14,10 +14,8 @@ try:
     _HAVE_ELASTICSEARCH = True
 except ImportError:
     _HAVE_ELASTICSEARCH = False
-    pass
 import tokiotest
-
-BINARY = os.path.join(tokiotest.BIN_DIR, 'cache_collectdes.py')
+import tokiobin.cache_collectdes
 
 #
 #  TESTING APPEND/UPDATE FUNCTIONALITY
@@ -48,18 +46,17 @@ def generate_tts(output_file):
     """
     Create a TokioTimeSeries output file
     """
-    cmd = [BINARY,
-           '--init-start', tokiotest.SAMPLE_COLLECTDES_START,
-           '--init-end', tokiotest.SAMPLE_COLLECTDES_END,
-           '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
-           '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
-           '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
-           '--output', output_file,
-           '--debug',
-           tokiotest.SAMPLE_COLLECTDES_START,
-           tokiotest.SAMPLE_COLLECTDES_END]
-    print "Running [%s]" % ' '.join(cmd)
-    subprocess.check_output(cmd)
+    argv = ['--init-start', tokiotest.SAMPLE_COLLECTDES_START,
+            '--init-end', tokiotest.SAMPLE_COLLECTDES_END,
+            '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
+            '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
+            '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
+            '--output', output_file,
+            '--debug',
+            tokiotest.SAMPLE_COLLECTDES_START,
+            tokiotest.SAMPLE_COLLECTDES_END]
+    print "Running [%s]" % ' '.join(argv)
+    tokiobin.cache_collectdes.main(argv)
     print "Created", output_file
 
 def update_tts(output_file):
@@ -68,15 +65,14 @@ def update_tts(output_file):
     """
     assert os.path.isfile(output_file) # must update an existing file
 
-    cmd = [BINARY,
-           '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE2,
-           '--output', output_file,
-           '--debug',
-           tokiotest.SAMPLE_COLLECTDES_START2,
-           tokiotest.SAMPLE_COLLECTDES_END2]
+    argv = ['--input-json', tokiotest.SAMPLE_COLLECTDES_FILE2,
+            '--output', output_file,
+            '--debug',
+            tokiotest.SAMPLE_COLLECTDES_START2,
+            tokiotest.SAMPLE_COLLECTDES_END2]
 
-    print "Running [%s]" % ' '.join(cmd)
-    subprocess.check_output(cmd)
+    print "Running [%s]" % ' '.join(argv)
+    tokiobin.cache_collectdes.main(argv)
     print "Updated", output_file
 
 def summarize_hdf5(hdf5_file):
@@ -156,16 +152,18 @@ def test_bin_cache_collectdes_oob():
     new_start_dt = orig_start_dt + orig_delta/3
     new_end_dt = orig_end_dt - orig_delta/3
 
-    cmd = [BINARY,
-           '--init-start', new_start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-           '--init-end', new_end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-           '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
-           '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
-           '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
-           '--output', tokiotest.TEMP_FILE.name,
-           '--debug',
-           tokiotest.SAMPLE_COLLECTDES_START,
-           tokiotest.SAMPLE_COLLECTDES_END]
-    print "Running [%s]" % ' '.join(cmd)
-    stdout = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-    assert 'warning' in stdout
+    argv = ['--init-start', new_start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+            '--init-end', new_end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
+            '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
+            '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
+            '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
+            '--output', tokiotest.TEMP_FILE.name,
+            '--debug',
+            tokiotest.SAMPLE_COLLECTDES_START,
+            tokiotest.SAMPLE_COLLECTDES_END]
+    print "Running [%s]" % ' '.join(argv)
+    with warnings.catch_warnings(record=True) as warn:
+        warnings.simplefilter("always")
+        tokiobin.cache_collectdes.main(argv)
+        print "Caught %d warnings" % len(warn)
+        assert len(warn) > 0

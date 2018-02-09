@@ -3,23 +3,19 @@
 Test the bin/compare_isdct.py tool
 """
 
-import os
 import json
-import subprocess
 import tokiotest
 import test_connectors_nersc_isdct
-
-BINARY = os.path.join(tokiotest.BIN_DIR, 'compare_isdct.py')
+import tokiobin.compare_isdct
 
 def test_all_json():
     """
     compare_isdct --all json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--all',
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ['--all',
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     test_connectors_nersc_isdct.validate_diff(result, report_zeros=False)
 
@@ -27,10 +23,9 @@ def test_reduced_json():
     """
     compare_isdct reduced json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = [tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     for reduction in ('ave', 'count', 'min', 'max', 'sum'):
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
@@ -44,12 +39,11 @@ def test_all_json_w_zeros():
     """
     compare_isdct --all --report-zeros json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--all',
-        "--report-zeros",
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ["--all",
+            "--report-zeros",
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     test_connectors_nersc_isdct.validate_diff(result, report_zeros=True)
 
@@ -57,11 +51,10 @@ def test_reduced_json_w_zeros():
     """
     compare_isdct reduced --report-zeros json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        "--report-zeros",
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ["--report-zeros",
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     for reduction in ('ave', 'min', 'max', 'sum'):
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
@@ -77,11 +70,10 @@ def test_reduced_json_gibs():
     """
     compare_isdct reduced --gibs json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        "--gibs",
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ["--gibs",
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     success = 0
     for counter in result.keys():
@@ -94,12 +86,11 @@ def test_all_json_w_gibs():
     """
     compare_isdct --all --gibs json output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--all',
-        "--gibs",
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ["--all",
+            "--gibs",
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
     result = json.loads(output_str)
     success = 0
     for counters in result['devices'].itervalues():
@@ -113,11 +104,10 @@ def test_summary():
     """
     compare_isdct --summary human-readable output
     """
-    output_str = subprocess.check_output([
-        BINARY,
-        '--summary',
-        tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
-        tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE])
+    argv = ["--summary",
+            tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
+            tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
+    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
 
     ### look for a section on devices removed
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_RM > 0:

@@ -19,7 +19,7 @@ def process_log(darshan_log):
     """
     result = {}
     try:
-        darshan_data = tokio.connectors.darshan.Darshan(darshan_log)
+        darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
         darshan_data.darshan_parser_base()
     except:
         errmsg = "Unable to open or parse %s" % darshan_log

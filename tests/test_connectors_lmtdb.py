@@ -96,8 +96,17 @@ def test_get_timeseries_data():
     dt_end = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_END)
     result0 = lmtdb.get_timeseries_data('OST_DATA', dt_start, dt_end)
     assert len(result0) > 0
-    result1 = lmtdb.get_timeseries_data('OST_DATA', dt_start, dt_end, datetime.timedelta(seconds=10))
-    result2 = lmtdb.get_timeseries_data('OST_DATA', dt_start, dt_end, datetime.timedelta(seconds=30))
-    result3 = lmtdb.get_timeseries_data('OST_DATA', dt_start, dt_end, datetime.timedelta(seconds=60))
+    result1 = lmtdb.get_timeseries_data('OST_DATA',
+                                        dt_start,
+                                        dt_end,
+                                        datetime.timedelta(seconds=10))
+    result2 = lmtdb.get_timeseries_data('OST_DATA',
+                                        dt_start,
+                                        dt_end,
+                                        datetime.timedelta(seconds=30))
+    result3 = lmtdb.get_timeseries_data('OST_DATA',
+                                        dt_start,
+                                        dt_end,
+                                        datetime.timedelta(seconds=60))
     assert result0 == result1 == result2 == result3
     print result0

@@ -271,11 +271,11 @@ def serialize_datetime(obj):
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
     raise TypeError("Type %s not serializable" % type(obj))
 
-def retrieve_darshan_data(results, darshan_log_file):
+def retrieve_darshan_data(results, darshan_log_file, silent_errors=False):
     """
     Extract the performance data from the Darshan log
     """
-    darshan_data = tokio.connectors.darshan.Darshan(darshan_log_file)
+    darshan_data = tokio.connectors.darshan.Darshan(darshan_log_file, silent_errors=silent_errors)
     darshan_data.darshan_parser_perf()
     darshan_data.darshan_parser_base()
 
@@ -524,6 +524,8 @@ def main(argv=None):
                         help="path to an ost fullness file (lfs df)")
     parser.add_argument("--ost-map", type=str, default=None, nargs="?",
                         help="path to an ost map file (lctl dl -t)")
+    parser.add_argument("--silent-errors", action='store_true',
+                        help="suppress error messages from darshan-parser")
     parser.add_argument("files", nargs='*', default=None,
                         help="darshan logs to process")
     args = parser.parse_args(argv)
@@ -555,7 +557,7 @@ def main(argv=None):
         try:
             # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
             if len(args.files) > 0:
-                results = retrieve_darshan_data(results, args.files[i])
+                results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
             results = retrieve_lmt_data(results, args.file_system)
             results = retrieve_topology_data(results,
                                              slurm_cache_file=args.slurm_jobid,

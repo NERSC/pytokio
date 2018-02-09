@@ -4,16 +4,27 @@ Useful helpers that are used throughout the TOKIO test suite
 """
 
 import os
+import sys
 import gzip
 import errno
 import tempfile
 import subprocess
+
+try:
+    import cStringIO as StringIO
+except ImportError:
+    import StringIO
+
 import nose
-import tokio.connectors.darshan
 
 ### Sample input files and their expected contents
+PYTOKIO_HOME = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..')
 INPUT_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'inputs')
-BIN_DIR = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'bin')
+BIN_DIR = os.path.join(PYTOKIO_HOME, 'bin')
+
+sys.path.insert(0, os.path.abspath(PYTOKIO_HOME))
+
+import tokio.connectors.darshan
 
 ### For tests that function without the Darshan log--these values must reflect
 ### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
@@ -90,11 +101,11 @@ SAMPLE_NERSCISDCT_DIFF_EMPTYSTR = ['model_number'] # diff should always be an em
 SAMPLE_COLLECTDES_FILE = os.path.join(INPUT_DIR, 'sample_collectdes-full.json.gz')
 SAMPLE_COLLECTDES_NUMNODES = 64
 SAMPLE_COLLECTDES_TIMESTEP = 10
-SAMPLE_COLLECTDES_START = '2017-12-13T00:00:00' 
+SAMPLE_COLLECTDES_START = '2017-12-13T00:00:00'
 SAMPLE_COLLECTDES_END = '2017-12-13T01:00:00'
 # SAMPLE_COLLECTDES_FILE2 should be a complete subset of SAMPLE_COLLECTDES_FILE
 SAMPLE_COLLECTDES_FILE2 = os.path.join(INPUT_DIR, 'sample_collectdes-part.json.gz')
-SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00' 
+SAMPLE_COLLECTDES_START2 = '2017-12-13T00:30:00'
 SAMPLE_COLLECTDES_END2 = '2017-12-13T01:00:00'
 
 SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
@@ -120,6 +131,42 @@ SAMPLE_COLLECTDES_QUERY = {
     },
 }
 
+class CaptureOutputs(object):
+    """Context manager to capture stdout/stderr
+    """
+    def __enter__(self):
+        self.actual_stdout = sys.stdout
+        self.actual_stderr = sys.stderr
+        self.stdout = StringIO.StringIO()
+        self.stderr = StringIO.StringIO()
+        sys.stdout = self.stdout
+        sys.stderr = self.stderr
+        return self
+
+    def __exit__(self, *args):
+        sys.stdout = self.actual_stdout
+        sys.stderr = self.actual_stderr
+
+def run_bin(module, argv, also_error=False):
+    """Run a standalone pytokio script directly and return its stdout
+    
+    Args:
+        module: a module containing a main(argv) function
+        argv (list of str): command-line parameters to pass to module.main()
+        also_error (bool): return a tuple of (stdout, stderr) instead of only
+            stdout
+
+    Returns:
+        str containing stdout of the called main or tuple of strings containing
+        stdout and stderr
+    """
+    with CaptureOutputs() as output:
+        module.main(argv)
+        stdout = output.stdout.getvalue()
+        stderr = output.stderr.getvalue()
+    if also_error:
+        return stdout, stderr
+    return stdout
 
 ### Global state
 SKIP_DARSHAN = None

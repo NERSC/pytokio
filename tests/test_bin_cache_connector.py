@@ -8,10 +8,16 @@ import json
 import sqlite3
 import StringIO
 import datetime
-import subprocess
 import pandas
 import nose
 import tokiotest
+import tokiobin.cache_isdct
+import tokiobin.cache_darshan
+import tokiobin.cache_slurm
+import tokiobin.cache_topology
+import tokiobin.cache_lfsstatus
+import tokiobin.cache_nersc_jobsdb
+import tokiobin.cache_lmtdb
 
 # For cache_lfsstatus.py
 os.environ['PYTOKIO_H5LMT_BASE_DIR'] = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
@@ -72,67 +78,80 @@ def verify_sacct(csv_str):
 
 CACHE_CONNECTOR_CONFIGS = [
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_isdct.py'),
+        'name':       'bin/cache_isdct.py',
+        'binary':     tokiobin.cache_isdct,
         'args':       ['--json', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_isdct.py'),
+        'name':       'bin/cache_isdct.py',
+        'binary':     tokiobin.cache_isdct,
         'args':       ['--csv', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_csv,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--base', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--base', '--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--base', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_darshan.py'),
+        'name':       'bin/cache_darshan.py',
+        'binary':     tokiobin.cache_darshan,
         'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
+        'name':       'bin/cache_slurm.py',
+        'binary':     tokiobin.cache_slurm,
         'args':       ['--json', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_json,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
+        'name':       'bin/cache_slurm.py',
+        'binary':     tokiobin.cache_slurm,
         'args':       ['--csv', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_csv,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_slurm.py'),
+        'name':       'bin/cache_slurm.py',
+        'binary':     tokiobin.cache_slurm,
         'args':       ['--native', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_sacct,],
     },
     {
-        'binary':     os.path.join(tokiotest.BIN_DIR, 'cache_topology.py'),
+        'name':       'bin/cache_topology.py',
+        'binary':     tokiobin.cache_topology,
         'args':       [
             '--craysdb-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
             '--slurm-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
@@ -141,7 +160,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --fullness, no cache',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':     tokiobin.cache_lfsstatus,
         'args':        [
             '--fullness',
             '--',
@@ -152,7 +171,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --fullness, explicit cache',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':     tokiobin.cache_lfsstatus,
         'args':        [
             '--fullness',
             tokiotest.SAMPLE_OSTFULLNESS_FILE,
@@ -163,7 +182,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --failure, no cache',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':     tokiobin.cache_lfsstatus,
         'args':        [
             '--failure',
             '--',
@@ -174,7 +193,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lfsstatus.py --failure, explicit cache',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lfsstatus.py'),
+        'binary':     tokiobin.cache_lfsstatus,
         'args':        [
             '--failure',
             tokiotest.SAMPLE_OSTMAP_FILE,
@@ -185,7 +204,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_nersc_jobsdb.py',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_nersc_jobsdb.py'),
+        'binary':     tokiobin.cache_nersc_jobsdb,
         'args':        [
             '-i', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
             datetime.datetime.fromtimestamp(
@@ -200,7 +219,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lmtdb.py',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lmtdb.py'),
+        'binary':     tokiobin.cache_lmtdb,
         'args':        [
             '-i', tokiotest.SAMPLE_LMTDB_FILE,
             datetime.datetime.fromtimestamp(
@@ -214,7 +233,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'description': 'bin/cache_lmtdb.py --limit',
-        'binary':      os.path.join(tokiotest.BIN_DIR, 'cache_lmtdb.py'),
+        'binary':     tokiobin.cache_lmtdb,
         'args':        [
             '--limit', '2',
             '-i', tokiotest.SAMPLE_LMTDB_FILE,
@@ -234,27 +253,25 @@ def run_cache_connector(config, to_file=False):
     """
     Test a connector cache (cache_*.py) CLI interface
     """
-    if config['binary'].endswith('cache_darshan.py'):
+    if config['binary'] == tokiobin.cache_darshan:
         tokiotest.check_darshan()
 
     if to_file:
-        cmd = [config['binary']] \
-            + ['-o', tokiotest.TEMP_FILE.name] \
-            + config['args']
+        argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
         print "Caching to", tokiotest.TEMP_FILE.name
-        print "Executing:", ' '.join(cmd)
-        output_str = subprocess.check_output(cmd)
-        ### validate_contents means return the contents of the tempfile rather
-        ### than the stdout of the subprocess.  Some cache tools cannot print to
-        ### stdout (e.g., anything that caches to a binary format like sqlite)
-        ### so we need to pass the file name to the validator instead.
+        print "Executing:", ' '.join(argv)
+        output_str = tokiotest.run_bin(config['binary'], argv)
+
+        # (validate_contents == True) means the associated validator function
+        # expects the contents of the output file rather than the name of the
+        # output file
         if config.get('validate_contents', True):
             output_str = tokiotest.TEMP_FILE.read()
     else:
-        cmd = [config['binary']] + config['args']
+        argv = config['args']
         print "Caching to stdout"
-        print "Executing:", ' '.join(cmd)
-        output_str = subprocess.check_output(cmd)
+        print "Executing:", ' '.join(argv)
+        output_str = tokiotest.run_bin(config['binary'], argv)
 
     for validator in config['validators']:
         validator(output_str)
@@ -265,13 +282,18 @@ def craft_description(config, suffix):
     """
     if 'description' in config:
         result = "%s %s" % (config['description'], suffix)
-    elif 'cache_topology' in config['binary']:
+    elif 'name' in config:
+        result = "%s %s %s" % (
+            config['name'],
+            ' '.join(config['args'][0:-1]),
+            suffix)
+    elif config['binary'] == tokiobin.cache_topology:
         result = "%s %s" % (
             os.sep.join(config['binary'].split(os.sep)[-2:]),
             suffix)
     else:
         result = "%s %s %s" % (
-            os.sep.join(config['binary'].split(os.sep)[-2:]),
+            config['binary'],
             ' '.join(config['args'][0:-1]),
             suffix)
     return result

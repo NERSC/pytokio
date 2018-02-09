@@ -81,18 +81,18 @@ def test_timeseries_deltas():
     TimeSeries.timeseries_deltas()
     """
 
-    MAX_DELTA = 9
-    NUM_COLS = 16
-    NUM_ROWS = 20
+    max_delta = 9
+    num_cols = 16
+    num_rows = 20
 
     numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format})
     random.seed(0)
 
     # Create an array of random deltas as our ground truth
-    actual_deltas = numpy.random.random(size=(NUM_ROWS, NUM_COLS)) * MAX_DELTA
-    first_row = numpy.random.random(size=(1, NUM_COLS)) * MAX_DELTA
-#   actual_deltas = numpy.full((NUM_ROWS, NUM_COLS), 2.0)
-#   first_row = numpy.full((1, NUM_COLS), 2.0)
+    actual_deltas = numpy.random.random(size=(num_rows, num_cols)) * max_delta
+    first_row = numpy.random.random(size=(1, num_cols)) * max_delta
+#   actual_deltas = numpy.full((num_rows, num_cols), 2.0)
+#   first_row = numpy.full((1, num_cols), 2.0)
 
     # Calculate the monotonically increasing dataset that would result in these deltas
     monotonic_values = actual_deltas.copy()
@@ -111,34 +111,34 @@ def test_timeseries_deltas():
     # Delete some data from our sample monotonically increasing dataset
     # Columns 0-3 are hand-picked to exercise all edge cases
     delete_data = [
-        ( 1,  0),
-        ( 2,  0),
-        ( 5,  0),
-        ( 0,  1),
-        ( 1,  1),
-        ( 1,  2),
-        ( 3,  2),
-        (-1,  2),
-        (-2,  2),
-        ( 0,  3),
-        (-1,  3),
+        (1, 0),
+        (2, 0),
+        (5, 0),
+        (0, 1),
+        (1, 1),
+        (1, 2),
+        (3, 2),
+        (-1, 2),
+        (-2, 2),
+        (0, 3),
+        (-1, 3),
     ]
     # Columns 4-7 are low density errors
-    for _ in range(int(NUM_COLS * NUM_ROWS / 4)):
-        delete_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(4, 8)))
+    for _ in range(int(num_cols * num_rows / 4)):
+        delete_data.append((numpy.random.randint(0, num_rows), numpy.random.randint(4, 8)))
 
     # Columns 8-11 are high density errors
-    for _ in range(int(3 * NUM_COLS * NUM_ROWS / 4)):
-        delete_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(8, 12)))
+    for _ in range(int(3 * num_cols * num_rows / 4)):
+        delete_data.append((numpy.random.randint(0, num_rows), numpy.random.randint(8, 12)))
 
 ### Note that this method produces bad data if the input data is non-monotonic
 ### in time.  It would need some small tweaks to deal with that, so in the meantime,
 ### just don't do it.
     # Columns 12-15 are nonzero but non-monotonic flips
-    START_FLIP = 12
+    start_flip = 12
 #   flip_data = []
-#   for _ in range(int(3 * NUM_COLS * NUM_ROWS / 4)):
-#       flip_data.append((numpy.random.randint(0, NUM_ROWS), numpy.random.randint(12, 16)))
+#   for _ in range(int(3 * num_cols * num_rows / 4)):
+#       flip_data.append((numpy.random.randint(0, num_rows), numpy.random.randint(12, 16)))
 
     for coordinates in delete_data:
         monotonic_values[coordinates] = 0.0
@@ -170,10 +170,11 @@ def test_timeseries_deltas():
     # matches the logical total obtained by subtracting the largest absolute
     # measurement from the smallest
     print "Checking each column's sum (missing data)"
-    for icol in range(START_FLIP):
+    for icol in range(start_flip):
         truth = actual_deltas[:, icol].sum()
         calculated = calculated_deltas[:, icol].sum()
-        total_delta = monotonic_values[:, icol].max() - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
+        total_delta = monotonic_values[:, icol].max() \
+                      - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
         print 'truth=', truth, \
               'from piecewise deltas=', calculated, \
               'from total delta=', total_delta
@@ -185,10 +186,11 @@ def test_timeseries_deltas():
         assert numpy.isclose(truth - calculated, 0.0) or ((truth - calculated) > 0)
 
     print "Checking each column's sum (flipped data)"
-    for icol in range(START_FLIP, actual_deltas.shape[1]):
+    for icol in range(start_flip, actual_deltas.shape[1]):
         truth = actual_deltas[:, icol].sum()
         calculated = calculated_deltas[:, icol].sum()
-        total_delta = monotonic_values[:, icol].max() - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
+        total_delta = monotonic_values[:, icol].max() \
+                      - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
         print 'truth=', truth, \
               'from piecewise deltas=', calculated, \
               'from total delta=', total_delta
@@ -220,7 +222,7 @@ def test_timeseries_deltas():
     print
 
     print "Non-missing and known-missing data (everything should be True):"
-    print (close_matrix | fix_matrix)
+    print close_matrix | fix_matrix
     print
     assert (close_matrix | fix_matrix).all()
 
@@ -314,11 +316,11 @@ def test_add_rows():
     """
     TimeSeries.add_rows()
     """
-    ADD_ROWS = 5
+    add_rows = 5
     timeseries = generate_timeseries()
     orig_row = timeseries.timestamps.copy()
     orig_row_count = timeseries.timestamps.shape[0]
-    timeseries.add_rows(ADD_ROWS)
+    timeseries.add_rows(add_rows)
 
     prev_deltim = None
     for index in range(1, timeseries.dataset.shape[0]):
@@ -328,10 +330,10 @@ def test_add_rows():
         prev_deltim = new_deltim
 
     print "Orig timestamps:", orig_row[-5: -1]
-    print "Now timestamps: ", timeseries.timestamps[-5 - ADD_ROWS: -1]
+    print "Now timestamps: ", timeseries.timestamps[-5 - add_rows: -1]
     assert prev_deltim > 0
     assert timeseries.timestamps.shape[0] == timeseries.dataset.shape[0]
-    assert (timeseries.timestamps.shape[0] - ADD_ROWS) == orig_row_count
+    assert (timeseries.timestamps.shape[0] - add_rows) == orig_row_count
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_uneven_columns():
@@ -356,7 +358,7 @@ def test_uneven_columns():
     print orig_col_names
     print dataset.attrs['columns']
     print "%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result)
-    assert result 
+    assert result
 
     print "Test case where there are more column names than shape of dataset"
     extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
@@ -367,7 +369,7 @@ def test_uneven_columns():
     assert result
     for icol in range(timeseries.dataset.shape[1]):
         print "%-15s == %15s? %s" % (extra_columns[icol], timeseries.columns[icol],
-                                extra_columns[icol] == timeseries.columns[icol])
+                                     extra_columns[icol] == timeseries.columns[icol])
         assert extra_columns[icol] == timeseries.columns[icol]
 
     print "Test cases where column names are incomplete compared to shape of dataset"
@@ -377,10 +379,10 @@ def test_uneven_columns():
     result = len(timeseries.columns) < timeseries.dataset.shape[1]
     print "%-3d < %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result)
     assert result
-    for icol in range(len(fewer_columns)):
-        print "%-15s == %15s? %s" % (fewer_columns[icol], timeseries.columns[icol],
-                                fewer_columns[icol] == timeseries.columns[icol])
-        assert fewer_columns[icol] == timeseries.columns[icol]
+    for icol, fewer_col in enumerate(fewer_columns):
+        print "%-15s == %15s? %s" % (fewer_col, timeseries.columns[icol],
+                                     fewer_col == timeseries.columns[icol])
+        assert fewer_col == timeseries.columns[icol]
 
 def test_light_attach():
     """
@@ -396,18 +398,18 @@ def test_negative_zero_matrix():
     """
     timeseries.negative_zero_matrix()
     """
-    NUM_COLS = 40 
-    NUM_ROWS = 800
-    NUM_MISSING = NUM_COLS * NUM_ROWS / 4
+    num_cols = 40
+    num_rows = 800
+    num_missing = num_cols * num_rows / 4
 
     random.seed(0)
-    dataset = numpy.random.random(size=(NUM_ROWS, NUM_COLS)) + 0.1
-    inverse = numpy.full((NUM_ROWS, NUM_COLS), False)
-    
+    dataset = numpy.random.random(size=(num_rows, num_cols)) + 0.1
+    inverse = numpy.full((num_rows, num_cols), False)
+
     remove_list = set([])
-    for _ in range(NUM_MISSING):
-        irow = numpy.random.randint(0, NUM_ROWS)
-        icol = numpy.random.randint(0, NUM_COLS)
+    for _ in range(num_missing):
+        irow = numpy.random.randint(0, num_rows)
+        icol = numpy.random.randint(0, num_cols)
         remove_list.add((irow, icol))
 
     for irow, icol in remove_list:
@@ -416,6 +418,7 @@ def test_negative_zero_matrix():
 
     missing_matrix = tokio.timeseries.negative_zero_matrix(dataset)
 
-    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list), missing_matrix.sum())
-    assert len(remove_list)== missing_matrix.sum()
+    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list),
+                                                                 missing_matrix.sum())
+    assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()
