@@ -74,11 +74,6 @@ class DatasetDict(dict):
                 "delta": False,
                 "column": "PCT_CPU",
             },
-            'mdservers/memused': {
-                "units": "%",
-                "delta": False,
-                "column": "PCT_MEMORY",
-            },
             'mdtargets/open': {
                 "units": "ops",
                 "delta": False,
@@ -211,10 +206,55 @@ class DatasetDict(dict):
                 self[dataset_name].group_metadata.update({'source': 'lmt'})
 
     def archive_mds_data(self, lmtdb):
+        """Extract and encode data from LMT's MDS_DATA table
+
+        Queries the LMT database, interprets resulting rows, and populates a
+        dictionary of TimeSeries objects with those values.
+
+        Args:
+            lmtdb (LmtDb): database object
         """
-        Extract and encode data from LMT's MDS_DATA table (CPU loads)
-        """
-        pass
+
+        dataset_names = [
+            'mdservers/cpuload',
+        ]
+
+        self.init_datasets(dataset_names, lmtdb.mds_names)
+
+        # Now query the OSS_DATA table to get byte counts over the query time range
+        results, columns = lmtdb.get_timeseries_data('MDS_DATA',
+                                                     self.query_start,
+                                                     self.query_end_plusplus)
+
+        # Index the columns to speed up insertion of data
+        col_map = {}
+        try:
+            for db_col in ['TIMESTAMP', 'MDS_ID', 'PCT_CPU']:
+                col_map[db_col] = columns.index(db_col)
+        except ValueError:
+            raise ValueError("LMT database schema does not match expectation")
+
+        # Loop through all the results of the timeseries query
+        for row in results:
+            if isinstance(row[col_map['TIMESTAMP']], basestring):
+                # SQLite stores timestamps as a unicode string
+                timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
+                                                       "%Y-%m-%d %H:%M:%S")
+            else:
+                # MySQL timestamps are automatically converted to datetime.datetime
+                timestamp = row[col_map['TIMESTAMP']]
+            target_name = lmtdb.mds_id_map[row[col_map['MDS_ID']]]
+            for dataset_name in dataset_names:
+                target_dbcol = self.config[dataset_name].get('column')
+                # target_dbcol=PCT_CPU, target_name=snx11025n022
+                if target_dbcol is not None:
+                    self[dataset_name].insert_element(
+                        timestamp,
+                        target_name,
+                        row[col_map[target_dbcol]])
+                else:
+                    errmsg = "%s in self.config but missing 'column' setting" % dataset_name
+                    raise KeyError(errmsg)
 
     def archive_mds_ops_data(self, lmtdb):
         """
@@ -373,6 +413,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
 
     datasets.archive_ost_data(lmtdb)
     datasets.archive_oss_data(lmtdb)
+    datasets.archive_mds_data(lmtdb)
 
     datasets.finalize()
 
