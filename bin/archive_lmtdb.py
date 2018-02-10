@@ -74,51 +74,51 @@ class DatasetDict(dict):
                 "delta": False,
                 "column": "PCT_CPU",
             },
-            'mdtargets/open': {
+            'mdtargets/opens': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/close': {
+            'mdtargets/closes': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/mknod': {
+            'mdtargets/mknods': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/link': {
+            'mdtargets/links': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/unlink': {
+            'mdtargets/unlinks': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/mkdir': {
+            'mdtargets/mkdirs': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/rmdir': {
+            'mdtargets/rmdirs': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/rename': {
+            'mdtargets/renames': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/getxattr': {
+            'mdtargets/getxattrs': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/statfs': {
+            'mdtargets/statfss': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/setattr': {
+            'mdtargets/setattrs': {
                 "units": "ops",
                 "delta": True,
             },
-            'mdtargets/getattr': {
+            'mdtargets/getattrs': {
                 "units": "ops",
                 "delta": True,
             },
@@ -271,18 +271,18 @@ class DatasetDict(dict):
 
         # mapping between OPERATION_INFO.OPERATION_NAME to HDF5 dataset names
         opname_to_dataset_name = {
-            'open': 'mdtargets/open',
-            'close': 'mdtargets/close',
-            'mknod': 'mdtargets/mknod',
-            'link': 'mdtargets/link',
-            'unlink': 'mdtargets/unlink',
-            'mkdir': 'mdtargets/mkdir',
-            'rmdir': 'mdtargets/rmdir',
-            'rename': 'mdtargets/rename',
-            'getxattr': 'mdtargets/getxattr',
-            'statfs': 'mdtargets/statfs',
-            'setattr': 'mdtargets/setattr',
-            'getattr': 'mdtargets/getattr',
+            'open': 'mdtargets/opens',
+            'close': 'mdtargets/closes',
+            'mknod': 'mdtargets/mknods',
+            'link': 'mdtargets/links',
+            'unlink': 'mdtargets/unlinks',
+            'mkdir': 'mdtargets/mkdirs',
+            'rmdir': 'mdtargets/rmdirs',
+            'rename': 'mdtargets/renames',
+            'getxattr': 'mdtargets/getxattrs',
+            'statfs': 'mdtargets/statfss',
+            'setattr': 'mdtargets/setattrs',
+            'getattr': 'mdtargets/getattrs',
         }
         dataset_names = list(opname_to_dataset_name.itervalues())
 

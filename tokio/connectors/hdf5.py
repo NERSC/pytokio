@@ -9,8 +9,7 @@ derived datasets dynamically.
 import datetime
 import h5py
 import pandas
-from .. import config
-from _hdf5 import *
+from tokio.connectors._hdf5 import convert_counts_rates, map_and_transpose
 
 SCHEMA = {
     None: {},
@@ -23,30 +22,30 @@ SCHEMA = {
         "datatargets/writeops": "/datatargets/writeops",
         "datatargets/readoprates": "/datatargets/readoprates",
         "datatargets/writeoprates": "/datatargets/writeoprates",
-        "mdtargets/open": "/mdtargets/open",
-        "mdtargets/openrate": "/mdtargets/openrate",
-        "mdtargets/close": "/mdtargets/close",
-        "mdtargets/closerate": "/mdtargets/closerate",
-        "mdtargets/mknod": "/mdtargets/mknod",
-        "mdtargets/mknodrate": "/mdtargets/mknodrate",
-        "mdtargets/link": "/mdtargets/link",
-        "mdtargets/linkrate": "/mdtargets/linkrate",
-        "mdtargets/unlink": "/mdtargets/unlink",
-        "mdtargets/unlinkrate": "/mdtargets/unlinkrate",
-        "mdtargets/mkdir": "/mdtargets/mkdir",
-        "mdtargets/mkdirrate": "/mdtargets/mkdirrate",
-        "mdtargets/rmdir": "/mdtargets/rmdir",
-        "mdtargets/rmdirrate": "/mdtargets/rmdirrate",
-        "mdtargets/rename": "/mdtargets/rename",
-        "mdtargets/renamerate": "/mdtargets/renamerate",
-        "mdtargets/getxattr": "/mdtargets/getxattr",
-        "mdtargets/getxattrrate": "/mdtargets/getxattrrate",
-        "mdtargets/statfs": "/mdtargets/statfs",
-        "mdtargets/statfsrate": "/mdtargets/statfsrate",
-        "mdtargets/setattr": "/mdtargets/setattr",
-        "mdtargets/setattrrate": "/mdtargets/setattrrate",
-        "mdtargets/getattr": "/mdtargets/getattr",
-        "mdtargets/getattrrate": "/mdtargets/getattrrate",
+        "mdtargets/opens": "/mdtargets/opens",
+        "mdtargets/openrates": "/mdtargets/openrates",
+        "mdtargets/closes": "/mdtargets/closes",
+        "mdtargets/closerates": "/mdtargets/closerates",
+        "mdtargets/mknods": "/mdtargets/mknods",
+        "mdtargets/mknodrates": "/mdtargets/mknodrates",
+        "mdtargets/links": "/mdtargets/links",
+        "mdtargets/linkrates": "/mdtargets/linkrates",
+        "mdtargets/unlinks": "/mdtargets/unlinks",
+        "mdtargets/unlinkrates": "/mdtargets/unlinkrates",
+        "mdtargets/mkdirs": "/mdtargets/mkdirs",
+        "mdtargets/mkdirrates": "/mdtargets/mkdirrates",
+        "mdtargets/rmdirs": "/mdtargets/rmdirs",
+        "mdtargets/rmdirrates": "/mdtargets/rmdirrates",
+        "mdtargets/renames": "/mdtargets/renames",
+        "mdtargets/renamerates": "/mdtargets/renamerates",
+        "mdtargets/getxattrs": "/mdtargets/getxattrs",
+        "mdtargets/getxattrrates": "/mdtargets/getxattrrates",
+        "mdtargets/statfss": "/mdtargets/statfss",
+        "mdtargets/statfsrates": "/mdtargets/statfsrates",
+        "mdtargets/setattrs": "/mdtargets/setattrs",
+        "mdtargets/setattrrates": "/mdtargets/setattrrates",
+        "mdtargets/getattrs": "/mdtargets/getattrs",
+        "mdtargets/getattrrates": "/mdtargets/getattrrates",
         "mdservers/cpuuser": "/mdservers/cpuuser",
         "mdservers/cpusys": "/mdservers/cpusys",
         "mdservers/cpuidle": "/mdservers/cpuidle",
@@ -78,11 +77,17 @@ SCHEMA = {
 
 # Map keys which don't exist as datasets in the underlying HDF5 but can be
 # calculated from datasets that _do_ exist to the functions that do these
-# conversions
+# conversions.  This table is only consulted when a dataset is not found
+# directly in the underlying HDF5 _and_ a mapping from the SCHEMA table
+# above does not return a match, so this table contains what appear to be
+# some circular references (e.g., both datatargets/readbytes and
+# datatargets/readrates).  This allows any valid HDF5 file to contain either
+# bytes or rates but have them all present the same datasets to the downstream
+# application.
 SCHEMA_DATASET_PROVIDERS = {
     None: {
-        "datatargets/readbytes": { 
-            'func': convert_bytes_rates,
+        "datatargets/readbytes": {
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'OSTReadGroup/OSTBulkReadDataSet',
                 'to_rates': False,
@@ -90,7 +95,7 @@ SCHEMA_DATASET_PROVIDERS = {
             },
         },
         "datatargets/writebytes": {
-            'func': convert_bytes_rates,
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'OSTWriteGroup/OSTBulkWriteDataSet',
                 'to_rates': False,
@@ -117,32 +122,200 @@ SCHEMA_DATASET_PROVIDERS = {
         },
     },
     "1": {
-        "datatargets/readbytes": { 
-            'func': convert_bytes_rates,
+        "datatargets/readbytes": {
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'datatargets/readrates',
                 'to_rates': False,
             },
         },
         "datatargets/writebytes": {
-            'func': convert_bytes_rates,
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'datatargets/writerates',
                 'to_rates': False,
             },
         },
         "datatargets/readrates": {
-            'func': convert_bytes_rates,
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'datatargets/readbytes',
                 'to_rates': True,
             },
         },
         "datatargets/writerates": {
-            'func': convert_bytes_rates,
+            'func': convert_counts_rates,
             'args': {
                 'from_key': 'datatargets/writebytes',
                 'to_rates': True,
+            },
+        },
+        "mdtargets/opens": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/openrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/closes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/closerates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/mknods": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mknodrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/links": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/linkrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/unlinks": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/unlinkrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/mkdirs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mkdirrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/rmdirs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/rmdirrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/renames": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/renamerates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/getxattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getxattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/statfss": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/statfsrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/setattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/setattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/getattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/openrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/opens",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/closerates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/closes",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/mknodrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mknods",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/linkrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/links",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/unlinkrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/unlinks",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/mkdirrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mkdirs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/rmdirrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/rmdirs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/renamerates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/renames",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/getxattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getxattrs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/statfsrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/statfss",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/setattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/setattrs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/getattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getattrs",
+                'to_rates': False,
             },
         },
     },
@@ -177,7 +350,7 @@ class Hdf5(h5py.File):
         # Connect the schema map to this object
         if self.version in SCHEMA:
             self.schema = SCHEMA[self.version]
-        elif self.version == None:
+        elif self.version is None:
             self.schema = {}
         else:
             raise KeyError("Unknown schema version %s" % self.version)
@@ -249,8 +422,7 @@ class Hdf5(h5py.File):
             dataset_name = dataset.name.lstrip('/')
             if dataset_name in H5LMT_COLUMN_ATTRS:
                 return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
-            else:
-                return []
+            return []
         else:
             return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
@@ -269,7 +441,6 @@ class Hdf5(h5py.File):
         Turn a datetime object into an integer that can be used to reference
         specific times in datasets.
         """
-        dataset = self.__getitem__(dataset_name)
         timestamps = self.get_timestamps(dataset_name)[0:2]
         timestep = self.get_timestep(dataset_name, timestamps)
         t_start = datetime.datetime.fromtimestamp(timestamps[0])
@@ -284,6 +455,8 @@ class Hdf5(h5py.File):
     def to_dataframe(self, dataset_name=None):
         """
         Convert the hdf5 class in a pandas dataframe
+
+        TODO - this needs to be updated for TOKIO HDF5
         """
         # Convenience:may put in lower case
         if dataset_name is None:

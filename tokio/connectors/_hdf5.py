@@ -42,7 +42,7 @@ class MappedDataset(h5py.Dataset):
         else:
             return result
 
-def _convert_bytes_rates(return_value, parent_dataset, divide=False):
+def _convert_counts_rates(return_value, parent_dataset, divide=False):
     """
     Transform the data returned when slicing a h5py.Dataset object by
     multiplying or dividing it by that dataset's timestep.
@@ -66,7 +66,7 @@ def _convert_bytes_rates(return_value, parent_dataset, divide=False):
     else:
         return return_value * timestep
 
-def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
+def convert_counts_rates(hdf5_file, from_key, to_rates, transpose=False):
     """
     Retrieve a dataset from an HDF5 file, convert it to a MappedDataset, and
     attach a multiply/divide function to it so that subsequent slices return
@@ -82,7 +82,7 @@ def convert_bytes_rates(hdf5_file, from_key, to_rates, transpose=False):
 
     dataset = hdf5_file[from_key]
     return MappedDataset(bind=dataset.id,
-                         map_function=_convert_bytes_rates,
+                         map_function=_convert_counts_rates,
                          map_kwargs={'parent_dataset': dataset, 'divide': to_rates},
                          transpose=transpose)
 
