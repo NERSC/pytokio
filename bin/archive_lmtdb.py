@@ -76,51 +76,51 @@ class DatasetDict(dict):
             },
             'mdtargets/open': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/close': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/mknod': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/link': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/unlink': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/mkdir': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/rmdir': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/rename': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/getxattr': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/statfs': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/setattr': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
             'mdtargets/getattr': {
                 "units": "ops",
-                "delta": False,
+                "delta": True,
             },
         }
 
@@ -165,16 +165,16 @@ class DatasetDict(dict):
         they have been populated.  Such actions are configured entirely in
         self.config and require no external input.
         """
-        self.to_rates(self.config.keys())
-        self.set_metadata(self.config.keys())
+        self.convert_deltas(self.config.keys())
+        self.set_timeseries_metadata(self.config.keys())
 
-    def to_rates(self, dataset_names):
-        """Convert datasets from absolute values to values/second
+    def convert_deltas(self, dataset_names):
+        """Convert datasets from absolute values to values per timestep
 
         Given a list of dataset names, determine if they need to be converted
-        to rates and convert those that do.  For those that don't, trim off the
-        final row since it is not needed to calculate the difference between
-        rows.
+        from monotonically increasing counters to counts per timestep, and
+        convert those that do.  For those that don't, trim off the final row
+        since it is not needed to calculate the difference between rows.
 
         Args:
             dataset_names (list of str): keys corresponding to self.config for
@@ -190,7 +190,7 @@ class DatasetDict(dict):
                     # for initial over-sizing of the time range by an extra timestamp
                     self[dataset_name].trim_rows(1)
 
-    def set_metadata(self, dataset_names):
+    def set_timeseries_metadata(self, dataset_names):
         """Set metadata constants (version, units, etc) on datasets and groups
 
         Args:
@@ -221,7 +221,7 @@ class DatasetDict(dict):
 
         self.init_datasets(dataset_names, lmtdb.mds_names)
 
-        # Now query the OSS_DATA table to get byte counts over the query time range
+        # Now query the MDS_DATA table to get byte counts over the query time range
         results, columns = lmtdb.get_timeseries_data('MDS_DATA',
                                                      self.query_start,
                                                      self.query_end_plusplus)
@@ -257,10 +257,78 @@ class DatasetDict(dict):
                     raise KeyError(errmsg)
 
     def archive_mds_ops_data(self, lmtdb):
+        """Extract and encode data from LMT's MDS_OPS_DATA table
+
+        Queries the LMT database, interprets resulting rows, and populates a
+        dictionary of TimeSeries objects with those values.  Avoids JOINing the
+        MDS_VARIABLE_INFO table and instead uses an internal mapping of
+        OPERATION_IDs to demultiplex the data in MDS_OPS_DATA into different
+        HDF5 datasets.
+
+        Args:
+            lmtdb (LmtDb): database object
         """
-        Extract and encode data from LMT's MDS_OPS_DATA table (metadata ops)
-        """
-        pass
+
+        # mapping between OPERATION_INFO.OPERATION_NAME to HDF5 dataset names
+        opname_to_dataset_name = {
+            'open': 'mdtargets/open',
+            'close': 'mdtargets/close',
+            'mknod': 'mdtargets/mknod',
+            'link': 'mdtargets/link',
+            'unlink': 'mdtargets/unlink',
+            'mkdir': 'mdtargets/mkdir',
+            'rmdir': 'mdtargets/rmdir',
+            'rename': 'mdtargets/rename',
+            'getxattr': 'mdtargets/getxattr',
+            'statfs': 'mdtargets/statfs',
+            'setattr': 'mdtargets/setattr',
+            'getattr': 'mdtargets/getattr',
+        }
+        dataset_names = list(opname_to_dataset_name.itervalues())
+
+        self.init_datasets(dataset_names, lmtdb.mds_names)
+
+        results, columns = lmtdb.get_timeseries_data('MDS_OPS_DATA',
+                                                     self.query_start,
+                                                     self.query_end_plusplus)
+
+        # Index the columns to speed up insertion of data
+        col_map = {}
+        try:
+            for db_col in ['TIMESTAMP', 'MDS_ID', 'OPERATION_ID', 'SAMPLES']:
+                col_map[db_col] = columns.index(db_col)
+        except ValueError:
+            raise ValueError("LMT database schema does not match expectation")
+
+        # Loop through all the results of the timeseries query
+        for row in results:
+            if isinstance(row[col_map['TIMESTAMP']], basestring):
+                # SQLite stores timestamps as a unicode string
+                timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
+                                                       "%Y-%m-%d %H:%M:%S")
+            else:
+                # MySQL timestamps are automatically converted to datetime.datetime
+                timestamp = row[col_map['TIMESTAMP']]
+
+            # figure out the dataset this row's data will go into (this
+            # implicitly filters out operations that aren't defined in
+            # opname_to_dataset_name)
+            op_name = lmtdb.mds_op_id_map[row[col_map['OPERATION_ID']]]
+            dataset_name = opname_to_dataset_name.get(op_name)
+            if dataset_name is None:
+                continue
+
+            # figure out which column (MDS name) this row's data will go into
+            mds_name = lmtdb.mds_id_map.get(row[col_map['MDS_ID']])
+            if not mds_name:
+                errmsg = "unknown MDS_ID %s" % row[col_map['MDS_ID']]
+                warnings.warn(errmsg)
+                continue
+
+            self[dataset_name].insert_element(
+                timestamp,
+                mds_name,
+                row[col_map['SAMPLES']])
 
     def archive_oss_data(self, lmtdb):
         """Extract and encode data from LMT's OSS_DATA table
@@ -414,6 +482,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
     datasets.archive_ost_data(lmtdb)
     datasets.archive_oss_data(lmtdb)
     datasets.archive_mds_data(lmtdb)
+    datasets.archive_mds_ops_data(lmtdb)
 
     datasets.finalize()
 

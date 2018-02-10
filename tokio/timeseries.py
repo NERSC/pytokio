@@ -244,8 +244,9 @@ class TimeSeries(object):
                           % (column_name, index, self.column_map[column_name]))
         self.column_map[column_name] = index
         if index >= (self.dataset.shape[1]):
-            raise IndexError("index %d exceeds number of columns %d"
-                             % (index, self.dataset.shape[1]))
+            errmsg = "new index %d (%s) exceeds number of columns %d (%s)" % (
+                index, column_name, self.dataset.shape[1], self.columns[-1])
+            raise IndexError(errmsg)
         self.columns.append(str(column_name)) # convert from unicode to str for numpy
         return index
 
