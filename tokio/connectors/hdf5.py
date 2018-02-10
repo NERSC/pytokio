@@ -327,7 +327,7 @@ def get_timestamps_key(hdf5_file, dataset_name):
     # Get dataset out of HDF5 file
     hdf5_dataset = hdf5_file.get(dataset_name)
     if hdf5_dataset is None:
-        return None, None
+        return None
 
     if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
         return '/FSStepsGroup/FSStepsDataSet'
