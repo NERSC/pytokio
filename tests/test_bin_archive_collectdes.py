@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
-Test the cache_collectdes.py tool, summarize_tts.py tool, and the
-TokioTimeSeries class
+Test the archive_collectdes.py tool
 """
 
 import os
@@ -15,7 +14,7 @@ try:
 except ImportError:
     _HAVE_ELASTICSEARCH = False
 import tokiotest
-import tokiobin.cache_collectdes
+import tokiobin.archive_collectdes
 
 #
 #  TESTING APPEND/UPDATE FUNCTIONALITY
@@ -29,14 +28,14 @@ import tokiobin.cache_collectdes
 # For example,
 #
 # rm -v output.hdf5
-# ./bin/cache_collectdes.py --init-start 2017-12-13T00:00:00 \
+# ./bin/archive_collectdes.py --init-start 2017-12-13T00:00:00 \
 #                           --init-end 2017-12-14T00:00:00 \
-#                           --input-json output.json \
+#                           --input output.json \
 #                           --num-bbnodes 288 \
 #                           --timestep 10 \
 #                           2017-12-13T00:00:00 2017-12-13T01:00:00
 # ./bin/summarize_bbhdf5.py output.hdf5
-# ./bin/cache_collectdes.py --debug --input-json output.json 2017-12-13T00:15:00 2017-12-13T00:30:00
+# ./bin/archive_collectdes.py --debug --input output.json 2017-12-13T00:15:00 2017-12-13T00:30:00
 # ./bin/summarize_bbhdf5.py output.hdf5
 #
 # Assert that the two instances of summarize_bbhdf5.py return identical results
@@ -48,7 +47,7 @@ def generate_tts(output_file):
     """
     argv = ['--init-start', tokiotest.SAMPLE_COLLECTDES_START,
             '--init-end', tokiotest.SAMPLE_COLLECTDES_END,
-            '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
+            '--input', tokiotest.SAMPLE_COLLECTDES_FILE,
             '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
             '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
             '--output', output_file,
@@ -56,7 +55,7 @@ def generate_tts(output_file):
             tokiotest.SAMPLE_COLLECTDES_START,
             tokiotest.SAMPLE_COLLECTDES_END]
     print "Running [%s]" % ' '.join(argv)
-    tokiobin.cache_collectdes.main(argv)
+    tokiobin.archive_collectdes.main(argv)
     print "Created", output_file
 
 def update_tts(output_file):
@@ -65,14 +64,14 @@ def update_tts(output_file):
     """
     assert os.path.isfile(output_file) # must update an existing file
 
-    argv = ['--input-json', tokiotest.SAMPLE_COLLECTDES_FILE2,
+    argv = ['--input', tokiotest.SAMPLE_COLLECTDES_FILE2,
             '--output', output_file,
             '--debug',
             tokiotest.SAMPLE_COLLECTDES_START2,
             tokiotest.SAMPLE_COLLECTDES_END2]
 
     print "Running [%s]" % ' '.join(argv)
-    tokiobin.cache_collectdes.main(argv)
+    tokiobin.archive_collectdes.main(argv)
     print "Updated", output_file
 
 def summarize_hdf5(hdf5_file):
@@ -102,9 +101,9 @@ def summarize_hdf5(hdf5_file):
     return summary
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def test_bin_cache_collectdes():
+def test_bin_archive_collectdes():
     """
-    bin/cache_collectdes.py
+    bin/archive_collectdes.py
     """
     if not _HAVE_ELASTICSEARCH:
         raise nose.SkipTest("elasticsearch module not available")
@@ -134,9 +133,9 @@ def test_bin_cache_collectdes():
     assert num_compared > 0
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def test_bin_cache_collectdes_oob():
+def test_bin_archive_collectdes_oob():
     """
-    bin/cache_collectdes.py with out-of-bounds
+    bin/archive_collectdes.py with out-of-bounds
     """
     if not _HAVE_ELASTICSEARCH:
         raise nose.SkipTest("elasticsearch module not available")
@@ -154,7 +153,7 @@ def test_bin_cache_collectdes_oob():
 
     argv = ['--init-start', new_start_dt.strftime("%Y-%m-%dT%H:%M:%S"),
             '--init-end', new_end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
-            '--input-json', tokiotest.SAMPLE_COLLECTDES_FILE,
+            '--input', tokiotest.SAMPLE_COLLECTDES_FILE,
             '--num-bbnodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
             '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
             '--output', tokiotest.TEMP_FILE.name,
@@ -164,6 +163,6 @@ def test_bin_cache_collectdes_oob():
     print "Running [%s]" % ' '.join(argv)
     with warnings.catch_warnings(record=True) as warn:
         warnings.simplefilter("always")
-        tokiobin.cache_collectdes.main(argv)
+        tokiobin.archive_collectdes.main(argv)
         print "Caught %d warnings" % len(warn)
         assert len(warn) > 0

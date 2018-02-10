@@ -9,6 +9,7 @@ import gzip
 import errno
 import tempfile
 import subprocess
+import datetime
 
 try:
     import cStringIO as StringIO
@@ -25,6 +26,11 @@ BIN_DIR = os.path.join(PYTOKIO_HOME, 'bin')
 sys.path.insert(0, os.path.abspath(PYTOKIO_HOME))
 
 import tokio.connectors.darshan
+
+SAMPLE_TIMESTAMP_DATE_FMT = "%Y-%m-%dT%H:%M:%S"
+SAMPLE_TIMESTAMP_END_NOW = datetime.datetime.now().strftime(SAMPLE_TIMESTAMP_DATE_FMT)
+SAMPLE_TIMESTAMP_START_NOW = (datetime.datetime.now() - datetime.timedelta(minutes=1))\
+                            .strftime(SAMPLE_TIMESTAMP_DATE_FMT)
 
 ### For tests that function without the Darshan log--these values must reflect
 ### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
