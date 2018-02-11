@@ -193,14 +193,14 @@ class TestArchiveLmtdbCorrectness(object):
 
         cls.ref_h5lmt = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_LMTDB_H5LMT, 'r')
 
-#TODO   cls.ref_hdf5 = h5py.File(, 'r')
+        cls.ref_hdf5 = h5py.File(tokiotest.SAMPLE_LMTDB_TTS_HDF5, 'r')
 
     @classmethod
     def teardown_class(cls):
         """Close reference files and unlink temp file
         """
         cls.generated.close()
-#TODO   cls.ref_hdf5.close()
+        cls.ref_hdf5.close()
         cls.ref_h5lmt.close()
 
         tokiotest.delete_tempfile()
@@ -231,7 +231,7 @@ class TestArchiveLmtdbCorrectness(object):
             print func.description
             yield func, self.generated, self.ref_h5lmt, dataset_name, False
 
-#           # check the timestamp
+            # check the timestamp
             func.description = "bin/archive_h5lmt.py: comparing %s's timestamps dataset inside h5lmt" % dataset_name
             print func.description
             yield func, self.generated_tts, self.ref_h5lmt, dataset_name, True
@@ -240,23 +240,23 @@ class TestArchiveLmtdbCorrectness(object):
         print "Verified %d datasets against reference" % checked_ct
         assert checked_ct > 0
 
-#TODOef test_compare_tts(self):
-#       """Compare two TOKIO HDF5 files
-#       """
-#       checked_ct = 0
-#       for group_name, group_data in self.generated.iteritems():
-#           for dataset in group_data.itervalues():
-#               if not isinstance(dataset, h5py.Dataset):
-#                   continue
-#               dataset_name = dataset.name
-#
-#               func = compare_tts_dataset
-#               func.description = "bin/archive_h5mlt.py: comparing %s to hdf5 reference" % dataset_name
-#               print func.description
-#               yield func, self.generated, self.ref_hdf5, dataset_name
-#               checked_ct += 1
-#
-#       assert checked_ct > 0
+    def test_compare_tts(self):
+        """Compare two TOKIO HDF5 files
+        """
+        checked_ct = 0
+        for group_name, group_data in self.generated.iteritems():
+            for dataset in group_data.itervalues():
+                if not isinstance(dataset, h5py.Dataset):
+                    continue
+                dataset_name = dataset.name
+
+                func = compare_tts_dataset
+                func.description = "bin/archive_h5mlt.py: comparing %s to hdf5 reference" % dataset_name
+                print func.description
+                yield func, self.generated, self.ref_hdf5, dataset_name
+                checked_ct += 1
+
+        assert checked_ct > 0
 
 def compare_tts_dataset(generated, reference, dataset_name):
     """Compare a single dataset between a generated HDF5 and a reference HDF5
@@ -284,14 +284,14 @@ def compare_tts_dataset(generated, reference, dataset_name):
         print "generated %f == reference %f? %s" % (sum_gen, sum_ref,
                                                     numpy.isclose(sum_gen, sum_ref))
         assert numpy.isclose(sum_gen, sum_ref)
-        assert sum_gen > 0
+        assert sum_gen > 0 or sum_ref == 0
     elif len(gen_dataset.shape) == 2:
         assert (numpy.isclose(gen_dataset[:, :], ref_dataset[:, :])).all()
         sum_gen = gen_dataset[:].sum().sum()
         sum_ref = ref_dataset[:].sum().sum()
         print "%f == %f? %s" % (sum_gen, sum_ref, numpy.isclose(sum_gen, sum_ref))
         assert numpy.isclose(sum_gen, sum_ref)
-        assert sum_gen > 0
+        assert sum_gen > 0 or sum_ref == 0
 
 def compare_h5lmt_dataset(generated, ref_h5lmt, dataset_name, check_timestamps=False):
     """Compare a single dataset between an H5LMT and TOKIO HDF5 file
