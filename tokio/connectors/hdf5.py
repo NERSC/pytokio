@@ -670,57 +670,66 @@ class Hdf5(h5py.File):
         """
         return get_timestamps(self, dataset_name)
 
-    def to_dataframe(self, dataset_name=None):
+    def to_dataframe(self, dataset_name):
+        """Convert a dataset into a dataframe
+
+        Args:
+            dataset_name (str): dataset name to conver to DataFrame
+
+        Returns:
+            Pandas DataFrame indexed by datetime objects corresponding to
+            timestamps, columns labeled appropriately, and values from the
+            dataset
         """
-        Convert the hdf5 class in a pandas dataframe
+        if self.version is None:
+            return self._to_dataframe_h5lmt(dataset_name)
+        return self._to_dataframe(dataset_name)
 
-        TODO - this needs to be updated for TOKIO HDF5
+    def _to_dataframe(self, dataset_name):
+        """Convert a dataset into a dataframe via TOKIO HDF5 schema
         """
-        # Convenience:may put in lower case
-        if dataset_name is None:
-            dataset_name = '/FSStepsGroup/FSStepsDataSet'
-        # Normalize to absolute path
-        if not dataset_name.startswith('/'):
-            dataset_name = '/' + dataset_name
+        values = self[dataset_name][:]
+        columns = self.get_columns(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)
+        dataframe = pandas.DataFrame(data=values,
+                                     index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
+                                     columns=columns)
+        return dataframe
 
-        if dataset_name in ('/OSTReadGroup/OSTBulkReadDataSet',
-                            '/OSTWriteGroup/OSTBulkWriteDataSet'):
-            col_header_key = 'OSTNames'
-        elif dataset_name == '/MDSOpsGroup/MDSOpsDataSet':
-            col_header_key = 'OpNames'
-        elif dataset_name == '/OSSCPUGroup/OSSCPUDataSet':
-            col_header_key = 'OSSNames'
-        else:
-            col_header_key = None
+    def _to_dataframe_h5lmt(self, dataset_name):
+        """Convert a dataset into a dataframe via H5LMT native schema
+        """
+        normed_name = dataset_name.lstrip('/')
+        col_header_key = H5LMT_COLUMN_ATTRS.get(normed_name)
 
-        # Get column header from col_header_key
+        # Hack around datasets that lack column headers to retrieve column names
         if col_header_key is not None:
-            col_header = self[dataset_name].attrs[col_header_key]
-        elif dataset_name == '/FSMissingGroup/FSMissingDataSet' \
-        and '/OSSCPUGroup/OSSCPUDataSet' in self:
-            # Because FSMissingDataSet lacks the appropriate metadata in v1...
-            col_header = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
+            columns = self[dataset_name].attrs[col_header_key]
+        elif normed_name == 'FSMissingGroup/FSMissingDataSet':
+            columns = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
+        elif normed_name == 'MDSCPUGroup/MDSCPUDataSet':
+            columns = ['unknown_mds']
         else:
-            col_header = None
+            columns = None
 
-        # Retrieve timestamp indexes
-        index = self['/FSStepsGroup/FSStepsDataSet'][:]
+        # Get timestamps through regular API
+        timestamps = self.get_timestamps(dataset_name)
 
-        # Retrieve hdf5 values
-        if dataset_name == '/FSStepsGroup/FSStepsDataSet':
+        # Retrieve and transform data using H5LMT schema directly
+        if normed_name == 'FSStepsGroup/FSStepsDataSet':
             values = None
         else:
             num_dims = len(self[dataset_name].shape)
             if num_dims == 1:
                 values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[dataset_name][:, :].T
+                values = self[dataset_name][:].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
         return pandas.DataFrame(data=values,
-                                index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
-                                columns=col_header)
+                                index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
+                                columns=columns)
 
 def get_timestamps_key(hdf5_file, dataset_name):
     """

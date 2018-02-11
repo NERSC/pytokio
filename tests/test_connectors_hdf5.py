@@ -5,6 +5,7 @@ Test the HDF5 connector
 
 import datetime
 import numpy
+import nose
 import tokiotest
 import tokio.connectors
 
@@ -25,21 +26,22 @@ POSITIVE_2D = [
 ]
 
 def test_h5lmt():
-    """
-    connectors.hdf5.Hdf5() h5lmt support
+    """connectors.hdf5.Hdf5() h5lmt support
     """
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
-    # Make sure group_name=None works
-    assert len(hdf5_file.to_dataframe().index)
-
     for dataset in DATASETS_1D:
+        print "Testing", dataset
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 1
         assert hdf5_file[dataset][:].sum() > 0
-        assert len(hdf5_file.to_dataframe(dataset).index)
+        if dataset != "FSStepsGroup/FSStepsDataSet":
+            # TOKIO HDF5 has no direct support for FSStepsGroup since timestamps
+            # aren't considered a dataset
+            assert len(hdf5_file.to_dataframe(dataset).index)
 
     for dataset in DATASETS_2D:
+        print "Testing", dataset
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 2
         assert hdf5_file[dataset][:, :].sum() > 0
@@ -69,6 +71,25 @@ def test_h5lmt_compat():
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
     for dataset_name in tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[None]:
         assert hdf5_file[dataset_name] is not None
+
+def _test_to_dataframe(hdf5_file, dataset_name):
+    """Exercise to_dataframe() and check basic correctness
+    """
+    df = hdf5_file.to_dataframe(dataset_name)
+    assert len(df.columns) > 0
+    assert len(df) > 0
+    
+def test_to_dataframe():
+    """connectors.hdf5.Hdf5.to_dataframe
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_LMTDB_TTS_HDF5)
+    for dataset_name in hdf5_file.schema:
+        if hdf5_file.get(dataset_name) is None:
+            continue
+
+        func = _test_to_dataframe
+        func.description = "connectors.hdf5.Hdf5.to_dataframe(%s)" % dataset_name
+        yield func, hdf5_file, dataset_name
 
 def test_tts():
     """
