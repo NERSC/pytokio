@@ -39,13 +39,13 @@ def summarize_tts_hdf5(hdf5_file):
     # readrates and writerates come via the same collectd message, so if one is
     # missing, both are missing
     values = hdf5_file['/datatargets/readbytes'][:, :]
-    num_missing = tokio.timeseries.negative_zero_matrix(values).sum()
+    num_missing = tokio.connectors.hdf5.missing_values(values).sum()
     total = values.shape[0] * values.shape[1]
 
     # find the row offset containing the first and last nonzero data
     first_time_idx = -1
     last_time_idx = -1
-    nonzero_rows = tokio.timeseries.negative_zero_matrix(values, inverse=True).sum(axis=1)
+    nonzero_rows = tokio.connectors.hdf5.missing_values(values, inverse=True).sum(axis=1)
     for index, value in enumerate(nonzero_rows):
         if first_time_idx < 0 and value > 0:
             first_time_idx = index

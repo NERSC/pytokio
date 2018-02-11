@@ -235,3 +235,32 @@ def _test_get_timestamps(input_file):
             if prev_delta is not None:
                 assert prev_delta == delta
             prev_delta = delta
+
+def test_missing_values():
+    """
+    connectors.hdf5.missing_values()
+    """
+    num_cols = 40
+    num_rows = 800
+    num_missing = num_cols * num_rows / 4
+
+    random.seed(0)
+    dataset = numpy.random.random(size=(num_rows, num_cols)) + 0.1
+    inverse = numpy.full((num_rows, num_cols), False)
+
+    remove_list = set([])
+    for _ in range(num_missing):
+        irow = numpy.random.randint(0, num_rows)
+        icol = numpy.random.randint(0, num_cols)
+        remove_list.add((irow, icol))
+
+    for irow, icol in remove_list:
+        dataset[irow, icol] = -0.0
+        inverse[irow, icol] = True
+
+    missing_matrix = tokio.connectors.missing_values(dataset)
+
+    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list),
+                                                                 missing_matrix.sum())
+    assert len(remove_list) == missing_matrix.sum()
+    assert ((missing_matrix == 0.0) | inverse).all()

@@ -6,8 +6,10 @@ schemas.  Also supports dynamically mapping static HDF5 datasets into new
 derived datasets dynamically.
 """
 
+import math
 import datetime
 import h5py
+import numpy
 import pandas
 from tokio.connectors._hdf5 import convert_counts_rates, map_dataset, demux_column
 
@@ -670,6 +672,11 @@ class Hdf5(h5py.File):
         """
         return get_timestamps(self, dataset_name)
 
+    def get_missing(self, dataset_name, inverse=False):
+        """Convert a dataset into a binary matrix highlighting missing values
+        """
+        return missing_values(self[dataset_name][:], inverse)
+
     def to_dataframe(self, dataset_name):
         """Convert a dataset into a dataframe
 
@@ -761,3 +768,21 @@ def get_timestamps(hdf5_file, dataset_name):
     Return the timestamps dataset for a given dataset name
     """
     return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]
+
+def missing_values(dataset, inverse=False):
+    """Identify matrix values that are missing
+
+    Because we initialize datasets with -0.0, we can scan the sign bit of every
+    element of an array to determine how many data were never populated.  This
+    converts negative zeros to ones and all other data into zeros then count up
+    the number of missing elements in the array.
+
+    Args: dataset
+    """
+    if inverse:
+        converter = numpy.vectorize(lambda x:
+                                    0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
+    else:
+        converter = numpy.vectorize(lambda x:
+                                    1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
+    return converter(dataset)
