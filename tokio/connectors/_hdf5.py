@@ -58,16 +58,20 @@ class MappedDataset(h5py.Dataset):
                 array_buf = array_buf.T
             if self.force2d and len(array_buf.shape) == 1:
                 array_buf = array_buf.reshape((array_buf.shape[0], 1))
-            result = array_buf
+            # We have to __getitem__ *after* applying the transformation or else
+            # we won't get transformed indices
+            if self.map_function:
+                return self.map_function(array_buf, **self.map_kwargs).__getitem__(key)
+            else:
+                return array_buf.__getitem__(key)
         else:
-            result = super(MappedDataset, self)
-
-        # Remember: don't __getitem__(key) until the absolute end to avoid
-        # doubly slicing and getting potentially incorrect results 
-        if self.map_function:
-            return self.map_function(result[:], **self.map_kwargs).__getitem__(key)
-        else:
-            return result.__getitem__(key)
+            # if we didn't have to preload the whole dataset, we get __getitem__
+            # then apply the map function
+            result = super(MappedDataset, self).__getitem__(key)
+            if self.map_function:
+                return self.map_function(result, **self.map_kwargs)
+            else:
+                return result
 
 def _apply_timestep(return_value, parent_dataset, func=lambda x, timestep: x * timestep):
     """Apply a transformation function to a return value
