@@ -60,10 +60,21 @@ class TimeSeries(object):
 
     def init(self, start, end, timestep, num_columns, dataset_name,
              column_names=None, timestamp_key=None):
-        """
-        Create a new TimeSeries dataset object
+        """Create a new TimeSeries dataset object
 
         Responsible for setting self.timestep, self.timestamp_key, and self.timestamps
+
+        Args:
+            start (datetime): timestamp to correspond with the 0th index
+            end (datetime): timestamp at which timeseries will end (exclusive)
+            timestep (int): seconds between consecutive timestamp indices
+            num_columns (int): number of columns to initialize in the numpy.ndarray
+            dataset_name (str): an HDF5-compatible name for this timeseries
+            column_names (list of str, optional): strings by which each column
+                should be indexed.  Must be less than or equal to num_columns in
+                length; difference remains uninitialized
+            timestamp_key (str, optional): an HDF5-compatible name for this timeseries'
+                timestamp vector.  Default is /groupname/timestamps
         """
         if column_names is None:
             column_names = []

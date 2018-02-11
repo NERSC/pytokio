@@ -9,7 +9,7 @@ derived datasets dynamically.
 import datetime
 import h5py
 import pandas
-from tokio.connectors._hdf5 import convert_counts_rates, map_and_transpose
+from tokio.connectors._hdf5 import convert_counts_rates, map_dataset, demux_column
 
 SCHEMA = {
     None: {},
@@ -103,21 +103,239 @@ SCHEMA_DATASET_PROVIDERS = {
             },
         },
         "datatargets/readrates": {
-            'func': map_and_transpose,
+            'func': map_dataset,
             'args': {
                 'from_key': "/OSTReadGroup/OSTBulkReadDataSet",
+                'transpose': True,
             },
         },
         "datatargets/writerates": {
-            'func': map_and_transpose,
+            'func': map_dataset,
             'args': {
                 'from_key': "/OSTWriteGroup/OSTBulkWriteDataSet",
+                'transpose': True,
             },
         },
         "dataservers/cpuload": {
-            'func': map_and_transpose,
+            'func': map_dataset,
             'args': {
                 'from_key': "/OSSCPUGroup/OSSCPUDataSet",
+                'transpose': True,
+            },
+        },
+        "mdservers/cpuload": {
+            'func': map_dataset,
+            'args': {
+                'from_key': "/MDSCPUGroup/MDSCPUDataSet",
+                'transpose': True,
+                'force2d': True,
+            },
+        },
+
+        ### MDSOpsGroup, as counts per timestep
+        "mdtargets/opens": {
+            'func': demux_column,
+            'args': {
+                'from_key': "/MDSOpsGroup/MDSOpsDataSet",
+                'column': 'open',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True
+            },
+        },
+        "mdtargets/closes": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'close',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/mknods": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mknod',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/links": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'link',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/unlinks": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'unlink',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/mkdirs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mkdir',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/rmdirs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rmdir',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/renames": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rename',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/getxattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getxattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/statfss": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'statfs',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/setattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'setattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/getattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        ### MDSOpsGroup, as counts per second
+        "mdtargets/openrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': "/MDSOpsGroup/MDSOpsDataSet",
+                'column': 'open',
+                'transpose': True
+            },
+        },
+        "mdtargets/closerates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'close',
+                'transpose': True,
+            },
+        },
+        "mdtargets/mknodrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mknod',
+                'transpose': True,
+            },
+        },
+        "mdtargets/linkrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'link',
+                'transpose': True,
+            },
+        },
+        "mdtargets/unlinkrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'unlink',
+                'transpose': True,
+            },
+        },
+        "mdtargets/mkdirrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mkdir',
+                'transpose': True,
+            },
+        },
+        "mdtargets/rmdirrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rmdir',
+                'transpose': True,
+            },
+        },
+        "mdtargets/renamerates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rename',
+                'transpose': True,
+            },
+        },
+        "mdtargets/getxattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getxattr',
+                'transpose': True,
+            },
+        },
+        "mdtargets/statfsrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'statfs',
+                'transpose': True,
+            },
+        },
+        "mdtargets/setattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'setattr',
+                'transpose': True,
+            },
+        },
+        "mdtargets/getattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getattr',
+                'transpose': True,
             },
         },
     },

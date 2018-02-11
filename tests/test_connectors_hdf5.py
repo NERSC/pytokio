@@ -63,6 +63,13 @@ def test_h5lmt():
     for dataset in POSITIVE_2D:
         assert numpy.greater_equal(hdf5_file[dataset][:], 0.0).all()
 
+def test_h5lmt_compat():
+    """connectors.hdf5.Hdf5() h5lmt support via compatibility
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    for dataset_name in tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[None]:
+        assert hdf5_file[dataset_name] is not None
+
 def test_tts():
     """
     connectors.hdf5.Hdf5() TOKIO Time Series support
