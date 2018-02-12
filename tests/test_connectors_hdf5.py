@@ -4,8 +4,8 @@ Test the HDF5 connector
 """
 
 import datetime
+import random
 import numpy
-import nose
 import tokiotest
 import tokio.connectors
 
@@ -75,10 +75,10 @@ def test_h5lmt_compat():
 def _test_to_dataframe(hdf5_file, dataset_name):
     """Exercise to_dataframe() and check basic correctness
     """
-    df = hdf5_file.to_dataframe(dataset_name)
-    assert len(df.columns) > 0
-    assert len(df) > 0
-    
+    dataframe = hdf5_file.to_dataframe(dataset_name)
+    assert len(dataframe.columns) > 0
+    assert len(dataframe) > 0
+
 def test_to_dataframe():
     """connectors.hdf5.Hdf5.to_dataframe
     """
@@ -258,7 +258,7 @@ def test_missing_values():
         dataset[irow, icol] = -0.0
         inverse[irow, icol] = True
 
-    missing_matrix = tokio.connectors.missing_values(dataset)
+    missing_matrix = tokio.connectors.hdf5.missing_values(dataset)
 
     print "Added %d missing data; missing_matrix contains %d" % (len(remove_list),
                                                                  missing_matrix.sum())
