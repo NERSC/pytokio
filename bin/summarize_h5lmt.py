@@ -112,8 +112,6 @@ def summarize_reduced_h5lmt(data):
     totals['ave_gibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
 
     # For convenience
-    totals['tot_tibs_read'] = totals['tot_bytes_read'] * BYTES_TO_GIB * 2.0**(-10.0)
-    totals['tot_tibs_write'] = totals['tot_bytes_write'] * BYTES_TO_GIB * 2.0**(-10.0)
     totals['ave_tibs_read_per_dt'] = totals['tot_gibs_read'] / totals['n']
     totals['ave_tibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
 
