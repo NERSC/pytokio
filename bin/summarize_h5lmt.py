@@ -227,7 +227,12 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum["ave_" + base_key] = dataset[index0:indexf, :].sum() / float(indexf - index0)
         bin_datum["tot_" + base_key] = dataset[index0:indexf, :].sum()
         bin_datum["missing_" + base_key] = hdf5_file.get_missing(dataset_name)[index0:indexf, :].sum()
-        bin_datum["total_" + base_key] = (indexf - index0) * dataset.shape[1]
+        try:
+            bin_datum["total_" + base_key] = (indexf - index0) * dataset.shape[1]
+        except IndexError:
+            # dataset.shape[1] will fail for MappedDataSets with force2d; when
+            # this is the case, the second dimension is 1
+            bin_datum["total_" + base_key] = (indexf - index0)
         bin_datum["frac_missing_" + base_key] = float(bin_datum["missing_" + base_key]) / bin_datum["total_" + base_key]
 
         if 'ost_' in base_key:
