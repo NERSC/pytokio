@@ -3,13 +3,13 @@
 Generate summary metrics from an h5lmt file
 """
 
+import os
 import sys
 import json
 import time
 import datetime
 import argparse
 import warnings
-import pandas
 import tokio
 import tokio.tools
 
@@ -18,18 +18,18 @@ DATASETS_TO_BIN_KEYS = {
     'datatargets/writebytes': 'ost_write',
     'dataservers/cpuload': 'oss_cpu',
     'mdservers/cpuload': 'mds_cpu',
-#   'mdtargets/opens': 'mdt_opens',
-#   'mdtargets/closes': 'mdt_closes',
-#   'mdtargets/getattrs': 'mdt_getattrs',
-#   'mdtargets/unlinks': 'mdt_unlinks',
-#   'mdtargets/setattrs': 'mdt_setattrs',
-#   'mdtargets/getxattrs': 'mdt_getxattrs',
-#   'mdtargets/rmdirs': 'mdt_rmdirs',
-#   'mdtargets/renames': 'mdt_renames',
-#   'mdtargets/mkdirs': 'mdt_mkdirs',
 }
 
 BYTES_TO_GIB = 2.0**30
+DATE_FMT = "%Y-%m-%d"
+class DateTimeToEpoch(json.JSONEncoder):
+    """
+    JSONEncoder to convert datetime.datetime into a seconds-since-epoch
+    """
+    def default(self, obj): # pylint: disable=E0202
+        if isinstance(obj, datetime.datetime):
+            return long(time.mktime(obj.timetuple()))
+        return json.JSONEncoder.default(self, obj)
 
 def summarize_reduced_data(data):
     """
@@ -49,7 +49,6 @@ def summarize_reduced_data(data):
 
     for timestamp in sorted(data.keys()):
         datum = data[timestamp]
-#   for datum in data:
         points_in_bin = (datum['indexf'] - datum['index0'])
         totals['tot_bytes_read'] += datum['tot_ost_read']
         totals['tot_bytes_write'] += datum['tot_ost_write']
@@ -67,8 +66,14 @@ def summarize_reduced_data(data):
         else:
             totals['mds_max'] = totals['mds_max']
 
-        totals['tot_missing'] += datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
-        totals['tot_present'] += datum['total_ost_read'] + datum['total_ost_write'] + datum['total_oss_cpu'] + datum['total_mds_cpu']
+        totals['tot_missing'] += datum['missing_ost_read'] \
+                                 + datum['missing_ost_write'] \
+                                 + datum['missing_oss_cpu'] \
+                                 + datum['missing_mds_cpu']
+        totals['tot_present'] += datum['total_ost_read'] \
+                                 + datum['total_ost_write'] \
+                                 + datum['total_oss_cpu'] \
+                                 + datum['total_mds_cpu']
 
     # Derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
@@ -111,7 +116,7 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
     Returns:
         Dictionary of lists.  Keys are metrics, and values (lists) are the
         aggregated value of that metric in a single timestep bin.  For example,
-        
+
             {
                 "sum_some_metric":      [  0,   2,   3,   1],
                 "sum_someother_metric": [9.9, 2.3, 5.1, 0.2],
@@ -127,26 +132,26 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
         #
         # binned_dataset = {
         #     "ave_mds_cpu": [
-        #         0.86498, 
-        #         0.80356, 
+        #         0.86498,
+        #         0.80356,
         #         ...
-        #     ], 
+        #     ],
         #     "ave_oss_cpu": [
-        #         39.7725, 
-        #         39.2170, 
+        #         39.7725,
+        #         39.2170,
         #         ...
-        #     ], 
+        #     ],
         #     ...
         # }
 
         binned_dataset = bin_dataset(hdf5_file, dataset_key, num_bins)
 
         # loop over time bins
-        for index, counters in enumerate(binned_dataset): 
+        for index, counters in enumerate(binned_dataset):
             # loop over aggregate metrics in a single bin
             #   key = ave_mds_cpu
             #   value = { 0.86498, 0.80356 }
-            for key, value in counters.iteritems(): 
+            for key, value in counters.iteritems():
                 # look for keys that appear in multiple datasets.  only record
                 # values for the first dataset in which the key is encountered
                 if key in found_metrics:
@@ -226,22 +231,25 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum["min_" + base_key] = dataset[index0:indexf, :].min()
         bin_datum["ave_" + base_key] = dataset[index0:indexf, :].sum() / float(indexf - index0)
         bin_datum["tot_" + base_key] = dataset[index0:indexf, :].sum()
-        bin_datum["missing_" + base_key] = hdf5_file.get_missing(dataset_name)[index0:indexf, :].sum()
+        bin_datum["missing_" + base_key] = \
+            hdf5_file.get_missing(dataset_name)[index0:indexf, :].sum()
         try:
             bin_datum["total_" + base_key] = (indexf - index0) * dataset.shape[1]
         except IndexError:
             # dataset.shape[1] will fail for MappedDataSets with force2d; when
             # this is the case, the second dimension is 1
             bin_datum["total_" + base_key] = (indexf - index0)
-        bin_datum["frac_missing_" + base_key] = float(bin_datum["missing_" + base_key]) / bin_datum["total_" + base_key]
+        bin_datum["frac_missing_" + base_key] = \
+            float(bin_datum["missing_" + base_key]) / bin_datum["total_" + base_key]
 
         if 'ost_' in base_key:
             for agg_key in 'max', 'min', 'ave', 'tot':
-                bin_datum['%s_%s_kibs' % (agg_key, base_key)] = bin_datum['%s_%s' % (agg_key, base_key)] / 1024.0
-                bin_datum['%s_%s_mibs' % (agg_key, base_key)] = bin_datum['%s_%s_kibs' % (agg_key, base_key)] / 1024.0
-                bin_datum['%s_%s_gibs' % (agg_key, base_key)] = bin_datum['%s_%s_mibs' % (agg_key, base_key)] / 1024.0
-                bin_datum['%s_%s_tibs' % (agg_key, base_key)] = bin_datum['%s_%s_gibs' % (agg_key, base_key)] / 1024.0
-                bin_datum['%s_%s_pibs' % (agg_key, base_key)] = bin_datum['%s_%s_tibs' % (agg_key, base_key)] / 1024.0
+                root = "%s_%s" % (agg_key, base_key)
+                bin_datum['%s_kibs' % root] = bin_datum[root] / 1024.0
+                bin_datum['%s_mibs' % root] = bin_datum['%s_kibs' % root] / 1024.0
+                bin_datum['%s_gibs' % root] = bin_datum['%s_mibs' % root] / 1024.0
+                bin_datum['%s_tibs' % root] = bin_datum['%s_gibs' % root] / 1024.0
+                bin_datum['%s_pibs' % root] = bin_datum['%s_tibs' % root] / 1024.0
 
         binned_data.append(bin_datum)
 
@@ -253,13 +261,20 @@ def print_datum(datum=None, units='GiB'):
     """
 
     if datum is None:
-        return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ("date/time", "%ss read" % units.lower(),
-                                                         "%ss writ" % units.lower(), "ossav",
-                                                         "ossmx", "mdsav",
+        return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ("date/time",
+                                                         "%ss read" % units.lower(),
+                                                         "%ss writ" % units.lower(),
+                                                         "ossav", "ossmx", "mdsav",
                                                          "mdsmx", "mssng")
 
-    missing_overall = datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
-    total_overall = datum['total_ost_read'] + datum['total_ost_write'] + datum['total_oss_cpu'] + datum['total_mds_cpu']
+    missing_overall = datum['missing_ost_read'] \
+                      + datum['missing_ost_write'] \
+                      + datum['missing_oss_cpu'] \
+                      + datum['missing_mds_cpu']
+    total_overall = datum['total_ost_read'] \
+                    + datum['total_ost_write'] \
+                    + datum['total_oss_cpu'] \
+                    + datum['total_mds_cpu']
     frac_missing_overall = float(missing_overall) / total_overall
 
     print_str = "%19s-%8s " % (datum['tstart'].strftime("%Y-%m-%d %H:%M:%S"),
@@ -273,17 +288,11 @@ def print_datum(datum=None, units='GiB'):
     print_str += "%6.1f" % (100.0 * frac_missing_overall)
     return print_str + "\n"
 
-def print_data_summary(data, use_json=False, units='TiB'):
+def print_data_summary(data, units='TiB'):
     """
     Print the output of the summarize_reduced_data function in a human-readable format
     """
-    try:
-        totals = summarize_reduced_data(data)
-    except KeyError:
-        print json.dumps(data, indent=4, sort_keys=True, cls=tokio.connectors.slurm.SlurmEncoder)
-        raise
-    if use_json:
-        return json.dumps(totals, indent=4, sort_keys=True)
+    totals = summarize_reduced_data(data)
 
     print_str = ""
     print_str += ("Total read:  %%(tot_%ss_read)14.2f %s\n" % (units.lower(), units)) % totals
@@ -311,13 +320,13 @@ def main(argv=None):
     group.add_argument('--gibs', action='store_true',
                        help='print in units of GiBs (default)')
     group.add_argument('--tibs', action='store_true', help='print in units of TiBs')
-    parser.add_argument('--bins', dest='bins', type=int, default=24,
+    parser.add_argument('--bins', type=int, default=24,
                         help="number of bins per day")
-    parser.add_argument('--start', dest='start', type=str, default=None,
-                        help="date/time to start in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument('--end', dest='end', type=str, default=None,
-                        help="date/time to end in YYYY-MM-DD HH:MM:SS format")
-    parser.add_argument('--json', dest='json', action='store_true',
+    parser.add_argument('--start', type=str, default=None,
+                        help="date/time to start in %s format" % DATE_FMT)
+    parser.add_argument('--end', type=str, default=None,
+                        help="date/time to end in %s format" % DATE_FMT)
+    parser.add_argument('--json', action='store_true',
                         help='return json output')
     args = parser.parse_args(argv)
 
@@ -332,40 +341,53 @@ def main(argv=None):
     else: # default units
         units = 'GiB'
 
-    sys.stdout.write(print_datum(None, units=units))
-
-    all_binned_data = {}
+    # Figure out the list of HDF5 files to open
     if args.start and args.end:
-        raise NotImplementedError("tokio.tools.hdf5 is not integrated yet")
-#       tstart = datetime.datetime.strptime(args.start, "%Y-%m-%d %H:%M:%S")
-#       tend = datetime.datetime.strptime(args.end, "%Y-%m-%d %H:%M:%S")
-
-#       h5lmt_filename = os.path.basename(args.h5lmt[0])
-#       if len(args.h5lmt) > 1:
-#           warnings.warn("multiple h5lmt files specified with --start/--end; only using "
-#                         + h5lmt_filename)
-
-#       hdf5_file = tokio.connectors.hdf5.Hdf5(h5lmt_filename)
-#       binned_data = bin_datasets(hdf5_file,
-#                                  dataset_names=DATASETS_TO_BIN_KEYS.keys(),
-#                                  num_bins=args.bins)
+        hdf5_basename = os.path.basename(args.h5lmt[0])
+        if len(args.h5lmt) > 1:
+            warnings.warn("multiple h5lmt files specified with --start/--end; only using "
+                          + hdf5_basename)
+        hdf5_filenames = [x[0] for x in tokio.tools.hdf5.get_files_and_indices(
+            hdf5_basename,
+            DATASETS_TO_BIN_KEYS.keys()[0],
+            datetime.datetime.strptime(args.start, DATE_FMT),
+            datetime.datetime.strptime(args.end, DATE_FMT))]
     else:
-        for h5lmt_filename in args.h5lmt:
-            h5lmt_file = tokio.connectors.hdf5.Hdf5(h5lmt_filename, 'r')
-            binned_data = bin_datasets(hdf5_file=h5lmt_file,
-                                       dataset_names=DATASETS_TO_BIN_KEYS.keys(),
-                                       orient='index',
-                                       num_bins=args.bins)
-#           print pandas.DataFrame.from_dict(binned_data, orient='index')
-#           print json.dumps(binned_data, sort_keys=True, indent=4, cls=tokio.connectors.slurm.SlurmEncoder)
+        hdf5_filenames = args.h5lmt
 
+    # Process each HDF5 file and append its bins to a global dictionary
+    all_binned_data = {}
+    if not args.json:
+        sys.stdout.write(print_datum(None, units=units))
+    for hdf5_filename in hdf5_filenames:
+        hdf5_file = tokio.connectors.hdf5.Hdf5(hdf5_filename, 'r')
+        binned_data = bin_datasets(hdf5_file=hdf5_file,
+                                   dataset_names=DATASETS_TO_BIN_KEYS.keys(),
+                                   orient='index',
+                                   num_bins=args.bins)
+
+        if not args.json:
             for timestamp in sorted(binned_data.keys()):
                 print print_datum(binned_data[timestamp], units=units).strip()
 
-            all_binned_data.update(binned_data)
+        all_binned_data.update(binned_data)
+#       print pandas.DataFrame.from_dict(binned_data, orient='index')
 
-    if args.summary:
-        sys.stdout.write(print_data_summary(all_binned_data, use_json=args.json, units=units))
+    # Print binned results in the desired format
+    if args.json:
+        if args.summary:
+            to_serialize = {
+                'bins': all_binned_data,
+                'summary': summarize_reduced_data(all_binned_data),
+            }
+        else:
+            to_serialize = {'bins': all_binned_data}
+        print json.dumps(to_serialize,
+                         sort_keys=True,
+                         indent=4,
+                         cls=DateTimeToEpoch)
+    elif args.summary:
+        sys.stdout.write(print_data_summary(all_binned_data, units=units))
 
 if __name__ == '__main__':
     main()
