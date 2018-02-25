@@ -10,9 +10,17 @@ import StringIO
 import datetime
 import pandas
 import nose
+
+try:
+    import elasticsearch.exceptions
+    _HAVE_ELASTICSEARCH = True
+except ImportError:
+    _HAVE_ELASTICSEARCH = False
+
 import tokio.config
 import tokiotest
 import tokiobin.cache_isdct
+import tokiobin.cache_collectdes
 import tokiobin.cache_darshan
 import tokiobin.cache_slurm
 import tokiobin.cache_topology
@@ -56,9 +64,20 @@ def verify_sqlite(output_str):
         print "Found %d rows in %s" % (num_rows, table)
         assert len(rows) > 0
 
-def verify_json(json_str):
+def verify_json_zero_ok(json_str):
+    """Ensure that json is loadable
+
+    Args:
+        json_str (str): string containing json text
     """
-    Ensure that json is loadable
+    data = json.loads(json_str)
+    assert data is not None
+
+def verify_json(json_str):
+    """Ensure that json is loadable and contains something
+
+    Args:
+        json_str (str): string containing json text
     """
     data = json.loads(json_str)
     assert len(data) > 0
@@ -77,6 +96,36 @@ def verify_sacct(csv_str):
     data = pandas.read_csv(StringIO.StringIO(csv_str), sep="|")
     assert len(data) > 0
 
+def run_connector(binary, argv):
+    """Default cache_connector run function
+
+    Args:
+        binary (module): tokiobin module that contains a main() function
+        argv (list of str): list of CLI arguments to pass to connector
+
+    Returns:
+        Stdout of cache connector script as a string
+    """
+    return tokiotest.run_bin(binary, argv)
+
+def run_elasticsearch(binary, argv):
+    """Run function that traps connection errors from ElasticSearch
+
+    Args:
+        binary (module): tokiobin module that contains a main() function
+        argv (list of str): list of CLI arguments to pass to connector
+
+    Returns:
+        Stdout of cache connector script as a string
+    """
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
+
+    try:
+        return tokiotest.run_bin(binary, argv)
+    except elasticsearch.exceptions.ConnectionError as error:
+        raise nose.SkipTest(error)
+
 CACHE_CONNECTOR_CONFIGS = [
     {
         'name':       'bin/cache_isdct.py',
@@ -89,6 +138,24 @@ CACHE_CONNECTOR_CONFIGS = [
         'binary':     tokiobin.cache_isdct,
         'args':       ['--csv', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_csv,],
+    },
+    {
+        'name':       'bin/cache_collectdes.py',
+        'description': 'bin/cache_collectdes.py, cached input',
+        'binary':     tokiobin.cache_collectdes,
+        'args':       ['--input', tokiotest.SAMPLE_COLLECTDES_FILE,
+                        tokiotest.SAMPLE_COLLECTDES_START,
+                        tokiotest.SAMPLE_COLLECTDES_END],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'bin/cache_collectdes.py',
+        'description': 'bin/cache_collectdes.py, remote connection',
+        'binary':     tokiobin.cache_collectdes,
+        'args':       [tokiotest.SAMPLE_TIMESTAMP_START_NOW,
+                       tokiotest.SAMPLE_TIMESTAMP_END_NOW],
+        'runfunction': run_elasticsearch,
+        'validators': [verify_json_zero_ok,],
     },
     {
         'name':       'bin/cache_darshan.py',
@@ -152,6 +219,7 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'name':       'bin/cache_topology.py',
+        'description': 'bin/cache_topology.py',
         'binary':     tokiobin.cache_topology,
         'args':       [
             '--craysdb-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
@@ -257,11 +325,13 @@ def run_cache_connector(config, to_file=False):
     if config['binary'] == tokiobin.cache_darshan:
         tokiotest.check_darshan()
 
+    runfunction = config.get('runfunction', run_connector)
+
     if to_file:
         argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
         print "Caching to", tokiotest.TEMP_FILE.name
         print "Executing:", ' '.join(argv)
-        output_str = tokiotest.run_bin(config['binary'], argv)
+        output_str = runfunction(config['binary'], argv)
 
         # (validate_contents == True) means the associated validator function
         # expects the contents of the output file rather than the name of the
@@ -272,7 +342,7 @@ def run_cache_connector(config, to_file=False):
         argv = config['args']
         print "Caching to stdout"
         print "Executing:", ' '.join(argv)
-        output_str = tokiotest.run_bin(config['binary'], argv)
+        output_str = runfunction(config['binary'], argv)
 
     for validator in config['validators']:
         validator(output_str)
@@ -287,10 +357,6 @@ def craft_description(config, suffix):
         result = "%s %s %s" % (
             config['name'],
             ' '.join(config['args'][0:-1]),
-            suffix)
-    elif config['binary'] == tokiobin.cache_topology:
-        result = "%s %s" % (
-            os.sep.join(config['binary'].split(os.sep)[-2:]),
             suffix)
     else:
         result = "%s %s %s" % (

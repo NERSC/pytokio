@@ -12,7 +12,6 @@ import warnings
 import numpy
 import tokio.connectors.hdf5
 
-
 class TimeSeries(object):
     """
     In-memory representation of an HDF5 group in a TokioFile.  Can either
@@ -60,10 +59,21 @@ class TimeSeries(object):
 
     def init(self, start, end, timestep, num_columns, dataset_name,
              column_names=None, timestamp_key=None):
-        """
-        Create a new TimeSeries dataset object
+        """Create a new TimeSeries dataset object
 
         Responsible for setting self.timestep, self.timestamp_key, and self.timestamps
+
+        Args:
+            start (datetime): timestamp to correspond with the 0th index
+            end (datetime): timestamp at which timeseries will end (exclusive)
+            timestep (int): seconds between consecutive timestamp indices
+            num_columns (int): number of columns to initialize in the numpy.ndarray
+            dataset_name (str): an HDF5-compatible name for this timeseries
+            column_names (list of str, optional): strings by which each column
+                should be indexed.  Must be less than or equal to num_columns in
+                length; difference remains uninitialized
+            timestamp_key (str, optional): an HDF5-compatible name for this timeseries'
+                timestamp vector.  Default is /groupname/timestamps
         """
         if column_names is None:
             column_names = []
@@ -86,8 +96,11 @@ class TimeSeries(object):
 
         # Root the timestamp_key at the same parent as the dataset
         if self.timestamp_key is None:
-            self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] \
-                                 + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
+            if timestamp_key is None:
+                self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] \
+                                     + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
+            else:
+                self.timestamp_key = timestamp_key
 
     def attach(self, hdf5_file, dataset_name, light=False):
         """
@@ -150,7 +163,7 @@ class TimeSeries(object):
                                                     **extra_dataset_args)
 
         # Create the timestamps in the HDF5 file (if necessary) and calculate
-        # where to insert our data into the HDF5's dataset 
+        # where to insert our data into the HDF5's dataset
         if self.timestamp_key not in hdf5_file:
             timestamps_hdf5 = hdf5_file.create_dataset(name=self.timestamp_key,
                                                        shape=self.timestamps.shape,
@@ -183,8 +196,7 @@ class TimeSeries(object):
             if hdf5_file.attrs['start'] != start_timestamp \
             or hdf5_file.attrs['end'] != end_timestamp:
 #               warnings.warn(
-                raise IndexError(
-                    "Mismatched start or end values:  %d != %d or %d != %d" % (
+                raise IndexError("Mismatched start or end values:  %d != %d or %d != %d" % (
                     start_timestamp, hdf5_file.attrs['start'],
                     end_timestamp, hdf5_file.attrs['end']))
 
@@ -244,8 +256,9 @@ class TimeSeries(object):
                           % (column_name, index, self.column_map[column_name]))
         self.column_map[column_name] = index
         if index >= (self.dataset.shape[1]):
-            raise IndexError("index %d exceeds number of columns %d"
-                             % (index, self.dataset.shape[1]))
+            errmsg = "new index %d (%s) exceeds number of columns %d (%s)" % (
+                index, column_name, self.dataset.shape[1], self.columns[-1])
+            raise IndexError(errmsg)
         self.columns.append(str(column_name)) # convert from unicode to str for numpy
         return index
 
@@ -332,7 +345,7 @@ class TimeSeries(object):
         converts negative zeros to ones and all other data into zeros then count up
         the number of missing elements in the array.
         """
-        return negative_zero_matrix(self.dataset)
+        return tokio.connectors.hdf5.missing_values(self.dataset, inverse)
 
     def convert_to_deltas(self):
         """
@@ -444,21 +457,6 @@ def timeseries_deltas(dataset):
                     prev_nonzero[icol] = this_element
 
     return diff_matrix
-
-def negative_zero_matrix(dataset, inverse=False):
-    """
-    Because we initialize datasets with -0.0, we can scan the sign bit of every
-    element of an array to determine how many data were never populated.  This
-    converts negative zeros to ones and all other data into zeros then count up
-    the number of missing elements in the array.
-    """
-    if inverse:
-        converter = numpy.vectorize(lambda x:
-                                    0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
-    else:
-        converter = numpy.vectorize(lambda x:
-                                    1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
-    return converter(dataset)
 
 def get_insert_indices(my_timestamps, existing_timestamps):
     """

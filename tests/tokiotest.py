@@ -9,6 +9,7 @@ import gzip
 import errno
 import tempfile
 import subprocess
+import datetime
 
 try:
     import cStringIO as StringIO
@@ -25,6 +26,11 @@ BIN_DIR = os.path.join(PYTOKIO_HOME, 'bin')
 sys.path.insert(0, os.path.abspath(PYTOKIO_HOME))
 
 import tokio.connectors.darshan
+
+SAMPLE_TIMESTAMP_DATE_FMT = "%Y-%m-%dT%H:%M:%S"
+SAMPLE_TIMESTAMP_END_NOW = datetime.datetime.now().strftime(SAMPLE_TIMESTAMP_DATE_FMT)
+SAMPLE_TIMESTAMP_START_NOW = (datetime.datetime.now() - datetime.timedelta(minutes=1))\
+                            .strftime(SAMPLE_TIMESTAMP_DATE_FMT)
 
 ### For tests that function without the Darshan log--these values must reflect
 ### the contents of SAMPLE_DARSHAN_LOG for the tests to actually pass
@@ -56,12 +62,18 @@ SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
 SAMPLE_NERSCJOBSDB_START = 1489872299
 SAMPLE_NERSCJOBSDB_END = 1490167256
 SAMPLE_NERSCJOBSDB_HOST = 'edison'
-SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'sample_lmtdb.sqlite3')
+SAMPLE_LMTDB_FILE = os.path.join(INPUT_DIR, 'snx11025_2018-01-28.sqlite3')
+SAMPLE_LMTDB_H5LMT = os.path.join(INPUT_DIR, 'snx11025_2018-01-28.h5lmt')
+SAMPLE_LMTDB_TTS_HDF5 = os.path.join(INPUT_DIR, 'snx11025_2018-01-28.hdf5')
 SAMPLE_LMTDB_START = 1517126400
 SAMPLE_LMTDB_END = 1517126700
+SAMPLE_LMTDB_START_STAMP = datetime.datetime.fromtimestamp(SAMPLE_LMTDB_START).strftime(SAMPLE_TIMESTAMP_DATE_FMT)
+SAMPLE_LMTDB_END_STAMP = datetime.datetime.fromtimestamp(SAMPLE_LMTDB_END).strftime(SAMPLE_TIMESTAMP_DATE_FMT)
 SAMPLE_LMTDB_TIMESTEP = 5
+SAMPLE_LMTDB_MAX_INDEX = 60
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
+SAMPLE_H5LMT_DATES = ['2017-03-20', '2017-03-21']
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_TIMESERIES_FILES = {
     "TOKIO HDF5": SAMPLE_TOKIOTS_FILE,

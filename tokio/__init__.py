@@ -3,7 +3,7 @@
 TODO: add support for external configuration
 """
 
-import tokio.timeseries
+import tokio.timeseries as timeseries
 
 try:
     from .connectors.hdf5 import HDF5

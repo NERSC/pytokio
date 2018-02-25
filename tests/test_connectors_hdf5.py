@@ -4,6 +4,7 @@ Test the HDF5 connector
 """
 
 import datetime
+import random
 import numpy
 import tokiotest
 import tokio.connectors
@@ -25,21 +26,22 @@ POSITIVE_2D = [
 ]
 
 def test_h5lmt():
-    """
-    connectors.hdf5.Hdf5() h5lmt support
+    """connectors.hdf5.Hdf5() h5lmt support
     """
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
-    # Make sure group_name=None works
-    assert len(hdf5_file.to_dataframe().index)
-
     for dataset in DATASETS_1D:
+        print "Testing", dataset
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 1
         assert hdf5_file[dataset][:].sum() > 0
-        assert len(hdf5_file.to_dataframe(dataset).index)
+        if dataset != "FSStepsGroup/FSStepsDataSet":
+            # TOKIO HDF5 has no direct support for FSStepsGroup since timestamps
+            # aren't considered a dataset
+            assert len(hdf5_file.to_dataframe(dataset).index)
 
     for dataset in DATASETS_2D:
+        print "Testing", dataset
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 2
         assert hdf5_file[dataset][:, :].sum() > 0
@@ -62,6 +64,34 @@ def test_h5lmt():
     # No negative rates
     for dataset in POSITIVE_2D:
         assert numpy.greater_equal(hdf5_file[dataset][:], 0.0).all()
+
+def test_h5lmt_compat():
+    """connectors.hdf5.Hdf5() h5lmt support via compatibility
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    for dataset_name in tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[None]:
+        print "Checking %s" % dataset_name
+        assert hdf5_file[dataset_name] is not None
+        assert hdf5_file[dataset_name][0, 0] is not None # make sure we can index 2d
+
+def _test_to_dataframe(hdf5_file, dataset_name):
+    """Exercise to_dataframe() and check basic correctness
+    """
+    dataframe = hdf5_file.to_dataframe(dataset_name)
+    assert len(dataframe.columns) > 0
+    assert len(dataframe) > 0
+
+def test_to_dataframe():
+    """connectors.hdf5.Hdf5.to_dataframe
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_LMTDB_TTS_HDF5)
+    for dataset_name in hdf5_file.schema:
+        if hdf5_file.get(dataset_name) is None:
+            continue
+
+        func = _test_to_dataframe
+        func.description = "connectors.hdf5.Hdf5.to_dataframe(%s)" % dataset_name
+        yield func, hdf5_file, dataset_name
 
 def test_tts():
     """
@@ -207,3 +237,32 @@ def _test_get_timestamps(input_file):
             if prev_delta is not None:
                 assert prev_delta == delta
             prev_delta = delta
+
+def test_missing_values():
+    """
+    connectors.hdf5.missing_values()
+    """
+    num_cols = 40
+    num_rows = 800
+    num_missing = num_cols * num_rows / 4
+
+    random.seed(0)
+    dataset = numpy.random.random(size=(num_rows, num_cols)) + 0.1
+    inverse = numpy.full((num_rows, num_cols), False)
+
+    remove_list = set([])
+    for _ in range(num_missing):
+        irow = numpy.random.randint(0, num_rows)
+        icol = numpy.random.randint(0, num_cols)
+        remove_list.add((irow, icol))
+
+    for irow, icol in remove_list:
+        dataset[irow, icol] = -0.0
+        inverse[irow, icol] = True
+
+    missing_matrix = tokio.connectors.hdf5.missing_values(dataset)
+
+    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list),
+                                                                 missing_matrix.sum())
+    assert len(remove_list) == missing_matrix.sum()
+    assert ((missing_matrix == 0.0) | inverse).all()
