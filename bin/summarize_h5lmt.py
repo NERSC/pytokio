@@ -68,7 +68,7 @@ def summarize_reduced_data(data):
             totals['mds_max'] = totals['mds_max']
 
         totals['tot_missing'] += datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
-        totals['tot_present'] += datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
+        totals['tot_present'] += datum['total_ost_read'] + datum['total_ost_write'] + datum['total_oss_cpu'] + datum['total_mds_cpu']
 
     # Derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
@@ -197,16 +197,17 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
 
     dataset = hdf5_file[dataset_name]
 
-    if hdf5_file.schema is None:
+    if hdf5_file.schema:
+        if not (timestamps.shape[0] % num_bins) == 0:
+            warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" %
+                          (num_bins, (timestamps.shape[0])))
+        dt_per_bin = int(timestamps.shape[0] / num_bins)
+    else:
+        # no schema means h5lmt file, which has + 1 extra timestep
         if not ((timestamps.shape[0] - 1) % num_bins) == 0:
             warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" %
                           (num_bins, (timestamps.shape[0] - 1)))
         dt_per_bin = int((timestamps.shape[0] - 1) / num_bins)
-    else:
-        if not (timestamps.shape[0] % num_bins) == 0:
-            warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" %
-                          (num_bins, (timestamps.shape[0] - 1)))
-        dt_per_bin = int(timestamps.shape[0] / num_bins)
 
     # create a list of dictionaries, where each list element is a bin
     binned_data = []
@@ -245,11 +246,16 @@ def print_datum(datum=None, units='GiB'):
     """
     Take a json bag and print out relevant fields
     """
+
     if datum is None:
         return "%28s %12s %12s %5s %5s %5s %5s %5s\n" % ("date/time", "%ss read" % units.lower(),
                                                          "%ss writ" % units.lower(), "ossav",
                                                          "ossmx", "mdsav",
                                                          "mdsmx", "mssng")
+
+    missing_overall = datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
+    total_overall = datum['total_ost_read'] + datum['total_ost_write'] + datum['total_oss_cpu'] + datum['total_mds_cpu']
+    frac_missing_overall = float(missing_overall) / total_overall
 
     print_str = "%19s-%8s " % (datum['tstart'].strftime("%Y-%m-%d %H:%M:%S"),
                                datum['tend'].strftime("%H:%M:%S"))
@@ -259,7 +265,7 @@ def print_datum(datum=None, units='GiB'):
     print_str += "%(max_oss_cpu)5.1f " % datum
     print_str += "%(ave_mds_cpu)5.1f " % datum
     print_str += "%(max_mds_cpu)5.1f" % datum
-    print_str += "%(frac_missing_ost_read)5.1f" % datum
+    print_str += "%6.1f" % (100.0 * frac_missing_overall)
     return print_str + "\n"
 
 def print_data_summary(data, use_json=False, units='TiB'):
