@@ -5,6 +5,7 @@ Generate summary metrics from an h5lmt file
 
 import sys
 import json
+import time
 import datetime
 import argparse
 import warnings
@@ -30,7 +31,7 @@ DATASETS_TO_BIN_KEYS = {
 
 BYTES_TO_GIB = 2.0**30
 
-def summarize_reduced_h5lmt(data):
+def summarize_reduced_data(data):
     """
     Take a list of LMT data sets and return summaries of each relevant key
     """
@@ -44,27 +45,30 @@ def summarize_reduced_h5lmt(data):
         'mds_max': 0.0,
         'tot_missing': 0,
         'tot_present': 0,
-        'tot_zeros': 0,
     }
 
-    for datum in data:
-        points_in_bin = (datum['if'] - datum['i0'])
-        totals['tot_bytes_read'] += datum['bytes_read']
-        totals['tot_bytes_write'] += datum['bytes_write']
+    for timestamp in sorted(data.keys()):
+        datum = data[timestamp]
+#   for datum in data:
+        points_in_bin = (datum['indexf'] - datum['index0'])
+        totals['tot_bytes_read'] += datum['tot_ost_read']
+        totals['tot_bytes_write'] += datum['tot_ost_write']
         totals['oss_ave'] += datum['ave_oss_cpu'] * points_in_bin
         totals['mds_ave'] += datum['ave_mds_cpu'] * points_in_bin
         totals['n'] += points_in_bin
+
         if datum['max_oss_cpu'] > totals['oss_max']:
             totals['oss_max'] = datum['max_oss_cpu']
         else:
             totals['oss_max'] = totals['oss_max']
+
         if datum['max_mds_cpu'] > totals['mds_max']:
             totals['mds_max'] = datum['max_mds_cpu']
         else:
             totals['mds_max'] = totals['mds_max']
-        totals['tot_missing'] += datum['tot_missing']
-        totals['tot_present'] += datum['tot_present']
-        totals['tot_zeros'] += datum['tot_zeros']
+
+        totals['tot_missing'] += datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
+        totals['tot_present'] += datum['missing_ost_read'] + datum['missing_ost_write'] + datum['missing_oss_cpu'] + datum['missing_mds_cpu']
 
     # Derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
@@ -90,12 +94,10 @@ def summarize_reduced_h5lmt(data):
 
     totals['frac_missing'] = 100.0 * totals['tot_missing'] \
         / (totals['tot_missing'] + totals['tot_present'])
-    totals['frac_zeros'] = 100.0 * totals['tot_zeros'] \
-        / (totals['tot_missing'] + totals['tot_present'])
 
     return totals
 
-def bin_datasets(hdf5_file, dataset_names, num_bins=24):
+def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
     """Group many timeseries datasets into bins
 
     Takes a TOKIO HDF file and converts it into bins of reduced data (e.g., bin
@@ -104,6 +106,8 @@ def bin_datasets(hdf5_file, dataset_names, num_bins=24):
     Args:
         hdf5_file (connectors.Hdf5): HDF5 file from where data should be retrieved
         dataset_names (list of str): dataset names to be aggregated
+        columns (str): either 'columns' or 'index'; same semantic meaning as
+            pandas.DataFrame.from_dict
         num_binds (int): number of bins to generate per day
 
     Returns:
@@ -115,37 +119,66 @@ def bin_datasets(hdf5_file, dataset_names, num_bins=24):
                 "sum_someother_metric": [9.9, 2.3, 5.1, 0.2],
             }
     """
-    measurements = {}
+    bins_by_columns = {}
+    bins_by_index = {}
     found_metrics = {}
     for dataset_key in dataset_names:
         # binned_dataset is a list of dictionaries.  Each list element
         # corresponds to a single time bin, and its key-value pairs are
         # individual metrics aggregated over that bin.
+        #
+        # binned_dataset = {
+        #     "ave_mds_cpu": [
+        #         0.86498, 
+        #         0.80356, 
+        #         ...
+        #     ], 
+        #     "ave_oss_cpu": [
+        #         39.7725, 
+        #         39.2170, 
+        #         ...
+        #     ], 
+        #     ...
+        # }
+
         binned_dataset = bin_dataset(hdf5_file, dataset_key, num_bins)
 
         # loop over time bins
         for index, counters in enumerate(binned_dataset): 
             # loop over aggregate metrics in a single bin
+            #   key = ave_mds_cpu
+            #   value = { 0.86498, 0.80356 }
             for key, value in counters.iteritems(): 
                 # look for keys that appear in multiple datasets.  only record
                 # values for the first dataset in which the key is encountered
                 if key in found_metrics:
                     if found_metrics[key] != dataset_key:
-                        if measurements[key][index] != value:
-                            print measurements[key]
-                            print value
-                            assert measurements[key][compare_idx] == compare_value
+                        if bins_by_columns[key][index] != value:
+                            raise Exception("Not all timesteps are the same in HDF5")
                         continue
                 else:
                     found_metrics[key] = dataset_key
 
-                # append the value to its metric counter in measurements
-                if key in measurements:
-                    measurements[key].append(value)
+                # append the value to its metric counter in bins_by_columns
+                if key in bins_by_columns:
+                    bins_by_columns[key].append(value)
                 else:
-                    measurements[key] = [value]
+                    bins_by_columns[key] = [value]
 
-    return measurements
+            # append the value to its metric counter in bins_by_index
+            if 'tstart' in counters:
+                index_key = long(time.mktime(counters['tstart'].timetuple()))
+#               index_key = counters['tstart']
+                if index_key not in bins_by_index:
+                    bins_by_index[index_key] = {}
+                bins_by_index[index_key].update(counters)
+
+    if orient == 'columns':
+        return bins_by_columns
+    elif orient == 'index':
+        return bins_by_index
+    else:
+        raise ValueError('only recognize index or columns for orient')
 
 def bin_dataset(hdf5_file, dataset_name, num_bins):
     """Group timeseries dataset into bins
@@ -195,8 +228,8 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum["ave_" + base_key] = dataset[index0:indexf, :].sum() / float(indexf - index0)
         bin_datum["tot_" + base_key] = dataset[index0:indexf, :].sum()
         bin_datum["missing_" + base_key] = hdf5_file.get_missing(dataset_name)[index0:indexf, :].sum()
-        tot_elements = (indexf - index0) * dataset.shape[1]
-        bin_datum["frac_missing_" + base_key] = float(bin_datum["missing_" + base_key]) / tot_elements
+        bin_datum["total_" + base_key] = (indexf - index0) * dataset.shape[1]
+        bin_datum["frac_missing_" + base_key] = float(bin_datum["missing_" + base_key]) / bin_datum["total_" + base_key]
 
         if 'ost_' in base_key:
             for agg_key in 'max', 'min', 'ave', 'tot':
@@ -233,9 +266,13 @@ def print_datum(datum=None, units='GiB'):
 
 def print_data_summary(data, use_json=False, units='TiB'):
     """
-    Print the output of the summarize_reduced_h5lmt function in a human-readable format
+    Print the output of the summarize_reduced_data function in a human-readable format
     """
-    totals = summarize_reduced_h5lmt(data)
+    try:
+        totals = summarize_reduced_data(data)
+    except KeyError:
+        print json.dumps(data, indent=4, sort_keys=True, cls=tokio.connectors.slurm.SlurmEncoder)
+        raise
     if use_json:
         return json.dumps(totals, indent=4, sort_keys=True)
 
@@ -288,6 +325,7 @@ def main(argv=None):
 
     sys.stdout.write(print_datum(None, units=units))
 
+    all_binned_data = {}
     if args.start and args.end:
         raise NotImplementedError("tokio.tools.hdf5 is not integrated yet")
 #       tstart = datetime.datetime.strptime(args.start, "%Y-%m-%d %H:%M:%S")
@@ -307,14 +345,18 @@ def main(argv=None):
             h5lmt_file = tokio.connectors.hdf5.Hdf5(h5lmt_filename, 'r')
             binned_data = bin_datasets(hdf5_file=h5lmt_file,
                                        dataset_names=DATASETS_TO_BIN_KEYS.keys(),
+                                       orient='index',
                                        num_bins=args.bins)
-            print pandas.DataFrame.from_dict(binned_data)
-#           for binned_datum in binned_data:
-#               print print_datum(binned_datum, units=units).strip()
-#   all_binned_data = all_binned_data + bin_data
+#           print pandas.DataFrame.from_dict(binned_data, orient='index')
+#           print json.dumps(binned_data, sort_keys=True, indent=4, cls=tokio.connectors.slurm.SlurmEncoder)
 
-#   if args.summary:
-#       sys.stdout.write(print_data_summary(all_binned_data, use_json=args.json, units=units))
+            for timestamp in sorted(binned_data.keys()):
+                print print_datum(binned_data[timestamp], units=units).strip()
+
+            all_binned_data.update(binned_data)
+
+    if args.summary:
+        sys.stdout.write(print_data_summary(all_binned_data, use_json=args.json, units=units))
 
 if __name__ == '__main__':
     main()
