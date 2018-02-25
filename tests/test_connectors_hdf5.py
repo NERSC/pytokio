@@ -70,7 +70,9 @@ def test_h5lmt_compat():
     """
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
     for dataset_name in tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[None]:
+        print "Checking %s" % dataset_name
         assert hdf5_file[dataset_name] is not None
+        assert hdf5_file[dataset_name][0, 0] is not None # make sure we can index 2d
 
 def _test_to_dataframe(hdf5_file, dataset_name):
     """Exercise to_dataframe() and check basic correctness
