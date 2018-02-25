@@ -287,7 +287,7 @@ def retrieve_darshan_data(results, darshan_log_file, silent_errors=False):
     # based on empirical observation that LMT is still flushing data for this
     # long after the job concludes.
     results['_datetime_start'] = datetime.datetime.fromtimestamp(
-        int(darshan_data['header']['start_time']) + tokio.config.LMT_TIMESTEP)
+        int(darshan_data['header']['start_time']))
     results['_datetime_end'] = datetime.datetime.fromtimestamp(
         int(darshan_data['header']['end_time']) + tokio.config.LMT_TIMESTEP)
 
