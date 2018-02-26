@@ -45,6 +45,13 @@ DATASETS = {
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
+# This is necessary because multiprocessing needs to be able to serialize the
+# reducer that is passed back, but lambda functions are not pickleable.  So we
+# pass back a string that maps to a lambda.
+LAMBDA_MAPS = {
+    'sum': lambda x, y: x + y,
+}
+
 def process_page(page):
     """
     Go through a list of docs and insert their data into a numpy matrix.  In
@@ -96,19 +103,19 @@ def process_page(page):
             if source['type_instance'] == 'idle':
                 # note that we store (100 - idle) as load
                 inserts.append(('dataservers/cpuload', timestamp, source['hostname'],
-                               100.0 - val1, lambda x, y: x + y))
+                               100.0 - val1, 'sum'))
                 inserts.append(('dataservers/_num_cpuload', timestamp, source['hostname'],
-                               1, lambda x, y: x + y))
+                               1, 'sum'))
             elif source['type_instance'] == 'user':
                 inserts.append(('dataservers/cpuuser', timestamp, source['hostname'],
-                               val1, lambda x, y: x + y))
+                               val1, 'sum'))
                 inserts.append(('dataservers/_num_cpuuser', timestamp, source['hostname'],
-                               1, lambda x, y: x + y))
+                               1, 'sum'))
             elif source['type_instance'] == 'system':
                 inserts.append(('dataservers/cpusys', timestamp, source['hostname'],
-                               val1, lambda x, y: x + y))
+                               val1, 'sum'))
                 inserts.append(('dataservers/_num_cpusys', timestamp, source['hostname'],
-                               1, lambda x, y: x + y))
+                               1, 'sum'))
         elif source['plugin'] == 'memory' and 'value' in source:
             timestamp = dateutil.parser.parse(source['@timestamp'])\
                                               .astimezone(dateutil.tz.tzlocal())\
@@ -155,7 +162,8 @@ def update_datasets(inserts, datasets):
                 (dataset_name, timestamp, col_name, rate) = insert
                 reducer = None
             else:
-                (dataset_name, timestamp, col_name, rate, reducer) = insert
+                (dataset_name, timestamp, col_name, rate, reducer_name) = insert
+                reducer = LAMBDA_MAPS.get(reducer_name)
         except ValueError:
             print insert
             raise
@@ -180,7 +188,7 @@ def update_datasets(inserts, datasets):
         + " %(datatargets/writerates)d bytes/%(datatargets/writeoprates)d ops of write"
     print update_str % data_volume
 
-def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_devices, threads=1):
+def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_servers, devices_per_server, threads=1):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
@@ -200,14 +208,20 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
     for dataset_name in DATASETS.keys():
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
-            warnings.warn("Dataset %s is not in schema (passing through)" % dataset_name)
+            if '/_' not in dataset_name:
+                warnings.warn("Dataset %s is not in schema (passing through)" % dataset_name)
             hdf5_dataset_name = dataset_name
+        if dataset_name.lstrip('/').startswith('datatargets'):
+            num_columns = num_servers * devices_per_server
+        else:
+            num_columns = num_servers
         datasets[dataset_name] = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
                                                              start=init_start,
                                                              end=init_end,
                                                              timestep=timestep,
-                                                             num_columns=num_devices,
+                                                             num_columns=num_columns,
                                                              hdf5_file=hdf5_file)
+
     # Process all pages retrieved (this is computationally expensive)
     _time0 = time.time()
     updates = []
@@ -235,10 +249,19 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
         print "Inserted %d elements from %d pages in %.4f seconds" % (len(updates), len(pages), _update_time)
         print "Processed %d pages in %.4f seconds" % (len(pages), _extract_time + _update_time)
 
+    # Normalize the CPU datasets - necessary because these measurements are
+    # reported on a per-core basis, but not all cores may be reported for each
+    # timestamp
+    for dataset_name in ['dataservers/cpuload', 'dataservers/cpuuser', 'dataservers/cpusys']:
+        count_key = '_num_' + dataset_name
+        if dataset_name in datasets and count_key in datasets:
+            datasets[dataset_name].values /= datasets[count_key].values
+
     # Write datasets out to HDF5 file
     _time0 = time.time()
-    for dataset in datasets.itervalues():
-        dataset.commit_dataset(hdf5_file)
+    for dataset_name, dataset in datasets.iteritems():
+        if '/_' not in dataset_name:
+            dataset.commit_dataset(hdf5_file)
 
     if tokio.DEBUG:
         print "Committed data to disk in %.4f seconds" % (time.time() - _time0)
@@ -263,8 +286,10 @@ def main(argv=None):
                         + ' (default: same as end)')
     parser.add_argument('--debug', action='store_true',
                         help="produce debug messages")
-    parser.add_argument('--num-bbnodes', type=int, default=288,
-                        help='number of expected BB nodes (default: 288)')
+    parser.add_argument('--num-nodes', type=int, default=288,
+                        help='number of expected burst buffer nodes (default: 288)')
+    parser.add_argument('--ssds-per-node', type=int, default=4,
+                        help='number of SSDs in each BB node (default: 4)')
     parser.add_argument('--timestep', type=int, default=10,
                         help='collection frequency, in seconds (default: 10)')
     parser.add_argument('--timeout', type=int, default=30,
@@ -327,7 +352,7 @@ def main(argv=None):
                             timeout=args.timeout)
             pages = esdb.scroll_pages
             tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
-            pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
+            pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_nodes, args.ssds_per_node, args.threads)
     else:
         _, encoding = mimetypes.guess_type(args.input)
         if encoding == 'gzip':
@@ -337,7 +362,7 @@ def main(argv=None):
         pages = json.load(input_file)
         input_file.close()
         tokio.debug.debug_print("Loaded results from %s" % args.input)
-        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
+        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_nodes, args.ssds_per_node, args.threads)
 
     print "Wrote output to %s" % args.output
 
