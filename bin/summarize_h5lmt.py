@@ -100,10 +100,8 @@ def summarize_reduced_data(data):
     totals['sum_tibs_write'] = totals['sum_gibs_write'] / 1024.0
     totals['ave_gibs_read_per_dt'] = totals['sum_gibs_read'] / totals['n']
     totals['ave_gibs_write_per_dt'] = totals['sum_gibs_write'] / totals['n']
-    if 'oss_ave' in totals:
-        totals['oss_ave'] = totals['oss_ave'] / totals['n']
-    if 'mds_ave' in totals:
-        totals['mds_ave'] = totals['mds_ave'] / totals['n']
+    totals['oss_ave'] = totals['oss_ave'] / totals['n']
+    totals['mds_ave'] = totals['mds_ave'] / totals['n']
 
     # Missing fractions
     for base in ['ost_read', 'ost_write', 'oss_cpu', 'mds_cpu']:
@@ -213,6 +211,8 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
     base_key = DATASETS_TO_BIN_KEYS.get(dataset_name.lstrip('/'))
     if not base_key:
         raise KeyError("Cannot bin unknown dataset %s" % dataset_name)
+    missing_key = "missing_" + base_key
+    total_key = "num_" + base_key
 
     dataset = hdf5_file.get(dataset_name)
     if dataset is None:
@@ -251,13 +251,13 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
 
         bin_datum["max_" + base_key] = dataset[index0:indexf, :].max()
         bin_datum["min_" + base_key] = dataset[index0:indexf, :].min()
-        bin_datum["ave_" + base_key] = dataset[index0:indexf, :].sum() / float(indexf - index0)
         bin_datum["sum_" + base_key] = dataset[index0:indexf, :].sum()
+        bin_datum["ave_" + base_key] = bin_datum["sum_" + base_key] / float(indexf - index0)
+        bin_datum["ave_" + base_key] /= dataset.shape[1] if len(dataset.shape) > 1 else 1
 
         # deal with the missing values dataset
-        missing_key = "missing_" + base_key
-        total_key = "num_" + base_key
         bin_datum[missing_key] = missing_dataset[index0:indexf, :].sum()
+
         # dataset.shape[1] will fail for MappedDataSets with force2d; when this
         # is the case, the second dimension is 1
         try:
@@ -266,7 +266,7 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
             bin_datum[total_key] = (indexf - index0)
         bin_datum["frac_" + missing_key] = float(bin_datum[missing_key]) / bin_datum[total_key]
 
-        if 'ost_' in base_key:
+        if base_key.startswith('ost_'):
             for agg_key in 'max', 'min', 'ave', 'sum':
                 root = "%s_%s" % (agg_key, base_key)
                 bin_datum['%s_bytes' % root] = bin_datum[root]
