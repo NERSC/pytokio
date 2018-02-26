@@ -330,8 +330,8 @@ class TimeSeries(object):
 
         # actually copy the two data points into the datasets
         old_value = self.dataset[t_index, c_index]
-        if self.dataset[t_index, c_index] == 0.0 \
-        and math.copysign(1, old_value) < 0.0 \
+        if (self.dataset[t_index, c_index] != 0.0 \
+        or math.copysign(1, old_value) < 0.0) \
         and reducer is not None:
             self.dataset[t_index, c_index] = reducer(old_value, value)
         else:
