@@ -457,7 +457,8 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
     for dataset_name, dataset in datasets.iteritems():
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
-            warnings.warn("Dataset key %s is not in schema" % dataset_name)
+            if '/_' not in dataset_name:
+                warnings.warn("Dataset key %s is not in schema" % dataset_name)
             continue
         if hdf5_dataset_name not in hdf5_file:
             new_dataset = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
