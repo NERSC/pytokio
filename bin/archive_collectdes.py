@@ -17,6 +17,7 @@ import multiprocessing
 
 import dateutil.parser # because of how ElasticSearch returns time data
 import dateutil.tz
+import numpy
 import h5py
 
 import tokio
@@ -253,9 +254,12 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_server
     # reported on a per-core basis, but not all cores may be reported for each
     # timestamp
     for dataset_name in ['dataservers/cpuload', 'dataservers/cpuuser', 'dataservers/cpusys']:
-        count_key = '_num_' + dataset_name
+        count_key = dataset_name.replace('/', '/_num_')
+        numpy.seterr(divide='ignore', invalid='ignore') # don't worry about divide-by-zero
         if dataset_name in datasets and count_key in datasets:
-            datasets[dataset_name].values /= datasets[count_key].values
+            datasets[dataset_name].dataset /= datasets[count_key].dataset
+            # convert NaNs (from dividing by zero) back to -0.0
+            datasets[dataset_name].dataset[numpy.isnan(datasets[dataset_name].dataset)] = -0.0
 
     # Write datasets out to HDF5 file
     _time0 = time.time()
