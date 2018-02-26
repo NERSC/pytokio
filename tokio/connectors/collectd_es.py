@@ -49,6 +49,68 @@ QUERY_DISK_DATA = {
         }
     }
 }
+QUERY_CPU_DATA = {
+    "query": {
+        "constant_score": {
+            "filter": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "@timestamp": {}
+                            }
+                        },
+                        {
+                            "prefix": {
+                                "hostname": "bb"
+                            }
+                        },
+                        {
+                            "term": {
+                                "plugin": "cpu"
+                            }
+                        },
+                        {
+                            "regexp": {
+                                "type_instance": "(idle|user|system)"
+                            }
+                        },
+                    ]
+                }
+            }
+        }
+    }
+}
+QUERY_MEMORY_DATA = {
+    "query": {
+        "constant_score": {
+            "filter": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "@timestamp": {}
+                            }
+                        },
+                        {
+                            "prefix": {
+                                "hostname": "bb"
+                            }
+                        },
+                        {
+                            "term": {
+                                "plugin": "memory"
+                            }
+                        },
+
+                    ]
+                }
+            }
+        }
+    }
+}
+
+
 ### Only return the following _source fields
 COLLECTD_SOURCE_FILTER = [
     '@timestamp',
@@ -225,7 +287,37 @@ class CollectdEs(object):
             t_end (datetime): upper bound for query (exclusive)
             timeout (int): timeout for the query (in seconds)
         """
-        query = build_timeseries_query(QUERY_DISK_DATA, t_start, t_end)
+        self.query_timeseries(QUERY_DISK_DATA, t_start, t_end, timeout=timeout)
+
+    def query_memory(self, t_start, t_end, timeout=None):
+        """Query ElasticSearch for collectd memory plugin data
+
+        Args:
+            t_start (datetime): lower bound for query (inclusive)
+            t_end (datetime): upper bound for query (exclusive)
+            timeout (int): timeout for the query (in seconds)
+        """
+        self.query_timeseries(QUERY_MEMORY_DATA, t_start, t_end, timeout=timeout)
+
+    def query_cpu(self, t_start, t_end, timeout=None):
+        """Query ElasticSearch for collectd cpu plugin data
+
+        Args:
+            t_start (datetime): lower bound for query (inclusive)
+            t_end (datetime): upper bound for query (exclusive)
+            timeout (int): timeout for the query (in seconds)
+        """
+        self.query_timeseries(QUERY_CPU_DATA, t_start, t_end, timeout=timeout)
+
+    def query_timeseries(self, query_template, t_start, t_end, timeout=None):
+        """Query ElasticSearch for collectd plugin data
+
+        Args:
+            t_start (datetime): lower bound for query (inclusive)
+            t_end (datetime): upper bound for query (exclusive)
+            timeout (int): timeout for the query (in seconds)
+        """
+        query = build_timeseries_query(query_template, t_start, t_end)
 
         ### Print query
         tokio.debug.debug_print(json.dumps(query, indent=4))

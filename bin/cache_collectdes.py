@@ -66,22 +66,25 @@ def main(argv=None):
     # option) or by querying ElasticSearch?
     if args.input is None:
         ### Try to connect
-        if args.timeout is None:
-            esdb = tokio.connectors.collectd_es.CollectdEs(
-                host=args.host,
-                port=args.port,
-                index=args.index)
-        else:
-            esdb = tokio.connectors.collectd_es.CollectdEs(
-                host=args.host,
-                port=args.port,
-                index=args.index,
-                timeout=args.timeout)
+        esdb = tokio.connectors.collectd_es.CollectdEs(
+            host=args.host,
+            port=args.port,
+            index=args.index,
+            timeout=args.timeout)
 
-        esdb.query_disk(query_start,
-                        query_end,
-                        timeout=args.timeout)
-        pages = esdb.scroll_pages
+        pages = None
+        for plugin_query in [tokio.connectors.collectd_es.QUERY_CPU_DATA,
+                             tokio.connectors.collectd_es.QUERY_DISK_DATA,
+                             tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
+            esdb.query_timeseries(plugin_query,
+                            query_start,
+                            query_end,
+                            timeout=args.timeout)
+            if pages is None:
+                pages = esdb.scroll_pages
+            else:
+                pages += esdb.scroll_pages
+            print "+ %d = %d" % (len(esdb.scroll_pages), len(pages))
         tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
     else:
         _, encoding = mimetypes.guess_type(args.input)

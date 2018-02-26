@@ -24,12 +24,24 @@ import tokio.connectors.collectd_es
 
 SCHEMA_VERSION = "1"
 
-DATASET_NAMES = [
-    'datatargets/readrates',
-    'datatargets/writerates',
-    'datatargets/readoprates',
-    'datatargets/writeoprates',
-]
+DATASETS = {
+    'datatargets/readrates': 'bytes/sec',
+    'datatargets/writerates': 'bytes/sec',
+    'datatargets/readoprates': 'ops/sec',
+    'datatargets/writeoprates': 'ops/sec',
+    'dataservers/memcached': 'bytes',
+    'dataservers/membuffered': 'bytes',
+    'dataservers/memfree': 'bytes',
+    'dataservers/memused': 'bytes',
+    'dataservers/memslab': 'bytes',
+    'dataservers/memslab_unrecl': 'bytes',
+    'dataservers/cpuload': '%',
+    'dataservers/cpuuser': '%',
+    'dataservers/cpusys': '%',
+    'dataservers/_num_cpuload': 'cpu count',
+    'dataservers/_num_cpuuser': 'cpu count',
+    'dataservers/_num_cpusys': 'cpu count',
+}
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
@@ -65,34 +77,72 @@ def process_page(page):
             col_name = "%s:%s" % (source['hostname'], source['plugin_instance'])
 
             if source['collectd_type'] == 'disk_octets':
-                read_rate = source.get('read')
-                write_rate = source.get('write')
-                if read_rate is not None and write_rate is not None:
-                    inserts.append(('datatargets/readrates', timestamp, col_name, read_rate))
-                    inserts.append(('datatargets/writerates', timestamp, col_name, write_rate))
+                val1 = source.get('read')
+                val2 = source.get('write')
+                if val1 is not None and val2 is not None:
+                    inserts.append(('datatargets/readrates', timestamp, col_name, val1))
+                    inserts.append(('datatargets/writerates', timestamp, col_name, val2))
             elif source['collectd_type'] == 'disk_ops':
-                read_rate = source.get('read')
-                write_rate = source.get('write')
-                if read_rate is not None and write_rate is not None:
-                    inserts.append(('datatargets/readoprates', timestamp, col_name, read_rate))
-                    inserts.append(('datatargets/writeoprates', timestamp, col_name, write_rate))
+                val1 = source.get('read')
+                val2 = source.get('write')
+                if val1 is not None and val2 is not None:
+                    inserts.append(('datatargets/readoprates', timestamp, col_name, val1))
+                    inserts.append(('datatargets/writeoprates', timestamp, col_name, val2))
+        elif source['plugin'] == 'cpu' and 'value' in source:
+            timestamp = dateutil.parser.parse(source['@timestamp'])\
+                                              .astimezone(dateutil.tz.tzlocal())\
+                                              .replace(tzinfo=None)
+            val1 = source.get('value')
+            if source['type_instance'] == 'idle':
+                # note that we store (100 - idle) as load
+                inserts.append(('dataservers/cpuload', timestamp, source['hostname'],
+                               100.0 - val1, lambda x, y: x + y))
+                inserts.append(('dataservers/_num_cpuload', timestamp, source['hostname'],
+                               1, lambda x, y: x + y))
+            elif source['type_instance'] == 'user':
+                inserts.append(('dataservers/cpuuser', timestamp, source['hostname'],
+                               val1, lambda x, y: x + y))
+                inserts.append(('dataservers/_num_cpuuser', timestamp, source['hostname'],
+                               1, lambda x, y: x + y))
+            elif source['type_instance'] == 'system':
+                inserts.append(('dataservers/cpusys', timestamp, source['hostname'],
+                               val1, lambda x, y: x + y))
+                inserts.append(('dataservers/_num_cpusys', timestamp, source['hostname'],
+                               1, lambda x, y: x + y))
+        elif source['plugin'] == 'memory' and 'value' in source:
+            timestamp = dateutil.parser.parse(source['@timestamp'])\
+                                              .astimezone(dateutil.tz.tzlocal())\
+                                              .replace(tzinfo=None)
+            val1 = source.get('value')
+            if source['type_instance'] == 'cached':
+                inserts.append(('dataservers/memcached', timestamp, source['hostname'], val1))
+            elif source['type_instance'] == 'buffered':
+                inserts.append(('dataservers/membuffered', timestamp, source['hostname'], val1))
+            elif source['type_instance'] == 'free':
+                inserts.append(('dataservers/memfree', timestamp, source['hostname'], val1))
+            elif source['type_instance'] == 'used':
+                inserts.append(('dataservers/memused', timestamp, source['hostname'], val1))
+            elif source['type_instance'] == 'slab_recl':
+                inserts.append(('dataservers/memslab', timestamp, source['hostname'], val1))
+            elif source['type_instance'] == 'slab_unrecl':
+                inserts.append(('dataservers/memslab_unrecl', timestamp, source['hostname'], val1))
 
     _timef = time.time()
     if tokio.DEBUG:
         print "Extracted %d inserts in %.4f seconds" % (len(inserts), _timef - _time0)
+        per_dataset = {}
+        for insert in inserts:
+            if insert[0] not in per_dataset:
+                per_dataset[insert[0]] = 0
+            per_dataset[insert[0]] += 1
+        for dataset_name in sorted(per_dataset.keys()):
+            print "  %6d entries for %s" % (per_dataset[dataset_name], dataset_name)
     return inserts
 
 def update_datasets(inserts, datasets):
     """
     Given a list of tuples to insert into a dataframe, insert those data serially
     """
-    units = {
-        'datatargets/readrates': 'bytes/sec',
-        'datatargets/writerates': 'bytes/sec',
-        'datatargets/readoprates': 'ops/sec',
-        'datatargets/writeoprates': 'ops/sec',
-    }
-
     data_volume = {}
     errors = {}
     for key in datasets.keys():
@@ -101,18 +151,22 @@ def update_datasets(inserts, datasets):
 
     for insert in inserts:
         try:
-            (dataset_name, timestamp, col_name, rate) = insert
+            if len(insert) == 4:
+                (dataset_name, timestamp, col_name, rate) = insert
+                reducer = None
+            else:
+                (dataset_name, timestamp, col_name, rate, reducer) = insert
         except ValueError:
             print insert
             raise
-        if datasets[dataset_name].insert_element(timestamp, col_name, rate):
+        if datasets[dataset_name].insert_element(timestamp, col_name, rate, reducer):
             data_volume[dataset_name] += rate
         else:
             errors[dataset_name] += 1
 
     # Update dataset metadata
     for key in datasets.keys():
-        unit = units.get(key, "unknown")
+        unit = DATASETS.get(key, "unknown")
         datasets[key].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': unit})
         datasets[key].group_metadata.update({'source': 'collectd_disk'})
 
@@ -143,17 +197,17 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_device
     hdf5_file.attrs['version'] = SCHEMA_VERSION
 
     # Initialize datasets
-    for dataset_name in DATASET_NAMES:
+    for dataset_name in DATASETS.keys():
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
-            warnings.warn("Skipping %s (not in schema)" % dataset_name)
-        else:
-            datasets[dataset_name] = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                                 start=init_start,
-                                                                 end=init_end,
-                                                                 timestep=timestep,
-                                                                 num_columns=num_devices,
-                                                                 hdf5_file=hdf5_file)
+            warnings.warn("Dataset %s is not in schema (passing through)" % dataset_name)
+            hdf5_dataset_name = dataset_name
+        datasets[dataset_name] = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                             start=init_start,
+                                                             end=init_end,
+                                                             timestep=timestep,
+                                                             num_columns=num_devices,
+                                                             hdf5_file=hdf5_file)
     # Process all pages retrieved (this is computationally expensive)
     _time0 = time.time()
     updates = []
@@ -258,26 +312,22 @@ def main(argv=None):
     # option) or by querying ElasticSearch?
     if args.input is None:
         ### Try to connect
-        if args.timeout is None:
-            esdb = tokio.connectors.collectd_es.CollectdEs(
-                host=args.host,
-                port=args.port,
-                index=args.index)
-        else:
-            esdb = tokio.connectors.collectd_es.CollectdEs(
-                host=args.host,
-                port=args.port,
-                index=args.index,
-                timeout=args.timeout)
+        esdb = tokio.connectors.collectd_es.CollectdEs(
+            host=args.host,
+            port=args.port,
+            index=args.index,
+            timeout=args.timeout)
 
-        esdb.query_disk(args.host,
-                        args.port,
-                        args.index,
-                        query_start,
-                        query_end,
-                        timeout=args.timeout)
-        pages = esdb.scroll_pages
-        tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
+        for plugin_query in [tokio.connectors.collectd_es.QUERY_CPU_DATA,
+                             tokio.connectors.collectd_es.QUERY_DISK_DATA,
+                             tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
+            esdb.query_timeseries(plugin_query,
+                            query_start,
+                            query_end,
+                            timeout=args.timeout)
+            pages = esdb.scroll_pages
+            tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
+            pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
     else:
         _, encoding = mimetypes.guess_type(args.input)
         if encoding == 'gzip':
@@ -287,8 +337,7 @@ def main(argv=None):
         pages = json.load(input_file)
         input_file.close()
         tokio.debug.debug_print("Loaded results from %s" % args.input)
-
-    pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
+        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_bbnodes, args.threads)
 
     print "Wrote output to %s" % args.output
 

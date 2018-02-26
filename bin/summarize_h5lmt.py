@@ -45,8 +45,14 @@ def summarize_reduced_data(data):
         'oss_max': 0.0,
         'mds_ave': 0.0,
         'mds_max': 0.0,
-        'tot_missing': 0,
-        'tot_present': 0,
+        'missing_ost_read': 0,
+        'missing_ost_write': 0,
+        'missing_oss_cpu': 0,
+        'missing_mds_cpu': 0,
+        'num_ost_read': 0,
+        'num_ost_write': 0,
+        'num_oss_cpu': 0,
+        'num_mds_cpu': 0,
     }
 
     for timestamp in sorted(data.keys()):
@@ -54,34 +60,36 @@ def summarize_reduced_data(data):
         points_in_bin = (datum['indexf'] - datum['index0'])
         totals['tot_bytes_read'] += datum['tot_ost_read']
         totals['tot_bytes_write'] += datum['tot_ost_write']
-        totals['oss_ave'] += datum['ave_oss_cpu'] * points_in_bin
-        totals['mds_ave'] += datum['ave_mds_cpu'] * points_in_bin
         totals['n'] += points_in_bin
+
+        if 'ave_oss_cpu' in datum:
+            totals['oss_ave'] += datum['ave_oss_cpu'] * points_in_bin
+        if 'ave_mds_cpu' in datum:
+            totals['mds_ave'] += datum['ave_mds_cpu'] * points_in_bin
 
         if datum['max_oss_cpu'] > totals['oss_max']:
             totals['oss_max'] = datum['max_oss_cpu']
         else:
             totals['oss_max'] = totals['oss_max']
 
-        if datum['max_mds_cpu'] > totals['mds_max']:
-            totals['mds_max'] = datum['max_mds_cpu']
-        else:
-            totals['mds_max'] = totals['mds_max']
+        if 'max_mds_cpu' in datum:
+            if datum['max_mds_cpu'] > totals['mds_max']:
+                totals['mds_max'] = datum['max_mds_cpu']
+            else:
+                totals['mds_max'] = totals['mds_max']
 
-        totals['tot_missing'] += datum['missing_ost_read'] \
-                                 + datum['missing_ost_write'] \
-                                 + datum['missing_oss_cpu'] \
-                                 + datum['missing_mds_cpu']
-        totals['tot_present'] += datum['total_ost_read'] \
-                                 + datum['total_ost_write'] \
-                                 + datum['total_oss_cpu'] \
-                                 + datum['total_mds_cpu']
+        totals['missing_ost_read'] += datum.get('missing_ost_read', 0)
+        totals['missing_ost_write'] += datum.get('missing_ost_write', 0)
+        totals['missing_oss_cpu'] += datum.get('missing_oss_cpu', 0)
+        totals['missing_mds_cpu'] += datum.get('missing_mds_cpu', 0)
+        totals['num_ost_read'] += datum.get('num_ost_read', 0)
+        totals['num_ost_write'] += datum.get('num_ost_write', 0)
+        totals['num_oss_cpu'] += datum.get('num_oss_cpu', 0)
+        totals['num_mds_cpu'] += datum.get('num_mds_cpu', 0)
 
     # Derived values
     totals['ave_bytes_read_per_dt'] = totals['tot_bytes_read'] / totals['n']
     totals['ave_bytes_write_per_dt'] = totals['tot_bytes_write'] / totals['n']
-    totals['oss_ave'] = totals['oss_ave'] / totals['n']
-    totals['mds_ave'] = totals['mds_ave'] / totals['n']
     totals['tot_kibs_read'] = totals['tot_bytes_read'] / 1024.0
     totals['tot_kibs_write'] = totals['tot_bytes_write'] / 1024.0
     totals['tot_mibs_read'] = totals['tot_kibs_read'] / 1024.0
@@ -92,13 +100,20 @@ def summarize_reduced_data(data):
     totals['tot_tibs_write'] = totals['tot_gibs_write'] / 1024.0
     totals['ave_gibs_read_per_dt'] = totals['tot_gibs_read'] / totals['n']
     totals['ave_gibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
+    if 'oss_ave' in totals:
+        totals['oss_ave'] = totals['oss_ave'] / totals['n']
+    if 'mds_ave' in totals:
+        totals['mds_ave'] = totals['mds_ave'] / totals['n']
+
+    # Missing fractions
+    for base in ['ost_read', 'ost_write', 'oss_cpu', 'mds_cpu']:
+        if totals['num_%s' % base] > 0:
+            totals['frac_missing_%s' % base] = float(totals['missing_%s' % base]) \
+                                               / totals['num_%s' % base]
 
     # For convenience
     totals['ave_tibs_read_per_dt'] = totals['tot_gibs_read'] / totals['n']
     totals['ave_tibs_write_per_dt'] = totals['tot_gibs_write'] / totals['n']
-
-    totals['frac_missing'] = 100.0 * totals['tot_missing'] \
-        / (totals['tot_missing'] + totals['tot_present'])
 
     return totals
 
@@ -173,7 +188,6 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
             # append the value to its metric counter in bins_by_index
             if 'tstart' in counters:
                 index_key = long(time.mktime(counters['tstart'].timetuple()))
-#               index_key = counters['tstart']
                 if index_key not in bins_by_index:
                     bins_by_index[index_key] = {}
                 bins_by_index[index_key].update(counters)
@@ -200,9 +214,11 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
     if not base_key:
         raise KeyError("Cannot bin unknown dataset %s" % dataset_name)
 
-    timestamps = hdf5_file.get_timestamps(dataset_name)
+    dataset = hdf5_file.get(dataset_name)
+    if dataset is None:
+        return []
 
-    dataset = hdf5_file[dataset_name]
+    timestamps = hdf5_file.get_timestamps(dataset_name)
 
     if hdf5_file.schema:
         if not (timestamps.shape[0] % num_bins) == 0:
@@ -215,6 +231,10 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
             warnings.warn("Bin count %d does not evenly divide into FSStepsDataSet size %d" %
                           (num_bins, (timestamps.shape[0] - 1)))
         dt_per_bin = int((timestamps.shape[0] - 1) / num_bins)
+
+    # we generate the missing data matrix for each dataset only once--it's very
+    # expensive to do this multiple times
+    missing_dataset = hdf5_file.get_missing(dataset_name)
 
     # create a list of dictionaries, where each list element is a bin
     binned_data = []
@@ -233,20 +253,23 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum["min_" + base_key] = dataset[index0:indexf, :].min()
         bin_datum["ave_" + base_key] = dataset[index0:indexf, :].sum() / float(indexf - index0)
         bin_datum["tot_" + base_key] = dataset[index0:indexf, :].sum()
+
+        # deal with the missing values dataset
         bin_datum["missing_" + base_key] = \
-            hdf5_file.get_missing(dataset_name)[index0:indexf, :].sum()
+            missing_dataset[index0:indexf, :].sum()
         try:
-            bin_datum["total_" + base_key] = (indexf - index0) * dataset.shape[1]
+            bin_datum["num_" + base_key] = (indexf - index0) * dataset.shape[1]
         except IndexError:
             # dataset.shape[1] will fail for MappedDataSets with force2d; when
             # this is the case, the second dimension is 1
-            bin_datum["total_" + base_key] = (indexf - index0)
+            bin_datum["num_" + base_key] = (indexf - index0)
         bin_datum["frac_missing_" + base_key] = \
-            float(bin_datum["missing_" + base_key]) / bin_datum["total_" + base_key]
+            float(bin_datum["missing_" + base_key]) / bin_datum["num_" + base_key]
 
         if 'ost_' in base_key:
             for agg_key in 'max', 'min', 'ave', 'tot':
                 root = "%s_%s" % (agg_key, base_key)
+                bin_datum['%s_bytes' % root] = bin_datum[root]
                 bin_datum['%s_kibs' % root] = bin_datum[root] / 1024.0
                 bin_datum['%s_mibs' % root] = bin_datum['%s_kibs' % root] / 1024.0
                 bin_datum['%s_gibs' % root] = bin_datum['%s_mibs' % root] / 1024.0
@@ -259,7 +282,11 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
 
 def print_datum(datum=None, units='GiB'):
     """
-    Take a json bag and print out relevant fields
+    Print out the relevant fields from a bin containing aggregated values
+
+    Args:
+        datum (dict): the results of bin_datum
+        units (str): units to print (KiB, MiB, GiB, TiB)
     """
 
     if datum is None:
@@ -269,25 +296,35 @@ def print_datum(datum=None, units='GiB'):
                                                          "ossav", "ossmx", "mdsav",
                                                          "mdsmx", "mssng")
 
-    missing_overall = datum['missing_ost_read'] \
-                      + datum['missing_ost_write'] \
-                      + datum['missing_oss_cpu'] \
-                      + datum['missing_mds_cpu']
-    total_overall = datum['total_ost_read'] \
-                    + datum['total_ost_write'] \
-                    + datum['total_oss_cpu'] \
-                    + datum['total_mds_cpu']
-    frac_missing_overall = float(missing_overall) / total_overall
+    # The per-line "mssng" only counts read/write bytes, not CPU data
+    frac_missing = float(datum.get('missing_ost_read', 0) + datum.get('missing_ost_write', 0)) \
+                   / (datum.get('num_ost_read', 0) + datum.get('num_ost_write', 0))
 
     print_str = "%19s-%8s " % (datum['tstart'].strftime("%Y-%m-%d %H:%M:%S"),
                                datum['tend'].strftime("%H:%M:%S"))
     print_str += ("%%(tot_ost_read_%ss)12.2f " % units.lower()) % datum
     print_str += ("%%(tot_ost_write_%ss)12.2f " % units.lower()) % datum
-    print_str += "%(ave_oss_cpu)5.1f " % datum
-    print_str += "%(max_oss_cpu)5.1f " % datum
-    print_str += "%(ave_mds_cpu)5.1f " % datum
-    print_str += "%(max_mds_cpu)5.1f" % datum
-    print_str += "%6.1f" % (100.0 * frac_missing_overall)
+
+    # The following data may not always be present; leave them blank if missing
+    if 'ave_oss_cpu' in datum:
+        print_str += "%(ave_oss_cpu)5.1f " % datum
+    else:
+        print_str += "%5s " % ''
+    if 'max_oss_cpu' in datum:
+        print_str += "%(max_oss_cpu)5.1f " % datum
+    else:
+        print_str += "%5s " % ''
+    if 'ave_mds_cpu' in datum:
+        print_str += "%(ave_mds_cpu)5.1f " % datum
+    else:
+        print_str += "%5s " % ''
+    if 'max_mds_cpu' in datum:
+        print_str += "%(max_mds_cpu)5.1f" % datum
+    else:
+        print_str += "%5s" % ''
+
+    print_str += "%6.1f" % (100.0 * frac_missing)
+
     return print_str + "\n"
 
 def print_data_summary(data, units='TiB'):
@@ -297,13 +334,33 @@ def print_data_summary(data, units='TiB'):
     totals = summarize_reduced_data(data)
 
     print_str = ""
-    print_str += ("Total read:  %%(tot_%ss_read)14.2f %s\n" % (units.lower(), units)) % totals
-    print_str += ("Total write: %%(tot_%ss_write)14.2f %s\n" % (units.lower(), units)) % totals
-    print_str += "Average OSS CPU: %(oss_ave)6.2f%%\n" % totals
-    print_str += "Max OSS CPU:     %(oss_max)6.2f%%\n" % totals
-    print_str += "Average MDS CPU: %(mds_ave)6.2f%%\n" % totals
-    print_str += "Max MDS CPU:     %(mds_max)6.2f%%\n" % totals
-    print_str += "Missing Data:    %(frac_missing)6.2f%%\n" % totals
+    print_str += ("Total read:  %%(tot_%ss_read)14.2f %s" % (units.lower(), units)) % totals
+    if 'frac_missing_ost_read' in totals:
+        print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_ost_read'])
+    else:
+        print_str += "\n"
+    print_str += ("Total write: %%(tot_%ss_write)14.2f %s" % (units.lower(), units)) % totals
+    if 'frac_missing_ost_write' in totals:
+        print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_ost_write'])
+    else:
+        print_str += "\n"
+
+    if 'oss_ave' in totals:
+        print_str += "Average OSS CPU:        %(oss_ave)6.2f%%" % totals
+        if 'frac_missing_oss_cpu' in totals:
+            print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_oss_cpu'])
+        else:
+            print_str += "\n"
+    if 'oss_ave' in totals:
+        print_str += "Max OSS CPU:            %(oss_max)6.2f%%\n" % totals
+    if 'mds_ave' in totals:
+        print_str += "Average MDS CPU:        %(mds_ave)6.2f%%" % totals
+        if 'frac_missing_mds_cpu' in totals:
+            print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_mds_cpu'])
+        else:
+            print_str += "\n"
+    if 'mds_max' in totals:
+        print_str += "Max MDS CPU:            %(mds_max)6.2f%%\n" % totals
     return print_str
 
 def main(argv=None):
