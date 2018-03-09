@@ -22,6 +22,8 @@ DATASETS_TO_BIN_KEYS = {
 
 BYTES_TO_GIB = 2.0**30
 DATE_FMT = "%Y-%m-%d"
+DATE_FMT_STR = "YYYY-MM-DDTHH:MM:SS"
+
 class DateTimeToEpoch(json.JSONEncoder):
     """
     JSONEncoder to convert datetime.datetime into a seconds-since-epoch
@@ -323,9 +325,9 @@ def main(argv=None):
     parser.add_argument('--bins', type=int, default=24,
                         help="number of bins per day")
     parser.add_argument('--start', type=str, default=None,
-                        help="date/time to start in %s format" % DATE_FMT)
+                        help="date/time to start in %s format" % DATE_FMT_STR)
     parser.add_argument('--end', type=str, default=None,
-                        help="date/time to end in %s format" % DATE_FMT)
+                        help="date/time to end in %s format" % DATE_FMT_STR)
     parser.add_argument('--json', action='store_true',
                         help='return json output')
     args = parser.parse_args(argv)
