@@ -311,6 +311,27 @@ class TimeSeries(object):
         self.column_map[self.columns[index2]] = index2
         self.column_map[self.columns[index1]] = index1
 
+    def get_insert_pos(self, timestamp, column_name, create_col=False):
+        """Determine col and row indices corresponding to timestamp and col name
+        
+        Args:
+            timestamp (datetime): Timestamp to map to a row index
+            column_name (str): Name of column to map to a column index
+            create_col (bool): If column_name does not exist, create it?
+        Returns:
+            (t_index, c_index) (long or None)
+        """
+        timestamp_epoch = long(time.mktime(timestamp.timetuple()))
+        t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
+        if t_index >= self.timestamps.shape[0]: # check bounds
+            return None, None
+
+        # create a new column label if necessary
+        c_index = self.column_map.get(column_name)
+        if c_index is None and create_col:
+            c_index = self.add_column(column_name)
+        return t_index, c_index
+
     def insert_element(self, timestamp, column_name, value, reducer=None):
         """
         Given a timestamp (datetime.datetime object) and a column name (string),
@@ -318,15 +339,11 @@ class TimeSeries(object):
         use that function to reconcile any existing values in the element to be
         updated.
         """
-        timestamp_epoch = long(time.mktime(timestamp.timetuple()))
-        t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
-        if t_index >= self.timestamps.shape[0]: # check bounds
-            return False                        # out of bounds element is non-fatal
-
-        # create a new column label if necessary
-        c_index = self.column_map.get(column_name)
-        if c_index is None:
-            c_index = self.add_column(column_name)
+        t_index, c_index = self.get_insert_pos(timestamp,
+                                               column_name,
+                                               create_col=True)
+        if t_index is None or c_index is None:
+            return False
 
         # actually copy the two data points into the datasets
         old_value = self.dataset[t_index, c_index]
