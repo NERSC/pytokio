@@ -104,19 +104,19 @@ def process_page(page):
             if source['type_instance'] == 'idle':
                 # note that we store (100 - idle) as load
                 inserts.append(('dataservers/cpuload', timestamp, source['hostname'],
-                               100.0 - val1, 'sum'))
+                                100.0 - val1, 'sum'))
                 inserts.append(('dataservers/_num_cpuload', timestamp, source['hostname'],
-                               1, 'sum'))
+                                1, 'sum'))
             elif source['type_instance'] == 'user':
                 inserts.append(('dataservers/cpuuser', timestamp, source['hostname'],
-                               val1, 'sum'))
+                                val1, 'sum'))
                 inserts.append(('dataservers/_num_cpuuser', timestamp, source['hostname'],
-                               1, 'sum'))
+                                1, 'sum'))
             elif source['type_instance'] == 'system':
                 inserts.append(('dataservers/cpusys', timestamp, source['hostname'],
-                               val1, 'sum'))
+                                val1, 'sum'))
                 inserts.append(('dataservers/_num_cpusys', timestamp, source['hostname'],
-                               1, 'sum'))
+                                1, 'sum'))
         elif source['plugin'] == 'memory' and 'value' in source:
             timestamp = dateutil.parser.parse(source['@timestamp'])\
                                               .astimezone(dateutil.tz.tzlocal())\
@@ -183,13 +183,58 @@ def update_datasets(inserts, datasets):
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
 
-    for key in data_volume.keys():
-        data_volume[key] *= datasets[key].timestep
-    update_str = "Added %(datatargets/readrates)d bytes/%(datatargets/readoprates)d ops of read," \
-        + " %(datatargets/writerates)d bytes/%(datatargets/writeoprates)d ops of write"
-    print update_str % data_volume
+    if tokio.DEBUG:
+        for key in data_volume.keys():
+            data_volume[key] *= datasets[key].timestep
+        update_str = "Added %(datatargets/readrates)d bytes/" \
+            + "%(datatargets/readoprates)d ops of read, " \
+            + "%(datatargets/writerates)d bytes/" \
+            + "%(datatargets/writeoprates)d ops of write"
+        print update_str % data_volume
+    return index_errors
 
-def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_servers, devices_per_server, threads=1):
+def normalize_cpu_datasets(inserts, datasets):
+    """Normalize CPU load datasets
+
+    Divide each element of CPU datasets by the number of CPUs counted at each
+    point in time.  Necessary because these measurements are reported on a
+    per-core basis, but not all cores may be reported for each timestamp.
+
+    Args:
+        datasets (dict of TimeSeries): all of the datasets being populated
+        inserts (list of tuples): list of inserts that were used to populate
+            datasets
+    Returns:
+        Nothing
+    """
+    dataset_names = set(['dataservers/cpuload', 'dataservers/cpuuser', 'dataservers/cpusys'])
+    num_dataset_names = {}
+
+    norm_elements = {}
+    for dataset_name in dataset_names:
+        norm_elements[dataset_name] = set([])
+        num_dataset_names[dataset_name] = dataset_name.replace('/', '/_num_')
+
+    # build a set of all elements that must be divided
+    for insert in inserts:
+        (dataset_name, timestamp, col_name) = insert[0:3]
+        if dataset_name in dataset_names:
+            # get the position of this element to be inserted
+            t_index, c_index = datasets[dataset_name].get_insert_pos(timestamp, col_name)
+            if t_index is not None and c_index is not None:
+                norm_elements[dataset_name].add((t_index, c_index))
+
+    # now divide each element to be divided
+    for dataset_name in dataset_names:
+        num_dataset_name = num_dataset_names[dataset_name]
+        for t_index, c_index in norm_elements[dataset_name]:
+            datasets[dataset_name].dataset[t_index, c_index] /= \
+                datasets[num_dataset_name].dataset[t_index, c_index]
+        # convert NaNs (0.0 / 0.0) back to -0.0
+        datasets[dataset_name].dataset[numpy.isnan(datasets[dataset_name].dataset)] = -0.0
+
+def pages_to_hdf5(pages, output_file, init_start, init_end, timestep,
+                  num_servers, devices_per_server, threads=1):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
@@ -226,7 +271,6 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_server
     # Process all pages retrieved (this is computationally expensive)
     _time0 = time.time()
     updates = []
-    num_elements = 0
     if threads > 1:
 #       updates = multiprocessing.Pool(16).map(process_page, pages)
         for update in multiprocessing.Pool(threads).imap_unordered(process_page, pages):
@@ -247,19 +291,13 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep, num_server
     _timef = time.time()
     _update_time = _timef - _time0
     if tokio.DEBUG:
-        print "Inserted %d elements from %d pages in %.4f seconds" % (len(updates), len(pages), _update_time)
-        print "Processed %d pages in %.4f seconds" % (len(pages), _extract_time + _update_time)
+        print "Inserted %d elements from %d pages in %.4f seconds" \
+            % (len(updates), len(pages), _update_time)
+        print "Processed %d pages in %.4f seconds" \
+            % (len(pages), _extract_time + _update_time)
 
-    # Normalize the CPU datasets - necessary because these measurements are
-    # reported on a per-core basis, but not all cores may be reported for each
-    # timestamp
-    for dataset_name in ['dataservers/cpuload', 'dataservers/cpuuser', 'dataservers/cpusys']:
-        count_key = dataset_name.replace('/', '/_num_')
-        numpy.seterr(divide='ignore', invalid='ignore') # don't worry about divide-by-zero
-        if dataset_name in datasets and count_key in datasets:
-            datasets[dataset_name].dataset /= datasets[count_key].dataset
-            # convert NaNs (from dividing by zero) back to -0.0
-            datasets[dataset_name].dataset[numpy.isnan(datasets[dataset_name].dataset)] = -0.0
+    for update in updates:
+        normalize_cpu_datasets(update, datasets)
 
     # Write datasets out to HDF5 file
     _time0 = time.time()
@@ -351,12 +389,14 @@ def main(argv=None):
                              tokio.connectors.collectd_es.QUERY_DISK_DATA,
                              tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
             esdb.query_timeseries(plugin_query,
-                            query_start,
-                            query_end,
-                            timeout=args.timeout)
+                                  query_start,
+                                  query_end,
+                                  timeout=args.timeout)
             pages = esdb.scroll_pages
             tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
-            pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_nodes, args.ssds_per_node, args.threads)
+            pages_to_hdf5(pages, args.output, init_start, init_end,
+                          args.timestep, args.num_nodes, args.ssds_per_node,
+                          args.threads)
     else:
         _, encoding = mimetypes.guess_type(args.input)
         if encoding == 'gzip':
@@ -366,7 +406,9 @@ def main(argv=None):
         pages = json.load(input_file)
         input_file.close()
         tokio.debug.debug_print("Loaded results from %s" % args.input)
-        pages_to_hdf5(pages, args.output, init_start, init_end, args.timestep, args.num_nodes, args.ssds_per_node, args.threads)
+        pages_to_hdf5(pages, args.output, init_start, init_end,
+                      args.timestep, args.num_nodes, args.ssds_per_node,
+                      args.threads)
 
     print "Wrote output to %s" % args.output
 
