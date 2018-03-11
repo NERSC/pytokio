@@ -72,12 +72,25 @@ class Umami(collections.OrderedDict):
         fig = matplotlib.pyplot.figure()
         fig.set_size_inches(figsize[0], len(rows_to_plot) * figsize[1])
 
-        ### Required to adjust the column widths of our figure (width_ratios)
+        # Required to adjust the column widths of our figure (width_ratios)
         gridspec = matplotlib.gridspec.GridSpec(
             len(rows_to_plot),  # how many rows to draw
             2,                  # how many columns to draw
             width_ratios=[4,1]) # ratio of column widths
 
+        # Get the full range of x so we can force all rows to share the same
+        # x range in the presence of trailing/leading NaNs
+        x_min = None
+        x_max = None
+        for measurement in self.itervalues():
+            this_min = min(measurement.timestamps)
+            this_max = max(measurement.timestamps)
+            if x_min is None or this_min < x_min:
+                x_min = this_min
+            if x_max is None or this_max > x_max:
+                x_max = this_max
+
+        # Draw UMAMI rows
         last_ax_ts = None
         row_num = None
         for metric, measurement in self.iteritems():
@@ -107,6 +120,7 @@ class Umami(collections.OrderedDict):
                                 horizontalalignment='right',
                                 verticalalignment='center')
             ax_ts.grid()
+            ax_ts.set_xlim(x_min, x_max)
     
             # blank out the labels for all subplots except the bottom-most one
             if row_num != len(rows_to_plot) - 1:
@@ -122,9 +136,9 @@ class Umami(collections.OrderedDict):
             for tick in ax_ts.yaxis.get_major_ticks():
                 tick.label.set_fontsize(fontsize)
     
-            ### then plot the boxplot summary of the given variable
+            # then plot the boxplot summary of the given variable
             ax_box = fig.add_subplot(gridspec[2*row_num + 1])
-            boxp = ax_box.boxplot(y[0:-1], ### note: do not include last measurement in boxplot
+            boxp = ax_box.boxplot(y[0:-1], # note: do not include last measurement in boxplot
                            widths=0.70,
                            boxprops={'linewidth':linewidth},
                            medianprops={'linewidth':linewidth},
@@ -146,11 +160,11 @@ class Umami(collections.OrderedDict):
             # of the row above it
             critical_fraction = abs(1.0 - (yticks[-1] - new_ylim[0]) / (new_ylim[-1] - new_ylim[0]))
             if row_num > 0 and critical_fraction < 0.01:
-                ### note that setting one of the yticks to a string resets the
-                ### formatting so that the tick labels appear as floats.  since
-                ### we (hopefully) would get integral ticks otherwise, force
-                ### them to ints.  This will mess things up if the yrange is
-                ### very narrow and must be expressed as floats.
+                # note that setting one of the yticks to a string resets the
+                # formatting so that the tick labels appear as floats.  since
+                # we (hopefully) would get integral ticks otherwise, force
+                # them to ints.  This will mess things up if the yrange is
+                # very narrow and must be expressed as floats.
                 yticks = map(int, yticks)
                 yticks[-1] = " "
                 ax_ts.set_yticklabels(yticks)
