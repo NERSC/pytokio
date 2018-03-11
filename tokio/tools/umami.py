@@ -138,7 +138,9 @@ class Umami(collections.OrderedDict):
     
             # then plot the boxplot summary of the given variable
             ax_box = fig.add_subplot(gridspec[2*row_num + 1])
-            boxp = ax_box.boxplot(y[0:-1], # note: do not include last measurement in boxplot
+            y_box_data = numpy.array(y[0:-1])
+            y_box_data = y_box_data[~numpy.isnan(y_box_data)]
+            boxp = ax_box.boxplot(y_box_data, # note: do not include last measurement in boxplot
                            widths=0.70,
                            boxprops={'linewidth':linewidth},
                            medianprops={'linewidth':linewidth},
@@ -173,7 +175,7 @@ class Umami(collections.OrderedDict):
             ax_box.set_ylim(ax_ts.get_ylim())
     
             # determine the color of our highlights based on quartile
-            percentiles = [ numpy.percentile(y[0:-1], percentile) for percentile in 25, 50, 75, 100 ]
+            percentiles = [ numpy.nanpercentile(y[0:-1], percentile) for percentile in 25, 50, 75, 100 ]
             for color_index, percentile in enumerate(percentiles):
                 if y[-1] <= percentile:
                     break
