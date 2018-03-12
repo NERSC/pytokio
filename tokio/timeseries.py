@@ -81,11 +81,14 @@ class TimeSeries(object):
         # Attach the timestep dataset
         self.timestep = timestep
 
+        # Calculate the hours in a day in epoch-seconds since Python datetime
+        # and timedelta doesn't understand DST
         time_list = []
-        timestamp = start
-        while timestamp < end:
-            time_list.append(long(time.mktime(timestamp.timetuple())))
-            timestamp += datetime.timedelta(seconds=timestep)
+        end_epoch = long(time.mktime(end.timetuple()))
+        timestamp = long(time.mktime(start.timetuple()))
+        while timestamp < end_epoch:
+            time_list.append(timestamp)
+            timestamp += timestep
 
         self.timestamps = numpy.array(time_list)
 

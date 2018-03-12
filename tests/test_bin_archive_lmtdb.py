@@ -227,12 +227,12 @@ class TestArchiveLmtdbCorrectness(object):
 
             # check the dataset
             func = compare_h5lmt_dataset
-            func.description = "bin/archive_h5lmt.py: comparing %s dataset inside h5lmt" % dataset_name
+            func.description = "bin/archive_lmtdb.py: comparing %s dataset inside h5lmt" % dataset_name
             print func.description
             yield func, self.generated, self.ref_h5lmt, dataset_name, False
 
             # check the timestamp
-            func.description = "bin/archive_h5lmt.py: comparing %s's timestamps dataset inside h5lmt" % dataset_name
+            func.description = "bin/archive_lmtdb.py: comparing %s's timestamps dataset inside h5lmt" % dataset_name
             print func.description
             yield func, self.generated_tts, self.ref_h5lmt, dataset_name, True
             checked_ct += 1
