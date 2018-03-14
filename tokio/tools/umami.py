@@ -60,13 +60,24 @@ class Umami(collections.OrderedDict):
         return pandas.DataFrame.from_dict(self._to_dict_for_pandas(), orient='index')
 
     def plot(self, output_file=None,
-                   linewidth=DEFAULT_LINEWIDTH,
-                   linecolor=DEFAULT_LINECOLOR,
-                   colorscale=DEFAULT_COLORSCALE,
-                   fontsize=DEFAULT_FONTSIZE,
-                   figsize=DEFAULT_FIGSIZE):
-        """
-        Create a graphical representation of the UMAMI object
+             highlight_index=-1,
+             linewidth=DEFAULT_LINEWIDTH,
+             linecolor=DEFAULT_LINECOLOR,
+             colorscale=DEFAULT_COLORSCALE,
+             fontsize=DEFAULT_FONTSIZE,
+             figsize=DEFAULT_FIGSIZE):
+        """Create a graphical representation of the UMAMI object
+
+        Args:
+            output_file (str or None): save umami diagram to file of given name
+            highlight_index (int): index of measurement to highlight
+            linewidth (int): linewidth for both timeseries and boxplot lines
+            linecolor (str): color of line in timeseries panels
+            colorscale (list of str): colors to use for data below the 25th,
+                50th, 75th, and 100th percentiles
+            fontsize (int): font size for UMAMI labels
+            figsize (tuple of float): x, y dimensions of a single UMAMI row;
+                multiplied by len(self.keys()) to determine full diagram height
         """
         rows_to_plot = self.keys()
         fig = matplotlib.pyplot.figure()
@@ -138,7 +149,10 @@ class Umami(collections.OrderedDict):
     
             # then plot the boxplot summary of the given variable
             ax_box = fig.add_subplot(gridspec[2*row_num + 1])
-            y_box_data = numpy.array(y[0:-1])
+            y_box_data = numpy.array(y)
+            y_box_mask = [True] * len(y_box_data)
+            y_box_mask[highlight_index] = False
+            y_box_data = y_box_data[y_box_mask]
             y_box_data = y_box_data[~numpy.isnan(y_box_data)]
             boxp = ax_box.boxplot(y_box_data, # note: do not include last measurement in boxplot
                            widths=0.70,
@@ -177,7 +191,7 @@ class Umami(collections.OrderedDict):
             # determine the color of our highlights based on quartile
             percentiles = [ numpy.nanpercentile(y[0:-1], percentile) for percentile in 25, 50, 75, 100 ]
             for color_index, percentile in enumerate(percentiles):
-                if y[-1] <= percentile:
+                if y[highlight_index] <= percentile:
                     break
             if measurement.big_is_good:
                 highlight_color = colorscale[color_index]
@@ -185,21 +199,21 @@ class Umami(collections.OrderedDict):
                 highlight_color = colorscale[(1+color_index)*-1]
     
             # highlight the latest measurement on the timeseries plot
-            x_last = matplotlib.dates.date2num(x[-1])
-            x_2nd_last = matplotlib.dates.date2num(x[-2])
+            x_last = matplotlib.dates.date2num(x[highlight_index])
+            x_2nd_last = matplotlib.dates.date2num(x[highlight_index-1])
             ax_ts.plot([x_2nd_last, x_last],
-                       [y[-2], y[-1]],
+                       [y[highlight_index-1], y[highlight_index]],
                        linestyle='-',
                        color=highlight_color,
                        linewidth=linewidth*2.0)
-            ax_ts.plot([x_last], [y[-1]],
+            ax_ts.plot([x_last], [y[highlight_index]],
                        marker='*',
                        color=highlight_color,
                        markersize=15)
     
             # where does this last data point lie on the distribution?
             ax_box.plot([0,2],
-                        [y[-1],y[-1]],
+                        [y[highlight_index],y[highlight_index]],
                         linestyle='--',
                         color=highlight_color,
                         linewidth=2.0,
