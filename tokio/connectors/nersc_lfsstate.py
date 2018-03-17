@@ -157,6 +157,8 @@ class NerscLfsOstMap(dict):
                         histogram[ost_count] = 1
                     else:
                         histogram[ost_count] += 1
+                if not histogram:
+                    raise KeyError('no OSTs to count')
                 mode = max(histogram, key=histogram.get)
 
                 # Build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }

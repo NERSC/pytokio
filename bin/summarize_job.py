@@ -164,7 +164,8 @@ def summarize_byterate_df(dataframe, readwrite, timestep=None):
     assert readwrite in ['read', 'written']
     if timestep is None:
         if dataframe.shape[0] < 2:
-            raise Exception("must specify timestep for single-row dataframe")
+            warnings.warn("given single-row dataframe without timestep")
+            return {}
         timestep = (dataframe.index[1].to_pydatetime() \
                     - dataframe.index[0].to_pydatetime()).total_seconds()
     results = {}
@@ -325,59 +326,62 @@ def retrieve_lmt_data(results, file_system):
         return results
 
     module_results = {}
-    # Read rates
-    module_results.update(summarize_byterate_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file,
-            '/OSTReadGroup/OSTBulkReadDataSet',
-            results['_datetime_start'],
-            results['_datetime_end']),
-        'read'
-    ))
+    try:
+        # Read rates
+        module_results.update(summarize_byterate_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file,
+                '/OSTReadGroup/OSTBulkReadDataSet',
+                results['_datetime_start'],
+                results['_datetime_end']),
+            'read'
+        ))
 
-    # Write rates
-    module_results.update(summarize_byterate_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file, '/OSTWriteGroup/OSTBulkWriteDataSet',
-            results['_datetime_start'],
-            results['_datetime_end']),
-        'written'
-    ))
-    # OSS cpu loads
-    module_results.update(summarize_cpu_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file,
-            '/OSSCPUGroup/OSSCPUDataSet',
-            results['_datetime_start'],
-            results['_datetime_end']),
-        'oss'
-    ))
-    # MDS cpu loads
-    module_results.update(summarize_cpu_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file,
-            '/MDSCPUGroup/MDSCPUDataSet',
-            results['_datetime_start'],
-            results['_datetime_end']),
-        'mds'
-    ))
-    # MDS op rates
-    module_results.update(summarize_mds_ops_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file,
-            '/MDSOpsGroup/MDSOpsDataSet',
-            results['_datetime_start'],
-            results['_datetime_end']),
-    ))
-    # Missing data
-    module_results.update(summarize_missing_df(
-        tokio.tools.hdf5.get_dataframe_from_time_range(
-            h5lmt_file,
-            '/FSMissingGroup/FSMissingDataSet',
-            results['_datetime_start'],
-            results['_datetime_end'])))
+        # Write rates
+        module_results.update(summarize_byterate_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file, '/OSTWriteGroup/OSTBulkWriteDataSet',
+                results['_datetime_start'],
+                results['_datetime_end']),
+            'written'
+        ))
+        # OSS cpu loads
+        module_results.update(summarize_cpu_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file,
+                '/OSSCPUGroup/OSSCPUDataSet',
+                results['_datetime_start'],
+                results['_datetime_end']),
+            'oss'
+        ))
+        # MDS cpu loads
+        module_results.update(summarize_cpu_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file,
+                '/MDSCPUGroup/MDSCPUDataSet',
+                results['_datetime_start'],
+                results['_datetime_end']),
+            'mds'
+        ))
+        # MDS op rates
+        module_results.update(summarize_mds_ops_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file,
+                '/MDSOpsGroup/MDSOpsDataSet',
+                results['_datetime_start'],
+                results['_datetime_end']),
+        ))
+        # Missing data
+        module_results.update(summarize_missing_df(
+            tokio.tools.hdf5.get_dataframe_from_time_range(
+                h5lmt_file,
+                '/FSMissingGroup/FSMissingDataSet',
+                results['_datetime_start'],
+                results['_datetime_end'])))
+    except IOError as error:
+        warnings.warn(str(error))
+
     merge_dicts(results, module_results, prefix='fs_')
-
     return results
 
 def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
@@ -435,9 +439,13 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         snx_name = tokio.config.FSNAME_TO_H5LMT_FILE[fs_key].split('_')[-1].split('.')[0]
 
         # Get the OST fullness summary
-        module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
-                                                                        results['_datetime_start'],
-                                                                        cache_file=ost_fullness)
+        try:
+            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
+                                                                            results['_datetime_start'],
+                                                                            cache_file=ost_fullness)
+        except KeyError as error:
+            warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
+            module_results = {}
         merge_dicts(results, module_results, prefix='fshealth_')
 
         # Get the OST failure status
@@ -445,28 +453,35 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         # ost_timestamp_* keys from get_fullness_at_datetime above;
         # these aren't used for correlation analysis and should be
         # pretty close anyway.
-        module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
-                                                                        results['_datetime_start'],
-                                                                        cache_file=ost_map)
+        try:
+            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
+                                                                            results['_datetime_start'],
+                                                                            cache_file=ost_map)
+        except KeyError as error:
+            warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
+            module_results = {}
         merge_dicts(results, module_results, False, prefix='fshealth_')
 
         # A measure, in sec, expressing how far before the job our OST fullness data was measured
-        results['fshealth_ost_fullness_lead_secs'] = \
-            (results['_datetime_start'] \
-            - datetime.datetime.fromtimestamp(
-                results['fshealth_ost_actual_timestamp'])).total_seconds()
+        if 'fshealth_ost_actual_timestamp' in results:
+            results['fshealth_ost_fullness_lead_secs'] = \
+                (results['_datetime_start'] \
+                - datetime.datetime.fromtimestamp(
+                    results['fshealth_ost_actual_timestamp'])).total_seconds()
 
         # Ost_overloaded_pct becomes the percent of OSTs in file system which are
         # in an abnormal state
-        results["fshealth_ost_overloaded_pct"] = \
-            100.0 * float(results["fshealth_ost_overloaded_ost_count"]) \
-            / float(results["fshealth_ost_count"])
+        if 'fshealth_ost_overloaded_ost_count' in results and 'fshealth_ost_count' in results:
+            results["fshealth_ost_overloaded_pct"] = \
+                100.0 * float(results["fshealth_ost_overloaded_ost_count"]) \
+                / float(results["fshealth_ost_count"])
 
         # A measure, in sec, expressing how far before the job our OST failure data was measured
-        results['fshealth_ost_failures_lead_secs'] = \
-            (results['_datetime_start'] \
-            - datetime.datetime.fromtimestamp(
-                results['fshealth_ost_actual_timestamp'])).total_seconds()
+        if 'fshealth_ost_actual_timestamp' in results:
+            results['fshealth_ost_failures_lead_secs'] = \
+                (results['_datetime_start'] \
+                - datetime.datetime.fromtimestamp(
+                    results['fshealth_ost_actual_timestamp'])).total_seconds()
 
     return results
 

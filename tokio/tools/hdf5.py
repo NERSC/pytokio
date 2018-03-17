@@ -63,7 +63,7 @@ def get_dataframe_from_time_range(file_name, dataset_name, datetime_start, datet
     """
     files_and_indices = get_files_and_indices(file_name, dataset_name, datetime_start, datetime_end)
     if not files_and_indices:
-        raise Exception("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
+        raise IOError("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
     result = None
 
     for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
