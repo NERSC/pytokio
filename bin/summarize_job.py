@@ -19,6 +19,23 @@ import tokio.tools
 import tokio.connectors.darshan
 import tokio.connectors.nersc_jobsdb
 
+# These Darshan POSIX counters are explicitly over into summary
+USEFUL_DARSHAN_COUNTERS = [
+        'BYTES_READ',
+        'BYTES_WRITTEN',
+        'READS',
+        'WRITES',
+        'F_META_TIME',
+        'F_READ_TIME',
+        'F_WRITE_TIME',
+        'OPENS',
+        'SEQ_READS',
+        'SEQ_WRITES',
+        'STATS',
+        'FILE_NOT_ALIGNED',
+        'MEM_NOT_ALIGNED',
+    ]
+
 def _identify_fs_from_path(path, mounts):
     """
     Scan a list of mount points and try to identify the one that matches the
@@ -38,18 +55,50 @@ def summarize_darshan_posix(darshan_data):
     Extract key metrics from the POSIX module in a Darshan log
     """
     # Extract POSIX performance counters if present
+    if 'counters' not in darshan_data or \
+    'posix' not in darshan_data['counters']:
+        return {}
+
     results = {}
-    if 'counters' in darshan_data \
-    and 'posix' in darshan_data['counters'] \
-    and '_perf' in darshan_data['counters']['posix']:
-        d_perf = darshan_data['counters']['posix']['_perf']
-        results['total_gibs_posix'] = d_perf.get('total_bytes')
+    posix_data = darshan_data['counters']['posix']
+    if '_perf' in posix_data:
+        perf_data = posix_data['_perf']
+        results['total_gibs_posix'] = perf_data.get('total_bytes')
         if results['total_gibs_posix']:
             results['total_gibs_posix'] /= 2.0**30
-            results['agg_perf_by_slowest_posix'] = d_perf.get('agg_perf_by_slowest')
-            results['io_time'] = d_perf.get('slowest_rank_io_time_unique_files')
+            results['agg_perf_by_slowest_posix'] = perf_data.get('agg_perf_by_slowest')
+            results['io_time'] = perf_data.get('slowest_rank_io_time_unique_files')
             if results['io_time']:
-                results['io_time'] += d_perf.get('time_by_slowest_shared_files')
+                results['io_time'] += perf_data.get('time_by_slowest_shared_files')
+
+    # Calculate various useful aggregate counters
+    totals = {}
+    counts = {}
+    mins = {}
+    maxes = {}
+    num_files = 0
+    for recordname, recorddata in posix_data.iteritems():
+        if recordname.startswith('_'):
+            continue
+        num_files += 1
+        for rankdata in recorddata.itervalues():
+            for counter, value in rankdata.iteritems():
+                totals[counter] = totals.get(counter, 0) + value
+                counts[counter] = counts.get(counter, 0) + 1
+                if counter not in mins or mins[counter] > value:
+                    mins[counter] = value
+                if counter not in maxes or maxes[counter] < value:
+                    maxes[counter] = value
+
+    # Generate statistics for each counter
+    for useful_key in USEFUL_DARSHAN_COUNTERS:
+        if useful_key in totals:
+            results['tot_%s_posix' % useful_key.lower()] = totals[useful_key]
+            results['ave_%s_posix' % useful_key.lower()] = float(totals[useful_key]) / counts[useful_key]
+            results['num_%s_posix' % useful_key.lower()] = counts[useful_key]
+            results['min_%s_posix' % useful_key.lower()] = mins[useful_key]
+            results['max_%s_posix' % useful_key.lower()] = maxes[useful_key]
+
     return results
 
 def get_biggest_api(darshan_data):
