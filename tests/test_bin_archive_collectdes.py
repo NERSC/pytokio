@@ -41,35 +41,41 @@ import tokiobin.archive_collectdes
 # Assert that the two instances of summarize_bbhdf5.py return identical results
 #
 
-def generate_tts(output_file):
+def generate_tts(output_file,
+                 init_start=tokiotest.SAMPLE_COLLECTDES_START,
+                 init_end=tokiotest.SAMPLE_COLLECTDES_END,
+                 input_file=tokiotest.SAMPLE_COLLECTDES_FILE,
+                 query_start=tokiotest.SAMPLE_COLLECTDES_START,
+                 query_end=tokiotest.SAMPLE_COLLECTDES_END):
+    """Create a TokioTimeSeries output file
     """
-    Create a TokioTimeSeries output file
-    """
-    argv = ['--init-start', tokiotest.SAMPLE_COLLECTDES_START,
-            '--init-end', tokiotest.SAMPLE_COLLECTDES_END,
-            '--input', tokiotest.SAMPLE_COLLECTDES_FILE,
+    argv = ['--init-start', init_start,
+            '--init-end', init_end,
+            '--input', input_file,
             '--num-nodes', str(tokiotest.SAMPLE_COLLECTDES_NUMNODES),
             '--ssds-per-node', str(tokiotest.SAMPLE_COLLECTDES_SSDS_PER),
             '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
             '--output', output_file,
             '--debug',
-            tokiotest.SAMPLE_COLLECTDES_START,
-            tokiotest.SAMPLE_COLLECTDES_END]
+            query_start,
+            query_end]
     print "Running [%s]" % ' '.join(argv)
     tokiobin.archive_collectdes.main(argv)
     print "Created", output_file
 
-def update_tts(output_file):
-    """
-    Append to an existing tts file
+def update_tts(output_file,
+               input_file=tokiotest.SAMPLE_COLLECTDES_FILE2,
+               query_start=tokiotest.SAMPLE_COLLECTDES_START2,
+               query_end=tokiotest.SAMPLE_COLLECTDES_END2):
+    """Append to an existing tts file
     """
     assert os.path.isfile(output_file) # must update an existing file
 
-    argv = ['--input', tokiotest.SAMPLE_COLLECTDES_FILE2,
+    argv = ['--input', input_file,
             '--output', output_file,
             '--debug',
-            tokiotest.SAMPLE_COLLECTDES_START2,
-            tokiotest.SAMPLE_COLLECTDES_END2]
+            query_start,
+            query_end]
 
     print "Running [%s]" % ' '.join(argv)
     tokiobin.archive_collectdes.main(argv)
@@ -132,6 +138,49 @@ def test_bin_archive_collectdes():
             assert summary1[metric][key] == value
 
     assert num_compared > 0
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_bin_archive_collectdes_cpuload():
+    """
+    bin/archive_collectdes.py cpuload idempotency
+    """
+    if not _HAVE_ELASTICSEARCH:
+        raise nose.SkipTest("elasticsearch module not available")
+    tokiotest.TEMP_FILE.close()
+
+    # initialize a new TimeSeries, populate it, and write it out as HDF5
+    generate_tts(output_file=tokiotest.TEMP_FILE.name,
+                 init_start=tokiotest.SAMPLE_COLLECTDES_START,
+                 init_end=tokiotest.SAMPLE_COLLECTDES_END,
+                 input_file=tokiotest.SAMPLE_COLLECTDES_CPULOAD,
+                 query_start=tokiotest.SAMPLE_COLLECTDES_START,
+                 query_end=tokiotest.SAMPLE_COLLECTDES_END)
+
+    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
+    summary0 = summarize_hdf5(h5_file)
+    h5_file.close()
+
+    # append an overlapping subset of data to the same HDF5
+    update_tts(output_file=tokiotest.TEMP_FILE.name,
+               input_file=tokiotest.SAMPLE_COLLECTDES_CPULOAD,
+               query_start=tokiotest.SAMPLE_COLLECTDES_START,
+               query_end=tokiotest.SAMPLE_COLLECTDES_END)
+    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
+    summary1 = summarize_hdf5(h5_file)
+    h5_file.close()
+
+    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
+    num_compared = 0
+    for metric in 'sums', 'shapes':
+        for key, value in summary0[metric].iteritems():
+            num_compared += 1
+            assert key in summary1[metric]
+            print "%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value)
+            assert summary1[metric][key] == value
+
+    assert num_compared > 0
+
+
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_bin_archive_collectdes_oob():
