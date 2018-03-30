@@ -13,6 +13,7 @@ import datetime
 import argparse
 import warnings
 import mimetypes
+import collections
 import multiprocessing
 
 import dateutil.parser # because of how ElasticSearch returns time data
@@ -25,24 +26,25 @@ import tokio.connectors.collectd_es
 
 SCHEMA_VERSION = "1"
 
-DATASETS = {
-    'datatargets/readrates': 'bytes/sec',
-    'datatargets/writerates': 'bytes/sec',
-    'datatargets/readoprates': 'ops/sec',
-    'datatargets/writeoprates': 'ops/sec',
-    'dataservers/memcached': 'bytes',
-    'dataservers/membuffered': 'bytes',
-    'dataservers/memfree': 'bytes',
-    'dataservers/memused': 'bytes',
-    'dataservers/memslab': 'bytes',
-    'dataservers/memslab_unrecl': 'bytes',
-    'dataservers/cpuload': '%',
-    'dataservers/cpuuser': '%',
-    'dataservers/cpusys': '%',
-    'dataservers/_num_cpuload': 'cpu count',
-    'dataservers/_num_cpuuser': 'cpu count',
-    'dataservers/_num_cpusys': 'cpu count',
-}
+DATASETS = collections.OrderedDict([
+    ('datatargets/readrates', 'bytes/sec'),
+    ('datatargets/writerates', 'bytes/sec'),
+    ('datatargets/readoprates', 'ops/sec'),
+    ('datatargets/writeoprates', 'ops/sec'),
+    ('dataservers/memcached', 'bytes'),
+    ('dataservers/membuffered', 'bytes'),
+    ('dataservers/memfree', 'bytes'),
+    ('dataservers/memused', 'bytes'),
+    ('dataservers/memslab', 'bytes'),
+    ('dataservers/memslab_unrecl', 'bytes'),
+    ('dataservers/cpuload', '%'),
+    ('dataservers/cpuuser', '%'),
+    ('dataservers/cpusys', '%'),
+    # these metadatasets _must_ be initialized _after_ their parent dataset
+    ('dataservers/_num_cpuload', 'cpu count'),
+    ('dataservers/_num_cpuuser', 'cpu count'),
+    ('dataservers/_num_cpusys', 'cpu count'),
+])
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
@@ -52,6 +54,35 @@ DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 LAMBDA_MAPS = {
     'sum': lambda x, y: x + y,
 }
+
+def metadataset2dataset_key(metadataset_name):
+    """Return the dataset name corresponding to a metadataset name
+
+    Metadatasets are not ever stored in the HDF5 and instead are only used to
+    store data needed to correctly calculate dataset values.  This function
+    maps a metadataset name to its corresponding dataset name.
+
+    Args:
+        metadataset_name (str): name of a metadataset
+    Returns:
+        str: name of corresponding dataset name, or None if `metadataset_name`
+            does not appear to be a metadataset name.
+    """
+    if '/_num_' not in metadataset_name:
+        return None
+    else:
+        return metadataset_name.replace('/_num_', '/', 1)
+
+def dataset2metadataset_key(dataset_key):
+    """Return the metadataset name corresponding to a dataset name
+
+    Args:
+        dataset_name (str): name of a dataset
+
+    Returns:
+        str: name of corresponding metadataset name
+    """
+    return dataset_key.replace('/', '/_num_', 1)
 
 def process_page(page):
     """
@@ -168,8 +199,11 @@ def update_datasets(inserts, datasets):
         except ValueError:
             print insert
             raise
+
         if datasets[dataset_name].insert_element(timestamp, col_name, rate, reducer):
             data_volume[dataset_name] += rate
+            tidx, cidx = datasets[dataset_name].get_insert_pos(timestamp, col_name)
+            print "Inserted %12.4f in %s@(%4d, %4d)" % (rate, dataset_name, tidx, cidx)
         else:
             errors[dataset_name] += 1
 
@@ -193,6 +227,24 @@ def update_datasets(inserts, datasets):
         print update_str % data_volume
     return index_errors
 
+def reset_timeseries(timeseries, start, end, value=-0.0):
+    """Zero out a region of a tokio.TimeSeries dataset
+
+    Args:
+        timeseries (tokio.TimeSeries): data from a subset should be zeroed
+        start (datetime.datetime): Time at which zeroing of all columns in
+            `timeseries` should begin
+        end (datetime.datetime): Time at which zeroing all columns in
+            `timeseries` should end (exclusive)
+        value: value which should be set in every element being reset
+
+    Returns:
+        Nothing
+    """
+    index0, _ = timeseries.get_insert_pos(start, None)
+    indexf, _ = timeseries.get_insert_pos(end, None)
+    timeseries.dataset[index0:indexf, :] = value
+
 def normalize_cpu_datasets(inserts, datasets):
     """Normalize CPU load datasets
 
@@ -201,9 +253,9 @@ def normalize_cpu_datasets(inserts, datasets):
     per-core basis, but not all cores may be reported for each timestamp.
 
     Args:
-        datasets (dict of TimeSeries): all of the datasets being populated
         inserts (list of tuples): list of inserts that were used to populate
             datasets
+        datasets (dict of TimeSeries): all of the datasets being populated
     Returns:
         Nothing
     """
@@ -213,7 +265,7 @@ def normalize_cpu_datasets(inserts, datasets):
     norm_elements = {}
     for dataset_name in dataset_names:
         norm_elements[dataset_name] = set([])
-        num_dataset_names[dataset_name] = dataset_name.replace('/', '/_num_')
+        num_dataset_names[dataset_name] = dataset2metadataset_key(dataset_name)
 
     # build a set of all elements that must be divided
     for insert in inserts:
@@ -233,8 +285,8 @@ def normalize_cpu_datasets(inserts, datasets):
         # convert NaNs (0.0 / 0.0) back to -0.0
         datasets[dataset_name].dataset[numpy.isnan(datasets[dataset_name].dataset)] = -0.0
 
-def pages_to_hdf5(pages, output_file, init_start, init_end, timestep,
-                  num_servers, devices_per_server, threads=1):
+def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_end,
+                  timestep, num_servers, devices_per_server, threads=1):
     """
     Take pages from ElasticSearch query and store them in output_file
     """
@@ -261,18 +313,44 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep,
             num_columns = num_servers * devices_per_server
         else:
             num_columns = num_servers
-        datasets[dataset_name] = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                             start=init_start,
-                                                             end=init_end,
-                                                             timestep=timestep,
-                                                             num_columns=num_columns,
-                                                             hdf5_file=hdf5_file)
+
+        # If this is a metadataset, initialize it with the shape and columns of
+        # the dataset it describes so that we can use the same index values for
+        # both.  This requires the parent dataset's TimeSeries to already be
+        # defined and attached, which requires DATASETS to be an OrderedDict so
+        # that we aren't initializing metadatasets before datasets.
+        real_dataset_name = metadataset2dataset_key(dataset_name)
+        if real_dataset_name:
+            if real_dataset_name not in datasets:
+                raise KeyError("Cannot init metadataset %s; dataset %s does not exist" %
+                               (dataset_name, real_dataset_name))
+            global_start = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[0])
+            global_end = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[-1] + datasets[real_dataset_name].timestep)
+            timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                     start=global_start,
+                                                     end=global_end,
+                                                     timestep=timestep,
+                                                     num_columns=num_columns,
+                                                     column_names=datasets[real_dataset_name].columns,
+                                                     hdf5_file=None)
+
+            # we can't update an average, so zero out all prior values that
+            # we will be overwriting
+            reset_timeseries(datasets[real_dataset_name], query_start, query_end)
+        else:
+            timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                     start=init_start,
+                                                     end=init_end,
+                                                     timestep=timestep,
+                                                     num_columns=num_columns,
+                                                     hdf5_file=hdf5_file)
+        datasets[dataset_name] = timeseries
 
     # Process all pages retrieved (this is computationally expensive)
     _time0 = time.time()
     updates = []
     if threads > 1:
-#       updates = multiprocessing.Pool(16).map(process_page, pages)
+        # updates = multiprocessing.Pool(16).map(process_page, pages)
         for update in multiprocessing.Pool(threads).imap_unordered(process_page, pages):
             updates.append(update)
     else:
@@ -280,9 +358,10 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, timestep,
             updates.append(process_page(page))
     _timef = time.time()
     _extract_time = _timef - _time0
-    if tokio.DEBUG:
-        print "Extracted %d elements from %d pages in %.4f seconds" \
-            % (sum([len(x) for x in updates]), len(pages), _extract_time)
+    tokio.debug_print("Extracted %d elements from %d pages in %.4f seconds" \
+                      % (sum([len(x) for x in updates]),
+                      len(pages),
+                      _extract_time))
 
     # Take the processed list of data to insert and actually insert them
     _time0 = time.time()
@@ -394,9 +473,16 @@ def main(argv=None):
                                   timeout=args.timeout)
             pages = esdb.scroll_pages
             tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
-            pages_to_hdf5(pages, args.output, init_start, init_end,
-                          args.timestep, args.num_nodes, args.ssds_per_node,
-                          args.threads)
+            pages_to_hdf5(pages=pages,
+                          output_file=args.output,
+                          init_start=init_start,
+                          init_end=init_end,
+                          query_start=query_start,
+                          query_end=query_end,
+                          timestep=args.timestep,
+                          num_servers=args.num_nodes,
+                          devices_per_server=args.ssds_per_node,
+                          threads=args.threads)
     else:
         _, encoding = mimetypes.guess_type(args.input)
         if encoding == 'gzip':
@@ -406,9 +492,16 @@ def main(argv=None):
         pages = json.load(input_file)
         input_file.close()
         tokio.debug.debug_print("Loaded results from %s" % args.input)
-        pages_to_hdf5(pages, args.output, init_start, init_end,
-                      args.timestep, args.num_nodes, args.ssds_per_node,
-                      args.threads)
+        pages_to_hdf5(pages=pages,
+                      output_file=args.output,
+                      init_start=init_start,
+                      init_end=init_end,
+                      query_start=query_start,
+                      query_end=query_end,
+                      timestep=args.timestep,
+                      num_servers=args.num_nodes,
+                      devices_per_server=args.ssds_per_node,
+                      threads=args.threads)
 
     print "Wrote output to %s" % args.output
 
