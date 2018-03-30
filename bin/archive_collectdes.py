@@ -243,11 +243,6 @@ def reset_timeseries(timeseries, start, end, value=-0.0):
     """
     index0, _ = timeseries.get_insert_pos(start, None)
     indexf, _ = timeseries.get_insert_pos(end, None)
-    print "Zeroing %d (%s) to %d (%s) for %s" % (index0,
-                                          timeseries.timestamps[index0],
-                                          indexf,
-                                          timeseries.timestamps[indexf],
-                                          timeseries.dataset_name)
     timeseries.dataset[index0:indexf, :] = value
 
 def normalize_cpu_datasets(inserts, datasets):
