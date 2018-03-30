@@ -203,7 +203,6 @@ def update_datasets(inserts, datasets):
         if datasets[dataset_name].insert_element(timestamp, col_name, rate, reducer):
             data_volume[dataset_name] += rate
             tidx, cidx = datasets[dataset_name].get_insert_pos(timestamp, col_name)
-            print "Inserted %12.4f in %s@(%4d, %4d)" % (rate, dataset_name, tidx, cidx)
         else:
             errors[dataset_name] += 1
 
