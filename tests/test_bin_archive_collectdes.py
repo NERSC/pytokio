@@ -8,11 +8,6 @@ import datetime
 import warnings
 import nose
 import h5py
-try:
-    import elasticsearch
-    _HAVE_ELASTICSEARCH = True
-except ImportError:
-    _HAVE_ELASTICSEARCH = False
 import tokiotest
 import tokiobin.archive_collectdes
 
@@ -108,44 +103,10 @@ def summarize_hdf5(hdf5_file):
     return summary
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def test_bin_archive_collectdes():
-    """
-    bin/archive_collectdes.py
-    """
-    if not _HAVE_ELASTICSEARCH:
-        raise nose.SkipTest("elasticsearch module not available")
-    tokiotest.TEMP_FILE.close()
-
-    # initialize a new TimeSeries, populate it, and write it out as HDF5
-    generate_tts(tokiotest.TEMP_FILE.name)
-    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
-    summary0 = summarize_hdf5(h5_file)
-    h5_file.close()
-
-    # append an overlapping subset of data to the same HDF5
-    update_tts(tokiotest.TEMP_FILE.name)
-    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
-    summary1 = summarize_hdf5(h5_file)
-    h5_file.close()
-
-    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
-    num_compared = 0
-    for metric in 'sums', 'shapes':
-        for key, value in summary0[metric].iteritems():
-            num_compared += 1
-            assert key in summary1[metric]
-            print "%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value)
-            assert summary1[metric][key] == value
-
-    assert num_compared > 0
-
-@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def test_bin_archive_collectdes_cpuload():
+def test_idempotency():
     """
     bin/archive_collectdes.py cpuload idempotency
     """
-    if not _HAVE_ELASTICSEARCH:
-        raise nose.SkipTest("elasticsearch module not available")
     tokiotest.TEMP_FILE.close()
 
     # initialize a new TimeSeries, populate it, and write it out as HDF5
@@ -183,13 +144,10 @@ def test_bin_archive_collectdes_cpuload():
 
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
-def test_bin_archive_collectdes_oob():
+def test_out_of_bounds():
     """
     bin/archive_collectdes.py with out-of-bounds
     """
-    if not _HAVE_ELASTICSEARCH:
-        raise nose.SkipTest("elasticsearch module not available")
-
     tokiotest.TEMP_FILE.close()
 
     # Calculate new bounds that are a subset of the actual data that will be returned
