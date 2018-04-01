@@ -191,17 +191,17 @@ def update_datasets(inserts, datasets):
     for insert in inserts:
         try:
             if len(insert) == 4:
-                (dataset_name, timestamp, col_name, rate) = insert
+                (dataset_name, timestamp, col_name, value) = insert
                 reducer = None
             else:
-                (dataset_name, timestamp, col_name, rate, reducer_name) = insert
+                (dataset_name, timestamp, col_name, value, reducer_name) = insert
                 reducer = LAMBDA_MAPS.get(reducer_name)
         except ValueError:
             print insert
             raise
 
-        if datasets[dataset_name].insert_element(timestamp, col_name, rate, reducer):
-            data_volume[dataset_name] += rate
+        if datasets[dataset_name].insert_element(timestamp, col_name, value, reducer):
+            data_volume[dataset_name] += value 
             tidx, cidx = datasets[dataset_name].get_insert_pos(timestamp, col_name)
         else:
             errors[dataset_name] += 1
@@ -219,10 +219,13 @@ def update_datasets(inserts, datasets):
     if tokio.DEBUG:
         for key in data_volume.keys():
             data_volume[key] *= datasets[key].timestep
+        update_str = "Added "
         update_str = "Added %(datatargets/readrates)d bytes/" \
             + "%(datatargets/readoprates)d ops of read, " \
             + "%(datatargets/writerates)d bytes/" \
-            + "%(datatargets/writeoprates)d ops of write"
+            + "%(datatargets/writeoprates)d ops of write, " \
+            + "%(dataservers/cpuload).1f%% of cpu load-seconds, " \
+            + "%(dataservers/memused)d bytes of memory-seconds"
         print update_str % data_volume
     return index_errors
 
