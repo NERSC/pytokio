@@ -219,6 +219,7 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         return []
 
     timestamps = hdf5_file.get_timestamps(dataset_name)
+    columns = hdf5_file.get_columns(dataset_name)
 
     if hdf5_file.schema:
         if not (timestamps.shape[0] % num_bins) == 0:
@@ -253,17 +254,11 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum["min_" + base_key] = dataset[index0:indexf, :].min()
         bin_datum["sum_" + base_key] = dataset[index0:indexf, :].sum()
         bin_datum["ave_" + base_key] = bin_datum["sum_" + base_key] / float(indexf - index0)
-        bin_datum["ave_" + base_key] /= dataset.shape[1] if len(dataset.shape) > 1 else 1
+        bin_datum["ave_" + base_key] /= columns.shape[0]
 
-        # deal with the missing values dataset
         bin_datum[missing_key] = missing_dataset[index0:indexf, :].sum()
 
-        # dataset.shape[1] will fail for MappedDataSets with force2d; when this
-        # is the case, the second dimension is 1
-        try:
-            bin_datum[total_key] = (indexf - index0) * dataset.shape[1]
-        except IndexError:
-            bin_datum[total_key] = (indexf - index0)
+        bin_datum[total_key] = (indexf - index0) * columns.shape[0]
         bin_datum["frac_" + missing_key] = float(bin_datum[missing_key]) / bin_datum[total_key]
 
         if base_key.startswith('ost_'):
