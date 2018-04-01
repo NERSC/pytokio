@@ -634,19 +634,33 @@ class Hdf5(h5py.File):
             raise KeyError(errmsg)
 
     def get_columns(self, dataset_name):
+        """Get the column names of a dataset
+
+        Args:
+            dataset_name (str): name of dataset whose columns will be retrieved
+
+        Returns:
+            numpy.ndarray of column names, or empty if no columns defined
         """
-        Get the column names of a dataset
-        """
+        if self.version is None:
+            return self._get_columns_h5lmt(dataset_name)
         # retrieve the dataset to resolve the schema key or get MappedDataset
         dataset = self.__getitem__(dataset_name)
+        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
-        if self.version is None:
-            dataset_name = dataset.name.lstrip('/')
-            if dataset_name in H5LMT_COLUMN_ATTRS:
-                return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
-            return []
+    def _get_columns_h5lmt(self, dataset_name):
+        """Get the column names of an h5lmt dataset
+        """
+        dataset = self.__getitem__(dataset_name)
+        dataset_name = dataset.name.lstrip('/')
+        if dataset_name in H5LMT_COLUMN_ATTRS:
+            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+        elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
+            return numpy.array(['_unknown'])
+        elif dataset_name == 'FSMissingGroup/FSMissingDataSet':
+            return numpy.array(['_unknown%04d' % i for i in range(dataset.shape[1])])
         else:
-            return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
+            raise KeyError('Unknown h5lmt dataset %s' % dataset_name)
 
     def get_timestep(self, dataset_name, timestamps=None):
         """
@@ -675,9 +689,48 @@ class Hdf5(h5py.File):
         return get_timestamps(self, dataset_name)
 
     def get_missing(self, dataset_name, inverse=False):
-        """Convert a dataset into a binary matrix highlighting missing values
+        """Convert a dataset into a matrix indicating the abscence of data
+
+        Args:
+            dataset_name (str): name of dataset to access
+            inverse (bool): return 0 for missing and 1 for present if True
+
+        Return:
+            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+                absence of specific elements
         """
+        if self.version is None:
+            return self._get_missing_h5lmt(dataset_name, inverse=inverse)
         return missing_values(self[dataset_name][:], inverse)
+
+    def _get_missing_h5lmt(self, dataset_name, inverse=False):
+        """Return the FSMissingGroup dataset from an H5LMT file
+
+        Encodes a hot mess of hacks to return something that looks like what
+        `get_missing()` would return for a real dataset.
+
+        Args:
+            dataset_name (str): name of dataset to access
+            inverse (bool): return 0 for missing and 1 for present if True
+
+        Return:
+            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+                absence of specific elements
+        """
+        dataset = self.__getitem__(dataset_name)
+        missing_dataset = self.get('/FSMissingGroup/FSMissingDataSet')
+        if len(dataset.shape) == 1:
+            result = numpy.zeros((dataset.shape[0], 1), dtype=numpy.int8)
+        elif dataset.shape == missing_dataset.shape:
+            result = missing_dataset[:, :].astype('i8').T
+        else:
+            result = numpy.zeros(dataset[:, :].shape, dtype=numpy.int8).T
+
+        print result.shape
+        if inverse:
+            return (~result.astype(bool)).astype('i8')
+        else:
+            return result
 
     def to_dataframe(self, dataset_name):
         """Convert a dataset into a dataframe
@@ -779,12 +832,20 @@ def missing_values(dataset, inverse=False):
     converts negative zeros to ones and all other data into zeros then count up
     the number of missing elements in the array.
 
-    Args: dataset
+    Args:
+        dataset: dataset to access
+        inverse (bool): return 0 for missing and 1 for present if True
+
+    Return:
+        numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+            absence of specific elements
     """
+    zero = numpy.int8(0)
+    one = numpy.int8(1)
     if inverse:
         converter = numpy.vectorize(lambda x:
-                                    0 if (x == 0.0 and math.copysign(1, x) < 0.0) else 1)
+                                    zero if (x == 0.0 and math.copysign(1, x) < 0.0) else one)
     else:
         converter = numpy.vectorize(lambda x:
-                                    1 if (x == 0.0 and math.copysign(1, x) < 0.0) else 0)
+                                    one if (x == 0.0 and math.copysign(1, x) < 0.0) else zero)
     return converter(dataset)
