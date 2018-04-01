@@ -726,7 +726,6 @@ class Hdf5(h5py.File):
         else:
             result = numpy.zeros(dataset[:, :].shape, dtype=numpy.int8).T
 
-        print result.shape
         if inverse:
             return (~result.astype(bool)).astype('i8')
         else:
