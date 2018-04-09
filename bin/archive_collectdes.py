@@ -471,8 +471,7 @@ def main(argv=None):
                              tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
             esdb.query_timeseries(plugin_query,
                                   query_start,
-                                  query_end,
-                                  timeout=args.timeout)
+                                  query_end)
             pages = esdb.scroll_pages
             tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
             pages_to_hdf5(pages=pages,
