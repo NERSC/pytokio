@@ -466,6 +466,7 @@ def main(argv=None):
             index=args.index,
             timeout=args.timeout)
 
+        pages = None
         for plugin_query in [tokio.connectors.collectd_es.QUERY_CPU_DATA,
                              tokio.connectors.collectd_es.QUERY_DISK_DATA,
                              tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
@@ -473,7 +474,11 @@ def main(argv=None):
                                   query_start,
                                   query_end,
                                   timeout=args.timeout)
-            pages = esdb.scroll_pages
+            if pages is None:
+                pages = esdb.scroll_pages
+            else:
+                pages += esdb.scroll_pages
+
             tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
             pages_to_hdf5(pages=pages,
                           output_file=args.output,

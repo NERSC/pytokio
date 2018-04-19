@@ -84,7 +84,7 @@ def main(argv=None):
                 pages = esdb.scroll_pages
             else:
                 pages += esdb.scroll_pages
-            print "+ %d = %d" % (len(esdb.scroll_pages), len(pages))
+
         tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
     else:
         _, encoding = mimetypes.guess_type(args.input)
