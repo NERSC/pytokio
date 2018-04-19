@@ -222,9 +222,8 @@ class DatasetDict(dict):
         self.init_datasets(dataset_names, lmtdb.mds_names)
 
         # Now query the MDS_DATA table to get byte counts over the query time range
-        results, columns = lmtdb.get_timeseries_data('MDS_DATA',
-                                                     self.query_start,
-                                                     self.query_end_plusplus)
+        results, columns = lmtdb.get_mds_data(self.query_start, self.query_end_plusplus)
+
 
         # Index the columns to speed up insertion of data
         col_map = {}
@@ -288,9 +287,7 @@ class DatasetDict(dict):
 
         self.init_datasets(dataset_names, lmtdb.mds_names)
 
-        results, columns = lmtdb.get_timeseries_data('MDS_OPS_DATA',
-                                                     self.query_start,
-                                                     self.query_end_plusplus)
+        results, columns = lmtdb.get_mds_ops_data(self.query_start, self.query_end_plusplus)
 
         # Index the columns to speed up insertion of data
         col_map = {}
@@ -348,9 +345,7 @@ class DatasetDict(dict):
         self.init_datasets(dataset_names, lmtdb.oss_names)
 
         # Now query the OSS_DATA table to get byte counts over the query time range
-        results, columns = lmtdb.get_timeseries_data('OSS_DATA',
-                                                     self.query_start,
-                                                     self.query_end_plusplus)
+        results, columns = lmtdb.get_oss_data(self.query_start, self.query_end_plusplus)
 
         # Index the columns to speed up insertion of data
         col_map = {}
@@ -404,9 +399,7 @@ class DatasetDict(dict):
         self.init_datasets(dataset_names, lmtdb.ost_names)
 
         # Now query the OST_DATA table to get byte counts over the query time range
-        results, columns = lmtdb.get_timeseries_data('OST_DATA',
-                                                     self.query_start,
-                                                     self.query_end_plusplus)
+        results, columns = lmtdb.get_ost_data(self.query_start, self.query_end_plusplus)
 
         # Index the columns to speed up insertion of data
         col_map = {}

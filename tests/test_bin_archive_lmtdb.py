@@ -251,7 +251,7 @@ class TestArchiveLmtdbCorrectness(object):
                 dataset_name = dataset.name
 
                 func = compare_tts_dataset
-                func.description = "bin/archive_h5mlt.py: comparing %s to hdf5 reference" % dataset_name
+                func.description = "bin/archive_lmtdb.py: comparing %s to hdf5 reference" % dataset_name
                 print func.description
                 yield func, self.generated, self.ref_hdf5, dataset_name
                 checked_ct += 1
