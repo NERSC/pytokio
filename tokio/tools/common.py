@@ -20,7 +20,7 @@ def enumerate_dated_dir(base_dir,
         raise Exception('A start time must be provided')
 
     if datetime_end is None: 
-        datatime_end = datetime.datetime.day()
+        datetime_end = datetime_start
 
     if datetime_end < datetime_start:
         raise Exception("datetime_end < datetime_start")

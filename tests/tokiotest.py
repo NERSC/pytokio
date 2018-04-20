@@ -41,6 +41,10 @@ SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47'
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43'
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
 SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
+SAMPLE_DARSHAN_LOG_DIR = os.path.join(INPUT_DIR, 'darshanlogs')
+SAMPLE_DARSHAN_LOG_USER = 'glock'
+SAMPLE_DARSHAN_JOBID_2 = 4487503
+SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
 
 ### For lfsstatus connector/tool.  These values must reflect the contents of
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
