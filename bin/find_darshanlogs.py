@@ -32,7 +32,7 @@ def main(argv=None):
         if args.start:
             start = datetime.datetime.strptime(args.start, DATE_FMT)
         else:
-            start = datetime.datetime.now()
+            start = None
         if args.end:
             end = datetime.datetime.strptime(args.end, DATE_FMT)
         else:

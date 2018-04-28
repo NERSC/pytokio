@@ -5,6 +5,7 @@ Tools to find Darshan logs within a system-wide repository
 import os
 import glob
 import tokio.tools.common
+import tokio.connectors.slurm
 
 DARHSAN_LOG_NAME_STR = "%(username)s_%(exe)s_id%(jobid)s_%(month)s-%(day)s-%(seconds)s-%(logmod)s.darshan"
 DARSHAN_LOG_GLOB_FIELDS = {
@@ -17,7 +18,7 @@ DARSHAN_LOG_GLOB_FIELDS = {
     "logmod": "*",
 }
 
-def find_darshanlogs(datetime_start, datetime_end=None, username=None, jobid=None,
+def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobid=None,
                      darshan_log_dir=None):
     """Return darshan log file paths matching a set of criteria
 
@@ -38,6 +39,13 @@ def find_darshanlogs(datetime_start, datetime_end=None, username=None, jobid=Non
           that dispatches the correct workload manager connector.
         * Use a default `darshan_log_dir` from `tokio.config`
     """
+
+    if datetime_start is None:
+        if jobid is None:
+            raise TypeError("datetime_start must be defined if jobid is not")
+        else:
+            job_data = tokio.connectors.slurm.Slurm(jobid=jobid)
+            datetime_start, _ = job_data.get_job_startend()
 
     # the following will not work on Windows!
     darshan_dated_dir = os.path.join(darshan_log_dir, "%-Y", "%-m", "%-d")
