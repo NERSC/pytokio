@@ -3,6 +3,7 @@
 Test the bin/darshan_bad_ost.py tool
 """
 
+import nose.tools
 import test_tools_darshan
 import tokiotest
 import tokiobin.find_darshanlogs
@@ -21,12 +22,28 @@ def wrap_function(test_input):
         argv += ['--username', test_input['params']['username']]
     if test_input['params']['jobid'] is not None:
         argv += ['--jobid', str(test_input['params']['jobid'])]
+    if 'which' in test_input['params']:
+        argv += ['--load', test_input['params']['which']]
     argv += [test_input['params']['darshan_log_dir']]
 
     print "Test args:", argv
-    output_str = tokiotest.run_bin(tokiobin.find_darshanlogs, argv)
-    results = output_str.splitlines()
-    assert (test_input['pass_criteria'])(results)
+
+    expected_exception = test_input.get('expect_exception')
+    if expected_exception:
+        # assert_raises doesn't seem to work correctly here
+#       nose.tools.assert_raises(expected_exception,
+#                                tokiotest.run_bin(tokiobin.find_darshanlogs, argv))
+        caught = False
+        try:
+            output_str = tokiotest.run_bin(tokiobin.find_darshanlogs, argv)
+        except expected_exception:
+            caught = True
+        assert caught
+
+    else:
+        output_str = tokiotest.run_bin(tokiobin.find_darshanlogs, argv)
+        results = output_str.splitlines()
+        assert (test_input['pass_criteria'])(results)
 
 def test_bin_find_darshanlogs():
     """

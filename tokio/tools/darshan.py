@@ -5,6 +5,7 @@ Tools to find Darshan logs within a system-wide repository
 import os
 import glob
 import tokio.tools.common
+import tokio.connectors.darshan
 import tokio.connectors.slurm
 
 DARHSAN_LOG_NAME_STR = "%(username)s_%(exe)s_id%(jobid)s_%(month)s-%(day)s-%(seconds)s-%(logmod)s.darshan"
@@ -17,6 +18,59 @@ DARSHAN_LOG_GLOB_FIELDS = {
     "seconds": "*",
     "logmod": "*",
 }
+
+def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
+                     jobid=None, darshan_log_dir=None, which=None, **kwargs):
+    """Return parsed Darshan logs matching a set of criteria
+
+    Finds Darshan logs that match the input criteria, loads them, and returns a
+    dictionary of connectors.darshan.Darshan objects keyed by the full log file
+    paths to the source logs.
+
+    Args:
+        datetime_start (datetime.datetime): date to begin looking for Darshan logs
+        datetime_end (datetime.datetime): date to stop looking for Darshan logs
+        username (str): username of user who generated the log
+        jobid (int): jobid corresponding to Darshan log
+        darshan_log_dir (str): path to Darshan log directory base
+        which (str): 'base', 'total', and/or 'perf' as a comma-delimited string
+        kwargs: arguments to pass to the connectors.darshanDarshan object
+            initializer
+
+    Returns:
+        dict: keyed by log file name whose values are connectors.darshan.Darshan
+            objects
+
+    Todo:
+        * Use a default `darshan_log_dir` from `tokio.config`
+    """
+    if which is None:
+        raise TypeError("which must be base, total, and/or perf")
+
+    which_list = [x.lower() for x in which.split(',')]
+    if 'base' not in which_list \
+    and 'total' not in which_list \
+    and 'perf' not in which_list:
+        raise TypeError("which must be base, total, and/or perf")
+
+    matching_logfiles = find_darshanlogs(datetime_start=datetime_start,
+                                         datetime_end=datetime_end,
+                                         username=username,
+                                         jobid=jobid,
+                                         darshan_log_dir=darshan_log_dir)
+
+    results = {}
+    for matching_logfile in matching_logfiles:
+        results[matching_logfile] = tokio.connectors.darshan.Darshan(log_file=matching_logfile,
+                                                                     **kwargs)
+        if 'base' in which_list:
+            results[matching_logfile].darshan_parser_base()
+        if 'total' in which_list:
+            results[matching_logfile].darshan_parser_total()
+        if 'perf' in which_list:
+            results[matching_logfile].darshan_parser_perf()
+
+    return results
 
 def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobid=None,
                      darshan_log_dir=None):

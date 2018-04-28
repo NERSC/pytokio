@@ -3,6 +3,7 @@
 """
 
 import sys
+import json
 import argparse
 import datetime
 import tokio.tools.darshan
@@ -24,6 +25,8 @@ def main(argv=None):
                         help="username of Darshan log owner")
     parser.add_argument("-j", "--jobid", type=str, default=None,
                         help="jobid of Darshan log")
+    parser.add_argument("-l", "--load", type=str, default=None,
+                         help='load each Darshan log; must be {base[,total][,perf]}')
     parser.add_argument('logdir', type=str,
                         help='path to DARSHAN_LOG_DIR (exclusive of dated subdirectories)')
     args = parser.parse_args(argv)
@@ -45,12 +48,22 @@ def main(argv=None):
     if start > end:
         raise Exception('query_start >= query_end')
 
-    for logfile in tokio.tools.darshan.find_darshanlogs(datetime_start=start,
-                                                        datetime_end=end,
-                                                        username=args.username,
-                                                        jobid=args.jobid,
-                                                        darshan_log_dir=args.logdir):
-        print logfile
+    if args.load:
+        results = tokio.tools.darshan.load_darshanlogs(datetime_start=start,
+                                                       datetime_end=end,
+                                                       username=args.username,
+                                                       jobid=args.jobid,
+                                                       which=args.load,
+                                                       darshan_log_dir=args.logdir)
+        print json.dumps(results, indent=4, sort_keys=True)
+
+    else:
+        for logfile in tokio.tools.darshan.find_darshanlogs(datetime_start=start,
+                                                            datetime_end=end,
+                                                            username=args.username,
+                                                            jobid=args.jobid,
+                                                            darshan_log_dir=args.logdir):
+            print logfile
 
 if __name__ == "__main__":
     main()
