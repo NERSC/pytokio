@@ -52,7 +52,7 @@ def process_darshan_perfs(summary_json, limit_fs=None, limit_user=None, limit_ex
             continue
 
         if username not in results['per_user']:
-            results['per_user'][username] = {'read_bytes': 0, 'write_bytes': 0}
+            results['per_user'][username] = {'read_bytes': 0, 'write_bytes': 0, 'num_jobs': 0}
 
         for mount in counters.keys():
             if mount != '/':
@@ -61,14 +61,17 @@ def process_darshan_perfs(summary_json, limit_fs=None, limit_user=None, limit_ex
                     continue
                 results['per_user'][username]['read_bytes'] += counters[mount].get('read_bytes', 0)
                 results['per_user'][username]['write_bytes'] += counters[mount].get('write_bytes', 0)
+                results['per_user'][username]['num_jobs'] += 1
                 if mount not in results['per_fs']:
-                    results['per_fs'][mount] = {'read_bytes': 0, 'write_bytes': 0}
+                    results['per_fs'][mount] = {'read_bytes': 0, 'write_bytes': 0, 'num_jobs': 0}
                 results['per_fs'][mount]['read_bytes'] += counters[mount].get('read_bytes', 0)
                 results['per_fs'][mount]['write_bytes'] += counters[mount].get('write_bytes', 0)
+                results['per_fs'][mount]['num_jobs'] += 1
                 if exename not in results['per_exe']:
-                    results['per_exe'][exename] = {'read_bytes': 0, 'write_bytes': 0}
+                    results['per_exe'][exename] = {'read_bytes': 0, 'write_bytes': 0, 'num_jobs': 0}
                 results['per_exe'][exename]['read_bytes'] += counters[mount].get('read_bytes', 0)
                 results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
+                results['per_exe'][exename]['num_jobs'] += 1
 
     return results
 
@@ -87,14 +90,23 @@ def print_top(categorized_data, max_show=10):
         name = names.get(category, category)
         if categories > 0:
             print ""
-        print "%2s  %20s %20s %20s" % ('#', name, 'Read Bytes', 'Write Bytes')
-        print '=' * 66
+        print "%2s  %40s %10s %10s %8s" % ('#', name, 'Read(GiB)', 'Write(GiB)', '# Jobs')
+        print '=' * 75
         displayed = 0
         for winner in sorted(rankings, key=lambda x, r=rankings: r[x]['read_bytes'] + r[x]['write_bytes'], reverse=True):
+            if len(winner) > 40:
+#               winner_str = winner[0:19] + "..." + winner[-18:]
+                winner_str = "..." + winner[-37:]
+            else:
+                winner_str = winner
             displayed += 1
             if displayed > max_show:
                 break
-            print "%2d. %20.20s %20d %20d" % (displayed, winner, rankings[winner]['read_bytes'], rankings[winner]['write_bytes'])
+            print "%2d. %40.40s %10.1f %10.1f %8d" % (displayed,
+                                                  winner_str,
+                                                  rankings[winner]['read_bytes'] / 2.0**30,
+                                                  rankings[winner]['write_bytes'] / 2.0**30,
+                                                  rankings[winner]['num_jobs'])
         categories += 1
 
 def main(argv=None):
