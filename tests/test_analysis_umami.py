@@ -9,7 +9,7 @@ import datetime
 import nose
 import matplotlib
 import tokiotest
-import tokio.tools.umami
+import tokio.analysis.umami
 
 # prevent the test from throwing DISPLAY errors
 matplotlib.pyplot.switch_backend('agg')
@@ -38,9 +38,9 @@ def build_umami_from_sample():
     """
     Construct an Umami object from the test's constants
     """
-    umami = tokio.tools.umami.Umami()
+    umami = tokio.analysis.umami.Umami()
     for index, sample_data in enumerate(SAMPLE_DATA):
-        umami['test_metric_%d' % index] = tokio.tools.umami.UmamiMetric(
+        umami['test_metric_%d' % index] = tokio.analysis.umami.UmamiMetric(
             timestamps=SAMPLE_TIMES,
             values=sample_data,
             label="Test Metric %d" % index,
@@ -130,7 +130,7 @@ def test_umamimetric_append():
     """
     umami_metrics = []
     for index, sample_data in enumerate(SAMPLE_DATA):
-        umami_metric = tokio.tools.umami.UmamiMetric(
+        umami_metric = tokio.analysis.umami.UmamiMetric(
             timestamps=[],
             values=[],
             label="Test Metric %d" % index,
@@ -142,7 +142,7 @@ def test_umamimetric_append():
             umami_metric.append(SAMPLE_TIMES[jndex], sample_datum)
         umami_metrics.append(umami_metric)
 
-    umami = tokio.tools.umami.Umami()
+    umami = tokio.analysis.umami.Umami()
     for index, umami_metric in enumerate(umami_metrics):
         umami["test_metric_%d" % index] = umami_metric
 
