@@ -752,6 +752,8 @@ class Hdf5(h5py.File):
         values = self[dataset_name][:]
         columns = self.get_columns(dataset_name)
         timestamps = self.get_timestamps(dataset_name)
+        if len(columns) < values.shape[1]:
+            columns.resize(values.shape[1])
         dataframe = pandas.DataFrame(data=values,
                                      index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
                                      columns=columns)
