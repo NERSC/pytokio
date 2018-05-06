@@ -15,6 +15,9 @@ import subprocess
 import pandas
 from tokio.connectors.common import SubprocessOutputDict
 
+SACCT = 'sacct'
+SCONTROL = 'scontrol'
+
 def expand_nodelist(node_string):
     """Expand Slurm compact nodelist into a set of nodes
 
@@ -31,10 +34,10 @@ def expand_nodelist(node_string):
     """
     node_names = set([])
     try:
-        output_str = subprocess.check_output(['scontrol', 'show', 'hostname', node_string])
+        output_str = subprocess.check_output([SCONTROL, 'show', 'hostname', node_string])
     except OSError as error:
         if error[0] == errno.ENOENT:
-            raise type(error)(error[0], "Slurm CLI (sacct command) not found")
+            raise type(error)(error[0], "Slurm CLI (%s command) not found" % SACCT)
         raise
 
     for line in output_str.splitlines():
@@ -59,7 +62,7 @@ def compact_nodelist(node_string):
         node_string = ','.join(list(node_string))
 
     try:
-        node_string = subprocess.check_output(['scontrol', 'show', 'hostlist', node_string]).strip()
+        node_string = subprocess.check_output([SCONTROL, 'show', 'hostlist', node_string]).strip()
     except OSError as error:
         if error[0] == errno.ENOENT:
             # "No such file or directory" from subprocess.check_output
@@ -130,7 +133,7 @@ class Slurm(SubprocessOutputDict):
                 object
         """
         super(Slurm, self).__init__(*args, **kwargs)
-        self.subprocess_cmd = ['sacct']
+        self.subprocess_cmd = [SACCT]
         if jobid is not None:
             self.jobid = str(jobid)
         else:

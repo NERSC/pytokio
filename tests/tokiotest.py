@@ -191,11 +191,8 @@ def run_bin(module, argv, also_error=False):
         return stdout, stderr
     return stdout
 
-### Global state
+### Skipping external dependencies when unavailable ############################
 SKIP_DARSHAN = None
-SKIP_LFSHEALTH = None
-TEMP_FILE = None
-
 def needs_darshan(func):
     """
     Need to check if darshan-parser is available; if not, just skip all
@@ -224,6 +221,7 @@ def check_darshan():
     if SKIP_DARSHAN:
         raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
 
+SKIP_LFSHEALTH = None
 def needs_lustre_cli(func):
     """
     Check if Lustre CLI is available; if not, just skip tests
@@ -253,7 +251,36 @@ def check_lustre_cli():
         raise nose.SkipTest("%s or %s not available" % (tokio.connectors.lfshealth.LCTL,
                                                         tokio.connectors.lfshealth.LFS))
 
+SKIP_SLURM = None
+def needs_slurm(func):
+    """
+    Check if Slurm CLI is available; if not, just skip tests
+    """
+    global SKIP_SLURM
+    if SKIP_SLURM is not None:
+        return func
+    try:
+        subprocess.check_output(tokio.connectors.slurm.SACCT, stderr=subprocess.STDOUT)
+    except OSError as error:
+        if error[0] == errno.ENOENT:
+            SKIP_SLURM = True
+    except subprocess.CalledProcessError:
+        pass
 
+    return func
+
+def check_slurm():
+    """
+    If sacct isn't available, skip the test
+    """
+    global SKIP_SLURM
+    if SKIP_SLURM:
+        raise nose.SkipTest("%s not available" % (tokio.connectors.slurm.SACCT))
+
+
+### Managing temporary files ###################################################
+
+TEMP_FILE = None
 def create_tempfile(delete=True):
     """
     Create a temporary file
