@@ -22,7 +22,9 @@ _REX_OST_MAP = re.compile(r'^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(
 _REX_LFS_DF = re.compile(r'^\s*(snx\d+-\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+).\s+(\S+)\[([^:]+):(\d+)\]\s*$')
 
 LCTL = 'lctl'
+LCTL_DL_T = [LCTL, 'dl', '-t']
 LFS = 'lfs'
+LFS_DF = [LFS, 'df']
 
 class SubprocessOutput(dict):
     """Generic class to support connectors that parse the output of a subprocess
@@ -114,7 +116,7 @@ class LfsOstMap(SubprocessOutput):
     """
     def __init__(self, *args, **kwargs):
         super(LfsOstMap, self).__init__(*args, **kwargs)
-        self.subprocess_cmd = [LCTL, 'dl', '-t']
+        self.subprocess_cmd = LCTL_DL_T
         self.load()
 
     def __repr__(self):
@@ -217,7 +219,7 @@ class LfsOstFullness(SubprocessOutput):
     """
     def __init__(self, *args, **kwargs):
         super(LfsOstFullness, self).__init__(*args, **kwargs)
-        self.subprocess_cmd = [LFS, 'df']
+        self.subprocess_cmd = LFS_DF
         self.load()
 
     def __repr__(self):

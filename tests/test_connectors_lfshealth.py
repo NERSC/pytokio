@@ -53,6 +53,22 @@ def verify_ostfullness(keyvalues):
     assert keyvalues['total_kib'] > 0
     assert keyvalues['total_kib'] >= (keyvalues['remaining_kib'] + keyvalues['used_kib'])
 
+@tokiotest.needs_lustre_cli
+def test_ostmap():
+    """lfshealth.LfsOstMap: lctl subprocess
+    """
+    tokiotest.check_lustre_cli()
+    ostmap = tokio.connectors.lfshealth.LfsOstMap()
+    verify_ost(ostmap, input_type='ostmap')
+
+@tokiotest.needs_lustre_cli
+def test_ostfullness():
+    """lfshealth.LfsOstFullness: lfs subprocess
+    """
+    tokiotest.check_lustre_cli()
+    ostfullness = tokio.connectors.lfshealth.LfsOstFullness()
+    verify_ost(ostfullness, input_type='ostfullness')
+
 def test_ostmap_from_cache():
     """lfshealth.LfsOstMap: read from cache file
     """
@@ -79,8 +95,7 @@ def test_ostfullness_from_cache_gz():
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_serializer():
-    """
-    OST map can deserialize its serialization
+    """lfshealth.LfsOstMap: can serialize and deserialize circularly
     """
     # Read from a cache file
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_FILE)
@@ -94,8 +109,7 @@ def test_ostmap_serializer():
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_serializer():
-    """
-    OST fullness can deserialize its serialization
+    """lfshealth.LfsOstFullness: can serialize and deserialize circularly
     """
     # Read from a cache file
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_FILE)

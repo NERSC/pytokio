@@ -193,6 +193,7 @@ def run_bin(module, argv, also_error=False):
 
 ### Global state
 SKIP_DARSHAN = None
+SKIP_LFSHEALTH = None
 TEMP_FILE = None
 
 def needs_darshan(func):
@@ -222,6 +223,36 @@ def check_darshan():
     global SKIP_DARSHAN
     if SKIP_DARSHAN:
         raise nose.SkipTest("%s not available" % tokio.connectors.darshan.DARSHAN_PARSER_BIN)
+
+def needs_lustre_cli(func):
+    """
+    Check if Lustre CLI is available; if not, just skip tests
+    """
+    global SKIP_LFSHEALTH
+    if SKIP_LFSHEALTH is not None:
+        return func
+    try:
+        subprocess.check_output(tokio.connectors.lfshealth.LCTL_DL_T, stderr=subprocess.STDOUT)
+        subprocess.check_output(tokio.connectors.lfshealth.LFS_DF, stderr=subprocess.STDOUT)
+    except OSError as error:
+        if error[0] == errno.ENOENT:
+            SKIP_LFSHEALTH = True
+    except subprocess.CalledProcessError:
+        # this is ok--there's no way to make darshan-parser return zero without
+        # giving it a real darshan log
+        pass
+
+    return func
+
+def check_lustre_cli():
+    """
+    If lctl or lfs isn't available, skip the test
+    """
+    global SKIP_LFSHEALTH
+    if SKIP_LFSHEALTH:
+        raise nose.SkipTest("%s or %s not available" % (tokio.connectors.lfshealth.LCTL,
+                                                        tokio.connectors.lfshealth.LFS))
+
 
 def create_tempfile(delete=True):
     """
