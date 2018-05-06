@@ -13,6 +13,7 @@ import datetime
 import StringIO
 import subprocess
 import pandas
+from tokio.connectors.common import SubprocessOutputDict
 
 def expand_nodelist(node_string):
     """Expand Slurm compact nodelist into a set of nodes
@@ -99,7 +100,7 @@ class SlurmEncoder(json.JSONEncoder):
             return o.strftime("%Y-%m-%dT%H:%M:%S")
         return json.JSONEncoder.default(self, o)
 
-class Slurm(dict):
+class Slurm(SubprocessOutputDict):
     """Dictionary subclass that self-populates with Slurm output data
 
     Presents a schema that is keyed as
@@ -118,25 +119,23 @@ class Slurm(dict):
         * jobid.<step>
         * jobid.batch
     """
-    def __init__(self, jobid=None, cache_file=None):
+    def __init__(self, jobid=None, *args, **kwargs):
         """Load basic information from Slurm
 
         Args:
             jobid (str): Slurm Job ID associated with data this object contains
-            cache_file (str): Path to an output file to be read in as a cache
-                instead of querying Slurm
 
         Attributes:
             jobid (str): Slurm Job ID associated with data contained in this
                 object
         """
-        super(Slurm, self).__init__(self)
-        self.cache_file = cache_file
+        super(Slurm, self).__init__(*args, **kwargs)
+        self.subprocess_cmd = ['sacct']
         if jobid is not None:
             self.jobid = str(jobid)
         else:
             self.jobid = jobid
-        self._load()
+        self.load()
 
     def __repr__(self):
         """Serialize in the same format as sacct
@@ -165,22 +164,17 @@ class Slurm(dict):
             output_str += "\n" + '|'.join(print_values)
         return output_str
 
-    def _load(self):
+    def load(self):
         """Initialize values either from cache or sacct
         """
-        if self.cache_file is not None:
-            self._load_cache()
-        elif self.jobid is not None:
-            self.load_keys('jobidraw', 'start', 'end', 'nodelist')
+        if self.from_string is not None:
+            self.load_str(self.from_string)
+        elif self.cache_file:
+            self.load_cache()
+        elif self.jobid is None:
+            raise Exception("either jobid or cache_file must be specified on init")
         else:
-            raise Exception("Either jobid or cache_file must be specified on init")
-
-    def _load_cache(self):
-        """Load a Slurm job from a JSON-encoded cache file
-        """
-        if self.cache_file is None:
-            raise Exception("load_cache with None as cache_file")
-        self.from_json(open(self.cache_file, 'r').read())
+            self.load_keys('jobidraw', 'start', 'end', 'nodelist')
 
     def load_keys(self, *keys):
         """Retrieve a list of keys from sacct and populate self
@@ -195,19 +189,28 @@ class Slurm(dict):
         if self.jobid is None:
             raise Exception("Slurm.jobid is None")
 
-        try:
-            sacct_str = subprocess.check_output([
-                'sacct',
-                '--jobs', self.jobid,
+        args = ['--jobs', self.jobid,
                 '--format=%s' % ','.join(keys),
-                '--parsable2'])
-        except OSError as error:
-            if error[0] == errno.ENOENT:
-                raise type(error)(error[0], "Slurm CLI (sacct command) not found")
-            raise
-        except subprocess.CalledProcessError:
-            raise
-        self.update(parse_sacct(sacct_str))
+                '--parsable2']
+
+        self._load_subprocess(*args)
+
+        return self
+
+    def load_str(self, input_str):
+        """Load from either a json cache or the output of sacct
+        """
+        loaded_data = None
+        try:
+            loaded_data = self.from_json(input_str)
+        except ValueError:
+            pass
+
+        if loaded_data is None:
+            loaded_data = parse_sacct(input_str)
+
+        self.update(loaded_data)
+
         self._recast_keys()
 
     def _recast_keys(self, *target_keys):
@@ -236,29 +239,6 @@ class Slurm(dict):
                 for key, value in counters.iteritems():
                     if key in _RECAST_KEY_MAP and isinstance(value, basestring):
                         counters[key] = _RECAST_KEY_MAP[key][0](value)
-
-    def save_cache(self, output_file=None):
-        """Serialize self into json format
-
-        Args:
-            output_file (str): Path to a file to which json serialized
-                representation of self should be written; if None, print to
-                stdout.
-        """
-        if output_file is None:
-            self._save_cache(sys.stdout)
-        else:
-            with open(output_file, 'w') as output:
-                self._save_cache(output)
-
-    def _save_cache(self, output):
-        """Write json representation of self to a file-like object
-
-        Args:
-            output (file): file-like object to which the json representation of
-                self should be written.
-        """
-        output.write(self.to_json())
 
 #   def get_task_startend(self, taskid=self.jobid):
 #       """

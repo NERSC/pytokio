@@ -30,7 +30,6 @@ class SubprocessOutputDict(dict):
     def load(self):
         """Load based on initialization state of object
         """
-
         if self.from_string is not None:
             self.load_str(self.from_string)
         elif self.cache_file:
