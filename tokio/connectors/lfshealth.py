@@ -12,6 +12,7 @@ import re
 import warnings
 import mimetypes
 import subprocess
+from tokio.connectors.common import SubprocessOutput
 
 # Only try to match osc/mdc lines; skip mgc/lov/lmv
 # 351 UP osc snx11025-OST0007-osc-ffff8875ac1e7c00 3f30f170-90e6-b332-b141-a6d4a94a1829 5 10.100.100.12@o2ib1
@@ -25,84 +26,6 @@ LCTL = 'lctl'
 LCTL_DL_T = [LCTL, 'dl', '-t']
 LFS = 'lfs'
 LFS_DF = [LFS, 'df']
-
-class SubprocessOutput(dict):
-    """Generic class to support connectors that parse the output of a subprocess
-
-    When deriving from this class, the child object will have to
-
-    1. Define subprocess_cmd after initializing this parent object
-    2. Define self.__repr__ (if necessary)
-    2. Define its own self.load_str
-    3. Define any introspective analysis methods
-    """
-    def __init__(self, cache_file=None, from_string=None, silent_errors=False):
-        super(SubprocessOutput, self).__init__(self)
-        self.cache_file = cache_file
-        self.silent_errors = silent_errors
-        self.from_string = from_string
-        self.subprocess_cmd = []
-
-    def load(self):
-        """Load based on initialization state of object
-        """
-
-        if self.from_string is not None:
-            self.load_str(self.from_string)
-        elif self.cache_file:
-            self.load_cache()
-        else:
-            self._load_subprocess()
-
-    def _load_subprocess(self, *args):
-        """Run a subprocess and pass its stdout to a self-initializing parser
-        """
-
-        cmd = [self.subprocess_cmd]
-        if args:
-            cmd += args
-
-        try:
-            if self.silent_errors:
-                with open(os.devnull, 'w') as devnull:
-                    output_str = subprocess.check_output(cmd, stderr=devnull)
-            else:
-                output_str = subprocess.check_output(cmd)
-        except subprocess.CalledProcessError as error:
-            warnings.warn("%s returned nonzero exit code (%d)" % (cmd, error.returncode))
-            output_str = error.output
-        except OSError as error:
-            if error[0] == errno.ENOENT:
-                raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
-            raise
-
-        self.load_str(output_str)
-
-    def load_cache(self):
-        """Load subprocess output from a cached text file
-        """
-        _, encoding = mimetypes.guess_type(self.cache_file)
-        if encoding == 'gzip':
-            input_fp = gzip.open(self.cache_file, 'r')
-        else:
-            input_fp = open(self.cache_file, 'r')
-        self.load_str(input_fp.read())
-        input_fp.close()
-
-    def load_str(self, input_str):
-        """Load subprocess output from a string
-        """
-        self['_raw'] = input_str
-
-    def save_cache(self, output_file=None):
-        """Serialize subprocess output to a text file
-        """
-        if output_file is None:
-            sys.stdout.write(str(self))
-        else:
-            with open(output_file, 'w') as output_fp:
-                output_fp.write(str(self))
-
 
 class LfsOstMap(SubprocessOutput):
     """

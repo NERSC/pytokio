@@ -12,62 +12,78 @@ import json
 import errno
 import warnings
 import subprocess
+from tokio.connectors.common import SubprocessOutput
 
 DARSHAN_PARSER_BIN = 'darshan-parser'
 
-class Darshan(dict):
-    def __init__(self, log_file=None, cache_file=None, silent_errors=False):
-        super(Darshan,self).__init__(self)
-        self.cache_file = cache_file
+class Darshan(SubprocessOutput):
+    def __init__(self, log_file=None, *args, **kwargs):
+        super(Darshan,self).__init__(*args, **kwargs)
         self.log_file = log_file
-        self.silent_errors = silent_errors
-        self.load()
+        self._parser_mode = None
+        self.subprocess_cmd = [DARSHAN_PARSER_BIN]
+        if log_file is None:
+            self.load()
     
     def __repr__(self):
         return json.dumps(self.values())
         
     def load(self):
-        if self.cache_file is None and self.log_file is None:
+        if self.from_string is not None:
+            self.load_str(self.from_string)
+        elif self.cache_file:
+            self.load_cache()
+        elif self.log_file is None:
             raise Exception("parameters should be provided (at least log_file or cache_file)")
-        if self.cache_file:
-            self.__setitem__(json.load(cache_file))
-    
-    def save_cache(self, output_file=None):
-        """
-        Save the dictionary in a json file
-        """
-        if output_file is None:
-            self._save_cache(sys.stdout)
-        else:
-            with open(output_file, 'w') as fp:
-                output.write(json.dumps(self))
-
-     #=================================================#
     
     def darshan_parser_base(self):
-        return self._darshan_parser("BASE")
+        self._parser_mode = "BASE"
+        return self._darshan_parser()
 
     def darshan_parser_total(self):
-        return self._darshan_parser("TOTAL")
+        self._parser_mode = "TOTAL"
+        return self._darshan_parser()
 
     def darshan_parser_perf(self):
-        return self._darshan_parser("PERF")
+        self._parser_mode = "PERF"
+        return self._darshan_parser()
 
-    def _darshan_parser(self, counter_flag="BASE"):
+    def _darshan_parser(self):
+        """Call darshan-parser to initialize values in self
         """
-        Call darshan-parser --base on self.log_file and walk its output, identifying
-        different sections and invoking the appropriate line parser function
+
+        if self.log_file is None:
+            return self
+
+        if self._parser_mode in ["BASE", "TOTAL", "PERF"]:
+            darshan_flag = "--" + self._parser_mode.lower()
+        else:
+            self._parser_mode = "BASE"
+            darshan_flag = ""
+
+        args = [darshan_flag, self.log_file]
+
+        self._load_subprocess(*args)
+
+        return self
+
+    def load_str(self, input_str):
+        """Load from either a json cache or the output of darshan-parser
         """
+        loaded_data = None
+        try:
+            loaded_data = json.loads(input_str)
+        except ValueError:
+            pass
 
-        def counter_parser(line, counter_flag):
-            if counter_flag == "BASE":
-                return self._parse_base_counters(line)
-            if counter_flag == "PERF":
-                return self._parse_perf_counters(line)
-            if counter_flag == "TOTAL":
-                return self._parse_total_counters(line)
-            return None
+        if loaded_data:
+            self.__setitem__(loaded_data)
+        else:
+            self._parse_darshan_parser(input_str)
 
+    def _parse_darshan_parser(self, output_str):
+        """Load values from output of darshan-parser
+        """
         def is_valid_counter(counter):
             """
             if counter is not None, this line is valid (return True)
@@ -124,36 +140,13 @@ class Darshan(dict):
                 else:
                     value = long(value)
                 insert_base[counter] = value
-        
-        if self.log_file is None:
-            return self
 
         section = None
         counter = None
         module_section = None
         # This regex must match every possible module name
         module_rex = re.compile('^# ([A-Z\-0-9/]+) module data\s*$')
-        if counter_flag in ["BASE", "TOTAL", "PERF"]:
-            darshan_flag = "--" + counter_flag.lower()
-        else:
-            darshan_flag = ""
-
-        cmd = [DARSHAN_PARSER_BIN, darshan_flag, self.log_file]
-        try:
-            if self.silent_errors:
-                with open(os.devnull, 'w') as devnull:
-                    output_str = subprocess.check_output(cmd, stderr=devnull)
-            else:
-                output_str = subprocess.check_output(cmd)
-        except subprocess.CalledProcessError as error:
-            warnings.warn("darshan-parser returned nonzero exit code (%d)" % error.returncode)
-            output_str = error.output
-        except OSError as error:
-            if error[0] == errno.ENOENT:
-                raise type(error)(error[0], "darshan-parser command not found")
-            raise
-
-
+ 
         for line in output_str.splitlines():
             # Is this the start of a new section?
             # Why do we look at section, refactorize failed 
@@ -189,19 +182,19 @@ class Darshan(dict):
                     self[section][key] = val
 
             elif section == 'counters':
-                if counter_flag == "BASE":
-                    module, rank, record_id, counter, value, file_name, mount_pt, fs_type = counter_parser(line, counter_flag)
+                if self._parser_mode == "BASE":
+                    module, rank, record_id, counter, value, file_name, mount_pt, fs_type = self._parse_base_counters(line)
                     if module_section is not None:
                         # If it is none, is_valid_counter check below will bail
                         counter_prefix = module_section + "_"
-                elif counter_flag == "TOTAL":
-                    counter, value = counter_parser(line, counter_flag)
+                elif self._parser_mode == "TOTAL":
+                    counter, value = self._parse_total_counters(line)
                     file_name = '_total'
                     rank = None
                     if module_section is not None:
                         counter_prefix = 'total_%s_' % module_section
-                elif counter_flag == "PERF":
-                    counter, value = counter_parser(line, counter_flag)
+                elif self._parser_mode == "PERF":
+                    counter, value = self._parse_perf_counters(line)
                     file_name = '_perf'
                     rank = None
                     counter_prefix = None
@@ -233,13 +226,13 @@ class Darshan(dict):
         # exe: /home/user/bin/myjob.exe --whatever
         # uid: 69615
         """
-	if line.startswith("# darshan log version:"):
+        if line.startswith("# darshan log version:"):
             return 'version', line.split()[-1]
-   	elif line.startswith("# compression method:"):
+        elif line.startswith("# compression method:"):
             return "compression", line.split()[-1]
-    	elif line.startswith("# exe:"):
+        elif line.startswith("# exe:"):
             return "exe", line.split()[2:]
-    	elif line.startswith("# uid:"):
+        elif line.startswith("# uid:"):
             return "uid", int(line.split()[-1])
         elif line.startswith("# jobid:"):
             return 'jobid', line.split()[-1]
