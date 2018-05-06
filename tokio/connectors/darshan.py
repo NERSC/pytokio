@@ -12,11 +12,11 @@ import json
 import errno
 import warnings
 import subprocess
-from tokio.connectors.common import SubprocessOutput
+from tokio.connectors.common import SubprocessOutputDict
 
 DARSHAN_PARSER_BIN = 'darshan-parser'
 
-class Darshan(SubprocessOutput):
+class Darshan(SubprocessOutputDict):
     def __init__(self, log_file=None, *args, **kwargs):
         super(Darshan,self).__init__(*args, **kwargs)
         self.log_file = log_file

@@ -12,7 +12,7 @@ import re
 import warnings
 import mimetypes
 import subprocess
-from tokio.connectors.common import SubprocessOutput
+from tokio.connectors.common import SubprocessOutputDict
 
 # Only try to match osc/mdc lines; skip mgc/lov/lmv
 # 351 UP osc snx11025-OST0007-osc-ffff8875ac1e7c00 3f30f170-90e6-b332-b141-a6d4a94a1829 5 10.100.100.12@o2ib1
@@ -27,7 +27,7 @@ LCTL_DL_T = [LCTL, 'dl', '-t']
 LFS = 'lfs'
 LFS_DF = [LFS, 'df']
 
-class LfsOstMap(SubprocessOutput):
+class LfsOstMap(SubprocessOutputDict):
     """
     Representation for the lctl dl -t command.  Generates a dict of form
 
@@ -133,7 +133,7 @@ class LfsOstMap(SubprocessOutput):
 
         return resulting_data
 
-class LfsOstFullness(SubprocessOutput):
+class LfsOstFullness(SubprocessOutputDict):
     """
     Representation for the `lfs df` command.  Generates a dict of form
 

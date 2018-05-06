@@ -11,8 +11,9 @@ import errno
 import collections
 import subprocess
 import mimetypes
+from tokio.connectors.common import SubprocessOutputDict
 
-class CraySdbProc(dict):
+class CraySdbProc(SubprocessOutputDict):
     """
     Presents certain views of the Cray Service Database (SDB) as a dictionary.
     Lazy load data to prevent unnecessary touches to the actual service
@@ -21,43 +22,16 @@ class CraySdbProc(dict):
     This may someday become a base class for table-specific classes.
     
     """
-    def __init__(self, cache_file=None):
-        super(CraySdbProc, self).__init__(self)
-        self.cache_file = cache_file
-        # Keep the order in which we parse xtdb2proc output file  
-        self.key_order = []
-        self.load_xtdb2proc_table()
-
-    def load_xtdb2proc_table(self):
-        """
-        Load an xtdb2proc output file for a system
-        
-        """
-        if self.cache_file is None:
-            # Load directly from the Cray service database
-            try:
-                sdb = subprocess.check_output(['xtdb2proc', '-f', '-'])
-            except OSError as error:
-                if error[0] == errno.ENOENT:
-                    raise type(error)(error[0], "CraySDB CLI (xtdb2proc command) not found")
-                raise
-            # sdb = subprocess.Popen(['xtdb2proc', '-f', '-'], stdout=subprocess.PIPE).communicate()[0]
-            self._parse_xtdb2proc_table(sdb.splitlines())
-        else:
-            # Load a cached copy of the service database xtdb2proc table
-            _, encoding = mimetypes.guess_type(self.cache_file)
-            if encoding == 'gzip':
-                fp = gzip.open(self.cache_file, 'r')
-            else:
-                fp = open(self.cache_file, 'r')
-            self._parse_xtdb2proc_table(fp)
-            fp.close()
+    def __init__(self, *args, **kwargs):
+        super(CraySdbProc, self).__init__(*args, **kwargs)
+        self.subprocess_cmd = ['xtdb2proc', '-f', '-']
+        self.key_order = [] # implement poor-man's OrderedDict
+        self.load()
 
     def __repr__(self):
         """
         Returns the object in the same format as the xtdb2proc output so that
         this object can be circularly serialized and deserialized
-        
         """
         repr_result = ""
         for _, record in self.iteritems():
@@ -85,31 +59,13 @@ class CraySdbProc(dict):
             repr_result += ','.join(line) + "\n"
         return repr_result
     
-    
-    def save_cache(self, output_file=None):
-        """
-        Serialize the object in a form compatible with the output of xtdb2proc
-        
-        """
-        if output_file is None:
-            self._save_cache(sys.stdout)
-        else:
-            with open(output_file, 'w') as fp:
-                self._save_cache(fp)
-
-    def _save_cache(self, output):
-        output.write(str(self))
-
-    #========================================================#
-        
-    def _parse_xtdb2proc_table(self, iterable):
+    def load_str(self, input_str):
         """
         Load a serialized SDB cache passed in as an iterable
-
         """
         # Save the key order once
         check_keys = True
-        for line in iterable:
+        for line in input_str.splitlines():
             if line.startswith('#') or line.strip() == "":
                 continue
             fields = line.split(',')

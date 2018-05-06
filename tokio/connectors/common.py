@@ -10,7 +10,7 @@ import warnings
 import mimetypes
 import subprocess
 
-class SubprocessOutput(dict):
+class SubprocessOutputDict(dict):
     """Generic class to support connectors that parse the output of a subprocess
 
     When deriving from this class, the child object will have to
@@ -21,7 +21,7 @@ class SubprocessOutput(dict):
     3. Define any introspective analysis methods
     """
     def __init__(self, cache_file=None, from_string=None, silent_errors=False):
-        super(SubprocessOutput, self).__init__(self)
+        super(SubprocessOutputDict, self).__init__(self)
         self.cache_file = cache_file
         self.silent_errors = silent_errors
         self.from_string = from_string
