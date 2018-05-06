@@ -58,7 +58,7 @@ class SubprocessOutput(dict):
         """Run a subprocess and pass its stdout to a self-initializing parser
         """
 
-        cmd = self.subprocess_cmd
+        cmd = [self.subprocess_cmd]
         if args:
             cmd += args
 
