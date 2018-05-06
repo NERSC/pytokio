@@ -78,6 +78,9 @@ class Umami(collections.OrderedDict):
             fontsize (int): font size for UMAMI labels
             figsize (tuple of float): x, y dimensions of a single UMAMI row;
                 multiplied by len(self.keys()) to determine full diagram height
+
+        Returns:
+            List of axes corresponding to each panel in the UMAMI diagram
         """
         rows_to_plot = self.keys()
         fig = matplotlib.pyplot.figure()
@@ -231,7 +234,7 @@ class Umami(collections.OrderedDict):
         if output_file is not None:
             fig.savefig(output_file, bbox_inches="tight")
 
-        return fig
+        return fig.axes
 
 class UmamiMetric(object):
     """

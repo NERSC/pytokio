@@ -27,12 +27,12 @@ SAMPLE_DATA = [
     [random.randrange(-1000.0, 1000.0) for n in range(5)],
 ]
 
-def verify_umami_fig(fig):
+def verify_umami_fig(axes):
     """
     Verify basic UMAMI correctness
     """
     ### more correctness assertions?
-    assert len(fig.axes) == 2*len(SAMPLE_DATA)
+    assert len(axes) == 2*len(SAMPLE_DATA)
 
 def build_umami_from_sample():
     """
