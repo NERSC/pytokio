@@ -49,6 +49,10 @@ SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of 
 ### For lfsstatus connector/tool.  These values must reflect the contents of
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
 ### pass.
+SAMPLE_LCTL_DL_T_FILE = os.path.join(INPUT_DIR, 'lctl-dl-t.txt')
+SAMPLE_LFS_DF_FILE = os.path.join(INPUT_DIR, 'lfs-df.txt')
+SAMPLE_LCTL_DL_T_GZ = os.path.join(INPUT_DIR, 'lctl-dl-t.txt.gz')
+SAMPLE_LFS_DF_GZ = os.path.join(INPUT_DIR, 'lfs-df.txt.gz')
 SAMPLE_OSTMAP_FILE = os.path.join(INPUT_DIR, 'sample_ost-map.txt')
 SAMPLE_OSTMAP_FILE_GZ = SAMPLE_OSTMAP_FILE + ".gz"
 SAMPLE_OSTMAP_START = 1489998203
@@ -59,7 +63,6 @@ SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
 SAMPLE_OSTFULLNESS_FILE_GZ = SAMPLE_OSTFULLNESS_FILE + ".gz"
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
-
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
