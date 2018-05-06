@@ -37,7 +37,7 @@ def expand_nodelist(node_string):
         output_str = subprocess.check_output([SCONTROL, 'show', 'hostname', node_string])
     except OSError as error:
         if error[0] == errno.ENOENT:
-            raise type(error)(error[0], "Slurm CLI (%s command) not found" % SACCT)
+            raise type(error)(error[0], "Slurm CLI (%s command) not found" % SCONTROL)
         raise
 
     for line in output_str.splitlines():
