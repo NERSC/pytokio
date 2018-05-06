@@ -73,6 +73,10 @@ def test_h5lmt_compat():
         print "Checking %s" % dataset_name
         assert hdf5_file[dataset_name] is not None
         assert hdf5_file[dataset_name][0, 0] is not None # make sure we can index 2d
+        # check using new names to get dataframes from old files
+        dataframed = hdf5_file.to_dataframe(dataset_name)
+        assert len(dataframed) > 0
+        assert len(dataframed.columns) > 0
 
 def _test_to_dataframe(hdf5_file, dataset_name):
     """Exercise to_dataframe() and check basic correctness

@@ -784,7 +784,11 @@ class Hdf5(h5py.File):
             if num_dims == 1:
                 values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[dataset_name][:].T
+                # only transpose if dataset_name refers to a native type
+                if normed_name in SCHEMA_DATASET_PROVIDERS[None]:
+                    values = self[dataset_name][:]
+                else:
+                    values = self[dataset_name][:].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
