@@ -773,7 +773,7 @@ class Hdf5(h5py.File):
         elif normed_name == 'MDSCPUGroup/MDSCPUDataSet':
             columns = ['unknown_mds']
         else:
-            columns = None
+            columns = self.get_columns(normed_name)
 
         # Get timestamps through regular API
         timestamps = self.get_timestamps(dataset_name)
