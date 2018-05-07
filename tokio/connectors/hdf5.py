@@ -652,8 +652,11 @@ class Hdf5(h5py.File):
         """Get the column names of an h5lmt dataset
         """
         dataset = self.__getitem__(dataset_name)
+        orig_dataset_name = dataset_name.lstrip('/')
         dataset_name = dataset.name.lstrip('/')
-        if dataset_name in H5LMT_COLUMN_ATTRS:
+        if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
+            return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
+        elif dataset_name in H5LMT_COLUMN_ATTRS:
             return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
         elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
             return numpy.array(['_unknown'])
