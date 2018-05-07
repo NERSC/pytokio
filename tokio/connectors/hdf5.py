@@ -773,7 +773,7 @@ class Hdf5(h5py.File):
         elif normed_name == 'MDSCPUGroup/MDSCPUDataSet':
             columns = ['unknown_mds']
         else:
-            columns = self.get_columns(normed_name)
+            columns = None
 
         # Get timestamps through regular API
         timestamps = self.get_timestamps(dataset_name)
@@ -789,6 +789,7 @@ class Hdf5(h5py.File):
                 # only transpose if dataset_name refers to a native type
                 if normed_name in SCHEMA_DATASET_PROVIDERS[None]:
                     values = self[dataset_name][:]
+                    columns = self.get_columns(normed_name)
                 else:
                     values = self[dataset_name][:].T
             elif num_dims > 2:
