@@ -77,6 +77,9 @@ def summarize_darshan_perf(darshan_logs):
         if 'counters' not in darshan_data:
             warnings.warn("Invalid Darshan log %s" % darshan_log)
             continue
+        elif 'posix' not in darshan_data['counters']:
+            warnings.warn("Darshan log %s does not contain POSIX module data" % darshan_log)
+            continue
         elif 'lustre' not in darshan_data['counters']:
             warnings.warn("Darshan log %s does not contain Lustre module data" % darshan_log)
             continue
