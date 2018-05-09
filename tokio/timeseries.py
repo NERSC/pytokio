@@ -446,11 +446,22 @@ def sorted_nodenames(nodenames, sort_hex=False):
     return sorted(nodenames, natural_comp)
 
 def timeseries_deltas(dataset):
-    """
+    """Convert monotonically increasing values into deltas
+
     Subtract every row of the dataset from the row that precedes it to
     convert a matrix of monotonically increasing rows into deltas.  This is a
     lossy process because the deltas for the final measurement of the time
     series cannot be calculated.
+
+    Args:
+        dataset (numpy.ndarray): The dataset to convert from absolute values
+            into deltas.  rows should correspond to time, and columns to
+            individual components
+
+    Returns:
+        numpy.ndarray: The deltas between each row in the given input dataset.
+            Will have the same number of columns as the input dataset and one
+            fewer rows.
     """
     diff_matrix = numpy.full((dataset.shape[0] - 1, dataset.shape[1]), -0.0)
 
@@ -465,7 +476,7 @@ def timeseries_deltas(dataset):
                     prev_nonzero[icol] = this_element
             elif searching[icol]:
                 if this_element != 0.0:
-                    if prev_nonzero[icol] is not None:
+                    if prev_nonzero[icol] is not None and this_element >= prev_nonzero[icol]:
                         diff_matrix[irow - 1, icol] = this_element - prev_nonzero[icol]
                         searching[icol] = False
                     prev_nonzero[icol] = this_element
