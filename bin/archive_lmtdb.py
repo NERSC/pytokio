@@ -32,12 +32,12 @@ class DatasetDict(dict):
 
         self.config = {
             'datatargets/readbytes': {
-                "units": "bytes/sec",
+                "units": "bytes",
                 "delta": True,
                 "column": "READ_BYTES",
             },
             'datatargets/writebytes': {
-                "units": "bytes/sec",
+                "units": "bytes",
                 "delta": True,
                 "column": "WRITE_BYTES",
             },
