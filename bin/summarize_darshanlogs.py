@@ -7,17 +7,23 @@ warned that this can consume significant amounts of system memory.
 
 import os
 import json
+import functools
 import argparse
 import warnings
 import multiprocessing
 import tokio.connectors.darshan
 
-def process_log(darshan_log):
+def process_log(darshan_log, max_mb=0):
     """
     Parse a Darshan log and add up the bytes read and written to each entry in
     the mount table.
     """
     result = {}
+    if max_mb and (os.path.getsize(darshan_log) / 1024 / 1024) > max_mb:
+        errmsg = "Skipping %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
+        warnings.warn(errmsg)
+        return result
+
     try:
         darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
         darshan_data.darshan_parser_base()
@@ -60,14 +66,14 @@ def process_log(darshan_log):
 
     return result if result else {}
 
-def _process_log_parallel(darshan_log):
+def _process_log_parallel(darshan_log, max_mb):
     """
     Return a tuple containing the Darshan log name and the results of
     process_log() to the parallel orchestrator.
     """
-    return (darshan_log, process_log(darshan_log))
+    return (darshan_log, process_log(darshan_log, max_mb))
 
-def darshan_bytes_per_fs(log_list, threads=1):
+def darshan_bytes_per_fs(log_list, threads=1, max_mb=0):
     """
     Given a list of input files, process each as a Darshan log and return a
     dictionary, keyed by logfile name, containing the bytes read/written per
@@ -89,7 +95,7 @@ def darshan_bytes_per_fs(log_list, threads=1):
         new_log_list = log_list
 
     global_results = {}
-    for log_name, result in multiprocessing.Pool(threads).imap_unordered(_process_log_parallel, new_log_list):
+    for log_name, result in multiprocessing.Pool(threads).imap_unordered(functools.partial(_process_log_parallel, max_mb=max_mb), new_log_list):
         if result:
             global_results[log_name] = result
 
@@ -104,9 +110,10 @@ def main(argv=None):
     parser.add_argument('-t', '--threads', default=1, type=int,
                         help="Number of concurrent processes")
     parser.add_argument('-o', '--output', type=str, default=None, help="Name of output file")
+    parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider")
     args = parser.parse_args(argv)
 
-    global_results = darshan_bytes_per_fs(args.darshanlogs, args.threads)
+    global_results = darshan_bytes_per_fs(args.darshanlogs, args.threads, args.max_mb)
     if args.output is None:
         print json.dumps(global_results, sort_keys=True, indent=4)
     else:
