@@ -229,7 +229,7 @@ class NerscIsdct(dict):
             diff_dict = {}
             for counter, value in counters.iteritems():
                 if counter not in old_isdct[serial_no]:
-                    warnings.warn("Counter %s does not exist in old_isdct")
+                    warnings.warn("Counter %s does not exist in old_isdct" % counter)
 
                 ### just highlight different strings
                 elif isinstance(value, basestring):
