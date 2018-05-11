@@ -20,8 +20,7 @@ MODEST_PVALUE_CUTOFF = "0.01"
 
 @tokiotest.needs_darshan
 def test_good_log():
-    """
-    Detect no false positives in a good Darshan log
+    """bin/darshan_bad_ost.py: detect no false positives in a good Darshan log
     """
     tokiotest.check_darshan()
     argv = ['--json',
@@ -33,8 +32,7 @@ def test_good_log():
 
 @tokiotest.needs_darshan
 def test_bad_log():
-    """
-    Detect a very bad OST
+    """bin/darshan_bad_ost.py: detect a very bad OST
     """
     tokiotest.check_darshan()
     argv = ['--json',
@@ -49,8 +47,7 @@ def test_bad_log():
 
 @tokiotest.needs_darshan
 def test_single_file_log():
-    """
-    Handle a log with insufficient data for correlation
+    """bin/darshan_bad_ost.py: handle log with insufficient data for correlation
     """
     tokiotest.check_darshan()
     argv = ['--json', SAMPLE_1FILE_DARSHAN_LOG]
@@ -60,8 +57,7 @@ def test_single_file_log():
 
 @tokiotest.needs_darshan
 def test_multi_file_log():
-    """
-    Correctly handle multiple input logs
+    """bin/darshan_bad_ost.py: correctly handle multiple input logs
     """
     tokiotest.check_darshan()
     argv = ['--json',
