@@ -73,11 +73,23 @@ def _process_log_parallel(darshan_log, max_mb):
     """
     return (darshan_log, process_log(darshan_log, max_mb))
 
-def darshan_bytes_per_fs(log_list, threads=1, max_mb=0):
-    """
+def sum_bytes_per_fs(log_list, threads=1, max_mb=0, update=None):
+    """Calculate the sum bytes read/written
+
     Given a list of input files, process each as a Darshan log and return a
     dictionary, keyed by logfile name, containing the bytes read/written per
     file system mount point.
+
+    Args:
+        log_list (list): paths to Darshan logs to be processed
+        threads (int): number of subprocesses to spawn for Darshan log parsing
+        max_mb (int): skip logs of size larger than this value
+        update (dict): if provided, exclude Darshan logs that are already
+            present in this dictionary and return the merger of the new data
+            and this dictionary
+
+    Returns:
+        dict: The reduced data along different reduction dimensions
     """
 
     # If only one argument is passed in but it's a directory, enumerate all the
@@ -94,7 +106,20 @@ def darshan_bytes_per_fs(log_list, threads=1, max_mb=0):
     else:
         new_log_list = log_list
 
-    global_results = {}
+    if update:
+        global_results = update
+    else:
+        global_results = {}
+
+    # Filter out logs that were already processed
+    remove_list = []
+    for log_name in new_log_list:
+        if log_name in global_results:
+            remove_list.append(log_name)
+    for log_name in remove_list:
+        new_log_list.remove(log_name)
+
+    # Analyze the remaining logs in parallel
     for log_name, result in multiprocessing.Pool(threads).imap_unordered(functools.partial(_process_log_parallel, max_mb=max_mb), new_log_list):
         if result:
             global_results[log_name] = result
@@ -103,23 +128,35 @@ def darshan_bytes_per_fs(log_list, threads=1, max_mb=0):
 
 def main(argv=None):
     """
-    CLI wrapper around darshan_bytes_per_fs
+    CLI wrapper around sum_bytes_per_fs
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")
     parser.add_argument('-t', '--threads', default=1, type=int,
                         help="Number of concurrent processes")
+    parser.add_argument('-i', '--input', type=str, default=None, help='Name of input file to update')
     parser.add_argument('-o', '--output', type=str, default=None, help="Name of output file")
     parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider")
     args = parser.parse_args(argv)
 
-    global_results = darshan_bytes_per_fs(args.darshanlogs, args.threads, args.max_mb)
+    if args.input:
+        with open(args.input, 'r') as json_input:
+            existing_data = json.load(json_input)
+        starting_ct = len(existing_data)
+    else:
+        existing_data = None
+        starting_ct = 0
+
+    global_results = sum_bytes_per_fs(log_list=args.darshanlogs,
+                                      threads=args.threads,
+                                      max_mb=args.max_mb,
+                                      update=existing_data)
     if args.output is None:
         print json.dumps(global_results, sort_keys=True, indent=4)
     else:
         with open(args.output, 'w') as output_file:
             json.dump(global_results, output_file)
-            print "Wrote output to %s" % output_file
+            print "Added %d log summaries to %s" % (len(global_results) - starting_ct, args.output)
 
 if __name__ == "__main__":
     main()
