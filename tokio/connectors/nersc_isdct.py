@@ -302,11 +302,17 @@ def _merge_parsed_counters(parsed_counters_list):
     with redundant counters being overwritten.
 
     Args:
-        parsed_counters_list (list): List of parsed ISDCT outputs as dicts
+        parsed_counters_list (list): List of parsed ISDCT outputs as dicts.
+            Each list element is a dict with a single key (a device serial
+            number) and one or more values; each value is itself a dict of
+            key-value pairs corresponding to ISDCT/SMART counters from that
+            device.
 
     Returns:
-        dict: Schema dictated by all unique keys found in every element of
-            `parsed_counters_list`
+        dict: Dict with keys given by all device serial numbers found in
+            `parsed_counters_list` and whose values are a dict containing keys
+            and values representing all unique keys across all elements of
+            `parsed_counters_list`.
     """
     all_data = {}
     for parsed_counters in parsed_counters_list:
@@ -324,12 +330,19 @@ def _merge_parsed_counters(parsed_counters_list):
             all_data[device_sn].update(parsed_counters[device_sn])
 
     ### attempt to figure out the type of each counter
+    new_counters = []
     for device_sn, counters in all_data.iteritems():
         for counter, value in counters.iteritems():
-            new_value = None
             ### first, handle counters that do not have an obvious way to cast
-            if counter in ("Temperature", "Thermal_Throttle_Status_ThrottleStatus"):
-                value = value.split()[0]
+            if counter in ("temperature", "throttle_status", "endurance_analyzer"):
+                tokens = value.split(None, 1)
+                if len(tokens) == 2:
+                    new_value, unit = tokens
+                else:
+                    new_value, unit = tokens[0], None
+            else:
+                new_value = value
+                unit = None
 
             ### the order here is important, but hex that is not prefixed with
             ### 0x may be misinterpreted as integers.  if such counters ever
@@ -344,8 +357,23 @@ def _merge_parsed_counters(parsed_counters_list):
                 new_value = True
             elif value == "False":
                 new_value = False
-            if new_value is not None:
-                all_data[device_sn][counter] = new_value
+
+            ### endurance_analyzer can be numeric or an error string
+            if counter == 'endurance_analyzer':
+                if isinstance(new_value, basestring):
+                    new_value = None
+                    unit = None
+                elif unit is None:
+                    # because Intel reports this counter multiple times using different print formats
+                    unit = 'years'
+
+            ### Insert the key-value pair and its unit of measurement (if available)
+            all_data[device_sn][counter] = new_value
+            if unit is not None:
+                new_counters.append((device_sn, '%s_unit' % counter, unit))
+
+    for (device_sn, counter, value) in new_counters:
+        all_data[device_sn][counter] = value
 
     return all_data
 
