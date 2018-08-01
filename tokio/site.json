@@ -17,18 +17,18 @@
         "scratch3": "snx11036",
         "cscratch": "snx11168"
     },
-    "hdf5_file": {
+    "hdf5_files": {
         "scratch1": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11025.h5lmt",
         "scratch2": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11035.h5lmt",
         "scratch3": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11036.h5lmt",
         "cscratch": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/cori_snx11168.h5lmt"
     },
-    "isdct_file": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
-    "lfsstatus_fullness_file": [
+    "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
+    "lfsstatus_fullness_files": [
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts.txt",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts_edison.txt"
     ],
-    "lfsstatus_map_file": [
+    "lfsstatus_map_files": [
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map.txt",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
     ]

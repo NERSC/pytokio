@@ -65,9 +65,9 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         dict: various statistics about the file system fullness
     """
     if metric == "fullness":
-        template_path = tokio.config.LFSSTATUS_FULLNESS_FILE
+        template_path = tokio.config.LFSSTATUS_FULLNESS_FILES
     elif metric == "failures":
-        template_path = tokio.config.LFSSTATUS_MAP_FILE
+        template_path = tokio.config.LFSSTATUS_MAP_FILES
     else:
         raise Exception("unknown metric " + metric)
 

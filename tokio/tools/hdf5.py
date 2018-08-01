@@ -16,7 +16,7 @@ def enumerate_h5lmts(fsname, datetime_start, datetime_end):
     """   
     return common.enumerate_dated_files(start=datetime_start,
                                         end=datetime_end,
-                                        template=tokio.config.HDF5_FILE,
+                                        template=tokio.config.HDF5_FILES,
                                         lookup_key=fsname,
                                         match_first=True)
 

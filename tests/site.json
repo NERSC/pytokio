@@ -18,7 +18,7 @@
         "cscratch": "snx11168",
         "fakefs": "snx11035"
     },
-    "hdf5_file": {
+    "hdf5_files": {
         "scratch1": "inputs/%Y-%m-%d/edison_snx11025.h5lmt",
         "scratch2": "inputs/%Y-%m-%d/edison_snx11035.h5lmt",
         "scratch3": "inputs/%Y-%m-%d/edison_snx11036.h5lmt",
@@ -29,11 +29,12 @@
         "inputs/%Y-%m-%d/file1",
         "inputs/%Y-%m-%d/file2"
     ],
-    "lfsstatus_fullness_file": [
+    "isdct_files": "inputs/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
+    "lfsstatus_fullness_files": [
         "inputs/%Y-%m-%d/osts.txt",
         "inputs/%Y-%m-%d/osts_edison.txt"
     ],
-    "lfsstatus_map_file": [
+    "lfsstatus_map_files": [
         "inputs/%Y-%m-%d/ost-map.txt",
         "inputs/%Y-%m-%d/ost-map_edison.txt"
     ]
