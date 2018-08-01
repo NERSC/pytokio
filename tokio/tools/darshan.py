@@ -101,6 +101,9 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
             job_data = tokio.connectors.slurm.Slurm(jobid=jobid)
             datetime_start, _ = job_data.get_job_startend()
 
+    if datetime_end is None:
+        datetime_end = datetime_start
+
     # the following will not work on Windows!
     darshan_dated_dir = os.path.join(darshan_log_dir, "%-Y", "%-m", "%-d")
 
