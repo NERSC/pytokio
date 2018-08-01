@@ -45,9 +45,6 @@ def enumerate_dated_files(start, end, template,
             `start` and `end` while looking for matching files.
     """
 
-    if end is None:
-        end = start
-
     if end < start:
         raise IndexError("datetime_end < datetime_start")
 
@@ -113,6 +110,6 @@ def _match_files(check_paths, use_time, match_first):
         if os.path.exists(match_path):
             matching.append(match_path)
             if match_first:
-                continue
+                break
 
     return matching
