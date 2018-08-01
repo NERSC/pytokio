@@ -25,6 +25,10 @@
         "cscratch": "inputs/%Y-%m-%d/cori_snx11168.h5lmt",
         "fakefs": "inputs/%Y-%m-%d/sample.h5lmt"
     },
+    "test_list": [
+        "inputs/%Y-%m-%d/file1",
+        "inputs/%Y-%m-%d/file2"
+    ],
     "lfsstatus_fullness_file": [
         "inputs/%Y-%m-%d/osts.txt",
         "inputs/%Y-%m-%d/osts_edison.txt"
