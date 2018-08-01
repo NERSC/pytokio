@@ -16,8 +16,10 @@ DEADBEEF_VALUE = 0xDEADBEEF
 
 ### tokio.config settings that should be settable via environment variables
 MAGIC_VARIABLES = {
-    'H5LMT_BASE_DIR': os.path.join('abc', 'def'),
-    'LFSSTATUS_BASE_DIR': os.path.join('ghi', 'klmno', 'p'),
+    'HDF5_FILE': os.path.join('abc', 'def'),
+    'LFSSTATUS_FULLNESS_FILE': os.path.join('ghi', 'klmno', 'p'),
+    'LFSSTATUS_MAP_FILE': os.path.join('y', 'z', ''),
+    'ISDCT_FILE': os.path.join('qrs', 'tuv', 'wx'),
 }
 
 def flush_env():
