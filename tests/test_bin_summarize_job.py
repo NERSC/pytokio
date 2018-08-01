@@ -25,6 +25,7 @@ def verify_output_json(output_str, key=None, value=None):
     """
     for parsed_data in json.loads(output_str):
         if key is not None:
+            print "Checking if %s is present" % key
             assert key in parsed_data.keys()
             if value is not None:
                 assert parsed_data[key] == value

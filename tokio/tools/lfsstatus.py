@@ -65,9 +65,9 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         dict: various statistics about the file system fullness
     """
     if metric == "fullness":
-        file_basename = tokio.config.LFSSTATUS_FULLNESS_FILE
+        template_path = tokio.config.LFSSTATUS_FULLNESS_FILE
     elif metric == "failures":
-        file_basename = tokio.config.LFSSTATUS_MAP_FILE
+        template_path = tokio.config.LFSSTATUS_MAP_FILE
     else:
         raise Exception("unknown metric " + metric)
 
@@ -77,11 +77,11 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         # the previous day's index.  The lookahead can be much more conservative
         # since it only needs to compensate for sampling intervals (15 min in
         # practice at NERSC)
-        ost_health_files = tokio.tools.common.enumerate_dated_dir(
-            base_dir=tokio.config.LFSSTATUS_BASE_DIR,
-            datetime_start=datetime_target - datetime.timedelta(days=1),
-            datetime_end=datetime_target + datetime.timedelta(hours=1),
-            file_name=file_basename)
+        ost_health_files = tokio.tools.common.enumerate_dated_files(
+            start=datetime_target - datetime.timedelta(days=1),
+            end=datetime_target + datetime.timedelta(hours=1),
+            template=template_path,
+            match_first=True)
 
         for index, df_file in enumerate(ost_health_files):
             ost_health_files[index] = ost_health_files[index]
@@ -89,9 +89,8 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
         ost_health_files = [cache_file]
 
     if not ost_health_files:
-        raise Exception("No OST health files (%s) found in %s for %s" % (
-            file_basename,
-            datetime_target.strftime(tokio.config.LFSSTATUS_BASE_DIR),
+        raise Exception("No OST health files found in %s for %s" % (
+            template_path,
             str(datetime_target)))
 
     # We can get away with the following because NerscLfsOstFullness,

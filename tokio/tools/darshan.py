@@ -104,9 +104,9 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
     # the following will not work on Windows!
     darshan_dated_dir = os.path.join(darshan_log_dir, "%-Y", "%-m", "%-d")
 
-    search_dirs = tokio.tools.common.enumerate_dated_dir(darshan_dated_dir,
-                                                         datetime_start,
-                                                         datetime_end)
+    search_dirs = tokio.tools.common.enumerate_dated_files(start=datetime_start,
+                                                           end=datetime_end,
+                                                           template=darshan_dated_dir)
 
     glob_fields = DARSHAN_LOG_GLOB_FIELDS.copy()
     if jobid is not None:

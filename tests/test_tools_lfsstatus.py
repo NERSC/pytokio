@@ -11,9 +11,6 @@ from tokiotest import SAMPLE_OSTMAP_FILE, SAMPLE_OSTFULLNESS_FILE, SAMPLE_DARSHA
 import tokio
 import tokio.tools.lfsstatus as lfsstatus
 
-# Point this script at our inputs directory instead of the site-specific default
-tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-
 # These should correspond to the first and last BEGIN in the sample ost-map.txt
 # and ost-fullness.txt files.  If you change the contents of those files, you
 # MUST update these as well.

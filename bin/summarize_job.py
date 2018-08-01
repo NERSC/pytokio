@@ -355,8 +355,8 @@ def retrieve_lmt_data(results, file_system):
                 break
     else:
         results['_file_system'] = file_system
-    h5lmt_file = tokio.config.FSNAME_TO_H5LMT_FILE.get(results['_file_system'])
-    if h5lmt_file is None:
+
+    if results['_file_system'] is None:
         return results
 
     module_results = {}
@@ -364,7 +364,7 @@ def retrieve_lmt_data(results, file_system):
         # Read rates
         module_results.update(summarize_byterate_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/datatargets/readrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -373,7 +373,7 @@ def retrieve_lmt_data(results, file_system):
         # Write rates
         module_results.update(summarize_byterate_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/datatargets/writerates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -382,7 +382,7 @@ def retrieve_lmt_data(results, file_system):
         # OSS cpu loads
         module_results.update(summarize_cpu_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/dataservers/cpuload',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -391,7 +391,7 @@ def retrieve_lmt_data(results, file_system):
         # MDS cpu loads
         module_results.update(summarize_cpu_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdservers/cpuload',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -400,7 +400,7 @@ def retrieve_lmt_data(results, file_system):
         # MDS ops
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/openrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -408,7 +408,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/closerates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -416,7 +416,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/mknodrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -424,7 +424,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/linkrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -432,7 +432,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/unlinkrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -440,7 +440,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/mkdirrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -448,7 +448,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/rmdirrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -456,7 +456,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/renamerates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -464,7 +464,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/getxattrrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -472,7 +472,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/statfsrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -480,7 +480,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/setattrrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -488,7 +488,7 @@ def retrieve_lmt_data(results, file_system):
         ))
         module_results.update(summarize_mds_ops_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/mdtargets/getattrrates',
                 results['_datetime_start'],
                 results['_datetime_end']),
@@ -497,7 +497,7 @@ def retrieve_lmt_data(results, file_system):
         # Missing data
         module_results.update(summarize_missing_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
-                h5lmt_file,
+                results['_file_system'],
                 '/FSMissingGroup/FSMissingDataSet',
                 results['_datetime_start'],
                 results['_datetime_end'])))
@@ -557,9 +557,9 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     if ost:
         # Divine the sonexion name from the file system map
         fs_key = results.get('_file_system')
-        if fs_key is None or fs_key not in tokio.config.FSNAME_TO_H5LMT_FILE:
+        if fs_key is None or fs_key not in tokio.config.FSNAME_TO_BACKEND_NAME:
             return results
-        snx_name = tokio.config.FSNAME_TO_H5LMT_FILE[fs_key].split('_')[-1].split('.')[0]
+        snx_name = tokio.config.FSNAME_TO_BACKEND_NAME[fs_key]
 
         # Get the OST fullness summary
         try:

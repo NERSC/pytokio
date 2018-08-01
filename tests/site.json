@@ -1,0 +1,36 @@
+{
+    "lmt_timestep": 5,
+    "mount_to_fsname": {
+        "^/projects/radix-io": "mira-fs1",
+        "^/scratch1" : "scratch1",
+        "^/scratch2" : "scratch2",
+        "^/scratch3" : "scratch3",
+        "^/global/cscratch1" : "cscratch",
+        "^/var/opt/cray/dws/mounts/.*/ss/" : "bb-shared",
+        "^/var/opt/cray/dws/mounts/.*/ps/" : "bb-private",
+        "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch/" : "bb-shared",
+        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch/" : "bb-private"
+    },
+    "fsname_to_backend_name": {
+        "scratch1": "snx11025",
+        "scratch2": "snx11035",
+        "scratch3": "snx11036",
+        "cscratch": "snx11168",
+        "fakefs": "snx11035"
+    },
+    "hdf5_file": {
+        "scratch1": "inputs/%Y-%m-%d/edison_snx11025.h5lmt",
+        "scratch2": "inputs/%Y-%m-%d/edison_snx11035.h5lmt",
+        "scratch3": "inputs/%Y-%m-%d/edison_snx11036.h5lmt",
+        "cscratch": "inputs/%Y-%m-%d/cori_snx11168.h5lmt",
+        "fakefs": "inputs/%Y-%m-%d/sample.h5lmt"
+    },
+    "lfsstatus_fullness_file": [
+        "inputs/%Y-%m-%d/osts.txt",
+        "inputs/%Y-%m-%d/osts_edison.txt"
+    ],
+    "lfsstatus_map_file": [
+        "inputs/%Y-%m-%d/ost-map.txt",
+        "inputs/%Y-%m-%d/ost-map_edison.txt"
+    ]
+}
