@@ -11,7 +11,6 @@ import tokiotest
 import tokiobin.summarize_h5lmt
 
 ### For tokio.tools.hdf5, which is used by summarize_job.py
-tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 START_TIME = datetime.datetime.strptime(tokiotest.SAMPLE_H5LMT_DATES[0],
                                         tokiobin.summarize_h5lmt.DATE_FMT)
 END_TIME = START_TIME + datetime.timedelta(days=1)
