@@ -24,28 +24,45 @@ MAGIC_VARIABLES = {
     'ISDCT_FILES': os.path.join('qrs', 'tuv', 'wx'),
 }
 
+def delete_pytokio_vars(backup=True):
+    """Remove any environment variables that begin with PYTOKIO_
+
+    Args:
+        backup (bool): create a backup of the value of each variable purged
+    """
+    del_keys = []
+    for var_name in [x for x in os.environ.keys() if x.startswith("PYTOKIO_")]:
+        if backup:
+            backup_name = TMP_ENV_PREFIX + var_name
+            print "\033[93mBacking up %s to %s in runtime environment\033[0m" % (var_name, backup_name)
+            os.environ[backup_name] = os.environ[var_name]
+        del os.environ[var_name]
+
 def flush_env():
     """
     Ensure that the runtime environment isn't tainted by magic variables before
     running a test.
     """
-    for variable in os.environ.keys():
-        if variable.startswith('PYTOKIO_'):
-            print "Purging %s from runtime environment" % variable
-            new_name = TMP_ENV_PREFIX + variable
-            os.environ[new_name] = os.environ[variable]
-            del os.environ[variable]
+    print "\033[94mEntering flush_env\033[0m"
+    delete_pytokio_vars()
+
     tokio.config.init_config()
 
 def restore_env():
     """Restore PYTOKIO_ environment variables purged by flush_env()
     """
-    for variable in os.environ.keys():
-        if variable.startswith('_PYTOKIO_TEST_'):
-            new_name = variable[len(TMP_ENV_PREFIX):]
-            print "Restoring %s to runtime environment" % new_name
-            os.environ[new_name] = os.environ[variable]
-            del os.environ[variable]
+    print "\033[94mEntering restore_env\033[0m"
+
+    delete_pytokio_vars(backup=False)
+
+    # Now swap back in PYTOKIO_ variables
+    del_keys = []
+    for backup_name in [x for x in os.environ.keys() if x.startswith(TMP_ENV_PREFIX)]:
+        var_name = backup_name[len(TMP_ENV_PREFIX):]
+        print "\033[92mRestoring %s to runtime environment during restoration\033[0m" % var_name
+        os.environ[var_name] = os.environ[backup_name]
+        del os.environ[backup_name]
+
     tokio.config.init_config()
 
 def magic_variable(variable, set_value):
