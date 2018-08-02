@@ -14,6 +14,8 @@ import tokio.config
 DEADBEEF_KEY = "debug_dummy"
 DEADBEEF_VALUE = 0xDEADBEEF
 
+TMP_ENV_PREFIX = "_PYTOKIO_TEST_"
+
 ### tokio.config settings that should be settable via environment variables
 MAGIC_VARIABLES = {
     'HDF5_FILES': os.path.join('abc', 'def'),
@@ -30,7 +32,21 @@ def flush_env():
     for variable in os.environ.keys():
         if variable.startswith('PYTOKIO_'):
             print "Purging %s from runtime environment" % variable
+            new_name = TMP_ENV_PREFIX + variable
+            os.environ[new_name] = os.environ[variable]
             del os.environ[variable]
+    tokio.config.init_config()
+
+def restore_env():
+    """Restore PYTOKIO_ environment variables purged by flush_env()
+    """
+    for variable in os.environ.keys():
+        if variable.startswith('_PYTOKIO_TEST_'):
+            new_name = variable[len(TMP_ENV_PREFIX):]
+            print "Restoring %s to runtime environment" % new_name
+            os.environ[new_name] = os.environ[variable]
+            del os.environ[variable]
+    tokio.config.init_config()
 
 def magic_variable(variable, set_value):
     """
@@ -65,7 +81,7 @@ def compare_config_to_runtime(config_file):
     assert os.path.isfile(tokio.config.PYTOKIO_CONFIG)
 
     # Verify that the loaded config wasn't empty
-    assert len(tokio.config._CONFIG) > 0 #pylint: disable=protected-access
+    assert len(tokio.config._LOADED_CONFIG) > 0 #pylint: disable=protected-access
 
     # Load the reference file and compare its contents to the tokio.config namespace
     print "Comparing runtime config to %s" % config_file
@@ -79,7 +95,7 @@ def compare_config_to_runtime(config_file):
         assert type(runtime_value) == type(expected_value) #pylint: disable=unidiomatic-typecheck
         assert runtime_value == expected_value
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_default_config():
     """
     tokio.config: Load config file from default location
@@ -90,7 +106,7 @@ def test_default_config():
     # Verify the loaded attributes are what was in the config file
     compare_config_to_runtime(tokio.config.PYTOKIO_CONFIG)
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_configfile_env():
     """
     tokio.config: Load config file from PYTOKIO_CONFIG
@@ -106,7 +122,7 @@ def test_configfile_env():
     compare_config_to_runtime(config_file)
     assert getattr(tokio.config, DEADBEEF_KEY.upper()) == DEADBEEF_VALUE
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_config_magic_variable():
     """
     tokio.config: Use of magic overriding variable
@@ -116,7 +132,7 @@ def test_config_magic_variable():
         yield magic_variable, variable, value
 
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_no_env_effects_post_load():
     """
     tokio.config: Magic variables don't affect runtime post-load
@@ -134,7 +150,7 @@ def test_no_env_effects_post_load():
         assert getattr(tokio.config, variable) == orig_value
 
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_config_post_load_by_env():
     """
     tokio.config: Change tokio configuration after it is loaded (scalars)
@@ -149,7 +165,7 @@ def test_config_post_load_by_env():
         assert getattr(tokio.config, variable) != orig_value
         assert getattr(tokio.config, variable) == set_value
 
-@nose.tools.with_setup(flush_env)
+@nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_config_post_load_from_file():
     """
     tokio.config: Change tokio configuration after it is loaded (scalars+dicts)
