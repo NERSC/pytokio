@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+# For non-GNU systems
+if which greadlink > /dev/null
+then
+    READLINK=greadlink
+else
+    READLINK=readlink
+fi
+
 # Always run tests in the test directory since site.json contains relative paths
 TEST_DIR="$(dirname $(readlink -f ${BASH_SOURCE[0]}))"
 cd "$TEST_DIR"
