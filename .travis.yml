@@ -11,4 +11,4 @@ install:
     - export "PATH=${PWD}/darshan/darshan-util:$PATH"
 before_script:
     - export TZ=America/Los_Angeles
-script: (./tests/run_tests.sh --with-ceverage)
+script: (./tests/run_tests.sh --with-coverage)
