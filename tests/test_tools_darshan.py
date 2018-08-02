@@ -18,6 +18,7 @@ def wrap_find_darshanlogs(test_input):
 def wrap_load_darshanlogs(test_input):
     """Allow named args to pass through nosetests
     """
+    tokiotest.check_darshan()
     print "Running:", test_input['descr']
     print "Test args:", test_input['params']
     expected_exception = test_input.get('expect_exception')
@@ -32,6 +33,7 @@ def wrap_load_darshanlogs(test_input):
 def wrap_load_darshanlogs_assert_raises(test_input, exception):
     """Allow named args to pass through nosetests; expect an exception
     """
+    tokiotest.check_darshan()
     print "Running:", test_input['descr']
     print "Test args:", test_input['params']
     nose.tools.assert_raises(exception, tokio.tools.darshan.load_darshanlogs, **(test_input['params']))
@@ -191,6 +193,6 @@ def test_find_darshanlogs():
     """tools.darshan.find_darshanlogs()
     """
     for test in TEST_MATRIX:
-        test_func = test['test_function']
+        test_func = tokiotest.needs_darshan(test['test_function'])
         test_func.description = "tools.darshan.find_darshanlogs(): " + test['descr']
         yield test_func, test
