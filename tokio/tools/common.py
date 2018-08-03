@@ -77,17 +77,17 @@ def _expand_check_paths(template, lookup_key):
             identify the key-value to use as template.  If None and `template` is
             a dict, iterate through all values of `template`.
     """
-    if isinstance(template, basestring):
-        check_paths = [template]
-    elif isinstance(template, list):
-        check_paths = template
-    elif isinstance(template, dict):
-        check_paths = []
+    check_paths = []
+    if isinstance(template, dict):
         if lookup_key is None:
-            for value in template.values():
-                check_paths += _expand_check_paths(value, lookup_key)
+            check_paths += _expand_check_paths(template.values(), lookup_key)
         else:
             check_paths += _expand_check_paths(template.get(lookup_key, []), lookup_key)
+    elif isinstance(template, list):
+        for value in template:
+            check_paths += _expand_check_paths(value, lookup_key)
+    else:
+        check_paths += [template]
 
     return check_paths
 
