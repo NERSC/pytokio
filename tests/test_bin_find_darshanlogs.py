@@ -23,6 +23,7 @@ def wrap_function(test_input):
     if test_input['params']['jobid'] is not None:
         argv += ['--jobid', str(test_input['params']['jobid'])]
     if 'which' in test_input['params']:
+        tokiotest.check_darshan()
         argv += ['--load', test_input['params']['which']]
     argv += [test_input['params']['darshan_log_dir']]
 
@@ -51,6 +52,6 @@ def test_bin_find_darshanlogs():
     """
 
     for test in test_tools_darshan.TEST_MATRIX:
-        test_func = wrap_function
+        test_func = tokiotest.needs_darshan(wrap_function)
         test_func.description = 'bin/find_darshanlogs.py: ' + test['descr']
         yield test_func, test

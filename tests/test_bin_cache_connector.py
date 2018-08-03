@@ -17,7 +17,6 @@ try:
 except ImportError:
     _HAVE_ELASTICSEARCH = False
 
-import tokio.config
 import tokiotest
 import tokiobin.cache_isdct
 import tokiobin.cache_collectdes
@@ -27,10 +26,6 @@ import tokiobin.cache_topology
 import tokiobin.cache_lfsstatus
 import tokiobin.cache_nersc_jobsdb
 import tokiobin.cache_lmtdb
-
-# For cache_lfsstatus.py
-tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
-tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, '%Y-%m-%d')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def verify_sqlite(output_str):

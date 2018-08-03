@@ -63,10 +63,12 @@ def test_multithreaded():
     decoded_result = json.loads(output_str)
     assert len(decoded_result) > 0
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard():
     """bin/darshan_scoreboard.py ascii output
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -76,10 +78,12 @@ def test_scoreboard():
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     assert len(output_str.splitlines()) > 5
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_json():
     """bin/darshan_scoreboard.py --json
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -91,10 +95,12 @@ def test_scoreboard_json():
     print "Result:", decoded_result
     assert len(decoded_result) > 0
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_limit_user():
     """bin/darshan_scoreboard.py --limit-user
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -106,10 +112,12 @@ def test_scoreboard_limit_user():
     print "Result:", decoded_result
     assert decoded_result['per_user']
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_exclude_user():
     """bin/darshan_scoreboard.py --exclude-user
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -123,10 +131,12 @@ def test_scoreboard_exclude_user():
     assert not decoded_result['per_exe']
     assert not decoded_result['per_fs']
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_limit_fs():
     """bin/darshan_scoreboard.py --limit-fs
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -140,10 +150,12 @@ def test_scoreboard_limit_fs():
     assert decoded_result['per_fs']
     assert decoded_result['per_exe']
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_exclude_fs():
     """bin/darshan_scoreboard.py --exclude-fs
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -157,10 +169,12 @@ def test_scoreboard_exclude_fs():
     assert not decoded_result['per_exe']
     assert not decoded_result['per_fs']
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_limit_exe():
     """bin/darshan_scoreboard.py --limit-exe
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
@@ -181,10 +195,12 @@ def test_scoreboard_limit_exe():
         for wanted_app in wanted_apps:
             assert decoded_result['per_exe'][wanted_app]
 
+@tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_exclude_exe():
     """bin/darshan_scoreboard.py --exclude-exe
     """
+    tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
     print "Executing:", " ".join(argv)
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
