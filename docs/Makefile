@@ -15,10 +15,11 @@ TARGETS       = $(BUILDDIR)/html/index.html \
 
 $(TARGETS):
 
+$(BUILDDIR)/html/index.html: source/modules.rst
 $(BUILDDIR)/html/%.html: source/%.rst
 	$(SPHINXBUILD) -M $(SPHINXBUILDER) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-source/tokio.rst:
+source/tokio.rst source/modules.rst:
 	sphinx-apidoc -o source/ ../tokio/
 
 #source/tokiobin.rst:
