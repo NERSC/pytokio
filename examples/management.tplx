@@ -1,8 +1,9 @@
-# Convert the output of a notebook to a management-consumable report (i.e., hide
-# all the Python source code)
-#
-#   jupyter nbconvert --to pdf --template management tokio.connectors.nersc_isdct-demo.ipynb
-#
+%
+% Convert the output of a notebook to a management-consumable report (i.e., hide
+% all the Python source code)
+%
+%   jupyter nbconvert --to pdf --template management tokio.connectors.nersc_isdct-demo.ipynb
+%
 
 ((*- extends 'article.tplx' -*))
 

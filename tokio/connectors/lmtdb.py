@@ -256,3 +256,99 @@ class LmtDb(cachingdb.CachingDb):
                 chunk_start += timechunk
 
         return self.saved_results[table]['rows'][index0:], result_columns
+
+    def get_mds_data(self, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
+        """Schema-agnostic method for retrieving MDS load data.
+
+        Wraps get_timeseries_data() but fills in the exact table name used in
+        the LMT database schema.
+
+        Args:
+            datetime_start (datetime.datetime): lower bound on time series data
+                to retrieve, inclusive
+            datetime_End (datetime.datetime): upper bound on time series data to
+                retrieve, exclusive
+            timechunk (datetime.timedelta): divide time range query into
+                sub-ranges of this width to work around N*N scaling of JOINs
+
+        Returns:
+            Tuple of (results, column names)  where results are tuples of tuples
+            as returned by the MySQL query and column names are the names of
+            each column expressed in the individual rows of results.
+        """
+        return self.get_timeseries_data('MDS_DATA',
+                                        datetime_start,
+                                        datetime_end,
+                                        timechunk=timechunk)
+
+    def get_mds_ops_data(self, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
+        """Schema-agnostic method for retrieving metadata operations data.
+
+        Wraps get_timeseries_data() but fills in the exact table name used in
+        the LMT database schema.
+
+        Args:
+            datetime_start (datetime.datetime): lower bound on time series data
+                to retrieve, inclusive
+            datetime_End (datetime.datetime): upper bound on time series data to
+                retrieve, exclusive
+            timechunk (datetime.timedelta): divide time range query into
+                sub-ranges of this width to work around N*N scaling of JOINs
+
+        Returns:
+            Tuple of (results, column names)  where results are tuples of tuples
+            as returned by the MySQL query and column names are the names of
+            each column expressed in the individual rows of results.
+        """
+        return self.get_timeseries_data('MDS_OPS_DATA',
+                                        datetime_start,
+                                        datetime_end,
+                                        timechunk=timechunk)
+
+    def get_oss_data(self, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
+        """Schema-agnostic method for retrieving OSS data.
+
+        Wraps get_timeseries_data() but fills in the exact table name used in
+        the LMT database schema.
+
+        Args:
+            datetime_start (datetime.datetime): lower bound on time series data
+                to retrieve, inclusive
+            datetime_End (datetime.datetime): upper bound on time series data to
+                retrieve, exclusive
+            timechunk (datetime.timedelta): divide time range query into
+                sub-ranges of this width to work around N*N scaling of JOINs
+
+        Returns:
+            Tuple of (results, column names)  where results are tuples of tuples
+            as returned by the MySQL query and column names are the names of
+            each column expressed in the individual rows of results.
+        """
+        return self.get_timeseries_data('OSS_DATA',
+                                        datetime_start,
+                                        datetime_end,
+                                        timechunk=timechunk)
+
+    def get_ost_data(self, datetime_start, datetime_end, timechunk=datetime.timedelta(hours=1)):
+        """Schema-agnostic method for retrieving OST data.
+
+        Wraps get_timeseries_data() but fills in the exact table name used in
+        the LMT database schema.
+
+        Args:
+            datetime_start (datetime.datetime): lower bound on time series data
+                to retrieve, inclusive
+            datetime_End (datetime.datetime): upper bound on time series data to
+                retrieve, exclusive
+            timechunk (datetime.timedelta): divide time range query into
+                sub-ranges of this width to work around N*N scaling of JOINs
+
+        Returns:
+            Tuple of (results, column names)  where results are tuples of tuples
+            as returned by the MySQL query and column names are the names of
+            each column expressed in the individual rows of results.
+        """
+        return self.get_timeseries_data('OST_DATA',
+                                        datetime_start,
+                                        datetime_end,
+                                        timechunk=timechunk)

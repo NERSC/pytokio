@@ -259,7 +259,10 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
         bin_datum[missing_key] = missing_dataset[index0:indexf, :].sum()
 
         bin_datum[total_key] = (indexf - index0) * columns.shape[0]
-        bin_datum["frac_" + missing_key] = float(bin_datum[missing_key]) / bin_datum[total_key]
+        if bin_datum[total_key]:
+            bin_datum["frac_" + missing_key] = float(bin_datum[missing_key]) / bin_datum[total_key]
+        else:
+            bin_datum["frac_" + missing_key] = 1.0
 
         if base_key.startswith('ost_'):
             for agg_key in 'max', 'min', 'ave', 'sum':

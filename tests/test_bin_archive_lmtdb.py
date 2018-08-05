@@ -30,14 +30,15 @@ TEST_RANGES = [
 ### Test data placement correctness ############################################
 ################################################################################
 
-def generate_tts(output_file):
+def generate_tts(output_file,
+                 input_file=tokiotest.SAMPLE_LMTDB_FILE,
+                 init_start=tokiotest.SAMPLE_LMTDB_START_STAMP,
+                 init_end=tokiotest.SAMPLE_LMTDB_END_STAMP):
     """Create a TokioTimeSeries output file
     """
-    init_start = tokiotest.SAMPLE_LMTDB_START_STAMP
-    init_end = tokiotest.SAMPLE_LMTDB_END_STAMP
     argv = ['--init-start', init_start,
             '--init-end', init_end,
-            '--input', tokiotest.SAMPLE_LMTDB_FILE,
+            '--input', input_file,
             '--timestep', str(tokiotest.SAMPLE_LMTDB_TIMESTEP),
             '--output', output_file,
             '--debug',
@@ -91,6 +92,17 @@ def summarize_hdf5(hdf5_file):
 
     return summary
 
+def check_positivity(hdf5_file):
+    """
+    Return some summary metrics of an hdf5 file in a mostly content-agnostic way
+    """
+    def assert_positive(obj_name, obj_data):
+        if isinstance(obj_data, h5py.Dataset):
+            assert (obj_data[...] < 0.0).sum() == 0
+
+    hdf5_file.visititems(assert_positive)
+
+
 def identical_datasets(summary0, summary1):
     """
     compare the contents of two HDF5s for similarity
@@ -117,8 +129,7 @@ def identical_datasets(summary0, summary1):
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_bin_archive_lmtdb_overlaps():
-    """
-    bin/archive_lmtdb.py write + overwrite correctness
+    """bin/archive_lmtdb.py: write + overwrite correctness
 
     1. initialize a new HDF5 and pull down a large window
     2. pull down a complete subset of that window to this newly minted HDF5
@@ -153,6 +164,31 @@ def test_bin_archive_lmtdb_overlaps():
 # yield doesn't work because tokiotest.TEMP_FILE doesn't propagate
 #       yield func, summary0, summary1
         func(summary0, summary1)
+
+def test_bin_archive_lmtdb_nonmonotonic():
+    """bin/archive_lmtdb.py: counter reset to zero mid-day
+
+    Rebooting an OSS will cause its monotonic counters to become non-monotonic,
+    which can result in negative rates being tabulated.  This test ensures that
+    mid-day counter resets are detected and masked off as unknown data (-0.0)
+    rates rather than being reported as negative.
+    """
+    tokiotest.TEMP_FILE.close()
+
+    start = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_START)
+    end = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_END)
+    delta = (end - start).total_seconds()
+
+    # initialize a new TimeSeries, populate it, and write it out as HDF5
+    generate_tts(output_file=tokiotest.TEMP_FILE.name,
+                 input_file=tokiotest.SAMPLE_LMTDB_NONMONO,
+                 init_start=tokiotest.SAMPLE_LMTDB_NONMONO_START_STAMP,
+                 init_end=tokiotest.SAMPLE_LMTDB_NONMONO_END_STAMP)
+
+    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
+    check_positivity(h5_file)
+    h5_file.close()
+
 
 ################################################################################
 ### Compare generated dataset to ground-truth datasets and pytokio H5LMT file ##
@@ -251,7 +287,7 @@ class TestArchiveLmtdbCorrectness(object):
                 dataset_name = dataset.name
 
                 func = compare_tts_dataset
-                func.description = "bin/archive_h5mlt.py: comparing %s to hdf5 reference" % dataset_name
+                func.description = "bin/archive_lmtdb.py: comparing %s to hdf5 reference" % dataset_name
                 print func.description
                 yield func, self.generated, self.ref_hdf5, dataset_name
                 checked_ct += 1

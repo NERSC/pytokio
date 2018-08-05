@@ -652,8 +652,11 @@ class Hdf5(h5py.File):
         """Get the column names of an h5lmt dataset
         """
         dataset = self.__getitem__(dataset_name)
+        orig_dataset_name = dataset_name.lstrip('/')
         dataset_name = dataset.name.lstrip('/')
-        if dataset_name in H5LMT_COLUMN_ATTRS:
+        if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
+            return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
+        elif dataset_name in H5LMT_COLUMN_ATTRS:
             return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
         elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
             return numpy.array(['_unknown'])
@@ -752,6 +755,8 @@ class Hdf5(h5py.File):
         values = self[dataset_name][:]
         columns = self.get_columns(dataset_name)
         timestamps = self.get_timestamps(dataset_name)
+        if len(columns) < values.shape[1]:
+            columns.resize(values.shape[1])
         dataframe = pandas.DataFrame(data=values,
                                      index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
                                      columns=columns)
@@ -784,7 +789,12 @@ class Hdf5(h5py.File):
             if num_dims == 1:
                 values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[dataset_name][:].T
+                # only transpose if dataset_name refers to a native type
+                if normed_name in SCHEMA_DATASET_PROVIDERS[None]:
+                    values = self[dataset_name][:]
+                    columns = self.get_columns(normed_name)
+                else:
+                    values = self[dataset_name][:].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 

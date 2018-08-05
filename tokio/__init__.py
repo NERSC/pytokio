@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-TODO: add support for external configuration
+The Total Knowledge of I/O (TOKIO) reference implementation, pytokio.
 """
 
 import tokio.timeseries as timeseries

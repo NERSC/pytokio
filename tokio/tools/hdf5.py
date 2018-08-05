@@ -6,22 +6,21 @@ import tempfile
 import subprocess
 import numpy as np
 import common
-from .. import connectors, config
-from ..debug import debug_print as _debug_print
+import tokio
 
-def enumerate_h5lmts(file_name, datetime_start, datetime_end):
-    """
+def enumerate_h5lmts(fsname, datetime_start, datetime_end):
+    """Return all time-indexed HDF5 files falling between a time range
+
     Given a starting datetime and (optionally) an ending datetime, return all
-    H5LMT files that contain data inside of that date range (inclusive).
-    
+    HDF5 files that contain data inside of that date range (inclusive).
     """   
-    h5lmt_files = common.enumerate_dated_dir(config.H5LMT_BASE_DIR,
-                                             datetime_start,
-                                             datetime_end,
-                                             file_name=file_name)
-    return h5lmt_files
+    return common.enumerate_dated_files(start=datetime_start,
+                                        end=datetime_end,
+                                        template=tokio.config.HDF5_FILES,
+                                        lookup_key=fsname,
+                                        match_first=True)
 
-def get_files_and_indices(file_name, dataset_name, datetime_start, datetime_end):
+def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     """
     Given the name of an Hdf5 file and a start/end date+time, returns a list of
     tuples containing
@@ -30,11 +29,11 @@ def get_files_and_indices(file_name, dataset_name, datetime_start, datetime_end)
         datetime_end_local = datetime_start
     else:
         datetime_end_local = datetime_end
-    h5lmt_files = enumerate_h5lmts(file_name, datetime_start, datetime_end)
+    h5lmt_files = enumerate_h5lmts(fsname, datetime_start, datetime_end)
     output = []
 
     for h5lmt_file in h5lmt_files:
-        hdf5 = connectors.hdf5.Hdf5(h5lmt_file, mode="r")
+        hdf5 = tokio.connectors.hdf5.Hdf5(h5lmt_file, mode="r")
 
         i_0 = 0
         timestamps = hdf5.get_timestamps(dataset_name)
@@ -57,17 +56,22 @@ def get_files_and_indices(file_name, dataset_name, datetime_start, datetime_end)
         output.append((h5lmt_file, i_0, i_f))
     return output
 
-def get_dataframe_from_time_range(file_name, dataset_name, datetime_start, datetime_end):
+def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime_end):
     """
     Returns the same content as get_group_data_from_time_range into a dataframe
     """
-    files_and_indices = get_files_and_indices(file_name, dataset_name, datetime_start, datetime_end)
-    if not files_and_indices:
-        raise IOError("No relevant hdf5 files found in %s" % config.H5LMT_BASE_DIR)
+    files_and_indices = get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end)
     result = None
 
-    for h5file in enumerate_h5lmts(file_name, datetime_start, datetime_end):
-        with connectors.hdf5.Hdf5(h5file, mode='r') as f:
+    if not files_and_indices:
+#       raise IOError("No relevant hdf5 files found in %s between %s - %s" % (
+#           tokio.config.H5LMT_FILE,
+#           datetime_start,
+#           datetime_end))
+        return result
+
+    for h5file in enumerate_h5lmts(fsname, datetime_start, datetime_end):
+        with tokio.connectors.hdf5.Hdf5(h5file, mode='r') as f:
             df_slice = f.to_dataframe(dataset_name)
             df_slice = df_slice[(df_slice.index >= datetime_start) 
                                 & (df_slice.index < datetime_end)]

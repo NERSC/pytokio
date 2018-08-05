@@ -18,6 +18,7 @@ import gzip
 import re
 import warnings
 import mimetypes
+import tokio.connectors.lfshealth
 
 _REX_OST_MAP = re.compile(r'^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(\d+)\s+(\S+@\S+)\s*$')
 """Regular expression to match OSC/MDC lines
@@ -82,16 +83,7 @@ class NerscLfsOstMap(dict):
         for timestamp in sorted(self.keys()):
             fs_data = self[timestamp]
             repr_result += "BEGIN %d\n" % timestamp
-            # Iterate over file systems within each time step
-            for target_name in sorted(fs_data.keys()):
-                obd_data = fs_data[target_name]
-                for obd_name in sorted(obd_data.keys(),
-                                       key=lambda x, y=obd_data: int(y[x]['index'])):
-                    keyvals = obd_data[obd_name]
-                    record_string = \
-                        "%(index)3d %(status)2s %(role)3s %(role_id)s %(uuid)s %(ref_count)d %(nid)s\n" \
-                        % keyvals
-                    repr_result += record_string
+            repr_result += str(fs_data)
         return repr_result
 
     def load_ost_map_file(self):
@@ -110,38 +102,26 @@ class NerscLfsOstMap(dict):
 
         this_timestamp = None
         degenerate_keys = 0
+        load_str = []
         for line in input_file:
             if line.startswith('BEGIN'):
                 if degenerate_keys > 0:
-                    warnings.warn("%d degenerate keys found for timestamp %d"
-                                  % (degenerate_keys, this_timestamp))
+                    warnings.warn("%d degenerate keys found for timestamp %d" % (degenerate_keys, this_timestamp))
+                degenerate_keys = 0
+
+                # append previous data
+                if load_str:
+                    self.__setitem__(this_timestamp,
+                                     tokio.connectors.lfshealth.LfsOstMap(from_string='\n'.join(load_str)))
+
+                # initialize new timestamp
                 this_timestamp = int(line.split()[1])
                 if this_timestamp in self:
                     warnings.warn("degenerate timestamp %d found" % this_timestamp)
-                self.__setitem__(this_timestamp, {})
-                degenerate_keys = 0
+
+                load_str = []
             else:
-                match = _REX_OST_MAP.search(line)
-                if match is not None:
-                    file_system, target_name = (match.group(4).split('-')[0:2])
-
-                    if file_system not in self[this_timestamp]:
-                        self[this_timestamp][file_system] = {}
-
-                    # Duplicates can happen if a file system is doubly mounted
-                    if target_name in self[this_timestamp][file_system]:
-                        degenerate_keys += 1
-
-                    self[this_timestamp][file_system][target_name] = {
-                        'index': int(match.group(1)),
-                        'status': match.group(2).lower(),
-                        'role': match.group(3).lower(),
-                        'role_id': match.group(4),
-                        'uuid': match.group(5),
-                        'ref_count': int(match.group(6)),
-                        'target_ip': match.group(7).split('@')[0],
-                        'nid': match.group(7),
-                    }
+                load_str.append(line)
 
         input_file.close()
 
@@ -167,8 +147,6 @@ class NerscLfsOstMap(dict):
         """
         output.write(str(self))
 
-     #=================================================#
-
     def get_failovers(self):
         """Determine OSSes which are likely affected by a failover.
 
@@ -192,44 +170,8 @@ class NerscLfsOstMap(dict):
         """
         resulting_data = {}
         for timestamp, fs_data in self.iteritems():
-            per_timestamp_data = {}
-            for file_system, ost_data in fs_data.iteritems():
-                ost_counts = {} # key = ip address, val = ost count
-                for ost_name, ost_values in ost_data.iteritems():
-                    if ost_values['role'] != 'osc': # don't care about mdc, mgc
-                        continue
-                    ip_addr = ost_values['target_ip']
-                    ost_counts[ip_addr] = ost_counts.get(ip_addr, 0) + 1
-
-                # Get mode of OSTs per OSS to infer what "normal" OST/OSS ratio is
-                histogram = {}
-                for ip_addr, ost_count in ost_counts.iteritems():
-                    if ost_count not in histogram:
-                        histogram[ost_count] = 1
-                    else:
-                        histogram[ost_count] += 1
-                if not histogram:
-                    raise KeyError('no OSTs to count')
-                mode = max(histogram, key=histogram.get)
-
-                # Build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }
-                abnormal_ips = {}
-                for ost_name, ost_values in ost_data.iteritems():
-                    if ost_values['role'] != 'osc': # don't care about mdc, mgc
-                        continue
-                    ip_addr = ost_values['target_ip']
-                    if ost_counts[ip_addr] != mode:
-                        if ip_addr in abnormal_ips:
-                            abnormal_ips[ip_addr].append(ost_name)
-                        else:
-                            abnormal_ips[ip_addr] = [ost_name]
-
-                per_timestamp_data[file_system] = {
-                    'mode': mode,
-                    'abnormal_ips': abnormal_ips,
-                }
-            resulting_data[timestamp] = per_timestamp_data
-
+            resulting_data[timestamp] = fs_data.get_failovers()
+        
         return resulting_data
 
 class NerscLfsOstFullness(dict):

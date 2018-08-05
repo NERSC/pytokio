@@ -42,10 +42,12 @@ def test_load_slurm_cache():
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     verify_slurm(slurm_data)
 
+@tokiotest.needs_slurm
 def test_load_slurm_sacct():
     """
     Initialize Slurm from sacct command
     """
+    tokiotest.check_slurm()
     try:
         _ = tokio.connectors.slurm.Slurm(SAMPLE_JOBID)
     except OSError as error:
@@ -144,11 +146,13 @@ def test_compact_nodelist():
         raise nose.SkipTest(error)
 
 
+@tokiotest.needs_slurm
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_slurm_serializer():
     """
     Serialize and deserialize connectors.Slurm
     """
+    tokiotest.check_slurm()
     # Read from a cache file
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     # Serialize the object, then re-read it and verify it
