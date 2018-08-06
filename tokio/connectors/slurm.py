@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Connect to Slurm via Slurm CLI outputs
+"""Connect to Slurm via Slurm CLI outputs.
 
-Provide Python bindings to retrieve the information made available from the
-standard Slurm saccount and scontrol.
+This connector provides Python bindings to retrieve information made available
+through the standard Slurm saccount and scontrol CLI commands.
 """
 
 import sys
@@ -19,18 +19,18 @@ SACCT = 'sacct'
 SCONTROL = 'scontrol'
 
 def expand_nodelist(node_string):
-    """Expand Slurm compact nodelist into a set of nodes
+    """Expand Slurm compact nodelist into a set of nodes.
 
-    Wraps `scontrol show hostname nid0[5032-5159]` to expand a Slurm nodelist
+    Wraps ``scontrol show hostname nid0[5032-5159]`` to expand a Slurm nodelist
     string into a list of nodes.
 
     Args:
         node_string (str): Node list in Slurm's compact notation (e.g.,
-            nid0[5032-5159])
+            ``nid0[5032-5159]``)
 
     Returns:
-        set: strings which encode the fully expanded node names contained in
-            `node_string`.
+        set: Set of strings which encode the fully expanded node names contained
+        in `node_string`.
     """
     node_names = set([])
     try:
@@ -49,14 +49,16 @@ def expand_nodelist(node_string):
 def compact_nodelist(node_string):
     """Convert a string of nodes into compact representation.
 
-    Wraps `scontrol show hostlist nid05032,nid05033,...` to compact a list of
-    nodes to a Slurm nodelist string.  The inverse of expand_nodelist()
+    Wraps ``scontrol show hostlist nid05032,nid05033,...`` to compress a list of
+    nodes to a Slurm nodelist string.  This is effectively the reverse of
+    ``expand_nodelist()``
 
     Args:
         node_string (str): Comma-separated list of node names (e.g.,
-            nid05032,nid05033,...)
+            ``nid05032,nid05033,...``)
     Returns:
-        str: compact representation of node_string (e.g., nid0[5032-5159])
+        str: The compact representation of `node_string` (e.g.,
+        ``nid0[5032-5159]``)
     """
     if not isinstance(node_string, basestring):
         node_string = ','.join(list(node_string))
@@ -83,18 +85,18 @@ _RECAST_KEY_MAP = {
         compact_nodelist
     ),
 }
-"""dict: methods to convert Slurm string outputs into Python objects
+"""dict: Methods to convert Slurm string outputs into Python objects
 
 This table provides the methods to apply to various Slurm output keys to convert
 them from strings (the default Slurm output type) into more useful Python
 objects such as datetimes or lists.
 
-value[0] is the function to cast to Python
-value[1] is the function to cast back to a string
+* ``value[0]`` is the function to cast to Python
+* ``value[1]`` is the function to cast back to a string
 """
 
 class SlurmEncoder(json.JSONEncoder):
-    """Encode sets as lists and datetimes as ISO 8601
+    """Encode sets as lists and datetimes as ISO 8601.
     """
     def default(self, o): # pylint: disable=E0202
         if isinstance(o, set):
@@ -106,7 +108,7 @@ class SlurmEncoder(json.JSONEncoder):
 class Slurm(SubprocessOutputDict):
     """Dictionary subclass that self-populates with Slurm output data
 
-    Presents a schema that is keyed as
+    Presents a schema that is keyed as::
 
         {
             taskid: {
@@ -141,11 +143,12 @@ class Slurm(SubprocessOutputDict):
         self.load()
 
     def __repr__(self):
-        """Serialize in the same format as sacct
+        """Serialize object in the same format as sacct.
 
-        Returns serialized version of self in a similar format as the sacct
-        output so that this object can be circularly serialized and
-        deserialized.
+        Returns:
+            str: Serialized version of self in a similar format as the ``sacct``
+            output so that this object can be circularly serialized and
+            deserialized.
         """
         output_str = ""
         key_order = ['jobidraw']
@@ -180,13 +183,13 @@ class Slurm(SubprocessOutputDict):
             self.load_keys('jobidraw', 'start', 'end', 'nodelist')
 
     def load_keys(self, *keys):
-        """Retrieve a list of keys from sacct and populate self
+        """Retrieve a list of keys from sacct and insert them into self.
 
         This always invokes sacct and can be used to overwrite the contents of a
         cache file.
 
         Args:
-            *keys (list of str): Slurm attributes to include; names should be
+            *keys (list): Slurm attributes to include; names should be
                 valid input to `sacct --format` CLI utility.
         """
         if self.jobid is None:
@@ -217,7 +220,7 @@ class Slurm(SubprocessOutputDict):
         self._recast_keys()
 
     def _recast_keys(self, *target_keys):
-        """Convert own keys into native Python objects
+        """Convert own keys into native Python objects.
 
         Scan self and convert special keys into native Python objects where
         appropriate.  If no keys are given, scan everything.  Do NOT attempt
@@ -226,8 +229,8 @@ class Slurm(SubprocessOutputDict):
         not function outside of an environment containing Slurm.
 
         Args:
-            *target_keys (list of str): If specified, only convert the specified
-                keys into native Python object types
+            *target_keys (list, optional): Only convert these keys into native
+                Python object types.  If omitted, convert all keys.
         """
         scan_keys = len(target_keys)
         for counters in self.itervalues():
@@ -262,11 +265,14 @@ class Slurm(SubprocessOutputDict):
 #       return self[taskid]['start'], self[taskid]['end']
 
     def get_job_nodes(self):
-        """Return a list of all job nodes used
+        """Return a list of all job nodes used.
 
         Creates a list of all nodes used across all tasks for the self.jobid.
         Useful if the object contains only a subset of tasks executed by the
         Slurm job.
+
+        Returns:
+            set: Set of node names used by the job described by this object
         """
         nodelist = set([])
 
@@ -277,14 +283,14 @@ class Slurm(SubprocessOutputDict):
         return nodelist
 
     def get_job_startend(self):
-        """Find earliest start and latest end time for a job
+        """Find earliest start and latest end time for a job.
 
         For an entire job and all its tasks, find the absolute earliest start
         time and absolute latest end time.
 
         Returns:
-            tuple: (earliest start time, latest end time) in whatever type
-                self['start'] and self['end'] are store
+            tuple: Two-item tuple of (earliest start time, latest end time) in
+                whatever type ``self['start']`` and ``self['end']`` are stored
         """
         min_start = None
         max_end = None
@@ -297,7 +303,7 @@ class Slurm(SubprocessOutputDict):
         return min_start, max_end
 
     def get_job_ids(self):
-        """Return the top-level jobid(s) contained in object
+        """Return the top-level jobid(s) contained in object.
 
         Retrieve the jobid(s) contained in self without any accompanying taskid
         information.
@@ -314,16 +320,16 @@ class Slurm(SubprocessOutputDict):
     def to_json(self, **kwargs):
         """Return a json-encoded string representation of self.
 
-        Serializes self to json using _RECAST_KEY_MAP to convert Python types
-        back into JSON-compatible types.
+        Serializes self to json using ``_RECAST_KEY_MAP`` to convert Python
+        types back into JSON-compatible types.
 
-        Return:
+        Returns:
             str: JSON representation of self
         """
         return json.dumps(self, cls=SlurmEncoder, **kwargs)
 
     def from_json(self, json_string):
-        """Initialize self from a JSON-encoded string
+        """Initialize self from a JSON-encoded string.
 
         Args:
             json_string (str): JSON representation of self
@@ -334,31 +340,30 @@ class Slurm(SubprocessOutputDict):
         self._recast_keys()
 
     def to_dataframe(self):
-        """Convert self into a Pandas DataFrame
+        """Convert self into a Pandas DataFrame.
 
-        Return a pandas DataFrame representation of this object.  It's not an
-        unreasonable fit since the raw output from sacct is essentially a CSV.
+        Returns a Pandas DataFrame representation of this object.
 
         Returns:
             pandas.DataFrame: DataFrame representation of the same schema as
-                sacct
+            the Slurm ``sacct`` command.
         """
         buf = StringIO.StringIO(str(self))
         return pandas.read_csv(buf, sep='|', parse_dates=['start', 'end'])
 
 def parse_sacct(sacct_str):
-    """Convert output of `sacct -p` into a dictionary
+    """Convert output of ``sacct -p`` into a dictionary.
 
-    Parse the output of `sacct -p` and return a dictionary with the full (raw)
+    Parses the output of ``sacct -p`` and return a dictionary with the full (raw)
     contents.
 
     Args:
-        sacct_str (str): stdout of an invocation of `sacct -p`
+        sacct_str (str): stdout of an invocation of ``sacct -p``
 
     Returns:
         dict: Keyed by Slurm Job ID and whose values are dicts containing
-            key-value pairs corresponding to the Slurm quantities returned
-            by `sacct -p`.
+        key-value pairs corresponding to the Slurm quantities returned
+        by ``sacct -p``.
     """
     result = {}
     cols = []

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """
-Generic infrastructure for retrieving data from a relational database that
-contains immutable data.  Can use a local caching database (sqlite3) to allow
-for reanalysis on platforms that cannot access the original remote database.
+This module provides generic infrastructure for retrieving data from a
+relational database that contains immutable data.  It can use a local caching
+database (sqlite3) to allow for reanalysis on platforms that cannot access the
+original remote database or to reduce the load on remote databases.
 """
 
 import json
@@ -23,14 +24,47 @@ HIT_CACHE_DB = 1
 HIT_REMOTE_DB = 2
 
 class CachingDb(object):
-    """
-    Connect to and interact with a relational database. If this class is
-    instantiated with a cache_file argument, all queries will go to that
-    SQLite-based cache database.  If this class is not instantiated with a
-    cache_file argument, all queries will go out to the remote database.
+    """Connect relational database with an optional caching layer interposed.
     """
     #pylint: disable=too-many-arguments
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
+        """Connect to a relational database.
+        
+        If instantiated with a cache_file argument, all queries will go to that
+        SQLite-based cache database.  If this class is not instantiated with a
+        cache_file argument, all queries will go out to the remote database.
+
+        If none of the connection arguments (``db*``) are specified, do not
+        connect to a remote database and instead rely entirely on the caching
+        database or a separate call to the ``connect()`` method.
+
+        Arguments:
+            dbhost (str, optional): hostname for the remote database
+            dbuser (str, optional): username to use when connecting to database
+            dbpassword (str, optional): password for authenticating to database
+            dbname (str, optional): name of database to use when connecting
+            cache_file (str, optional):  Path to an SQLite3 database to use as
+                a caching layer.
+
+        Attributes:
+            saved_results (dict): in-memory data cache, keyed by table names
+                and whose values are dictionaries with keys ``rows`` and
+                ``schema``.  ``rows`` are a list of row tuples returned
+                from earlier queries, and ``schema`` is the SQL statement
+                required to create the table corresponding to ``rows``.
+            last_hit (int): a flag to indicate whether the last query was
+                found in the caching database or the remote database
+            cache_file (str): path to the caching database's file
+            cache_db (sqlite3.Connection): caching database connection handle
+            cache_db_ps (str): paramstyle of the caching database as defined
+                by `PEP-0249`_
+            remote_db: remote database connection handle
+            remote_db_ps (str): paramstyle of the remote database as defined
+                by `PEP-0249`_
+
+        .. _PEP-0249: https://www.python.org/dev/peps/pep-0249
+        """
+
         # self.saved_results is the in-memory data cache.  It has a structure of
         # saved_results = {
         #    'table1': {
@@ -70,8 +104,16 @@ class CachingDb(object):
                          dbname=dbname)
 
     def connect(self, dbhost, dbuser, dbpassword, dbname):
-        """
-        Establish db connection
+        """Establish remote db connection.
+
+        Connects to a remote MySQL database and defines the connection handler
+        and paramstyle attributes.
+
+        Args:
+            dbhost (str): hostname for the remote database
+            dbuser (str): username to use when connecting to database
+            dbpassword (str): password for authenticating to database
+            dbname (str): name of database to use when connecting
         """
         if self.cache_db is not None:
             # can't really do both local and remote dbs; all queries will be
@@ -87,17 +129,20 @@ class CachingDb(object):
         self.remote_db_ps = get_paramstyle_symbol(MySQLdb.paramstyle)
 
     def close(self):
-        """
-        Destroy connection objects and reset state of remote connection
-        attributes
+        """Destroy connection objects.
+
+        Close the remote database connection handler and reset state of remote
+        connection attributes.
         """
         self.remote_db = None
         self.remote_db_ps = None
 
     def connect_cache(self, cache_file):
-        """
-        Open the cache db and note whether our intent is to only write to it, or
-        read and write.
+        """Open the cache database file and set the handler attribute.
+
+        Args:
+            cache_file (str): Path to the SQLite3 caching database file to be
+                used.
         """
         if cache_file is not None:
             self.cache_db = sqlite3.connect(cache_file)
@@ -105,17 +150,21 @@ class CachingDb(object):
             self.cache_db_ps = get_paramstyle_symbol(sqlite3.paramstyle)
 
     def close_cache(self):
-        """
-        Close a cache db and reset its intent
+        """Close the cache database handler and reset caching db attributes.
         """
         if self.cache_db is not None:
             self.cache_db = self.cache_db.close()
             self.cache_file = None
 
     def drop_cache(self, tables=None):
-        """
-        Flush saved results from memory.  If tables are specified, only drop
-        those tables' results.  If no tables are provided, flush everything.
+        """Flush saved results from memory.
+        
+        If tables are specified, only drop those tables' results.  If no tables
+        are provided, flush everything.
+
+        Args:
+            tables (list, optional): List of table names (str) to flush.  If
+                omitted, flush all tables in cache.
         """
         drop_caches = set([])
         for table in self.saved_results.keys():
@@ -126,16 +175,23 @@ class CachingDb(object):
             del self.saved_results[drop_cache]
 
     def save_cache(self, cache_file):
-        """
-        Commit the in-memory cache to a cache database.  Currently very
-        memory-inefficient and not good for caching giant pieces of a database
-        without something wrapping it to feed it smaller pieces.
+        """Commit the in-memory cache to a cache database.
+        
+        This method is currently very memory-inefficient and not good for
+        caching giant pieces of a database without something wrapping it to feed
+        it smaller pieces.
 
-        Also note that we manipulate the object's cache_db* attributes in a
-        dirty way here to prevent closing and re-opening the original cache
-        db.  If the self.open_cache() is ever changed to include tracking
-        more state, this function must also be updated to retain that state
-        while the old cache db state is being temporarily shuffled out.
+        Note:
+            This manipulates the ``cache_db*`` attributes in a dirty way
+            to prevent closing and re-opening the original cache db.  If the
+            ``self.open_cache()`` is ever changed to include tracking more
+            state, this function must also be updated to retain that state while
+            the old cache db state is being temporarily shuffled out.
+
+        Args:
+            cache_file (str): Path to the cache file to be used to write out
+                the cache contents.  This file will temporarily pre-empt the
+                `cache_file` attribute and should be a different file.
         """
         ### Shuffle out the old cache db state (if it exists)
         old_state = {}
@@ -210,10 +266,24 @@ class CachingDb(object):
             self.cache_db_ps = old_state['cache_db_ps']
 
     def query(self, query_str, query_variables=(), table=None, table_schema=None):
-        """
-        Pass a query through all layers of cache and return on the first hit.
+        """Pass a query through all layers of cache and return on the first hit.
+
         If a table is specified, the results of this query can be saved to the
         cache db into a table of that name.
+
+        Args:
+            query_str (str): SQL query expressed as a string 
+            query_variables (tuple): parameters to be substituted into
+                `query_str` if `query_str` is a parameterized query
+            table (str, optional): name of table in the cache database to save
+                the results of the query
+            table_schema (str, optional): when `table` is specified, the SQL
+                line to initialize the table in which the query results will
+                be cached.
+
+        Returns:
+            tuple: Tuple of tuples corresponding to rows of fields as returned
+            by the SQL query.
         """
 
         ### Collapse query string to remove extraneous whitespace
@@ -249,9 +319,12 @@ class CachingDb(object):
         return results
 
     def _query_sqlite3(self, query_str, query_variables):
-        """
-        Run a query against the cache database and yield the full output.  No
-        buffering, so be careful.
+        """Run a query against the cache database and return the full output.
+
+        Args:
+            query_str (str): SQL query expressed as a string 
+            query_variables (tuple): parameters to be substituted into
+                `query_str` if `query_str` is a parameterized query
         """
         cursor = self.cache_db.cursor()
         if '%(ps)' in query_str:
@@ -262,10 +335,12 @@ class CachingDb(object):
         return rows
 
     def _query_mysql(self, query_str, query_variables):
-        """
-        Run a query against the MySQL database and yield the full output tuple.
-        No buffering, so be careful.
+        """Run a query against the MySQL database and return the full output.
 
+        Args:
+            query_str (str): SQL query expressed as a string 
+            query_variables (tuple): parameters to be substituted into
+                `query_str` if `query_str` is a parameterized query
         """
         cursor = self.remote_db.cursor()
         if '%(ps)' in query_str:
@@ -276,8 +351,20 @@ class CachingDb(object):
         return rows
 
 def get_paramstyle_symbol(paramstyle):
-    """
-    Infer the correct paramstyle for a database.paramstyle (see PEP-0249)
+    """Infer the correct paramstyle for a database.paramstyle
+
+    Provides a generic way to determine the paramstyle of a database connection
+    handle.  See `PEP-0249`_ for more information.
+
+    Args:
+        paramstyle (str): Result of a generic database handler's `paramstyle`
+            attribute
+
+    Returns:
+        str: The string corresponding to the paramstyle of the given database
+        connection.
+
+    .. _PEP-0249: https://www.python.org/dev/peps/pep-0249
     """
     if paramstyle == 'qmark':
         return "?"
