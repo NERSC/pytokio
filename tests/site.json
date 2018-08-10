@@ -37,5 +37,6 @@
     "lfsstatus_map_files": [
         "inputs/%Y-%m-%d/ost-map.txt",
         "inputs/%Y-%m-%d/ost-map_edison.txt"
-    ]
+    ],
+    "hpss_report_files": "inputs/hpss_daily_%Y%m%d"
 }
