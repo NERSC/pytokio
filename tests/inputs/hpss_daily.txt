@@ -1,0 +1,256 @@
+HPSS Report for Date 2018-08-09
+
+Archive : IO Totals by HPSS Client Gateway (UI) Host
+Host             Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+heart               53   148740.6     27991   109266.6     20172    39474.0      7819        0.0         0
+dtn11                5    29538.6      1694    29471.4      1688       67.3         6        0.0         0
+Total               58   178279.2     29685   138738.0     21860    39541.2      7825        0.0         0
+HPSS ACCOUNTING:         224962.6
+
+Hpss    : IO Totals by HPSS Client Gateway (UI) Host
+Host             Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+shire               16    18162.2      4240    18162.2      3281        0.0       959        0.0         0
+Total               16    18162.2      4240    18162.2      3281        0.0       959        0.0         0
+HPSS ACCOUNTING:          18155.1
+
+Archive : IO Totals by Client Host
+Host             Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+Cori                25    74318.5     11237    65835.7      7583     8482.8      3654        0.0         0
+Edison              15    52499.4     10948    27635.8     10555    24863.7       393        0.0         0
+DTN                 11    40124.8      6140    37761.7      2819     2363.1      3321        0.0         0
+Other                2     6517.7       670     3621.1       623     2896.6        47        0.0         0
+Nersc_Lan            7     4274.3       650     3339.3       240      935.0       410        0.0         0
+LBL                  4      544.5        40      544.5        40        0.0         0        0.0         0
+Total               64   178279.2     29685   138738.0     21860    39541.2      7825        0.0         0
+
+Hpss    : IO Totals by Client Host
+Host             Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+Nersc_Lan            7    14172.3      2264    14172.3      2072        0.0       192        0.0         0
+Genepool             2     1327.3       227     1327.3       227        0.0         0        0.0         0
+LBL                  5     1159.3        56     1159.3        56        0.0         0        0.0         0
+Other                3      664.1       130      664.1       130        0.0         0        0.0         0
+Cori                 2      408.5       196      408.5       102        0.0        94        0.0         0
+DTN                  2      259.8      1168      259.8       591        0.0       577        0.0         0
+Edison               2      170.9       199      170.9       103        0.0        96        0.0         0
+Total               23    18162.2      4240    18162.2      3281        0.0       959        0.0         0
+
+Archive : IO Totals by Client Application
+Client           Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+htar                19    87535.7      4105    60209.9      1751    27325.8      2354        0.0         0
+hsi                 33    60881.6     22674    49015.7     17896    11865.9      4778        0.0         0
+gftp                 5    29538.6      1694    29471.4      1688       67.3         6        0.0         0
+ftp                  4      323.3       444       41.0       141      282.3       303        0.0         0
+pftp                 1        0.0       768        0.0       384        0.0       384        0.0         0
+Total               62   178279.2     29685   138738.0     21860    39541.2      7825        0.0         0
+
+Hpss    : IO Totals by Client Application
+Client           Users      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  =====  =========  ========  =========  ========  =========  ========  =========  ========
+ftp                 13     9554.1      2428     9554.1      2332        0.0        96        0.0         0
+pftp                 2     6371.3       685     6371.3       301        0.0       384        0.0         0
+hsi                  8     2228.4      1122     2228.4       643        0.0       479        0.0         0
+htar                 2        8.4         5        8.4         5        0.0         0        0.0         0
+Total               25    18162.2      4240    18162.2      3281        0.0       959        0.0         0
+
+Archive : Largest Users
+User              App      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  ====  =========  ========  =========  ========  =========  ========  =========  ========
+user001          gftp    28372.1      1179    28372.0      1178        0.0         1        0.0         0
+user002          htar    23733.9       110        0.0         0    23733.9       110        0.0         0
+user003           hsi    21698.2      1152    21698.2      1152        0.0         0        0.0         0
+user004          htar    16143.2        23    16143.2        23        0.0         0        0.0         0
+user005          htar    15547.2       464    14081.6       433     1465.6        31        0.0         0
+user006          htar    14354.6       401    14354.6       401        0.0         0        0.0         0
+user007           hsi     7623.6       148     7623.6       148        0.0         0        0.0         0
+user008          htar     6868.9         9     6287.1         8      581.8         1        0.0         0
+user009          htar     4526.6        50     4526.6        50        0.0         0        0.0         0
+user010           hsi     4469.0       891     2647.5       179     1821.5       712        0.0         0
+user011           hsi     4347.5      1177     4347.5      1177        0.0         0        0.0         0
+user012           hsi     4109.4        71     1212.8        24     2896.6        47        0.0         0
+user013           hsi     3298.6      2715        0.0         0     3298.6      2715        0.0         0
+user014           hsi     2894.6      8936     2894.6      8936        0.0         0        0.0         0
+user015           hsi     2744.9         3     2744.9         3        0.0         0        0.0         0
+user016           hsi     2529.5       644        0.0         0     2529.5       644        0.0         0
+user017           hsi     2408.3       599     2408.3       599        0.0         0        0.0         0
+user018          htar     1556.4        44     1556.4        44        0.0         0        0.0         0
+user019          htar     1221.5       194      876.8       132      344.7        62        0.0         0
+user020           hsi     1208.2        15      560.5         7      647.6         8        0.0         0
+user021          gftp     1038.7       376     1038.7       376        0.0         0        0.0         0
+user022          htar      713.7      2203      239.3       176      474.4      2027        0.0         0
+user023          htar      674.3       288      674.3       288        0.0         0        0.0         0
+user024           hsi      658.6       294      658.6       294        0.0         0        0.0         0
+user025          htar      615.8       165      615.8       165        0.0         0        0.0         0
+user026          htar      612.3         1        0.0         0      612.3         1        0.0         0
+user027           hsi      494.1         2      494.1         2        0.0         0        0.0         0
+user028           hsi      463.3         6      463.3         6        0.0         0        0.0         0
+user029           hsi      381.0        24      381.0        24        0.0         0        0.0         0
+user030           hsi      378.8         2        0.0         0      378.8         2        0.0         0
+user031           hsi      370.8         2      185.4         1      185.4         1        0.0         0
+user032           hsi      369.9        14      343.5        13       26.4         1        0.0         0
+user033           ftp      282.3       202        0.0         0      282.3       202        0.0         0
+user034          htar      282.2         2      282.2         2        0.0         0        0.0         0
+user035          htar      281.4        17      276.1        12        5.3         5        0.0         0
+user036          htar      229.0        11      229.0        11        0.0         0        0.0         0
+user037           hsi      149.8         3      149.8         3        0.0         0        0.0         0
+user038           hsi      147.2         1      147.2         1        0.0         0        0.0         0
+user039          htar      107.8       117        0.0         0      107.8       117        0.0         0
+user040          gftp       67.2         5        0.0         0       67.2         5        0.0         0
+user041          htar       58.2         1       58.2         1        0.0         0        0.0         0
+user042          gftp       52.9        78       52.9        78        0.0         0        0.0         0
+user043           hsi       50.5        14       50.5        14        0.0         0        0.0         0
+user044           hsi        3.5      4808        3.5      4808        0.0         0        0.0         0
+
+Hpss    : Largest Users
+User              App      IO_GB       Ops   Write_GB     W_Ops    Read_GB     R_Ops    Copy_GB     C_Ops
+===============  ====  =========  ========  =========  ========  =========  ========  =========  ========
+fwfs             pftp     6371.3       301     6371.3       301        0.0         0        0.0         0
+mendelbk          ftp     4926.7       177     4926.7       177        0.0         0        0.0         0
+netback           ftp     1502.5      1142     1502.5      1142        0.0         0        0.0         0
+ccsebkup          ftp     1124.3        35     1124.3        35        0.0         0        0.0         0
+dcollect          hsi     1118.0       119     1118.0       119        0.0         0        0.0         0
+backup            ftp      728.4       194      728.4       194        0.0         0        0.0         0
+operator          ftp      561.9       607      561.9       511        0.0        96        0.0         0
+netback           hsi      347.9         1      347.9         1        0.0         0        0.0         0
+jgiarch           ftp      344.7       108      344.7       108        0.0         0        0.0         0
+esnet             ftp      319.5        30      319.5        30        0.0         0        0.0         0
+coribk            hsi      315.0         6      315.0         6        0.0         0        0.0         0
+jgi_dna           hsi      258.4        14      258.4        14        0.0         0        0.0         0
+edisonbk          hsi      170.1         4      170.1         4        0.0         0        0.0         0
+
+Archive: Migration Purge Report
+Storage Class              SC  MigFiles   Mig (GB)         MigTime  PurFiles  Purge(GB)       PurgeTime
+=========================  ==  ========  =========  ==============  ========  =========  ==============
+Large meta files(sc=2)      2         0        0.0      0-00:00:00         0        0.0      0-00:00:00
+Medium disk files(sc=3)     3         0        0.0      0-00:00:00         0        0.0      0-00:00:00
+Small Disk                  4     52681     7040.0      0-05:20:07         0        0.0      0-00:00:00
+Medium Disk                 8      5173    91698.0      0-13:44:23     16936   167765.5      0-00:07:59
+Large Disk                 10         6     5969.9      0-03:49:29        27    39462.2      0-00:00:02
+TOTAL                             57860   104707.9      0-22:53:59     16963   207227.7      0-00:08:01
+
+Hpss: Migration Purge Report
+Storage Class              SC  MigFiles   Mig (GB)         MigTime  PurFiles  Purge(GB)       PurgeTime
+=========================  ==  ========  =========  ==============  ========  =========  ==============
+Large meta files(sc=1)      1         0        0.0      0-00:00:01         0        0.0      0-00:00:00
+Small Disk                  4      1601       68.6      0-00:28:26         0        0.0      0-00:00:00
+Medium scsi files(sc=6)     6         0        0.0      0-00:00:00         0        0.0      0-00:00:00
+Medium Disk                 7       360     4442.9      0-19:39:44       706     9653.7      0-00:00:06
+Large Disk                 10        25     8406.9      0-03:29:18         0        0.0      0-00:00:00
+TOTAL                              1986    12918.4      0-23:37:29       706     9653.7      0-00:00:06
+
+Archive: No HPSS Configuration Changes
+
+Hpss: No HPSS Configuration Changes
+
+Archive: Tape Drive Report
+DriveTyp  Count  Cleans  Locks   Mounts       AvailTime        Locktime Lock%       MountTime  Mnt%
+========  =====  ======  =====  =======  ==============  ============== =====  ============== =====
+   T10KB      4       0      0        0      4-00:00:00      0-00:00:00   0.0      0-00:00:00   0.0
+ IBM3592     19       0      1      702     19-00:00:00      1-00:00:00   5.3     10-09:34:44  54.7
+   9840D     12       0      3        6     12-00:00:00      3-00:00:00  25.0      2-20:21:56  23.7
+   T10KC     48       3      3     1802     48-00:00:00      3-00:00:00   6.2     29-22:17:44  62.4
+
+Hpss: Tape Drive Report
+DriveTyp  Count  Cleans  Locks   Mounts       AvailTime        Locktime Lock%       MountTime  Mnt%
+========  =====  ======  =====  =======  ==============  ============== =====  ============== =====
+ IBM3592     16       0      0      146     16-00:00:00      0-00:00:00   0.0      2-23:44:37  18.7
+   9840D      4       0      0        0      4-00:00:00      0-00:00:00   0.0      0-00:00:00   0.0
+
+Tape Drive Replacement:
+
+LSM Free Slot Counts (Free/Total)
+     LSM  1,0:  2085/2522,     LSM  1,1:   697/2522,     LSM  1,2:  1134/2522,     LSM  1,3:   716/2522
+     LSM  1,4:  1594/2522,     LSM  1,5:  1191/2522,     LSM  1,6:  1116/2522,     LSM  1,7:   958/2522
+     LSM  1,8:  1373/2522,     LSM  1,9:     6/2522,     LSM 1,10:   244/2522,     LSM 1,11:     1/2522
+     LSM 1,12:  1484/2522,     LSM 1,13:    42/2522,     LSM 1,14:    77/2522,     LSM 1,15:    14/2522
+
+	LSM 1, 0  contains:     2  Archive   9840D Drives
+	LSM 1, 1  contains:     2  Archive   T10KC Drives
+	LSM 1, 2  contains:     2  Archive   T10KC Drives
+	LSM 1, 4  contains:     4  Archive   T10KB Drives     2  Archive   9840D Drives
+	LSM 1, 8  contains:     4  Archive   9840D Drives
+	LSM 1, 9  contains:     8  Archive   T10KC Drives
+	LSM 1,10  contains:     6  Archive   T10KC Drives
+	LSM 1,11  contains:     8  Archive   T10KC Drives
+	LSM 1,12  contains:     4  Archive   9840D Drives
+	LSM 1,13  contains:     8  Archive   T10KC Drives
+	LSM 1,14  contains:     6  Archive   T10KC Drives
+	LSM 1,15  contains:     8  Archive   T10KC Drives
+	IBM 3500  contains:    19  Archive  IBM3592_E08 Drives
+	LSM 1, 0  contains:     4     Hpss   9840D Drives
+	IBM 3500  contains:    16     Hpss  IBM3592_E08 Drives
+
+Cartridges Moved Between LSMs on SL8500 Complex (Src on Left, Dest on Top)
+        1,0  1,1  1,2  1,3    1,4  1,5  1,6  1,7    1,8  1,9 1,10 1,11   1,12 1,13 1,14 1,15   
+       ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + 
+  1,0 |                    |                     |                     |                     | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,1 |             7      |                   1 |        14    4    1 |         3    4    4 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,2 |        5           |                     |        11   13    8 |         9    7    7 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,3 |             1      |                     |                   3 |                     | 
+       ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + 
+  1,4 |                    |                     |                     |                     | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,5 |        1           |                     |         4         2 |         4         4 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,6 |                    |                   1 |                   1 |         1           | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,7 |             1      |                     |         1         3 |         3    1    5 | 
+       ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + 
+  1,8 |                    |                     |                     |                     | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+  1,9 |       54   10      |                   3 |             19   38 |        30    8   24 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+ 1,10 |        1   11      |         2         2 |        17        26 |        21   28   12 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+ 1,11 |        4    7   49 |                     |        24   28      |        26   13   42 | 
+       ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + 
+ 1,12 |                    |                     |                     |                     | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+ 1,13 |       14    7      |        51         1 |        35   17   23 |             17   20 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+ 1,14 |        3    5      |         2         3 |        16   18   12 |        27        30 | 
+       ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + ---- ---- ---- ---- + 
+ 1,15 |        2   12      |         2        57 |        22   14   26 |        25   23      | 
+       ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + ==== ==== ==== ==== + 
+
+Volume EP788900 moved   11 times, mounted   13 times
+Volume ES116300 moved    9 times, mounted   10 times
+Volume ES114300 moved    8 times, mounted   15 times
+Volume EP789700 moved    8 times, mounted   12 times
+Volume EP789100 moved    8 times, mounted   11 times
+Volume ES110900 moved    8 times, mounted   11 times
+Volume EP789800 moved    8 times, mounted    9 times
+Volume ES116200 moved    8 times, mounted   10 times
+Volume ES110800 moved    7 times, mounted   11 times
+Volume EP848500 moved    7 times, mounted    8 times
+Volume EP848900 moved    7 times, mounted    7 times
+Volume EP789400 moved    7 times, mounted   11 times
+Volume EP849100 moved    6 times, mounted    8 times
+Volume EP849200 moved    6 times, mounted    6 times
+Volume EP849300 moved    6 times, mounted    8 times
+Volume EP853700 moved    6 times, mounted    7 times
+Volume EP789500 moved    6 times, mounted   10 times
+Volume EP789600 moved    6 times, mounted    9 times
+Volume EP788700 moved    6 times, mounted    8 times
+Volume EP849000 moved    6 times, mounted    7 times
+Volume EP843600 moved    6 times, mounted    6 times
+Volume EP844100 moved    6 times, mounted    8 times
+Volume EP843100 moved    5 times, mounted    7 times
+Volume ES114200 moved    5 times, mounted   15 times
+Volume EP853800 moved    5 times, mounted    6 times
+Volume EP095000 moved    5 times, mounted    5 times
+Volume EP848800 moved    5 times, mounted    6 times
+Volume EP853200 moved    5 times, mounted    6 times
+Volume EP853100 moved    5 times, mounted    6 times
+Volume ES080700 moved    5 times, mounted    5 times
+Volume EP849500 moved    5 times, mounted    6 times
+Volume EP843200 moved    5 times, mounted    6 times
+Volume EP843800 moved    5 times, mounted    6 times
+
