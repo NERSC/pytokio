@@ -7,6 +7,37 @@ from tokio.connectors.common import SubprocessOutputDict
 
 REX_HEADING_LINE = re.compile(r"^[= ]+$")
 REX_EMPTY_LINE = re.compile(r"^\s*$")
+REX_TIMEDELTA = re.compile(r"^(\d+)-(\d+):(\d+):(\d+)$")
+
+FLOAT_KEYS = set([
+    'io_gb',
+    'write_gb',
+    'read_gb',
+    'copy_gb',
+    'mig (gb)',
+    'purge(gb)',
+    'lock%'
+])
+INT_KEYS = set([
+    'users',
+    'ops',
+    'w_ops',
+    'r_ops',
+    'c_ops',
+    'migfiles',
+    'purfiles',
+    'count',
+    'cleans',
+    'locks',
+    'mounts',
+])
+DELTIM_KEYS = set([
+    'migtime',
+    'purgetime',
+    'availtime',
+    'locktime',
+    'mounttime',
+])
 
 class HpssDailyReport(SubprocessOutputDict):
     """Representation for the daily report that HPSS can generate
@@ -35,10 +66,6 @@ class HpssDailyReport(SubprocessOutputDict):
         while start_line < num_lines:
             parsed_table, finish_line = _parse_section(lines, start_line)
             if finish_line != start_line and 'records' in parsed_table:
-                print "Found a table [%s] at line %d" % (
-                    parsed_table['system'],
-                    start_line
-                )
                 if parsed_table['system'] not in self:
                     self.__setitem__(parsed_table['system'], {})
                 self[parsed_table['system']][parsed_table['title']] = parsed_table['records']
@@ -126,7 +153,6 @@ def _parse_section(lines, start_line=0):
     col_extents = _find_columns(separator_line)
     if len(col_extents) == 0:
         return results, start_line
-    print "Found a heading at line %d" % (start_line + 2)
 
     # At this point, we are reasonably confident we have found a table.
     # Populate results so that this function returns some indicator of
@@ -155,7 +181,15 @@ def _parse_section(lines, start_line=0):
         for heading_idx, (start_pos, str_len) in enumerate(col_extents):
             col_name = headings[heading_idx].lower()
             col_val = line[start_pos:start_pos + str_len].lower().strip()
-            record[col_name] = col_val
+            if col_name in FLOAT_KEYS:
+                record[col_name] = float(col_val)
+            elif col_name in INT_KEYS:
+                record[col_name] = int(col_val)
+            elif col_name in DELTIM_KEYS:
+                record[col_name] = col_val
+                record[col_name + "secs"] = _hpss_timedelta_to_secs(col_val)
+            else:
+                record[col_name] = col_val
         records.append(record)
 
     if records:
@@ -218,3 +252,25 @@ def _find_columns(line, sep="=", gap=' ', strict=False):
         columns.append((col_start, len(line) - col_start))
 
     return columns
+
+def _hpss_timedelta_to_secs(timedelta_str):
+    """Convert HPSS-encoded timedelta string into seconds
+
+    Args:
+        timedelta_str (str): String in form d-HH:MM:SS where d is the number of
+            days, HH is hours, MM minutes, and SS seconds
+
+    Returns:
+        int: number of seconds represented by timedelta_str
+    """
+
+    match = REX_TIMEDELTA.match(timedelta_str)
+    if match:
+        seconds = int(match.group(1)) * 86400
+        seconds += int(match.group(2)) * 3600
+        seconds += int(match.group(3)) * 60
+        seconds += int(match.group(4))
+    else:
+        seconds = -1
+
+    return seconds
