@@ -64,6 +64,7 @@ SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt')
 SAMPLE_OSTFULLNESS_FILE_GZ = SAMPLE_OSTFULLNESS_FILE + ".gz"
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
+SAMPLE_HPSS_REPORT = os.path.join(INPUT_DIR, "hpss_daily.txt")
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
