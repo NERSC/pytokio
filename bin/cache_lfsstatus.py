@@ -35,8 +35,6 @@ def main(argv=None):
             target_datetime,
             cache_file=args.fullness if args.fullness != "" else None)
     else:
-        print "fullness:", args.fullness
-        print "failure:", args.failure
         raise Exception('Neither --fullness nor --failure were specified')
 
     # Serialize the object
