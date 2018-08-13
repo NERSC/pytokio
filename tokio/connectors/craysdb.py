@@ -5,13 +5,7 @@ It is intended to be used to determine information about a node's configuration
 within the network fabric to provide topological information.
 """
 
-import os
 import sys
-import gzip
-import errno
-import collections
-import subprocess
-import mimetypes
 from tokio.connectors.common import SubprocessOutputDict
 
 class CraySdbProc(SubprocessOutputDict):

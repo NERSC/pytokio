@@ -54,12 +54,8 @@ Note:
     ASCII translation.
 """
 
-import os
 import re
 import json
-import errno
-import warnings
-import subprocess
 from tokio.connectors.common import SubprocessOutputDict
 
 DARSHAN_PARSER_BIN = 'darshan-parser'
@@ -81,7 +77,7 @@ class Darshan(SubprocessOutputDict):
         Attributes:
             log_file (str): Path to the Darshan log file to load
         """
-        super(Darshan,self).__init__(*args, **kwargs)
+        super(Darshan, self).__init__(*args, **kwargs)
         self.log_file = log_file
         self._parser_mode = None
         self.subprocess_cmd = [DARSHAN_PARSER_BIN]
@@ -243,7 +239,7 @@ class Darshan(SubprocessOutputDict):
         counter = None
         module_section = None
         # This regex must match every possible module name
-        module_rex = re.compile('^# ([A-Z\-0-9/]+) module data\s*$')
+        module_rex = re.compile(r'^# ([A-Z\-0-9/]+) module data\s*$')
 
         for line in output_str.splitlines():
             # Is this the start of a new section?
@@ -281,7 +277,8 @@ class Darshan(SubprocessOutputDict):
 
             elif section == 'counters':
                 if self._parser_mode == "BASE":
-                    module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_base_counters(line)
+                    # module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_base_counters(line)
+                    _, rank, _, counter, value, file_name, _, _ = parse_base_counters(line)
                     if module_section is not None:
                         # If it is none, is_valid_counter check below will bail
                         counter_prefix = module_section + "_"
@@ -362,7 +359,7 @@ def parse_header(line):
         return "walltime", int(line.split()[-1])
     elif line.startswith("# metadata:"):
         return "metadata", line.split(None, 2)[-1].strip()
-    return None,None
+    return None, None
 
 
 def parse_mounts(line):

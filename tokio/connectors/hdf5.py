@@ -11,7 +11,14 @@ import datetime
 import h5py
 import numpy
 import pandas
-from tokio.connectors._hdf5 import convert_counts_rates, map_dataset, demux_column
+from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unused-import
+                                    map_dataset,
+                                    demux_column,
+                                    get_timestamps,
+                                    get_timestamps_key,
+                                    DEFAULT_TIMESTAMP_DATASET,
+                                    TIMESTAMP_KEY,
+                                    COLUMN_NAME_KEY)
 
 SCHEMA = {
     None: {},
@@ -550,10 +557,6 @@ H5LMT_COLUMN_ATTRS = {
     'OSSCPUGroup/OSSCPUDataSet': 'OSSNames',
 }
 
-TIMESTAMP_KEY = 'timestamps'
-DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
-COLUMN_NAME_KEY = 'columns'
-
 class Hdf5(h5py.File):
     """
     Create a parsed Hdf5 file class
@@ -645,7 +648,6 @@ class Hdf5(h5py.File):
         if self.version is None:
             return self._get_columns_h5lmt(dataset_name)
         # retrieve the dataset to resolve the schema key or get MappedDataset
-        dataset = self.__getitem__(dataset_name)
         return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
 
     def _get_columns_h5lmt(self, dataset_name):
@@ -731,8 +733,7 @@ class Hdf5(h5py.File):
 
         if inverse:
             return (~result.astype(bool)).astype('i8')
-        else:
-            return result
+        return result
 
     def to_dataframe(self, dataset_name):
         """Convert a dataset into a dataframe
@@ -801,37 +802,6 @@ class Hdf5(h5py.File):
         return pandas.DataFrame(data=values,
                                 index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
                                 columns=columns)
-
-def get_timestamps_key(hdf5_file, dataset_name):
-    """
-    Read into an HDF5 file and extract the name of the dataset containing the
-    timestamps correspond to the given dataset_name
-    """
-    # Get dataset out of HDF5 file
-    hdf5_dataset = hdf5_file.get(dataset_name)
-    if hdf5_dataset is None:
-        return None
-
-    if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
-        return '/FSStepsGroup/FSStepsDataSet'
-
-    # Identify the dataset containing timestamps for this dataset
-    if TIMESTAMP_KEY in hdf5_dataset.attrs:
-        timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
-    else:
-        timestamp_key = hdf5_dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
-
-    # Load timestamps dataset into memory
-    if timestamp_key not in hdf5_file:
-        raise KeyError("timestamp_key %s does not exist" % timestamp_key)
-
-    return timestamp_key
-
-def get_timestamps(hdf5_file, dataset_name):
-    """
-    Return the timestamps dataset for a given dataset name
-    """
-    return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]
 
 def missing_values(dataset, inverse=False):
     """Identify matrix values that are missing

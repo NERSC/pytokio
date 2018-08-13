@@ -41,7 +41,6 @@ def generate_tts(output_file,
             '--input', input_file,
             '--timestep', str(tokiotest.SAMPLE_LMTDB_TIMESTEP),
             '--output', output_file,
-            '--debug',
             init_start,
             init_end]
     print "Running [%s]" % ' '.join(argv)
@@ -56,7 +55,6 @@ def update_tts(output_file, q_start, q_end):
 
     argv = ['--input', tokiotest.SAMPLE_LMTDB_FILE,
             '--output', output_file,
-            '--debug',
             q_start.strftime(tokiotest.SAMPLE_TIMESTAMP_DATE_FMT),
             q_end.strftime(tokiotest.SAMPLE_TIMESTAMP_DATE_FMT)]
 

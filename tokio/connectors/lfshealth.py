@@ -4,14 +4,7 @@ Connectors for the Lustre `lfs df` and `lctl dl -t` commands to determine the
 health of Lustre file systems from the clients' perspective.
 """
 
-import os
-import sys
-import gzip
-import errno
 import re
-import warnings
-import mimetypes
-import subprocess
 from tokio.connectors.common import SubprocessOutputDict
 
 # Only try to match osc/mdc lines; skip mgc/lov/lmv

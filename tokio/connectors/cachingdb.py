@@ -6,7 +6,6 @@ database (sqlite3) to allow for reanalysis on platforms that cannot access the
 original remote database or to reduce the load on remote databases.
 """
 
-import json
 import warnings
 try:
     import pymysql
@@ -214,7 +213,7 @@ class CachingDb(object):
 
             num_fields = None
             ### Verify and preprocess each saved row
-            for index, row in enumerate(self.saved_results[table]['rows']):
+            for row in self.saved_results[table]['rows']:
                 if num_fields is None:
                     num_fields = len(row)
 
@@ -240,8 +239,8 @@ class CachingDb(object):
                 self.cache_db.execute(
                     "CREATE TABLE IF NOT EXISTS %s (%s, PRIMARY KEY(%s))" %
                     (table,
-                    ', '.join(table_info['schema']['columns']),
-                    ', '.join(table_info['schema']['primary_key'])))
+                     ', '.join(table_info['schema']['columns']),
+                     ', '.join(table_info['schema']['primary_key'])))
 
             ### INSERT OR REPLACE so that the cache db never wins if a duplicate
             ### primary key is detected

@@ -21,8 +21,10 @@ import dateutil.tz
 import numpy
 import h5py
 
-import tokio
+import tokio.debug
+import tokio.timeseries
 import tokio.connectors.collectd_es
+import tokio.connectors.hdf5
 
 SCHEMA_VERSION = "1"
 
@@ -167,7 +169,7 @@ def process_page(page):
                 inserts.append(('dataservers/memslab_unrecl', timestamp, source['hostname'], val1))
 
     _timef = time.time()
-    if tokio.DEBUG:
+    if tokio.debug.DEBUG:
         print "Extracted %d inserts in %.4f seconds" % (len(inserts), _timef - _time0)
         per_dataset = {}
         for insert in inserts:
@@ -201,7 +203,7 @@ def update_datasets(inserts, datasets):
             raise
 
         if datasets[dataset_name].insert_element(timestamp, col_name, value, reducer):
-            data_volume[dataset_name] += value 
+            data_volume[dataset_name] += value
             tidx, cidx = datasets[dataset_name].get_insert_pos(timestamp, col_name)
         else:
             errors[dataset_name] += 1
@@ -216,7 +218,7 @@ def update_datasets(inserts, datasets):
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
 
-    if tokio.DEBUG:
+    if tokio.debug.DEBUG:
         for key in data_volume.keys():
             data_volume[key] *= datasets[key].timestep
         update_str = "Added "
@@ -360,10 +362,10 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
             updates.append(process_page(page))
     _timef = time.time()
     _extract_time = _timef - _time0
-    tokio.debug_print("Extracted %d elements from %d pages in %.4f seconds" \
-                      % (sum([len(x) for x in updates]),
-                      len(pages),
-                      _extract_time))
+    tokio.debug.debug_print("Extracted %d elements from %d pages in %.4f seconds" \
+                            % (sum([len(x) for x in updates]),
+                               len(pages),
+                               _extract_time))
 
     # Take the processed list of data to insert and actually insert them
     _time0 = time.time()
@@ -371,7 +373,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
         update_datasets(update, datasets)
     _timef = time.time()
     _update_time = _timef - _time0
-    if tokio.DEBUG:
+    if tokio.debug.DEBUG:
         print "Inserted %d elements from %d pages in %.4f seconds" \
             % (len(updates), len(pages), _update_time)
         print "Processed %d pages in %.4f seconds" \
@@ -386,7 +388,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
         if '/_' not in dataset_name:
             dataset.commit_dataset(hdf5_file)
 
-    if tokio.DEBUG:
+    if tokio.debug.DEBUG:
         print "Committed data to disk in %.4f seconds" % (time.time() - _time0)
 
 def main(argv=None):
@@ -432,7 +434,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.debug:
-        tokio.DEBUG = True
+        tokio.debug.DEBUG = True
 
     # Convert CLI options into datetime
     try:

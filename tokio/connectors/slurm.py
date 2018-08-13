@@ -5,7 +5,6 @@ This connector provides Python bindings to retrieve information made available
 through the standard Slurm saccount and scontrol CLI commands.
 """
 
-import sys
 import json
 import errno
 import warnings

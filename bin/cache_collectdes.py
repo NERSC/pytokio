@@ -14,7 +14,7 @@ import argparse
 import warnings
 import mimetypes
 
-import tokio
+import tokio.debug
 import tokio.connectors.collectd_es
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"

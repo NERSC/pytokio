@@ -51,7 +51,6 @@ def generate_tts(output_file,
             '--ssds-per-node', str(tokiotest.SAMPLE_COLLECTDES_SSDS_PER),
             '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
             '--output', output_file,
-            '--debug',
             query_start,
             query_end]
     print "Running [%s]" % ' '.join(argv)
@@ -68,7 +67,6 @@ def update_tts(output_file,
 
     argv = ['--input', input_file,
             '--output', output_file,
-            '--debug',
             query_start,
             query_end]
 
@@ -166,7 +164,6 @@ def test_out_of_bounds():
             '--ssds-per-node', str(tokiotest.SAMPLE_COLLECTDES_SSDS_PER),
             '--timestep', str(tokiotest.SAMPLE_COLLECTDES_TIMESTEP),
             '--output', tokiotest.TEMP_FILE.name,
-            '--debug',
             tokiotest.SAMPLE_COLLECTDES_START,
             tokiotest.SAMPLE_COLLECTDES_END]
     print "Running [%s]" % ' '.join(argv)
