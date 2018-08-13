@@ -29,7 +29,7 @@ class CachingDb(object):
     #pylint: disable=too-many-arguments
     def __init__(self, dbhost=None, dbuser=None, dbpassword=None, dbname=None, cache_file=None):
         """Connect to a relational database.
-        
+
         If instantiated with a cache_file argument, all queries will go to that
         SQLite-based cache database.  If this class is not instantiated with a
         cache_file argument, all queries will go out to the remote database.
@@ -158,7 +158,7 @@ class CachingDb(object):
 
     def drop_cache(self, tables=None):
         """Flush saved results from memory.
-        
+
         If tables are specified, only drop those tables' results.  If no tables
         are provided, flush everything.
 
@@ -176,7 +176,7 @@ class CachingDb(object):
 
     def save_cache(self, cache_file):
         """Commit the in-memory cache to a cache database.
-        
+
         This method is currently very memory-inefficient and not good for
         caching giant pieces of a database without something wrapping it to feed
         it smaller pieces.
@@ -272,7 +272,7 @@ class CachingDb(object):
         cache db into a table of that name.
 
         Args:
-            query_str (str): SQL query expressed as a string 
+            query_str (str): SQL query expressed as a string
             query_variables (tuple): parameters to be substituted into
                 `query_str` if `query_str` is a parameterized query
             table (str, optional): name of table in the cache database to save
@@ -322,7 +322,7 @@ class CachingDb(object):
         """Run a query against the cache database and return the full output.
 
         Args:
-            query_str (str): SQL query expressed as a string 
+            query_str (str): SQL query expressed as a string
             query_variables (tuple): parameters to be substituted into
                 `query_str` if `query_str` is a parameterized query
         """
@@ -338,7 +338,7 @@ class CachingDb(object):
         """Run a query against the MySQL database and return the full output.
 
         Args:
-            query_str (str): SQL query expressed as a string 
+            query_str (str): SQL query expressed as a string
             query_variables (tuple): parameters to be substituted into
                 `query_str` if `query_str` is a parameterized query
         """

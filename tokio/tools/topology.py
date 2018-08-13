@@ -29,8 +29,8 @@ def get_job_diameter(jobid=None, craysdb_cache_file=None, slurm_cache_file=None)
         node_positions.append((node_x, node_y, node_z))
 
     # Three dimensional topology
-    center = [0.0, 0.0, 0.0] 
-    for node_position in node_positions: 
+    center = [0.0, 0.0, 0.0]
+    for node_position in node_positions:
         center[0] += node_position[0]
         center[1] += node_position[1]
         center[2] += node_position[2]
@@ -42,7 +42,7 @@ def get_job_diameter(jobid=None, craysdb_cache_file=None, slurm_cache_file=None)
     min_r = 10000.0
     max_r = 0.0
     avg_r = 0.0
-    for node_position in node_positions: 
+    for node_position in node_positions:
         r2 = (node_position[0] - center[0])**2.0
         r2 += (node_position[1] - center[1])**2.0
         r2 += (node_position[2] - center[2])**2.0
@@ -53,7 +53,7 @@ def get_job_diameter(jobid=None, craysdb_cache_file=None, slurm_cache_file=None)
             max_r = r
         avg_r += r
 
-    return { 
+    return {
         "job_min_radius": min_r,
         "job_max_radius": max_r,
         "job_avg_radius": avg_r / float(len(node_positions)),

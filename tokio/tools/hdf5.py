@@ -13,7 +13,7 @@ def enumerate_h5lmts(fsname, datetime_start, datetime_end):
 
     Given a starting datetime and (optionally) an ending datetime, return all
     HDF5 files that contain data inside of that date range (inclusive).
-    """   
+    """
     return common.enumerate_dated_files(start=datetime_start,
                                         end=datetime_end,
                                         template=tokio.config.HDF5_FILES,
@@ -43,7 +43,7 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
         i_f = -1
         if datetime.datetime.fromtimestamp(timestamps[-1]) >= datetime_end:
             # This is the last day's hdf5
-            i_f = hdf5.get_index(dataset_name, datetime_end) - 1  
+            i_f = hdf5.get_index(dataset_name, datetime_end) - 1
             # -1 because datetime_end should be exclusive
             #
             # If the last timestamp is on the first datapoint of a new day,
@@ -73,7 +73,7 @@ def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime
     for h5file in enumerate_h5lmts(fsname, datetime_start, datetime_end):
         with tokio.connectors.hdf5.Hdf5(h5file, mode='r') as f:
             df_slice = f.to_dataframe(dataset_name)
-            df_slice = df_slice[(df_slice.index >= datetime_start) 
+            df_slice = df_slice[(df_slice.index >= datetime_start)
                                 & (df_slice.index < datetime_end)]
             if result is None:
                 result = df_slice

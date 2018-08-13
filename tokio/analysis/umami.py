@@ -115,7 +115,7 @@ class Umami(collections.OrderedDict):
 
             x = measurement.timestamps
             y = measurement.values
-    
+
             ### first plot the timeseries of the given variable
             ax_ts = fig.add_subplot(gridspec[2*row_num])
             ax_ts.plot(x, y,
@@ -123,7 +123,7 @@ class Umami(collections.OrderedDict):
                        marker='x',
                        linewidth=linewidth,
                        color=linecolor)
-    
+
             # textwrap.wrap inserts line breaks into each label
             ax_ts.set_ylabel('\n'.join(textwrap.wrap(
                                 text=measurement.label,
@@ -135,7 +135,7 @@ class Umami(collections.OrderedDict):
                                 verticalalignment='center')
             ax_ts.grid()
             ax_ts.set_xlim(x_min, x_max)
-    
+
             # blank out the labels for all subplots except the bottom-most one
             if row_num != len(rows_to_plot) - 1:
                 ax_ts.set_xticklabels([])
@@ -143,13 +143,13 @@ class Umami(collections.OrderedDict):
                 last_ax_ts = ax_ts
                 # resize and rotate the labels for the timeseries plot
                 for tick in ax_ts.xaxis.get_major_ticks():
-                    tick.label.set_fontsize(fontsize) 
+                    tick.label.set_fontsize(fontsize)
                     tick.label.set_rotation(45)
-    
+
             # also adjust the font size for the y labels
             for tick in ax_ts.yaxis.get_major_ticks():
                 tick.label.set_fontsize(fontsize)
-    
+
             # then plot the boxplot summary of the given variable
             ax_box = fig.add_subplot(gridspec[2*row_num + 1])
             y_box_data = numpy.array(y)
@@ -165,14 +165,14 @@ class Umami(collections.OrderedDict):
                            capprops={'linewidth':linewidth},
                            flierprops={'linewidth':linewidth},
                            whis=[5,95])
-    
+
             # scale the extents of the y ranges a little for clarity
             orig_ylim = ax_ts.get_ylim()
             new_ylim = map(lambda a, b: a*(1 + b), orig_ylim, (-0.1, 0.1))
             ax_ts.set_ylim(new_ylim)
-            
+
             yticks = ax_ts.get_yticks().tolist()
-            
+
             # the following is a heuristic to determine how close the topmost
             # tick label is to the edge of the plot.  if it's too close, blank
             # it out so it doesn't overlap with the bottom-most tick label
@@ -187,10 +187,10 @@ class Umami(collections.OrderedDict):
                 yticks = map(int, yticks)
                 yticks[-1] = " "
                 ax_ts.set_yticklabels(yticks)
-                            
+
             # lock in the y range to match the timeseries plot, just in case
             ax_box.set_ylim(ax_ts.get_ylim())
-    
+
             # determine the color of our highlights based on quartile
             percentiles = [ numpy.nanpercentile(y[0:-1], percentile) for percentile in 25, 50, 75, 100 ]
             for color_index, percentile in enumerate(percentiles):
@@ -200,7 +200,7 @@ class Umami(collections.OrderedDict):
                 highlight_color = colorscale[color_index]
             else:
                 highlight_color = colorscale[(1+color_index)*-1]
-    
+
             # highlight the latest measurement on the timeseries plot
             x_last = matplotlib.dates.date2num(x[highlight_index])
             x_2nd_last = matplotlib.dates.date2num(x[highlight_index-1])
@@ -213,7 +213,7 @@ class Umami(collections.OrderedDict):
                        marker='*',
                        color=highlight_color,
                        markersize=15)
-    
+
             # where does this last data point lie on the distribution?
             ax_box.plot([0,2],
                         [y[highlight_index],y[highlight_index]],
@@ -221,16 +221,16 @@ class Umami(collections.OrderedDict):
                         color=highlight_color,
                         linewidth=2.0,
                         zorder=10)
-    
+
             # blank out all labels
             ax_box.set_yticklabels([""])
             ax_box.set_xticklabels([""])
             ax_box.yaxis.grid()
-    
+
         fig.subplots_adjust(hspace=0.0, wspace=0.0)
         fig.autofmt_xdate()
         last_ax_ts.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b %d'))
-    
+
         if output_file is not None:
             fig.savefig(output_file, bbox_inches="tight")
 
@@ -264,7 +264,7 @@ class UmamiMetric(object):
 
     def to_json(self):
         return json.dumps(self.__dict__, default=_serialize_datetime)
- 
+
     def append(self, timestamp, value):
         """
         Can only add values along with a timestamp.
@@ -284,7 +284,7 @@ def _serialize_datetime(obj):
     """
     Special serializer function that converts datetime into something that can
     be encoded in json
-    
+
     """
     if isinstance(obj, (datetime.datetime, datetime.date)):
         serial = obj.isoformat()
