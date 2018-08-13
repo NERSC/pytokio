@@ -4,19 +4,19 @@ Class and tools to generate TOKIO UMAMI plots
 """
 
 import json
-import numpy
-import pandas
-import textwrap
 import datetime
 import collections
+import textwrap
+import numpy
+import pandas
 import matplotlib
 import matplotlib.pyplot
 
-DEFAULT_LINEWIDTH  = 1
-DEFAULT_LINECOLOR  = "#853692"
-DEFAULT_FONTSIZE   = 12
-DEFAULT_COLORSCALE = [ '#DA0017', '#FD6A07', '#40A43A', '#2C69A9' ]
-DEFAULT_FIGSIZE    = (6.0, 12.0 / 9.0)
+DEFAULT_LINEWIDTH = 1
+DEFAULT_LINECOLOR = "#853692"
+DEFAULT_FONTSIZE = 12
+DEFAULT_COLORSCALE = ['#DA0017', '#FD6A07', '#40A43A', '#2C69A9']
+DEFAULT_FIGSIZE = (6.0, 12.0 / 9.0)
 
 class Umami(collections.OrderedDict):
     """
@@ -24,15 +24,15 @@ class Umami(collections.OrderedDict):
     UMAMI diagram.  It is keyed by a metric name, and values are UmamiMetric
     objects which contain timestamps (x values) and measurements (y values)
     """
-    def __init__(self, *args, **kwargs):
-        super(Umami, self).__init__(*args, **kwargs)
+#   def __init__(self, *args, **kwargs):
+#       super(Umami, self).__init__(*args, **kwargs)
 
     def to_dict(self):
         """
         Convert this object _and all of its constituent UmamiMetric objects_
         into a dictionary
         """
-        return { k: v.__dict__ for k, v in self.iteritems() }
+        return {k: v.__dict__ for k, v in self.iteritems()}
 
     def _to_dict_for_pandas(self, stringify_key=False):
         """
@@ -54,9 +54,20 @@ class Umami(collections.OrderedDict):
         return to_df
 
     def to_json(self):
+        """Serialize self into a JSON string
+
+        Returns:
+            str: JSON representation of numerical data being plotted
+        """
         return json.dumps(self._to_dict_for_pandas(stringify_key=True), indent=4, sort_keys=True)
 
     def to_dataframe(self):
+        """Return a representation of self as pandas.DataFrame
+
+        Returns:
+            pandas.DataFrame: numerical representation of the values being
+                plotted
+        """
         return pandas.DataFrame.from_dict(self._to_dict_for_pandas(), orient='index')
 
     def plot(self, output_file=None,
@@ -88,9 +99,9 @@ class Umami(collections.OrderedDict):
 
         # Required to adjust the column widths of our figure (width_ratios)
         gridspec = matplotlib.gridspec.GridSpec(
-            len(rows_to_plot),  # how many rows to draw
-            2,                  # how many columns to draw
-            width_ratios=[4,1]) # ratio of column widths
+            len(rows_to_plot),   # how many rows to draw
+            2,                   # how many columns to draw
+            width_ratios=[4, 1]) # ratio of column widths
 
         # Get the full range of x so we can force all rows to share the same
         # x range in the presence of trailing/leading NaNs
@@ -107,32 +118,32 @@ class Umami(collections.OrderedDict):
         # Draw UMAMI rows
         last_ax_ts = None
         row_num = None
-        for metric, measurement in self.iteritems():
+        for measurement in self.itervalues():
             if row_num is None:
                 row_num = 0
             else:
                 row_num += 1
 
-            x = measurement.timestamps
-            y = measurement.values
+            x_val = measurement.timestamps
+            y_val = measurement.values
 
             ### first plot the timeseries of the given variable
             ax_ts = fig.add_subplot(gridspec[2*row_num])
-            ax_ts.plot(x, y,
+            ax_ts.plot(x_val,
+                       y_val,
                        linestyle='-',
                        marker='x',
                        linewidth=linewidth,
                        color=linecolor)
 
             # textwrap.wrap inserts line breaks into each label
-            ax_ts.set_ylabel('\n'.join(textwrap.wrap(
-                                text=measurement.label,
-                                    width=15,
-                                    break_on_hyphens=True)),
-                                fontsize=fontsize,
-                                rotation=0,
-                                horizontalalignment='right',
-                                verticalalignment='center')
+            ax_ts.set_ylabel('\n'.join(textwrap.wrap(text=measurement.label,
+                                                     width=15,
+                                                     break_on_hyphens=True)),
+                             fontsize=fontsize,
+                             rotation=0,
+                             horizontalalignment='right',
+                             verticalalignment='center')
             ax_ts.grid()
             ax_ts.set_xlim(x_min, x_max)
 
@@ -152,19 +163,19 @@ class Umami(collections.OrderedDict):
 
             # then plot the boxplot summary of the given variable
             ax_box = fig.add_subplot(gridspec[2*row_num + 1])
-            y_box_data = numpy.array(y)
+            y_box_data = numpy.array(y_val)
             y_box_mask = [True] * len(y_box_data)
             y_box_mask[highlight_index] = False
             y_box_data = y_box_data[y_box_mask]
             y_box_data = y_box_data[~numpy.isnan(y_box_data)]
-            boxp = ax_box.boxplot(y_box_data, # note: do not include last measurement in boxplot
+            ax_box.boxplot(y_box_data, # note: do not include last measurement in boxplot
                            widths=0.70,
                            boxprops={'linewidth':linewidth},
                            medianprops={'linewidth':linewidth},
                            whiskerprops={'linewidth':linewidth},
                            capprops={'linewidth':linewidth},
                            flierprops={'linewidth':linewidth},
-                           whis=[5,95])
+                           whis=[5, 95])
 
             # scale the extents of the y ranges a little for clarity
             orig_ylim = ax_ts.get_ylim()
@@ -192,31 +203,35 @@ class Umami(collections.OrderedDict):
             ax_box.set_ylim(ax_ts.get_ylim())
 
             # determine the color of our highlights based on quartile
-            percentiles = [ numpy.nanpercentile(y[0:-1], percentile) for percentile in 25, 50, 75, 100 ]
+            percentiles = [numpy.nanpercentile(y_val[0:-1], percentile)
+                           for percentile in 25, 50, 75, 100]
+
+            color_index = 0
             for color_index, percentile in enumerate(percentiles):
-                if y[highlight_index] <= percentile:
+                if y_val[highlight_index] <= percentile:
                     break
+
             if measurement.big_is_good:
                 highlight_color = colorscale[color_index]
             else:
                 highlight_color = colorscale[(1+color_index)*-1]
 
             # highlight the latest measurement on the timeseries plot
-            x_last = matplotlib.dates.date2num(x[highlight_index])
-            x_2nd_last = matplotlib.dates.date2num(x[highlight_index-1])
+            x_last = matplotlib.dates.date2num(x_val[highlight_index])
+            x_2nd_last = matplotlib.dates.date2num(x_val[highlight_index-1])
             ax_ts.plot([x_2nd_last, x_last],
-                       [y[highlight_index-1], y[highlight_index]],
+                       [y_val[highlight_index-1], y_val[highlight_index]],
                        linestyle='-',
                        color=highlight_color,
                        linewidth=linewidth*2.0)
-            ax_ts.plot([x_last], [y[highlight_index]],
+            ax_ts.plot([x_last], [y_val[highlight_index]],
                        marker='*',
                        color=highlight_color,
                        markersize=15)
 
             # where does this last data point lie on the distribution?
-            ax_box.plot([0,2],
-                        [y[highlight_index],y[highlight_index]],
+            ax_box.plot([0, 2],
+                        [y_val[highlight_index], y_val[highlight_index]],
                         linestyle='--',
                         color=highlight_color,
                         linewidth=2.0,
@@ -247,12 +262,12 @@ class UmamiMetric(object):
     def __init__(self, timestamps, values, label, big_is_good=True):
         # If we are given pandas.Series, convert them to lists, then copy.
         # Otherwise, just copy the list-like inputs.
-        if type(timestamps) == pandas.Series:
+        if isinstance(timestamps, pandas.Series):
             self.timestamps = timestamps.tolist()[:]
         else:
             self.timestamps = timestamps[:]
 
-        if type(values) == pandas.Series:
+        if isinstance(values, pandas.Series):
             self.values = values.tolist()[:]
         else:
             self.values = values[:]
@@ -263,6 +278,11 @@ class UmamiMetric(object):
             raise Exception('timestamps and values must be of equal length')
 
     def to_json(self):
+        """Create JSON-encoded string representation of self
+
+        Returns:
+            str: JSON-encoded representation of values stored in UmamiMetric
+        """
         return json.dumps(self.__dict__, default=_serialize_datetime)
 
     def append(self, timestamp, value):
@@ -276,17 +296,15 @@ class UmamiMetric(object):
         """
         Analogous to the list .pop() method.
         """
-        t = self.timestamps.pop()
-        v = self.values.pop()
-        return t, v
+        timestamp = self.timestamps.pop()
+        value = self.values.pop()
+        return timestamp, value
 
 def _serialize_datetime(obj):
     """
     Special serializer function that converts datetime into something that can
     be encoded in json
-
     """
     if isinstance(obj, (datetime.datetime, datetime.date)):
-        serial = obj.isoformat()
         return (obj - datetime.datetime.utcfromtimestamp(0)).total_seconds()
-    raise TypeError ("Type %s not serializable" % type(obj))
+    raise TypeError("Type %s not serializable" % type(obj))
