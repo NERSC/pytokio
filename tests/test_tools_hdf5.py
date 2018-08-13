@@ -53,7 +53,7 @@ def check_get_files_and_indices(dataset_name, start_offset, duration):
     assert len(files_and_indices) > 0
 
     for (file_name, istart, iend) in files_and_indices:
-        with tokio.connectors.hdf.Hdf5(file_name, mode='r') as hdf_file:
+        with tokio.connectors.hdf5.Hdf5(file_name, mode='r') as hdf_file:
             derived_start = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][istart])
             derived_end = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][iend])
             assert (derived_start == start_time) or istart == 0
