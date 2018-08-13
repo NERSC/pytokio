@@ -6,6 +6,6 @@ provided as a convenience rather than a set of core functionality.
 
 ### Subpackages to include in the tokio.analysis.* namespace
 try:
-    import umami
+    import tokio.analysis.umami
 except ImportError:
     pass

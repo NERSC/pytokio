@@ -10,8 +10,8 @@ import time
 import datetime
 import argparse
 import warnings
-import tokio
-import tokio.tools
+import tokio.connectors.hdf5
+import tokio.tools.hdf5
 
 DATASETS_TO_BIN_KEYS = {
     'datatargets/readbytes': 'ost_read',

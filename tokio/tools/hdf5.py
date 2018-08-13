@@ -1,24 +1,25 @@
 #!/usr/bin/env python
+"""Retrieve data from TOKIO Time Series files using time as inputs
 
-import os
+Provides a mapping between dates and times and a site's time-indexed repository
+of TOKIO Time Series HDF5 files.
+"""
+
 import datetime
-import tempfile
-import subprocess
-import numpy as np
-import common
-import tokio
+import tokio.tools.common
+import tokio.connectors.hdf5
 
 def enumerate_h5lmts(fsname, datetime_start, datetime_end):
     """Return all time-indexed HDF5 files falling between a time range
 
     Given a starting datetime and (optionally) an ending datetime, return all
     HDF5 files that contain data inside of that date range (inclusive).
-    """   
-    return common.enumerate_dated_files(start=datetime_start,
-                                        end=datetime_end,
-                                        template=tokio.config.HDF5_FILES,
-                                        lookup_key=fsname,
-                                        match_first=True)
+    """
+    return tokio.tools.common.enumerate_dated_files(start=datetime_start,
+                                                    end=datetime_end,
+                                                    template=tokio.config.HDF5_FILES,
+                                                    lookup_key=fsname,
+                                                    match_first=True)
 
 def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     """
@@ -26,9 +27,9 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     tuples containing
     """
     if datetime_end is None:
-        datetime_end_local = datetime_start
+        datetime_end = datetime_start
     else:
-        datetime_end_local = datetime_end
+        datetime_end = datetime_end
     h5lmt_files = enumerate_h5lmts(fsname, datetime_start, datetime_end)
     output = []
 
@@ -43,7 +44,7 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
         i_f = -1
         if datetime.datetime.fromtimestamp(timestamps[-1]) >= datetime_end:
             # This is the last day's hdf5
-            i_f = hdf5.get_index(dataset_name, datetime_end) - 1  
+            i_f = hdf5.get_index(dataset_name, datetime_end) - 1
             # -1 because datetime_end should be exclusive
             #
             # If the last timestamp is on the first datapoint of a new day,
@@ -70,10 +71,10 @@ def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime
 #           datetime_end))
         return result
 
-    for h5file in enumerate_h5lmts(fsname, datetime_start, datetime_end):
-        with tokio.connectors.hdf5.Hdf5(h5file, mode='r') as f:
-            df_slice = f.to_dataframe(dataset_name)
-            df_slice = df_slice[(df_slice.index >= datetime_start) 
+    for hdf_filename in enumerate_h5lmts(fsname, datetime_start, datetime_end):
+        with tokio.connectors.hdf5.Hdf5(hdf_filename, mode='r') as hdf_file:
+            df_slice = hdf_file.to_dataframe(dataset_name)
+            df_slice = df_slice[(df_slice.index >= datetime_start)
                                 & (df_slice.index < datetime_end)]
             if result is None:
                 result = df_slice

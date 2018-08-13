@@ -14,27 +14,33 @@ import datetime
 import argparse
 import warnings
 import pandas
-import tokio
-import tokio.tools
+
+# cannot do blanket "import tokio" because tokiobin tests will fail
+#import tokio
+import tokio.config
 import tokio.connectors.darshan
+import tokio.connectors.slurm
 import tokio.connectors.nersc_jobsdb
+import tokio.tools.hdf5
+import tokio.tools.lfsstatus
+import tokio.tools.topology
 
 # These Darshan POSIX counters are explicitly over into summary
 USEFUL_DARSHAN_COUNTERS = [
-        'BYTES_READ',
-        'BYTES_WRITTEN',
-        'READS',
-        'WRITES',
-        'F_META_TIME',
-        'F_READ_TIME',
-        'F_WRITE_TIME',
-        'OPENS',
-        'SEQ_READS',
-        'SEQ_WRITES',
-        'STATS',
-        'FILE_NOT_ALIGNED',
-        'MEM_NOT_ALIGNED',
-    ]
+    'BYTES_READ',
+    'BYTES_WRITTEN',
+    'READS',
+    'WRITES',
+    'F_META_TIME',
+    'F_READ_TIME',
+    'F_WRITE_TIME',
+    'OPENS',
+    'SEQ_READS',
+    'SEQ_WRITES',
+    'STATS',
+    'FILE_NOT_ALIGNED',
+    'MEM_NOT_ALIGNED',
+]
 
 def _identify_fs_from_path(path, mounts):
     """

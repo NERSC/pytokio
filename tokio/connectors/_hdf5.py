@@ -6,7 +6,10 @@ compatible with the TOKIO HDF5 schemas and API.
 
 import numpy
 import h5py
-import tokio
+
+TIMESTAMP_KEY = 'timestamps'
+DEFAULT_TIMESTAMP_DATASET = 'timestamps' # this CANNOT be an absolute location
+COLUMN_NAME_KEY = 'columns'
 
 class MappedDataset(h5py.Dataset):
     """
@@ -92,7 +95,7 @@ def _apply_timestep(return_value, parent_dataset, func=lambda x, timestep: x * t
     """
     hdf5_file = parent_dataset.file
     dataset_name = parent_dataset.name
-    timestamps = tokio.connectors.hdf5.get_timestamps(hdf5_file, dataset_name)
+    timestamps = get_timestamps(hdf5_file, dataset_name)
 
     if timestamps is None:
         errmsg = "Could not find timestamps for %s in %s" % (dataset_name, hdf5_file.filename)
@@ -209,3 +212,34 @@ def demux_column(hdf5_file, from_key, column, apply_timestep_func=None, *args, *
                          map_kwargs=map_kwargs,
                          *args,
                          **kwargs)
+
+def get_timestamps_key(hdf5_file, dataset_name):
+    """
+    Read into an HDF5 file and extract the name of the dataset containing the
+    timestamps correspond to the given dataset_name
+    """
+    # Get dataset out of HDF5 file
+    hdf5_dataset = hdf5_file.get(dataset_name)
+    if hdf5_dataset is None:
+        return None
+
+    if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
+        return '/FSStepsGroup/FSStepsDataSet'
+
+    # Identify the dataset containing timestamps for this dataset
+    if TIMESTAMP_KEY in hdf5_dataset.attrs:
+        timestamp_key = hdf5_dataset.attrs[TIMESTAMP_KEY]
+    else:
+        timestamp_key = hdf5_dataset.parent.name + '/' + DEFAULT_TIMESTAMP_DATASET
+
+    # Load timestamps dataset into memory
+    if timestamp_key not in hdf5_file:
+        raise KeyError("timestamp_key %s does not exist" % timestamp_key)
+
+    return timestamp_key
+
+def get_timestamps(hdf5_file, dataset_name):
+    """
+    Return the timestamps dataset for a given dataset name
+    """
+    return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]

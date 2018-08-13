@@ -8,6 +8,7 @@ import datetime
 import argparse
 import warnings
 import h5py
+import tokio.debug
 import tokio.timeseries
 import tokio.connectors.lmtdb
 
@@ -489,8 +490,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
             print "Writing out %s" % dataset.dataset_name
             dataset.commit_dataset(hdf5_file)
 
-    if tokio.DEBUG:
-        print "Wrote output to %s" % output_file
+    tokio.debug.debug_print("Wrote output to %s" % output_file)
 
 def main(argv=None):
     """
@@ -519,7 +519,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.debug:
-        tokio.DEBUG = True
+        tokio.debug.DEBUG = True
 
     # Convert CLI options into datetime
     try:

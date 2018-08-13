@@ -5,9 +5,7 @@ CachingDb class.
 """
 
 import os
-import time
 import datetime
-import numpy as np
 from . import cachingdb
 
 ### Names and schemata of all LMT database tables worth caching
@@ -231,7 +229,6 @@ class LmtDb(cachingdb.CachingDb):
 
         index0 = len(self.saved_results.get(table, {'rows': []})['rows'])
         chunk_start = datetime_start
-        ts_id_start, ts_id_end = self.get_ts_ids(datetime_start, datetime_end)
         while chunk_start < datetime_end:
             if timechunk is None:
                 chunk_end = datetime_end

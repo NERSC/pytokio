@@ -15,7 +15,7 @@ SAMPLE_H5LMT_FILE_BN = os.path.basename(tokiotest.SAMPLE_H5LMT_FILE)
 TIMESTAMPS_DATASET = 'FSStepsGroup/FSStepsDataSet'
 FAKE_FSNAME = 'fakefs'
 
-TIME_0, TIME_1 = tokio.connectors.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)[TIMESTAMPS_DATASET][0:2]
+TIME_0, TIME_1 = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)[TIMESTAMPS_DATASET][0:2]
 LMT_TIMESTEP = int(TIME_1 - TIME_0)
 
 # Tuple of (offset relative to start of first day, duration)
@@ -53,7 +53,7 @@ def check_get_files_and_indices(dataset_name, start_offset, duration):
     assert len(files_and_indices) > 0
 
     for (file_name, istart, iend) in files_and_indices:
-        with tokio.connectors.Hdf5(file_name, mode='r') as hdf_file:
+        with tokio.connectors.hdf5.Hdf5(file_name, mode='r') as hdf_file:
             derived_start = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][istart])
             derived_end = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][iend])
             assert (derived_start == start_time) or istart == 0

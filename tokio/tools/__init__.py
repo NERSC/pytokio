@@ -7,20 +7,26 @@ be portably built.
 
 ### Subpackages to include in the tokio.tools.* namespace
 try:
-    import hdf5
+    import tokio.tools.darshan
 except ImportError:
     pass
 
 try:
-    import topology
+    import tokio.tools.hdf5
 except ImportError:
     pass
 
 try:
-    import lfsstatus
+    import tokio.tools.topology
 except ImportError:
     pass
 
+try:
+    import tokio.tools.lfsstatus
+except ImportError:
+    pass
+
+### For backwards compatibility
 try:
     import tokio.analysis.umami as umami
 except ImportError:

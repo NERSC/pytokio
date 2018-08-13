@@ -5,24 +5,18 @@ It is intended to be used to determine information about a node's configuration
 within the network fabric to provide topological information.
 """
 
-import os
 import sys
-import gzip
-import errno
-import collections
-import subprocess
-import mimetypes
 from tokio.connectors.common import SubprocessOutputDict
 
 class CraySdbProc(SubprocessOutputDict):
     """Dictionary subclass that self-populates with Cray SDB data.
-        
+
     Presents certain views of the Cray Service Database (SDB) as a
     dictionary-like object through the Cray SDB CLI.
     """
     def __init__(self, *args, **kwargs):
         """Load the processor configuration table from the SDB.
-            
+
         Args:
             *args: Passed to tokio.connectors.common.SubprocessOutputDict
             **kwargs: Passed to tokio.connectors.common.SubprocessOutputDict
@@ -37,7 +31,7 @@ class CraySdbProc(SubprocessOutputDict):
 
         Returns the object in the same format as the xtdb2proc output so that
         this object can be circularly serialized and deserialized.
-        
+
         Returns:
         str: String representation of the processor mapping table in a
         format compatible with the output of ``xtdb2proc``.
@@ -51,12 +45,12 @@ class CraySdbProc(SubprocessOutputDict):
                 except KeyError:
                     sys.stderr.write("key does not appear in all records\n")
                     raise
-                
-                # We don't need to know the difference between basestring 
-                # and other because when we parse it, we don't make the 
+
+                # We don't need to know the difference between basestring
+                # and other because when we parse it, we don't make the
                 # the difference
                 #
-                # Look at the type of each val and 
+                # Look at the type of each val and
                 # return the correponding string
                 if val is None:
                     line.append("%s=null" % key)
@@ -64,15 +58,15 @@ class CraySdbProc(SubprocessOutputDict):
                     line.append("%s='%s'" % (key, val))
                 else:
                     line.append("%s=%s" % (key, val))
-                
+
             repr_result += ','.join(line) + "\n"
         return repr_result
-    
+
     def load_str(self, input_str):
         """Load the xtdb2proc data for a Cray system.
-            
+
         Parses the xtdb2proc output text and inserts keys/values into self.
-        
+
         Args:
             input_str (str): stdout of the ``xtdb2proc`` command
         """
@@ -95,7 +89,7 @@ class CraySdbProc(SubprocessOutputDict):
                     except ValueError:
                         pass
                 record[key] = val
- 
+
                 if check_keys:
                     self.key_order.append(key)
             check_keys = False

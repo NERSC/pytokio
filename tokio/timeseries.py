@@ -316,7 +316,7 @@ class TimeSeries(object):
 
     def get_insert_pos(self, timestamp, column_name, create_col=False):
         """Determine col and row indices corresponding to timestamp and col name
-        
+
         Args:
             timestamp (datetime): Timestamp to map to a row index
             column_name (str): Name of column to map to a column index

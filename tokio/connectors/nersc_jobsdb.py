@@ -15,25 +15,14 @@ a cache database.
 """
 
 import os
-import warnings
-import sqlite3
-try:
-    import pymysql
-    pymysql.install_as_MySQLdb()
-except ImportError:
-    pass
-try:
-    import MySQLdb
-except ImportError:
-    pass
-import cachingdb
+import tokio.connectors.cachingdb as cachingdb
 
 NERSC_JOBSDB_SCHEMA = {
-    'columns': [ 'STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES' ],
-    'primary_key': [ 'STEPID' ],
+    'columns': ['STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES'],
+    'primary_key': ['STEPID'],
 }
 
-HIT_MEMORY   = 0
+HIT_MEMORY = 0
 HIT_CACHE_DB = 1
 HIT_REMOTE_DB = 2
 
@@ -143,7 +132,6 @@ class NerscJobsDb(cachingdb.CachingDb):
         if cache_key in self.cached_queries and not nocache:
             index_start, index_end = self.cached_queries[cache_key]
             results = self.saved_results['summary']['rows'][index_start:index_end]
-            self.cached_queries[cache_key]
             self.last_hit = HIT_MEMORY
         else:
             if 'summary' not in self.saved_results:

@@ -4,14 +4,47 @@ Connector interfaces for pytokio.  Each connector provides a Python interface
 into one component-level monitoring tool.
 """
 
-### LMTDB requires MySQLdb
+### The following modules are used internally and do not need to clutter up the namespace
+# cachingdb
+# common
+
+### The following modules are specific to NERSC
+# nersc_jobsdb
+# collectd_es
+# nersc_isdct
+# nersc_lfsstate
+
 try:
-    from lmt import LmtDb
+    import tokio.connectors.craysdb
 except ImportError:
     pass
 
-### HDF5 requires h5py
 try:
-    from hdf5 import Hdf5
+    import tokio.connectors.darshan
+except ImportError:
+    pass
+
+try:
+    import tokio.connectors.hdf5
+except ImportError:
+    pass
+
+try:
+    import tokio.connectors.hpss
+except ImportError:
+    pass
+
+try:
+    import tokio.connectors.lfshealth
+except ImportError:
+    pass
+
+try:
+    import tokio.connectors.lmtdb
+except ImportError:
+    pass
+
+try:
+    import tokio.connectors.slurm
 except ImportError:
     pass

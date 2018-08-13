@@ -171,7 +171,7 @@ class NerscLfsOstMap(dict):
         resulting_data = {}
         for timestamp, fs_data in self.iteritems():
             resulting_data[timestamp] = fs_data.get_failovers()
-        
+
         return resulting_data
 
 class NerscLfsOstFullness(dict):
