@@ -5,7 +5,7 @@ import datetime
 import tempfile
 import subprocess
 import numpy as np
-import common
+import tokio.tools.common
 import tokio
 
 def enumerate_h5lmts(fsname, datetime_start, datetime_end):
@@ -26,9 +26,9 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     tuples containing
     """
     if datetime_end is None:
-        datetime_end_local = datetime_start
+        datetime_end = datetime_start
     else:
-        datetime_end_local = datetime_end
+        datetime_end = datetime_end
     h5lmt_files = enumerate_h5lmts(fsname, datetime_start, datetime_end)
     output = []
 
