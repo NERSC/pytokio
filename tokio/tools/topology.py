@@ -19,7 +19,7 @@ def get_job_diameter(jobid=None, craysdb_cache_file=None, slurm_cache_file=None)
         return {}
     for jobnode in node_list:
         if not jobnode.startswith('nid'):
-            job_ids = job_info.get_jobids()
+            job_ids = job_info.get_job_ids()
             warnings.warn("unable to parse jobnode '%s' for jobid '%s'" % (jobnode, ','.join(job_ids)))
             return {}
         nid_num = int(jobnode.lstrip('nid'))
