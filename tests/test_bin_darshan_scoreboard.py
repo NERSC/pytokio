@@ -171,6 +171,44 @@ def test_scoreboard_exclude_fs():
 
 @tokiotest.needs_darshan
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_scoreboard_limit_fs_logical():
+    """bin/darshan_scoreboard.py --limit-fs, logical fs names
+    """
+    tokiotest.check_darshan()
+    argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
+    print "Executing:", " ".join(argv)
+    tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
+
+    argv = ['--json', '--limit-fs', tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL, tokiotest.TEMP_FILE.name]
+    print "Executing:", " ".join(argv)
+    output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
+    decoded_result = json.loads(output_str)
+    print "Result:", decoded_result
+    assert decoded_result['per_user']
+    assert decoded_result['per_fs']
+    assert decoded_result['per_exe']
+
+@tokiotest.needs_darshan
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_scoreboard_exclude_fs_logical():
+    """bin/darshan_scoreboard.py --exclude-fs, logical fs names
+    """
+    tokiotest.check_darshan()
+    argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
+    print "Executing:", " ".join(argv)
+    tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
+
+    argv = ['--json', '--exclude-fs', "%s" % tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL, tokiotest.TEMP_FILE.name]
+    print "Executing:", " ".join(argv)
+    output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
+    decoded_result = json.loads(output_str)
+    print decoded_result
+    assert not decoded_result['per_user']
+    assert not decoded_result['per_exe']
+    assert not decoded_result['per_fs']
+
+@tokiotest.needs_darshan
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_scoreboard_limit_exe():
     """bin/darshan_scoreboard.py --limit-exe
     """

@@ -13,6 +13,8 @@ import mimetypes
 import collections
 import argparse
 
+import tokio.config
+
 def process_darshan_perfs(summary_jsons,
                           limit_fs=[], limit_user=[], limit_exe=[],
                           exclude_fs=[], exclude_user=[], exclude_exe=[]):
@@ -57,21 +59,44 @@ def process_darshan_perfs(summary_jsons,
         or (exclude_exe and exename in exclude_exe):
             continue
 
+        # precompile regular expressions
+        mount_to_fsname = {}
+        for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).iteritems():
+            mount_to_fsname[re.compile(rex_str)] = fsname
+
         for mount in counters.keys():
-            if mount != '/':
-                # if limit_fs in play, filter at the per-record basis
-                if (limit_fs and mount not in limit_fs) \
-                or (exclude_fs and mount in exclude_fs):
+            if mount == '/':
+                continue
+
+            # try to map mount to a logical file system name
+            fs_key = None
+            for mount_rex, fsname in mount_to_fsname.iteritems():
+                match = mount_rex.match(mount)
+                if match:
+                    fs_key = fsname
+
+            # if limit_fs/exclude_fs in play, filter at the per-record basis
+            if limit_fs:
+                if mount not in limit_fs \
+                and (fs_key and fs_key not in limit_fs):
                     continue
-                results['per_user'][username]['read_bytes'] += counters[mount].get('read_bytes', 0)
-                results['per_user'][username]['write_bytes'] += counters[mount].get('write_bytes', 0)
-                results['per_user'][username]['num_jobs'] += 1
-                results['per_fs'][mount]['read_bytes'] += counters[mount].get('read_bytes', 0)
-                results['per_fs'][mount]['write_bytes'] += counters[mount].get('write_bytes', 0)
-                results['per_fs'][mount]['num_jobs'] += 1
-                results['per_exe'][exename]['read_bytes'] += counters[mount].get('read_bytes', 0)
-                results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
-                results['per_exe'][exename]['num_jobs'] += 1
+            if exclude_fs:
+                if mount in exclude_fs \
+                or (fs_key and fs_key in exclude_fs):
+                    continue
+
+            if fs_key is None:
+                fs_key = mount
+
+            results['per_user'][username]['read_bytes'] += counters[mount].get('read_bytes', 0)
+            results['per_user'][username]['write_bytes'] += counters[mount].get('write_bytes', 0)
+            results['per_user'][username]['num_jobs'] += 1
+            results['per_fs'][fs_key]['read_bytes'] += counters[mount].get('read_bytes', 0)
+            results['per_fs'][fs_key]['write_bytes'] += counters[mount].get('write_bytes', 0)
+            results['per_fs'][fs_key]['num_jobs'] += 1
+            results['per_exe'][exename]['read_bytes'] += counters[mount].get('read_bytes', 0)
+            results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
+            results['per_exe'][exename]['num_jobs'] += 1
 
     return results
 
