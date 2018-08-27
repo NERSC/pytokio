@@ -2,14 +2,19 @@
     "lmt_timestep": 5,
     "mount_to_fsname": {
         "^/projects/radix-io": "mira-fs1",
-        "^/scratch1" : "scratch1",
-        "^/scratch2" : "scratch2",
-        "^/scratch3" : "scratch3",
-        "^/global/cscratch1" : "cscratch",
-        "^/var/opt/cray/dws/mounts/.*/ss/" : "bb-shared",
-        "^/var/opt/cray/dws/mounts/.*/ps/" : "bb-private",
-        "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch/" : "bb-shared",
-        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch/" : "bb-private"
+        "^/scratch1": "scratch1",
+        "^/scratch2": "scratch2",
+        "^/scratch3": "scratch3",
+        "^/global/cscratch1": "cscratch",
+        "^/var/opt/cray/dws/mounts/.*/ss": "bb-shared",
+        "^/var/opt/cray/dws/mounts/.*/ps": "bb-private",
+        "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch": "bb-shared",
+        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch": "bb-private",
+        "^/global/project": "project2",
+        "^/global/projectb": "projectb",
+        "^/global/projecta": "projecta",
+        "^/global/u1": "homes-u1",
+        "^/global/u2": "homes-u2"
     },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",
