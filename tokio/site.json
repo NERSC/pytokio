@@ -37,5 +37,9 @@
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map.txt",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
     ],
-    "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d"
+    "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d",
+    "jobinfo_jobid_providers": [
+        "slurm",
+        "nersc_jobsdb"
+    ]
 }
