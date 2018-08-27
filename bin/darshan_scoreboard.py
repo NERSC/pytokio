@@ -7,6 +7,7 @@ application
 
 import os
 import re
+import sys
 import json
 import gzip
 import mimetypes
@@ -17,7 +18,8 @@ import tokio.config
 
 def process_darshan_perfs(summary_jsons,
                           limit_fs=[], limit_user=[], limit_exe=[],
-                          exclude_fs=[], exclude_user=[], exclude_exe=[]):
+                          exclude_fs=[], exclude_user=[], exclude_exe=[],
+                          tuples=False):
     """
     Ingest the per-log file system summary contained in the summary_json file(s)
     and produce a dictionary with bytes read/written reduced on application
@@ -34,11 +36,12 @@ def process_darshan_perfs(summary_jsons,
 
     regex_filename = re.compile(r'^([^_]+)_(.*?)_id(\d+)_.*.darshan')
 
-    results = {
-        'per_user': collections.defaultdict(lambda: collections.defaultdict(int)),
-        'per_fs': collections.defaultdict(lambda: collections.defaultdict(int)),
-        'per_exe': collections.defaultdict(lambda: collections.defaultdict(int)),
-    }
+    results = collections.OrderedDict()
+    results['per_user'] = collections.defaultdict(lambda: collections.defaultdict(int))
+    results['per_fs'] = collections.defaultdict(lambda: collections.defaultdict(int))
+    results['per_exe'] = collections.defaultdict(lambda: collections.defaultdict(int))
+    results['per_user_exe_fs'] = collections.defaultdict(lambda: collections.defaultdict(int))
+
     for darshan_log, counters in summary.iteritems():
         darshan_log_bn = os.path.basename(darshan_log)
         regex_match = regex_filename.search(darshan_log_bn)
@@ -98,6 +101,12 @@ def process_darshan_perfs(summary_jsons,
             results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
             results['per_exe'][exename]['num_jobs'] += 1
 
+            if tuples:
+                key = "%.12s/%.12s/%.12s" % (username, exename, fs_key)
+                results['per_user_exe_fs'][key]['read_bytes'] += counters[mount].get('read_bytes', 0)
+                results['per_user_exe_fs'][key]['write_bytes'] += counters[mount].get('write_bytes', 0)
+                results['per_user_exe_fs'][key]['num_jobs'] += 1
+
     return results
 
 def print_top(categorized_data, max_show=10):
@@ -106,32 +115,36 @@ def print_top(categorized_data, max_show=10):
     """
     names = {
         'per_fs': "File Systems",
-        'per_exe': "Applications",
         'per_user': "Users",
+        'per_exe': "Applications",
+        'per_user_exe_fs': "User/App/FS",
     }
 
     categories = 0
     for category, rankings in categorized_data.iteritems():
+        print_buffer = ""
         name = names.get(category, category)
         if categories > 0:
-            print ""
-        print "%2s  %40s %10s %10s %8s" % ('#', name, 'Read(GiB)', 'Write(GiB)', '# Jobs')
-        print '=' * 75
+            print_buffer += "\n"
+        print_buffer += "%2s  %40s %10s %10s %8s\n" % ('#', name, 'Read(GiB)', 'Write(GiB)', '# Jobs')
+        print_buffer += '=' * 75 + "\n"
         displayed = 0
         for winner in sorted(rankings, key=lambda x, r=rankings: r[x]['read_bytes'] + r[x]['write_bytes'], reverse=True):
             if len(winner) > 40:
-#               winner_str = winner[0:19] + "..." + winner[-18:]
                 winner_str = "..." + winner[-37:]
             else:
                 winner_str = winner
             displayed += 1
             if displayed > max_show:
                 break
-            print "%2d. %40.40s %10.1f %10.1f %8d" % (displayed,
+            print_buffer += "%2d. %40.40s %10.1f %10.1f %8d\n" % (displayed,
                                                       winner_str,
                                                       rankings[winner]['read_bytes'] / 2.0**30,
                                                       rankings[winner]['write_bytes'] / 2.0**30,
                                                       rankings[winner]['num_jobs'])
+        if displayed > 0:
+            sys.stdout.write(print_buffer)
+
         categories += 1
 
 def main(argv=None):
@@ -143,6 +156,8 @@ def main(argv=None):
                         help="json output of darshan_per_fs_bytes.py")
     parser.add_argument("--json", action='store_true',
                         help="output in json format")
+    parser.add_argument("--tuples", action='store_true',
+                        help="generate top user-fs-exe tuples")
     parser.add_argument("--max-show", type=int, default=10,
                         help="show top N users, apps, file systems")
     group_fs = parser.add_mutually_exclusive_group()
@@ -170,6 +185,7 @@ def main(argv=None):
         'exclude_user': args.exclude_user.split(',') if args.exclude_user else [],
         'exclude_fs': args.exclude_fs.split(',') if args.exclude_fs else [],
         'exclude_exe': args.exclude_exe.split(',') if args.exclude_exe else [],
+        'tuples': args.tuples,
     }
 
     results = process_darshan_perfs(args.summaryjson, **kwargs)
