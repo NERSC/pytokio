@@ -12,13 +12,13 @@ PYTOKIO_CONFIG = ""
 """Path to configuration file to load
 """
 
-_LOADED_CONFIG = {}
-"""Global variable for the parsed configuration file; used for unit testing
+CONFIG = {}
+"""Global variable for the parsed configuration
 """
 
 def init_config():
     global PYTOKIO_CONFIG
-    global _LOADED_CONFIG
+    global CONFIG
 
     # Load a pytokio config from a special location
     PYTOKIO_CONFIG = os.environ.get(
@@ -26,8 +26,7 @@ def init_config():
         os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
 
     # Load pytokio config file and convert its keys into a set of constants
-    _LOADED_CONFIG = json.load(open(PYTOKIO_CONFIG, 'r'))
-    for _key, _value in _LOADED_CONFIG.iteritems():
+    for _key, _value in json.load(open(PYTOKIO_CONFIG, 'r')).iteritems():
         # config keys beginning with an underscore get skipped
         if _key.startswith('_'):
             pass
@@ -35,12 +34,12 @@ def init_config():
         # if setting this key will overwrite something already in the tokio.config
         # namespace, only overwrite if the existing object is something we probably
         # loaded from a json
-        _old_attribute = getattr(sys.modules[__name__], _key.upper(), None)
+        _old_attribute = CONFIG.get(_key.lower())
         if _old_attribute is None \
         or isinstance(_old_attribute, basestring) \
         or isinstance(_old_attribute, dict) \
         or isinstance(_old_attribute, list):
-            setattr(sys.modules[__name__], _key.upper(), _value)
+            CONFIG[_key.lower()] = _value
 
     # Check for magic environment variables to override the contents of the config
     # file at runtime
@@ -50,8 +49,8 @@ def init_config():
             try:
                 _magic_value_decoded = json.loads(_magic_value)
             except ValueError:
-                setattr(sys.modules[__name__], _magic_variable, _magic_value)
+                CONFIG[_magic_variable.lower()] = _magic_value
             else:
-                setattr(sys.modules[__name__], _magic_variable, _magic_value_decoded)
+                CONFIG[_magic_variable.lower()] = _magic_value_decoded
 
 init_config()

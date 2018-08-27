@@ -330,7 +330,7 @@ def retrieve_darshan_data(results, darshan_log_file, silent_errors=False):
     results['_datetime_start'] = datetime.datetime.fromtimestamp(
         int(darshan_data['header']['start_time']))
     results['_datetime_end'] = datetime.datetime.fromtimestamp(
-        int(darshan_data['header']['end_time']) + tokio.config.LMT_TIMESTEP)
+        int(darshan_data['header']['end_time']) + tokio.config.CONFIG.get('lmt_timestep', 5))
 
     if '_jobid' not in results:
         results['_jobid'] = darshan_data['header']['jobid']
@@ -355,7 +355,7 @@ def retrieve_lmt_data(results, file_system):
             fs_key = 'darshan_biggest_write_fs'
         else:
             fs_key = 'darshan_biggest_read_fs'
-        for fs_path, fs_name in tokio.config.MOUNT_TO_FSNAME.iteritems():
+        for fs_path, fs_name in tokio.config.CONFIG.get('mount_to_fsname', {}).iteritems():
             if re.search(fs_path, results[fs_key]) is not None:
                 results['_file_system'] = fs_name
                 break
@@ -563,9 +563,9 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     if ost:
         # Divine the sonexion name from the file system map
         fs_key = results.get('_file_system')
-        if fs_key is None or fs_key not in tokio.config.FSNAME_TO_BACKEND_NAME:
+        if fs_key is None or fs_key not in tokio.config.CONFIG.get('fsname_to_backend_name', {}):
             return results
-        snx_name = tokio.config.FSNAME_TO_BACKEND_NAME[fs_key]
+        snx_name = tokio.config.CONFIG['fsname_to_backend_name'][fs_key]
 
         # Get the OST fullness summary
         try:
