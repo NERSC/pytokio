@@ -9,8 +9,6 @@ import collections
 import textwrap
 import numpy
 import pandas
-import matplotlib
-import matplotlib.pyplot
 
 DEFAULT_LINEWIDTH = 1
 DEFAULT_LINECOLOR = "#853692"
@@ -93,6 +91,10 @@ class Umami(collections.OrderedDict):
         Returns:
             List of axes corresponding to each panel in the UMAMI diagram
         """
+        # import here because of various things that can break matplotlib on import
+        import matplotlib
+        import matplotlib.pyplot
+
         rows_to_plot = self.keys()
         fig = matplotlib.pyplot.figure()
         fig.set_size_inches(figsize[0], len(rows_to_plot) * figsize[1])
