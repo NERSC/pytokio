@@ -17,7 +17,7 @@ def enumerate_h5lmts(fsname, datetime_start, datetime_end):
     """
     return tokio.tools.common.enumerate_dated_files(start=datetime_start,
                                                     end=datetime_end,
-                                                    template=tokio.config.HDF5_FILES,
+                                                    template=tokio.config.CONFIG['hdf5_files'],
                                                     lookup_key=fsname,
                                                     match_first=True)
 
@@ -66,7 +66,7 @@ def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime
 
     if not files_and_indices:
 #       raise IOError("No relevant hdf5 files found in %s between %s - %s" % (
-#           tokio.config.H5LMT_FILE,
+#           tokio.config.CONFIG['h5lmt_file'],
 #           datetime_start,
 #           datetime_end))
         return result
