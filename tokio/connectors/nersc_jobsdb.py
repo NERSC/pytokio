@@ -22,6 +22,16 @@ NERSC_JOBSDB_SCHEMA = {
     'columns': ['STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES'],
     'primary_key': ['STEPID'],
 }
+NERSC_JOBSDB_QUERY = """
+SELECT
+    s.stepid,
+    s.hostname,
+    s.start,
+    s.completion,
+    s.numnodes
+FROM
+    summary AS s
+"""
 
 HIT_MEMORY = 0
 HIT_CACHE_DB = 1
@@ -114,15 +124,7 @@ class NerscJobsDb(cachingdb.CachingDb):
         core hours that were burned overall during the start/end time of
         interest.
         """
-        query_str = """
-        SELECT
-            s.stepid,
-            s.hostname,
-            s.start,
-            s.completion,
-            s.numnodes
-        FROM
-            summary AS s
+        query_str = NERSC_JOBSDB_QUERY + """
         WHERE
             s.hostname = %(ps)s
         AND s.completion > %(ps)s
@@ -165,23 +167,18 @@ class NerscJobsDb(cachingdb.CachingDb):
             tuple of datetime.datetime: Two-item tuple of (start time,
                 end time)
         """
-        query_str = """
-        SELECT
-            s.start,
-            s.completion,
-        FROM
-            summary AS s
+        query_str = NERSC_JOBSDB_QUERY + """
         WHERE
-            s.hostname = %(ps)s
-        AND s.completion >= s.start
+            s.stepid LIKE %(ps)s
+        AND s.hostname = %(ps)s
         ORDER BY s.completion
         """
 
-        results = self.query(query_str, nersc_host)
+        results = self.query(query_str, query_variables=("%s.%%" % jobid, nersc_host))
 
         start = None
         end = None
-        for (this_start, this_end) in results:
+        for (_, _, this_start, this_end, _) in results:
             if start is not None:
                 warnings.warn("Multiple start+end times found for job %s" % jobid)
             start = this_start
