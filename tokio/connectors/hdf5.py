@@ -571,6 +571,9 @@ class Hdf5(h5py.File):
         super(Hdf5, self).__init__(*args, **kwargs)
 
         self.version = self.attrs.get('version')
+        if self.version is not None:
+            self.version = self.version.decode()
+        print(self.version, type(self.version))
         self._timesteps = {}
 
         # Connect the schema map to this object
@@ -649,7 +652,8 @@ class Hdf5(h5py.File):
         if self.version is None:
             return self._get_columns_h5lmt(dataset_name)
         # retrieve the dataset to resolve the schema key or get MappedDataset
-        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
+        
+        return numpy.array([x.decode() for x in self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]])
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
@@ -660,7 +664,8 @@ class Hdf5(h5py.File):
         if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
             return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
         elif dataset_name in H5LMT_COLUMN_ATTRS:
-            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+            print("decoding %s" % dataset_name)
+            return numpy.array([x.decode() for x in dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]])
         elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
             return numpy.array(['_unknown'])
         elif dataset_name == 'FSMissingGroup/FSMissingDataSet':

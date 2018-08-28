@@ -180,14 +180,14 @@ def _test_get_index(input_file):
         timestamps = hdf5_file.get_timestamps(dataset_name)
         timestep = timestamps[1] - timestamps[0]
         num_stamps = len(timestamps)
-        target_indices = [0, num_stamps/4, num_stamps/2, 3*num_stamps/4, num_stamps-1]
+        target_indices = [0, num_stamps//4, num_stamps//2, 3*num_stamps//4, num_stamps-1]
 
         for target_index in target_indices:
             for fuzz in range(timestep):
                 target_datetime = datetime.datetime.fromtimestamp(timestamps[target_index]) \
                                   + datetime.timedelta(seconds=fuzz)
                 new_index = hdf5_file.get_index(dataset_name, target_datetime)
-                print("%d == %d? %s" % (target_index, new_index, target_index == new_index))
+                print("%d(%s) == %d(%s)? %s" % (target_index, type(target_index), new_index, type(new_index), target_index == new_index))
                 assert target_index == new_index
                 assert (dataset[new_index] == dataset[target_index]).all()
 
@@ -248,7 +248,7 @@ def test_missing_values():
     """
     num_cols = 40
     num_rows = 800
-    num_missing = num_cols * num_rows / 4
+    num_missing = num_cols * num_rows // 4
 
     random.seed(0)
     dataset = numpy.random.random(size=(num_rows, num_cols)) + 0.1
