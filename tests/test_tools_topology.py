@@ -12,8 +12,8 @@ def test_basic():
 
     """
     topo = tokio.tools.topology.get_job_diameter(
-        slurm_cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE,
-        craysdb_cache_file=tokiotest.SAMPLE_XTDB2PROC_FILE)
+        jobid_cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE,
+        nodemap_cache_file=tokiotest.SAMPLE_XTDB2PROC_FILE)
     assert len(topo) > 0
     for expected_key in 'job_min_radius', 'job_max_radius', 'job_avg_radius':
         assert expected_key in topo

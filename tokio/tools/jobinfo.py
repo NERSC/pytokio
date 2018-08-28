@@ -42,9 +42,22 @@ def get_job_startend(jobid, cache_file=None):
         else:
             # TODO: this needs a better exception
             raise Exception("No valid jobid providers found")
+    raise Exception("No valid jobid providers found")
 
-#def get_job_ids():
-#    pass
+def get_job_nodes(jobid, cache_file=None):
+    """Return a list of all job nodes used.
 
-#def get_job_nodes():
-#    pass
+    Creates a list of all nodes used for a jobid.
+
+    Returns:
+        set: Set of node names used by the job described by this object
+    """
+    jobnodes_providers = config.CONFIG.get('jobinfo_jobnodes_providers', DEFAULT_JOBNODES_PROVIDERS)
+    for jobnodes_provider in jobnodes_providers:
+        if jobnodes_provider == 'slurm':
+            slurm_job = tokio.connectors.slurm.Slurm(jobid=jobid, cache_file=cache_file)
+            return slurm_job.get_job_nodes()
+        else:
+            # TODO: this needs a better exception
+            raise Exception("No valid jobnodes providers found")
+    raise Exception("No valid jobnodes providers found")
