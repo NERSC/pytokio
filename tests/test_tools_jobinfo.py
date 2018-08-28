@@ -11,6 +11,7 @@ def test_get_job_startend_slurm():
         jobid=tokiotest.SAMPLE_DARSHAN_JOBID,
         cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     print start, end
+    print type(start), type(end)
     assert start
     assert end
     assert start <= end
@@ -23,6 +24,7 @@ def test_get_job_startend_nerscjobsdb():
         jobid=tokiotest.SAMPLE_DARSHAN_JOBID,
         cache_file=tokiotest.SAMPLE_NERSCJOBSDB_FILE)
     print start, end
+    print type(start), type(end)
     assert start
     assert end
     assert start <= end
