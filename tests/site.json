@@ -42,6 +42,5 @@
     "jobinfo_jobid_providers": [
         "slurm",
         "nersc_jobsdb"
-    ],
-    "nersc_host": "edison"
+    ]
 }
