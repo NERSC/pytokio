@@ -11,6 +11,7 @@ import argparse
 import warnings
 import datetime
 import tokio.connectors.nersc_isdct
+from tokio.common import isstr
 
 # If the following keys report changes, the drive should be flagged
 ERROR_KEYS = [
@@ -41,8 +42,8 @@ def reduce_diff(diff_dict):
         'max': {},
         'count': {},
     }
-    for counters in diff_dict['devices'].itervalues():
-        for counter, value in counters.iteritems():
+    for counters in diff_dict['devices'].values():
+        for counter, value in counters.items():
             if counter not in reduced['count']:
                 reduced['count'][counter] = 1
                 new = True
@@ -50,7 +51,7 @@ def reduce_diff(diff_dict):
                 reduced['count'][counter] += 1
                 new = False
 
-            if not isinstance(value, basestring):
+            if not isstr(value):
                 if new:
                     reduced['sum'][counter] = value
                     reduced['min'][counter] = value
@@ -61,8 +62,8 @@ def reduce_diff(diff_dict):
                     reduced['max'][counter] = max(value, reduced['max'][counter])
 
     result = {}
-    for reduction, counters in reduced.iteritems():
-        for counter, value in counters.iteritems():
+    for reduction, counters in reduced.items():
+        for counter, value in counters.items():
             reduced_key = "%s_%s" % (reduction, counter)
             result[reduced_key] = value
             if reduction == 'sum':
@@ -78,7 +79,7 @@ def _convert_counters(counters, conversion_factor, label):
     results = {}
 
     # convert each relevant key
-    for counter, value in counters.iteritems():
+    for counter, value in counters.items():
         if counter.endswith('_bytes'):
             new_key = counter.replace('_bytes', "_" + label)
             new_value = value * conversion_factor
@@ -98,7 +99,7 @@ def convert_byte_keys(input_dict, conversion_factor=2.0**(-30.0), label="gibs"):
     # raw diff dict
     if 'devices' in input_dict:
         results = input_dict.copy()
-        for serial_no, counters in input_dict['devices'].iteritems():
+        for serial_no, counters in input_dict['devices'].items():
             results['devices'][serial_no] = _convert_counters(counters, conversion_factor, label)
     else:
         results = _convert_counters(input_dict, conversion_factor, label)
@@ -150,7 +151,7 @@ def discover_errors(diff_dict):
         return []
 
     errors = []
-    for serial_no, counters in diff_dict['devices'].iteritems():
+    for serial_no, counters in diff_dict['devices'].items():
         for error_key in ERROR_KEYS:
             if error_key in counters:
                 errors.append((serial_no, error_key))
@@ -164,27 +165,27 @@ def print_summary(old_isdctfile, new_isdctfile, diff_dict):
     diff_buf = summarize_reduced_diffs(reduced_diff)
     err_buf = summarize_errors(diff_dict, new_isdctfile)
 
-    print "=== ISDCT Summary: %s - %s ===" % (
-        datetime.datetime.fromtimestamp(old_isdctfile.itervalues().next()['timestamp']),
-        datetime.datetime.fromtimestamp(new_isdctfile.itervalues().next()['timestamp']))
+    print("=== ISDCT Summary: %s - %s ===" % (
+        datetime.datetime.fromtimestamp(iter(old_isdctfile.values()).next()['timestamp']),
+        datetime.datetime.fromtimestamp(iter(new_isdctfile.values()).next()['timestamp'])))
 
     if len(err_buf) > 0:
-        print "\n*** Errors Detected! ***"
-        print err_buf
+        print("\n*** Errors Detected! ***")
+        print(err_buf)
 
     if len(diff_dict['removed_devices']) > 0:
-        print "\n=== Devices Removed ==="
+        print("\n=== Devices Removed ===")
         for dev in diff_dict['removed_devices']:
-            print "%s %s" % (old_isdctfile[dev]['node_name'], dev)
+            print("%s %s" % (old_isdctfile[dev]['node_name'], dev))
 
     if len(diff_dict['added_devices']) > 0:
-        print "\n=== Devices Installed ==="
+        print("\n=== Devices Installed ===")
         for dev in diff_dict['added_devices']:
-            print "%s %s" % (new_isdctfile[dev]['node_name'], dev)
+            print("%s %s" % (new_isdctfile[dev]['node_name'], dev))
 
     if len(diff_buf) > 0:
-        print "\n=== Workload Statistics ==="
-        print diff_buf
+        print("\n=== Workload Statistics ===")
+        print(diff_buf)
 
 def main(argv=None):
     """Parse command line arguments and dispatch analysis
@@ -212,10 +213,10 @@ def main(argv=None):
     if args.summary:
         print_summary(old_isdctfile, new_isdctfile, diff_dict)
     elif args.all:
-        print json.dumps(diff_dict, indent=4, sort_keys=True)
+        print(json.dumps(diff_dict, indent=4, sort_keys=True))
     else:
         reduced_diff = reduce_diff(diff_dict)
-        print json.dumps(reduced_diff, indent=4, sort_keys=True)
+        print(json.dumps(reduced_diff, indent=4, sort_keys=True))
 
 if __name__ == "__main__":
     main()

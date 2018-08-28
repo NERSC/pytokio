@@ -99,7 +99,7 @@ def process_page(page):
         # basic validity checking
         if '_source' not in doc:
             warnings.warn("No _source in doc")
-            print json.dumps(doc, indent=4)
+            print(json.dumps(doc, indent=4))
             continue
         source = doc['_source']
 
@@ -170,14 +170,14 @@ def process_page(page):
 
     _timef = time.time()
     if tokio.debug.DEBUG:
-        print "Extracted %d inserts in %.4f seconds" % (len(inserts), _timef - _time0)
+        print("Extracted %d inserts in %.4f seconds" % (len(inserts), _timef - _time0))
         per_dataset = {}
         for insert in inserts:
             if insert[0] not in per_dataset:
                 per_dataset[insert[0]] = 0
             per_dataset[insert[0]] += 1
         for dataset_name in sorted(per_dataset.keys()):
-            print "  %6d entries for %s" % (per_dataset[dataset_name], dataset_name)
+            print("  %6d entries for %s" % (per_dataset[dataset_name], dataset_name))
     return inserts
 
 def update_datasets(inserts, datasets):
@@ -186,7 +186,7 @@ def update_datasets(inserts, datasets):
     """
     data_volume = {}
     errors = {}
-    for key in datasets.keys():
+    for key in datasets:
         data_volume[key] = 0.0
         errors[key] = 0
 
@@ -199,7 +199,7 @@ def update_datasets(inserts, datasets):
                 (dataset_name, timestamp, col_name, value, reducer_name) = insert
                 reducer = LAMBDA_MAPS.get(reducer_name)
         except ValueError:
-            print insert
+            print(insert)
             raise
 
         if datasets[dataset_name].insert_element(timestamp, col_name, value, reducer):
@@ -209,17 +209,17 @@ def update_datasets(inserts, datasets):
             errors[dataset_name] += 1
 
     # Update dataset metadata
-    for key in datasets.keys():
+    for key in datasets:
         unit = DATASETS.get(key, "unknown")
         datasets[key].dataset_metadata.update({'version': SCHEMA_VERSION, 'units': unit})
         datasets[key].group_metadata.update({'source': 'collectd_disk'})
 
-    index_errors = sum(errors.itervalues())
+    index_errors = sum(errors.values())
     if index_errors > 0:
         warnings.warn("Out-of-bounds indices (%d total) were detected" % index_errors)
 
     if tokio.debug.DEBUG:
-        for key in data_volume.keys():
+        for key in data_volume:
             data_volume[key] *= datasets[key].timestep
         update_str = "Added "
         update_str = "Added %(datatargets/readrates)d bytes/" \
@@ -228,7 +228,7 @@ def update_datasets(inserts, datasets):
             + "%(datatargets/writeoprates)d ops of write, " \
             + "%(dataservers/cpuload).1f%% of cpu load-seconds, " \
             + "%(dataservers/memused)d bytes of memory-seconds"
-        print update_str % data_volume
+        print(update_str % data_volume)
     return index_errors
 
 def reset_timeseries(timeseries, start, end, value=-0.0):
@@ -307,7 +307,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
     hdf5_file.attrs['version'] = SCHEMA_VERSION
 
     # Initialize datasets
-    for dataset_name in DATASETS.keys():
+    for dataset_name in DATASETS:
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
             if '/_' not in dataset_name:
@@ -374,22 +374,22 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
     _timef = time.time()
     _update_time = _timef - _time0
     if tokio.debug.DEBUG:
-        print "Inserted %d elements from %d pages in %.4f seconds" \
-            % (len(updates), len(pages), _update_time)
-        print "Processed %d pages in %.4f seconds" \
-            % (len(pages), _extract_time + _update_time)
+        print("Inserted %d elements from %d pages in %.4f seconds" \
+            % (len(updates), len(pages), _update_time))
+        print("Processed %d pages in %.4f seconds" \
+            % (len(pages), _extract_time + _update_time))
 
     for update in updates:
         normalize_cpu_datasets(update, datasets)
 
     # Write datasets out to HDF5 file
     _time0 = time.time()
-    for dataset_name, dataset in datasets.iteritems():
+    for dataset_name, dataset in datasets.items():
         if '/_' not in dataset_name:
             dataset.commit_dataset(hdf5_file)
 
     if tokio.debug.DEBUG:
-        print "Committed data to disk in %.4f seconds" % (time.time() - _time0)
+        print("Committed data to disk in %.4f seconds" % (time.time() - _time0))
 
 def main(argv=None):
     """
@@ -512,7 +512,7 @@ def main(argv=None):
                       devices_per_server=args.ssds_per_node,
                       threads=args.threads)
 
-    print "Wrote output to %s" % args.output
+    print("Wrote output to %s" % args.output)
 
 if __name__ == '__main__':
     main()

@@ -53,9 +53,9 @@ def generate_tts(output_file,
             '--output', output_file,
             query_start,
             query_end]
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print "Created", output_file
+    print("Created", output_file)
 
 def update_tts(output_file,
                input_file=tokiotest.SAMPLE_COLLECTDES_FILE2,
@@ -70,9 +70,9 @@ def update_tts(output_file,
             query_start,
             query_end]
 
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print "Updated", output_file
+    print("Updated", output_file)
 
 def summarize_hdf5(hdf5_file):
     """
@@ -131,10 +131,10 @@ def test_idempotency():
     # ensure that updating the overlapping data didn't change the contents of the TimeSeries
     num_compared = 0
     for metric in 'sums', 'shapes':
-        for key, value in summary0[metric].iteritems():
+        for key, value in summary0[metric].items():
             num_compared += 1
             assert key in summary1[metric]
-            print "%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value)
+            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
             assert summary1[metric][key] == value
 
     assert num_compared > 0
@@ -166,9 +166,9 @@ def test_out_of_bounds():
             '--output', tokiotest.TEMP_FILE.name,
             tokiotest.SAMPLE_COLLECTDES_START,
             tokiotest.SAMPLE_COLLECTDES_END]
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     with warnings.catch_warnings(record=True) as warn:
         warnings.simplefilter("always")
         tokiobin.archive_collectdes.main(argv)
-        print "Caught %d warnings" % len(warn)
+        print("Caught %d warnings" % len(warn))
         assert len(warn) > 0

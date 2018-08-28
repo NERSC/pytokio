@@ -26,7 +26,7 @@ def test_enumerate_dated_files_str():
     """
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, template=TEST_FILE)
-    print "Found %d matches: %s" % (len(matches), matches)
+    print("Found %d matches: %s" % (len(matches), matches))
     assert len(matches) == 1
 
 def test_enumerate_dated_files_list():
@@ -35,13 +35,13 @@ def test_enumerate_dated_files_list():
     # match_first=True returns, at maximum, 1 entry per day
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, template=TEST_LIST, match_first=True)
-    print "Found %d matches: %s" % (len(matches), matches)
+    print("Found %d matches: %s" % (len(matches), matches))
     assert len(matches) == EXPECTED_DAYS 
 
     # match_first=False can return multiple entries per day
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, template=TEST_LIST, match_first=False)
-    print "Found %d matches: %s" % (len(matches), matches)
+    print("Found %d matches: %s" % (len(matches), matches))
     assert len(matches) > EXPECTED_DAYS
 
 def test_enumerate_dated_files_dict_scalar():
@@ -50,7 +50,7 @@ def test_enumerate_dated_files_dict_scalar():
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, lookup_key=FAKE_FS_NAME, template=TEST_DICT)
 
-    print "Found %d matches: %s" % (len(matches), matches)
+    print("Found %d matches: %s" % (len(matches), matches))
     assert len(matches) == 1
 
 def test_enumerate_dated_files_dict_scalar_nokey():
@@ -59,7 +59,7 @@ def test_enumerate_dated_files_dict_scalar_nokey():
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, lookup_key=None, template=TEST_DICT)
 
-    print "Found %d matches: %s" % (len(matches), matches)
+    print("Found %d matches: %s" % (len(matches), matches))
     assert len(matches) == 2
 
 def test_enumerate_dated_files_dict_list():
@@ -70,12 +70,12 @@ def test_enumerate_dated_files_dict_list():
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, lookup_key=FAKE_FS_NAME, template=TEST_RECURSE,
         match_first=True)
-    print "Found %d matches without multimatch: %s" % (len(matches), matches)
+    print("Found %d matches without multimatch: %s" % (len(matches), matches))
     assert len(matches) == EXPECTED_DAYS
 
     # match_first=False can return multiple entries per day
     matches = tokio.tools.common.enumerate_dated_files(
         start=START, end=END, lookup_key=FAKE_FS_NAME, template=TEST_RECURSE,
         match_first=False)
-    print "Found %d matches with multimatch: %s" % (len(matches), matches)
+    print("Found %d matches with multimatch: %s" % (len(matches), matches))
     assert len(matches) > EXPECTED_DAYS

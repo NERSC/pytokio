@@ -25,7 +25,7 @@ def validate_object(isdct_data):
     """
     assert isdct_data is not None
     assert len(isdct_data) > 0
-    for serial_no, counters in isdct_data.iteritems():
+    for serial_no, counters in isdct_data.items():
         assert len(serial_no) > 1
         for counter in counters:
             # a counter didn't get parsed correctly
@@ -33,7 +33,7 @@ def validate_object(isdct_data):
         # ensure that synthesized metrics are being calculated
         assert 'write_amplification_factor' in counters
         # ensure that timestamp is set
-        print json.dumps(counters, indent=4, sort_keys=True)
+        print(json.dumps(counters, indent=4, sort_keys=True))
         assert 'timestamp' in counters
 
 def validate_dataframe(isdct_data):
@@ -49,7 +49,7 @@ def validate_diff(diff_dict, report_zeros=True):
     assert len(diff_dict['added_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD
     assert len(diff_dict['removed_devices']) == tokiotest.SAMPLE_NERSCISDCT_DIFF_RM
     assert len(diff_dict['devices']) > 0
-    for counters in diff_dict['devices'].itervalues():
+    for counters in diff_dict['devices'].values():
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
             assert counters[counter] > 0
         if report_zeros:
@@ -129,7 +129,7 @@ def test_serializer():
     # Read from a cache file
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(DEFAULT_INPUT)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     isdct_data.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
     isdct_cached = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.TEMP_FILE.name)
@@ -173,7 +173,7 @@ def cleanup_untar(input_filename):
     for member in tar.getmembers():
         fq_name = os.path.join(tokiotest.INPUT_DIR, member.name)
         if os.path.exists(fq_name) and fq_name.startswith(tokiotest.INPUT_DIR): # one final backstop
-            print "Removing", fq_name
+            print("Removing", fq_name)
             if member.isdir():
                 shutil.rmtree(fq_name)
             else:

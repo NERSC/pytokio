@@ -24,11 +24,11 @@ def main(argv=None):
     # Serialize the object
     cache_file = args.output
     if cache_file is not None:
-        print "Caching to %s" % cache_file
+        print("Caching to %s" % cache_file)
 
     if args.csv:
         if cache_file is None:
-            print isdct_data.to_dataframe().to_csv()
+            print(isdct_data.to_dataframe().to_csv())
         else:
             isdct_data.to_dataframe().to_csv(cache_file)
     elif args.json:

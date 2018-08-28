@@ -10,8 +10,8 @@ DATETIME_START = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_START_TIME,
 def wrap_find_darshanlogs(test_input):
     """Allow named args to pass through nosetests
     """
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running:", test_input['descr'])
+    print("Test args:", test_input['params'])
     results = tokio.tools.darshan.find_darshanlogs(**(test_input['params']))
     assert (test_input['pass_criteria'])(results)
 
@@ -19,8 +19,8 @@ def wrap_load_darshanlogs(test_input):
     """Allow named args to pass through nosetests
     """
     tokiotest.check_darshan()
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running:", test_input['descr'])
+    print("Test args:", test_input['params'])
     expected_exception = test_input.get('expect_exception')
     if expected_exception:
         nose.tools.assert_raises(expected_exception,
@@ -34,8 +34,8 @@ def wrap_load_darshanlogs_assert_raises(test_input, exception):
     """Allow named args to pass through nosetests; expect an exception
     """
     tokiotest.check_darshan()
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running:", test_input['descr'])
+    print("Test args:", test_input['params'])
     nose.tools.assert_raises(exception, tokio.tools.darshan.load_darshanlogs, **(test_input['params']))
 
 TEST_MATRIX = [
