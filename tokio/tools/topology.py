@@ -7,7 +7,7 @@ import warnings
 import tokio.connectors.craysdb as craysdb
 from . import jobinfo as jobinfo
 
-def get_job_diameter(jobid, nodemap_cache_file=None, jobid_cache_file=None):
+def get_job_diameter(jobid, nodemap_cache_file=None, jobinfo_cache_file=None):
     """Calculate the diameter of a job
 
     An extremely crude way to reduce a job's node allocation into a scalar
@@ -19,7 +19,7 @@ def get_job_diameter(jobid, nodemap_cache_file=None, jobid_cache_file=None):
             topological placement is determined
         nodemap_cache_file (str): Full path to the file containing the cached
             contents to be used to determine the node position map
-        jobid_cache_file (str): Full path to the file containing the cached
+        jobinfo_cache_file (str): Full path to the file containing the cached
             contents to be used to convert the job id into a node list
 
     Returns:
@@ -32,7 +32,7 @@ def get_job_diameter(jobid, nodemap_cache_file=None, jobid_cache_file=None):
             * job_avg_radius: The average distance between the job's center of
               mass and all job nodes
     """
-    node_list = jobinfo.get_job_nodes(jobid=jobid, cache_file=jobid_cache_file)
+    node_list = jobinfo.get_job_nodes(jobid=jobid, cache_file=jobinfo_cache_file)
     proc_table = craysdb.CraySdbProc(cache_file=nodemap_cache_file)
     node_positions = []
     if len(node_list) == 0:
