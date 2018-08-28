@@ -513,7 +513,7 @@ def retrieve_lmt_data(results, file_system):
     merge_dicts(results, module_results, prefix='fs_')
     return results
 
-def retrieve_topology_data(results, jobid_cache_file, nodemap_cache_file):
+def retrieve_topology_data(results, jobinfo_cache_file, nodemap_cache_file):
     """
     Get the diameter of the job (Cray XC)
     """
@@ -527,14 +527,14 @@ def retrieve_topology_data(results, jobid_cache_file, nodemap_cache_file):
             nodemap_cache_file = None
 
         # verify slurm cache file
-        if jobid_cache_file == "" \
-        or jobid_cache_file is None \
-        or not os.path.isfile(jobid_cache_file):
-            jobid_cache_file = None
+        if jobinfo_cache_file == "" \
+        or jobinfo_cache_file is None \
+        or not os.path.isfile(jobinfo_cache_file):
+            jobinfo_cache_file = None
 
         module_results = tokio.tools.topology.get_job_diameter(
             results['_jobid'],
-            jobid_cache_file=jobid_cache_file,
+            jobinfo_cache_file=jobinfo_cache_file,
             nodemap_cache_file=nodemap_cache_file)
         merge_dicts(results, module_results, prefix='topology_')
     return results
@@ -701,7 +701,7 @@ def main(argv=None):
             results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
         results = retrieve_lmt_data(results, args.file_system)
         results = retrieve_topology_data(results,
-                                         jobid_cache_file=args.slurm_jobid,
+                                         jobinfo_cache_file=args.slurm_jobid,
                                          nodemap_cache_file=args.topology)
         results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
         results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
