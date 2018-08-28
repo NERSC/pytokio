@@ -4,6 +4,7 @@ Test the NERSC Lustre health data connector
 """
 
 import os
+import tempfile
 import nose
 import tokiotest
 import tokio.connectors.lfshealth
@@ -81,16 +82,22 @@ def test_ostfullness_from_cache():
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_FILE)
     verify_ost(ostfullness, input_type='ostfullness')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_from_cache_gz():
     """lfshealth.LfsOstMap: read from cache gzip
     """
-    ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_GZ)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_LCTL_DL_T_GZ, tokiotest.TEMP_FILE.name)
+    ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostmap, input_type='ostmap')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_from_cache_gz():
-    """lfshealth.LfsOstMap: read from cache gzip
+    """lfshealth.LfsOstFullness: read from cache gzip
     """
-    ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_GZ)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_LFS_DF_GZ, tokiotest.TEMP_FILE.name)
+    ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostfullness, input_type='ostfullness')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
