@@ -22,6 +22,7 @@ import datetime
 import warnings
 import numpy
 import pandas
+from tokio.common import isstr
 
 REX_SERIAL_NO = r'(Intel SSD|SMART Attributes|SMART and Health Information).*(CVF[^ ]+-\d+)'
 
@@ -107,16 +108,16 @@ class NerscIsdct(dict):
             timestamp = datetime.datetime.strptime(timestamp_str, "%Y%m%d%H%M%S")
 
         # Set the timestamp for each device serial number
-        timestamp = long(time.mktime(timestamp.timetuple()))
+        timestamp = int(time.mktime(timestamp.timetuple()))
         for parsed_counters in parsed_counters_list:
-            if len(parsed_counters.keys()) > 1:
+            if len(parsed_counters) > 1:
                 warnings.warn("Multiple serial numbers detected in a single file_obj: " \
-                              + str(parsed_counters.keys()))
-            for counters in parsed_counters.itervalues():
+                              + str(list(parsed_counters.keys())))
+            for counters in parsed_counters.values():
                 counters['timestamp'] = timestamp
 
         merged_counters = _merge_parsed_counters(parsed_counters_list)
-        for key, val in merged_counters.iteritems():
+        for key, val in merged_counters.items():
             self.__setitem__(key, val)
 
     def load_json(self):
@@ -133,7 +134,7 @@ class NerscIsdct(dict):
         else:
             open_func = open
 
-        for key, val in json.load(open_func(self.input_file, 'r')).iteritems():
+        for key, val in json.load(open_func(self.input_file, 'r')).items():
             self.__setitem__(key, val)
 
     def save_cache(self, output_file=None):
@@ -218,7 +219,7 @@ class NerscIsdct(dict):
             'devices': {},
         }
         existing_devices = set([])
-        for serial_no, counters in self.iteritems():
+        for serial_no, counters in self.items():
             existing_devices.add(serial_no)
             # new devices that are appearing for the first time
             if serial_no not in old_isdct:
@@ -227,12 +228,12 @@ class NerscIsdct(dict):
 
             # calculate the diff in each counter for this device
             diff_dict = {}
-            for counter, value in counters.iteritems():
+            for counter, value in counters.items():
                 if counter not in old_isdct[serial_no]:
                     warnings.warn("Counter %s does not exist in old_isdct" % counter)
 
                 ### just highlight different strings
-                elif isinstance(value, basestring):
+                elif isstr(value):
                     if old_isdct[serial_no][counter] != value:
                         diff_value = "+++%s ---%s" % (value, old_isdct[serial_no][counter])
                     else:
@@ -263,7 +264,7 @@ class NerscIsdct(dict):
             result['devices'][serial_no] = diff_dict
 
         # Look for serial numbers that used to exist but do not appear in self
-        for serial_no in old_isdct.keys():
+        for serial_no in old_isdct:
             if serial_no not in existing_devices:
                 result['removed_devices'].append(serial_no)
 
@@ -276,7 +277,7 @@ class NerscIsdct(dict):
         by ISDCT, then adds the resulting key-value pairs to self.
         """
 
-        for serial_no, counters in self.iteritems():
+        for serial_no, counters in self.items():
             # native units are "kiloblocks," whatever that signifies
             for key in 'data_units_read', 'data_units_written':
                 if key in counters:
@@ -318,10 +319,10 @@ def _merge_parsed_counters(parsed_counters_list):
     for parsed_counters in parsed_counters_list:
         if parsed_counters is None:
             continue
-        elif len(parsed_counters.keys()) > 1:
+        elif len(parsed_counters) > 1:
             raise Exception("Received multiple serial numbers from parse_dct_counters_file")
         else:
-            device_sn = parsed_counters.keys()[0]
+            device_sn = next(iter(parsed_counters))
 
         ### merge file's counter dict with any previous counters we've parsed
         if device_sn not in all_data:
@@ -331,8 +332,8 @@ def _merge_parsed_counters(parsed_counters_list):
 
     ### attempt to figure out the type of each counter
     new_counters = []
-    for device_sn, counters in all_data.iteritems():
-        for counter, value in counters.iteritems():
+    for device_sn, counters in all_data.items():
+        for counter, value in counters.items():
             ### first, handle counters that do not have an obvious way to cast
             if counter in ("temperature", "throttle_status", "endurance_analyzer"):
                 tokens = value.split(None, 1)
@@ -347,7 +348,7 @@ def _merge_parsed_counters(parsed_counters_list):
             ### the order here is important, but hex that is not prefixed with
             ### 0x may be misinterpreted as integers.  if such counters ever
             ### surface, they must be explicitly cast above
-            for cast in (long, float, lambda x: long(x, 16)):
+            for cast in (int, float, lambda x: int(x, 16)):
                 try:
                     new_value = cast(value)
                     break
@@ -360,7 +361,7 @@ def _merge_parsed_counters(parsed_counters_list):
 
             ### endurance_analyzer can be numeric or an error string
             if counter == 'endurance_analyzer':
-                if isinstance(new_value, basestring):
+                if isstr(new_value):
                     new_value = None
                     unit = None
                 elif unit is None:
@@ -415,7 +416,7 @@ def _rekey_smart_buffer(smart_buffer):
     if prefix is None:
         prefix = smart_buffer.get("_id")
 
-    for key, val in smart_buffer.iteritems():
+    for key, val in smart_buffer.items():
         key = ("SMART_%s_%s" % (prefix, key.strip())).replace("-", "").replace(" ", "_")
         key = _normalize_key(key)
         data[key] = val.strip()
@@ -513,12 +514,12 @@ def parse_counters_fileobj(fileobj, nodename=None):
             key = _normalize_key(key)
             smart_buffer[key] = val.strip()
         elif parse_mode > 0 and line.startswith('-') and line.endswith('-'):
-            for key, val in _rekey_smart_buffer(smart_buffer).iteritems():
+            for key, val in _rekey_smart_buffer(smart_buffer).items():
                 key = _normalize_key(key)
                 data[key] = val
             smart_buffer = {'_id' : line.split()[1]}
     if parse_mode > 0: # flush the last SMART register
-        for key, val in _rekey_smart_buffer(smart_buffer).iteritems():
+        for key, val in _rekey_smart_buffer(smart_buffer).items():
             key = _normalize_key(key)
             data[key] = val
 

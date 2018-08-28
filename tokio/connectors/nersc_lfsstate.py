@@ -169,7 +169,7 @@ class NerscLfsOstMap(dict):
             time stamp.
         """
         resulting_data = {}
-        for timestamp, fs_data in self.iteritems():
+        for timestamp, fs_data in self.items():
             resulting_data[timestamp] = fs_data.get_failovers()
 
         return resulting_data
@@ -208,7 +208,7 @@ class NerscLfsOstFullness(dict):
             fs_data = self[timestamp]
             for target_name in sorted(fs_data.keys()):
                 obd_data = fs_data[target_name]
-                for obd_name in sorted(obd_data.keys(),
+                for obd_name in sorted(list(obd_data.keys()),
                                        key=lambda x, y=obd_data: y[x]['target_index']):
                     keyvalues = obd_data[obd_name]
                     repr_result += "%s-%s_UUID %ld %ld %ld %3d%% %s[%s:%d]\n" % (
@@ -265,9 +265,9 @@ class NerscLfsOstFullness(dict):
                         degenerate_keys += 1
 
                     self[this_timestamp][file_system][target_name] = {
-                        'total_kib': long(match.group(2)),
-                        'used_kib': long(match.group(3)),
-                        'remaining_kib': long(match.group(4)),
+                        'total_kib': int(match.group(2)),
+                        'used_kib': int(match.group(3)),
+                        'remaining_kib': int(match.group(4)),
                         'mount_pt': match.group(6),
                         'role': match.group(7).lower(),
                         'target_index': int(match.group(8)),

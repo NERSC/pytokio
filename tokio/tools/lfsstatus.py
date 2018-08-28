@@ -112,10 +112,10 @@ def get_summary_at_datetime(file_system, datetime_target, metric, cache_file):
                 ost_map.update(nersc_lfsstate.NerscLfsOstMap(cache_file=map_file))
         ost_health = ost_map.get_failovers()
 
-    timestamps = sorted([int(x) for x in ost_health.keys()])
+    timestamps = sorted([int(x) for x in ost_health])
 
     # Unoptimized walk through to find our timestamp of interest
-    target_timestamp = long(time.mktime(datetime_target.timetuple()))
+    target_timestamp = int(time.mktime(datetime_target.timetuple()))
     # If the day's records start after the target time stamp, just report the
     # first record (target_index=0)
     target_index = 0
@@ -174,10 +174,10 @@ def summarize_maps_data(fs_data):
     Returns:
         dict: summary metrics about the state of failovers on the file system
     """
-    num_abnormal_ip = len(fs_data['abnormal_ips'].keys())
+    num_abnormal_ip = len(fs_data['abnormal_ips'])
     num_abnormal_osts = 0
     if num_abnormal_ip:
-        for _, ost_list in fs_data['abnormal_ips'].iteritems():
+        for _, ost_list in fs_data['abnormal_ips'].items():
             num_abnormal_osts += len(ost_list)
         avg_overload = float(num_abnormal_osts) / float(num_abnormal_ip)
         avg_overload_factor = avg_overload / float(fs_data['mode'])
@@ -232,7 +232,7 @@ def summarize_df_data(fs_data):
         'ost_count': 0,
     }
 
-    for ost_name, ost_data in fs_data.iteritems():
+    for ost_name, ost_data in fs_data.items():
         # Only care about OSTs, not MDTs or MGTs
         if not ost_name.lower().startswith('ost'):
             continue

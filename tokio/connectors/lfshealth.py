@@ -45,7 +45,7 @@ class LfsOstMap(SubprocessOutputDict):
         # Iterate over file systems within each time step
         for target_name in sorted(self.keys()):
             obd_data = self[target_name]
-            for obd_name in sorted(obd_data.keys(), key=lambda x: int(obd_data[x]['index'])):
+            for obd_name in sorted(list(obd_data.keys()), key=lambda x: int(obd_data[x]['index'])):
                 keyvals = obd_data[obd_name]
                 record_string = \
                     "%(index)3d %(status)2s %(role)3s %(role_id)s %(uuid)s %(ref_count)d %(nid)s\n" % keyvals
@@ -88,9 +88,9 @@ class LfsOstMap(SubprocessOutputDict):
         """
         resulting_data = {}
 
-        for file_system, ost_data in self.iteritems():
+        for file_system, ost_data in self.items():
             ost_counts = {} # key = ip address, val = ost count
-            for ost_name, ost_values in ost_data.iteritems():
+            for ost_name, ost_values in ost_data.items():
                 if ost_values['role'] != 'osc': # don't care about mdc, mgc
                     continue
                 ip_addr = ost_values['target_ip']
@@ -98,7 +98,7 @@ class LfsOstMap(SubprocessOutputDict):
 
             # Get mode of OSTs per OSS to infer what "normal" OST/OSS ratio is
             histogram = {}
-            for ip_addr, ost_count in ost_counts.iteritems():
+            for ip_addr, ost_count in ost_counts.items():
                 if ost_count not in histogram:
                     histogram[ost_count] = 1
                 else:
@@ -109,7 +109,7 @@ class LfsOstMap(SubprocessOutputDict):
 
             # Build a dict of { ip_addr: [ ostname1, ostname2, ... ], ... }
             abnormal_ips = {}
-            for ost_name, ost_values in ost_data.iteritems():
+            for ost_name, ost_values in ost_data.items():
                 if ost_values['role'] != 'osc': # don't care about mdc, mgc
                     continue
                 ip_addr = ost_values['target_ip']
@@ -148,7 +148,7 @@ class LfsOstFullness(SubprocessOutputDict):
         repr_result = ""
         for target_name in sorted(self.keys()):
             obd_data = self[target_name]
-            for obd_name in sorted(obd_data.keys(), key=lambda x: obd_data[x]['target_index']):
+            for obd_name in sorted(list(obd_data.keys()), key=lambda x: obd_data[x]['target_index']):
                 keyvalues = obd_data[obd_name]
                 repr_result += "%s-%s_UUID %ld %ld %ld %3d%% %s[%s:%d]\n" % (
                     target_name,
@@ -182,9 +182,9 @@ class LfsOstFullness(SubprocessOutputDict):
                     degenerate_keys += 1
 
                 self[file_system][target_name] = {
-                    'total_kib': long(match.group(2)),
-                    'used_kib': long(match.group(3)),
-                    'remaining_kib': long(match.group(4)),
+                    'total_kib': int(match.group(2)),
+                    'used_kib': int(match.group(3)),
+                    'remaining_kib': int(match.group(4)),
                     'mount_pt': match.group(6),
                     'role': match.group(7).lower(),
                     'target_index': int(match.group(8)),

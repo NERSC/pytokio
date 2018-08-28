@@ -9,9 +9,13 @@ import json
 import errno
 import warnings
 import datetime
-import StringIO
+try:
+    import StringIO as io
+except ImportError:
+    import io
 import subprocess
 import pandas
+from tokio.common import isstr
 from tokio.connectors.common import SubprocessOutputDict
 
 SACCT = 'sacct'
@@ -59,7 +63,7 @@ def compact_nodelist(node_string):
         str: The compact representation of `node_string` (e.g.,
         ``nid0[5032-5159]``)
     """
-    if not isinstance(node_string, basestring):
+    if not isstr(node_string):
         node_string = ','.join(list(node_string))
 
     try:
@@ -151,7 +155,7 @@ class Slurm(SubprocessOutputDict):
         """
         output_str = ""
         key_order = ['jobidraw']
-        for counters in self.itervalues():
+        for counters in self.values():
             # print the column headers on the first pass
             if output_str == "":
                 for key in counters:
@@ -232,17 +236,17 @@ class Slurm(SubprocessOutputDict):
                 Python object types.  If omitted, convert all keys.
         """
         scan_keys = len(target_keys)
-        for counters in self.itervalues():
+        for counters in self.values():
             # if specific keys were passed, only look for those keys
             if scan_keys > 0:
                 for key in target_keys:
                     value = counters[key]
-                    if key in _RECAST_KEY_MAP and isinstance(value, basestring):
+                    if key in _RECAST_KEY_MAP and isstr(value):
                         counters[key] = _RECAST_KEY_MAP[key][0](value)
             # otherwise, attempt to recast every key
             else:
-                for key, value in counters.iteritems():
-                    if key in _RECAST_KEY_MAP and isinstance(value, basestring):
+                for key, value in counters.items():
+                    if key in _RECAST_KEY_MAP and isstr(value):
                         counters[key] = _RECAST_KEY_MAP[key][0](value)
 
 #   def get_task_startend(self, taskid=self.jobid):
@@ -275,7 +279,7 @@ class Slurm(SubprocessOutputDict):
         """
         nodelist = set([])
 
-        for counters in self.itervalues():
+        for counters in self.values():
             for jobnode in counters['nodelist']:
                 nodelist.add(jobnode)
 
@@ -293,7 +297,7 @@ class Slurm(SubprocessOutputDict):
         """
         min_start = None
         max_end = None
-        for counters in self.itervalues():
+        for counters in self.values():
             if min_start is None or min_start > counters['start']:
                 min_start = counters['start']
             if max_end is None or max_end < counters['end']:
@@ -311,7 +315,7 @@ class Slurm(SubprocessOutputDict):
             list of str: list of jobid(s) contained in self.
         """
         jobids = []
-        for rawjobid in self.keys():
+        for rawjobid in self:
             if '.' not in rawjobid:
                 jobids.append(rawjobid)
         return jobids
@@ -334,7 +338,7 @@ class Slurm(SubprocessOutputDict):
             json_string (str): JSON representation of self
         """
         decoded_dict = json.loads(json_string)
-        for key, value in decoded_dict.iteritems():
+        for key, value in decoded_dict.items():
             self[key] = value
         self._recast_keys()
 
@@ -347,7 +351,7 @@ class Slurm(SubprocessOutputDict):
             pandas.DataFrame: DataFrame representation of the same schema as
             the Slurm ``sacct`` command.
         """
-        buf = StringIO.StringIO(str(self))
+        buf = io.StringIO(str(self))
         return pandas.read_csv(buf, sep='|', parse_dates=['start', 'end'])
 
 def parse_sacct(sacct_str):

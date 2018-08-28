@@ -426,8 +426,8 @@ def build_timeseries_query(orig_query, start, end):
         """
         Set the upper and lower bounds of a time range
         """
-        time_range_obj['gte'] = long(time.mktime(start.timetuple()))
-        time_range_obj['lt'] = long(time.mktime(end.timetuple()))
+        time_range_obj['gte'] = int(time.mktime(start.timetuple()))
+        time_range_obj['lt'] = int(time.mktime(end.timetuple()))
         time_range_obj['format'] = time_format
 
     query = copy.deepcopy(orig_query)
