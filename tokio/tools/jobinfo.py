@@ -2,6 +2,7 @@
 """
 
 import os
+import datetime
 import tokio.config as config
 
 try:
@@ -21,8 +22,8 @@ def get_job_startend(jobid, cache_file=None):
     """Find earliest start and latest end time for a job.
 
     Returns:
-        tuple: Two-item tuple of (earliest start time, latest end time) in
-            whatever type the underlying module returns
+        tuple of datetime.datetime: Two-item tuple of (earliest start time,
+            latest end time)
     """
     jobid_providers = config.CONFIG.get('jobinfo_jobid_providers', DEFAULT_JOBID_PROVIDERS)
     for jobid_provider in jobid_providers:
@@ -36,8 +37,10 @@ def get_job_startend(jobid, cache_file=None):
             if nersc_host is None:
                 raise KeyError("NERSC_HOST not defined in environment or pytokio config")
             nersc_jobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=cache_file)
-            return nersc_jobsdb.get_job_startend(jobid=jobid, nersc_host=nersc_host)
+            start, end = nersc_jobsdb.get_job_startend(jobid=jobid, nersc_host=nersc_host)
+            return datetime.datetime.fromtimestamp(start), datetime.datetime.fromtimestamp(end)
         else:
+            # TODO: this needs a better exception
             raise Exception("No valid jobid providers found")
 
 #def get_job_ids():
