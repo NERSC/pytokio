@@ -5,8 +5,8 @@ various site-specific constants, paths, and defaults.
 """
 
 import os
-import sys
 import json
+from tokio.common import isstr
 
 PYTOKIO_CONFIG = ""
 """Path to configuration file to load
@@ -26,7 +26,7 @@ def init_config():
         os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
 
     # Load pytokio config file and convert its keys into a set of constants
-    for _key, _value in json.load(open(PYTOKIO_CONFIG, 'r')).iteritems():
+    for _key, _value in json.load(open(PYTOKIO_CONFIG, 'r')).items():
         # config keys beginning with an underscore get skipped
         if _key.startswith('_'):
             pass
@@ -36,9 +36,8 @@ def init_config():
         # loaded from a json
         _old_attribute = CONFIG.get(_key.lower())
         if _old_attribute is None \
-        or isinstance(_old_attribute, basestring) \
-        or isinstance(_old_attribute, dict) \
-        or isinstance(_old_attribute, list):
+        or isstr(_old_attribute) \
+        or isinstance(_old_attribute, (dict, list)):
             CONFIG[_key.lower()] = _value
 
     # Check for magic environment variables to override the contents of the config

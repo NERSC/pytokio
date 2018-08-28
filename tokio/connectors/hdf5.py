@@ -11,6 +11,7 @@ import datetime
 import h5py
 import numpy
 import pandas
+from tokio.common import isstr
 from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unused-import
                                     map_dataset,
                                     demux_column,
@@ -623,7 +624,7 @@ class Hdf5(h5py.File):
 
         except KeyError:
             # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isinstance(key, basestring) else key
+            key = key.lstrip('/') if isstr(key) else key
             if key in self.schema:
                 hdf5_key = self.schema.get(key)
                 if super(Hdf5, self).__contains__(hdf5_key):
@@ -685,7 +686,7 @@ class Hdf5(h5py.File):
         timestamps = self.get_timestamps(dataset_name)[0:2]
         timestep = self.get_timestep(dataset_name, timestamps)
         t_start = datetime.datetime.fromtimestamp(timestamps[0])
-        return long((target_datetime - t_start).total_seconds() / timestep)
+        return int((target_datetime - t_start).total_seconds() / timestep)
 
     def get_timestamps(self, dataset_name):
         """

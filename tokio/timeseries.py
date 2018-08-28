@@ -84,8 +84,8 @@ class TimeSeries(object):
         # Calculate the hours in a day in epoch-seconds since Python datetime
         # and timedelta doesn't understand DST
         time_list = []
-        end_epoch = long(time.mktime(end.timetuple()))
-        timestamp = long(time.mktime(start.timetuple()))
+        end_epoch = int(time.mktime(end.timetuple()))
+        timestamp = int(time.mktime(start.timetuple()))
         while timestamp < end_epoch:
             time_list.append(timestamp)
             timestamp += timestep
@@ -134,9 +134,9 @@ class TimeSeries(object):
         self.schema = dataset.attrs.get('version')
 
         # copy metadata into memory
-        for key, value in dataset.attrs.iteritems():
+        for key, value in dataset.attrs.items():
             self.dataset_metadata[key] = value
-        for key, value in dataset.parent.attrs.iteritems():
+        for key, value in dataset.parent.attrs.items():
             self.group_metadata[key] = value
 
         self.timestamp_key = tokio.connectors.hdf5.get_timestamps_key(hdf5_file, dataset_name)
@@ -215,15 +215,15 @@ class TimeSeries(object):
 
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
-        self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
+        self.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
         self.dataset_metadata['version'] = str(self.version)
 
         # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
-        for key, value in self.dataset_metadata.iteritems():
+        for key, value in self.dataset_metadata.items():
             dataset_hdf5.attrs[key] = value
 
         # Insert/update group metadata
-        for key, value in self.group_metadata.iteritems():
+        for key, value in self.group_metadata.items():
             dataset_hdf5.parent.attrs[key] = value
 
     def update_column_map(self):
@@ -324,7 +324,7 @@ class TimeSeries(object):
         Returns:
             (t_index, c_index) (long or None)
         """
-        timestamp_epoch = long(time.mktime(timestamp.timetuple()))
+        timestamp_epoch = int(time.mktime(timestamp.timetuple()))
         t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
         if t_index >= self.timestamps.shape[0]: # check bounds
             return None, None
@@ -417,7 +417,7 @@ def sorted_nodenames(nodenames, sort_hex=False):
         """
         Tokenize string into alternating strings/ints if possible
         """
-        return map(extract_int, re.findall(r'(\d+|\D+)', string))
+        return list(map(extract_int, re.findall(r'(\d+|\D+)', string)))
 
     def natural_hex_compare(string):
         """
@@ -425,7 +425,7 @@ def sorted_nodenames(nodenames, sort_hex=False):
         recognizes hex, so be careful with ambiguous nodenames like "bb234",
         which is valid hex.
         """
-        return map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string))
+        return list(map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string)))
 
     def natural_comp(arg1, arg2):
         """

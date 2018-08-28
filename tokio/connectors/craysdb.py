@@ -7,6 +7,7 @@ within the network fabric to provide topological information.
 
 import sys
 from tokio.connectors.common import SubprocessOutputDict
+from tokio.common import isstr
 
 class CraySdbProc(SubprocessOutputDict):
     """Dictionary subclass that self-populates with Cray SDB data.
@@ -37,7 +38,7 @@ class CraySdbProc(SubprocessOutputDict):
         format compatible with the output of ``xtdb2proc``.
         """
         repr_result = ""
-        for _, record in self.iteritems():
+        for _, record in self.items():
             line = []
             for key in self.key_order:
                 try:
@@ -46,15 +47,10 @@ class CraySdbProc(SubprocessOutputDict):
                     sys.stderr.write("key does not appear in all records\n")
                     raise
 
-                # We don't need to know the difference between basestring
-                # and other because when we parse it, we don't make the
-                # the difference
-                #
-                # Look at the type of each val and
-                # return the correponding string
+                # Look at the type of each val and return the correponding string
                 if val is None:
                     line.append("%s=null" % key)
-                elif isinstance(val, basestring):
+                elif isstr(val):
                     line.append("%s='%s'" % (key, val))
                 else:
                     line.append("%s=%s" % (key, val))
