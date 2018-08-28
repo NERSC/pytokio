@@ -28,9 +28,9 @@ def main(argv=None):
     # Serialize the object
     cache_file = args.output
     if cache_file is None:
-        print json.dumps(topology_result, indent=4, sort_keys=True)
+        print(json.dumps(topology_result, indent=4, sort_keys=True))
     else:
-        print "Caching to %s" % cache_file
+        print("Caching to %s" % cache_file)
         json.dump(topology_result, open(cache_file, 'w'))
 
 if __name__ == "__main__":

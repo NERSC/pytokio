@@ -55,7 +55,7 @@ def main(argv=None):
                                                        jobid=args.jobid,
                                                        which=args.load,
                                                        darshan_log_dir=args.logdir)
-        print json.dumps(results, indent=4, sort_keys=True)
+        print(json.dumps(results, indent=4, sort_keys=True))
 
     else:
         for logfile in tokio.tools.darshan.find_darshanlogs(datetime_start=start,
@@ -63,7 +63,7 @@ def main(argv=None):
                                                             username=args.username,
                                                             jobid=args.jobid,
                                                             darshan_log_dir=args.logdir):
-            print logfile
+            print(logfile)
 
 if __name__ == "__main__":
     main()

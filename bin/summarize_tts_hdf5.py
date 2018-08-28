@@ -66,13 +66,13 @@ def print_tts_hdf5_summary(results):
     """
     Format and print the summary data calculated by summarize_tts_hdf5()
     """
-    print "Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])
-    print "Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])
-    print "Missing data points:  %9d" % results['missing_pts']
-    print "Expected data points: %9d" % results['total_pts']
-    print "Percent data missing: %8.1f%%" % results['missing_pct']
-    print "First non-empty row:  %9d" % results['first_nonzero_idx']
-    print "Last non-empty row:   %9d" % results['last_nonzero_idx']
+    print(("Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])))
+    print(("Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])))
+    print(("Missing data points:  %9d" % results['missing_pts']))
+    print(("Expected data points: %9d" % results['total_pts']))
+    print(("Percent data missing: %8.1f%%" % results['missing_pct']))
+    print(("First non-empty row:  %9d" % results['first_nonzero_idx']))
+    print(("Last non-empty row:   %9d" % results['last_nonzero_idx']))
 
 def summarize_timesteps(hdf5_file):
     """
@@ -94,11 +94,11 @@ def print_timestep_summary(summary):
     """
     Format and print the summary data calculated by summarize_timesteps()
     """
-    for timestamp, values in summary.iteritems():
-        print "%12s %14.2f read, %14.2f written" % (
+    for timestamp, values in summary.items():
+        print("%12s %14.2f read, %14.2f written" % (
             datetime.datetime.fromtimestamp(float(timestamp)),
             values.get('read_bytes', 0),
-            values.get('write_bytes', 0))
+            values.get('write_bytes', 0)))
 
 def summarize_columns(hdf5_file):
     """
@@ -121,11 +121,11 @@ def print_column_summary(results):
     """
     Format and print the summary data calculated by summarize_columns()
     """
-    for column_name, values in results.iteritems():
-        print "%12s %14.2f read, %14.2f written" % (
+    for column_name, values in results.items():
+        print("%12s %14.2f read, %14.2f written" % (
             column_name,
             values.get('read_bytes', 0),
-            values.get('write_bytes', 0))
+            values.get('write_bytes', 0)))
 
 def main(argv=None):
     """
@@ -149,7 +149,7 @@ def main(argv=None):
         results['columns'] = summarize_columns(hdf5_file)
 
     if args.json:
-        print json.dumps(results, indent=4, sort_keys=True)
+        print(json.dumps(results, indent=4, sort_keys=True))
     else:
         print_tts_hdf5_summary(results['total'])
         if 'timesteps' in results:

@@ -12,9 +12,9 @@ import subprocess
 import datetime
 
 try:
-    import cStringIO as StringIO
+    import StringIO as io
 except ImportError:
-    import StringIO
+    import io
 
 import nose
 
@@ -162,8 +162,8 @@ class CaptureOutputs(object):
     def __enter__(self):
         self.actual_stdout = sys.stdout
         self.actual_stderr = sys.stderr
-        self.stdout = StringIO.StringIO()
-        self.stderr = StringIO.StringIO()
+        self.stdout = io.StringIO()
+        self.stderr = io.StringIO()
         sys.stdout = self.stdout
         sys.stderr = self.stderr
         return self
@@ -310,7 +310,7 @@ def gunzip(input_filename, output_filename):
     with gzip.open(input_filename, 'rb') as input_file:
         file_content = input_file.read()
     with open(output_filename, 'w+b') as output_file:
-        print "Creating %s" % output_filename
+        print("Creating %s" % output_filename)
         output_file.write(file_content)
 
 def try_unlink(output_filename):
@@ -318,5 +318,5 @@ def try_unlink(output_filename):
     Destroy a temporarily decompressed input file
     """
     if os.path.exists(output_filename):
-        print "Destroying %s" % output_filename
+        print("Destroying %s" % output_filename)
         os.unlink(output_filename)

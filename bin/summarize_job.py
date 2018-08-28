@@ -83,12 +83,12 @@ def summarize_darshan_posix(darshan_data):
     mins = {}
     maxes = {}
     num_files = 0
-    for recordname, recorddata in posix_data.iteritems():
+    for recordname, recorddata in posix_data.items():
         if recordname.startswith('_'):
             continue
         num_files += 1
-        for rankdata in recorddata.itervalues():
-            for counter, value in rankdata.iteritems():
+        for rankdata in recorddata.values():
+            for counter, value in rankdata.items():
                 totals[counter] = totals.get(counter, 0) + value
                 counts[counter] = counts.get(counter, 0) + 1
                 if counter not in mins or mins[counter] > value:
@@ -115,17 +115,17 @@ def get_biggest_api(darshan_data):
         return {}
 
     biggest_api = {}
-    for api_name in darshan_data['counters'].keys():
+    for api_name in darshan_data['counters']:
         biggest_api[api_name] = {
             'write': 0,
             'read': 0,
             'write_files': 0,
             'read_files': 0,
         }
-        for file_path, records in darshan_data['counters'][api_name].iteritems():
+        for file_path, records in darshan_data['counters'][api_name].items():
             if file_path.startswith('_'):
                 continue
-            for record in records.itervalues():
+            for record in records.values():
                 bytes_read = record.get('BYTES_READ')
                 if bytes_read: # bytes_read is not None and bytes_read > 0:
                     biggest_api[api_name]['read'] += bytes_read
@@ -160,12 +160,12 @@ def get_biggest_fs(darshan_data):
         biggest_write_api = darshan_data['biggest_write_api']
 
     biggest_fs = {}
-    mounts = darshan_data['mounts'].keys()
+    mounts = list(darshan_data['mounts'].keys())
     for api_name in biggest_read_api, biggest_write_api:
         for file_path in darshan_data['counters'][api_name]:
             if file_path in ('_perf', '_total'): # only consider file records
                 continue
-            for record in darshan_data['counters'][api_name][file_path].itervalues():
+            for record in darshan_data['counters'][api_name][file_path].values():
                 key = _identify_fs_from_path(file_path, mounts)
                 if key is None:
                     key = '_unknown' ### for stuff like STDIO
@@ -284,7 +284,7 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
     after adding a prefix to every key.
 
     """
-    for key, value in dict2.iteritems():
+    for key, value in dict2.items():
         if prefix is not None:
             new_key = prefix + key
         else:
@@ -345,8 +345,9 @@ def retrieve_lmt_data(results, file_system):
     Figure out the H5LMT file corresponding to this run
     """
     if file_system is None:
-        if 'darshan_biggest_write_fs_bytes' not in results.keys() \
-        or 'darshan_biggest_read_fs_bytes' not in results.keys():
+        keys = list(results.keys())
+        if 'darshan_biggest_write_fs_bytes' not in keys \
+        or 'darshan_biggest_read_fs_bytes' not in keys:
             return results
 
         # Attempt to divine file system from Darshan log
@@ -355,7 +356,7 @@ def retrieve_lmt_data(results, file_system):
             fs_key = 'darshan_biggest_write_fs'
         else:
             fs_key = 'darshan_biggest_read_fs'
-        for fs_path, fs_name in tokio.config.CONFIG.get('mount_to_fsname', {}).iteritems():
+        for fs_path, fs_name in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
             if re.search(fs_path, results[fs_key]) is not None:
                 results['_file_system'] = fs_name
                 break
@@ -628,8 +629,8 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
         else:
             cache_file = concurrentjobs
 
-        start_stamp = long(time.mktime(results['_datetime_start'].timetuple()))
-        end_stamp = long(time.mktime(results['_datetime_end'].timetuple()))
+        start_stamp = int(time.mktime(results['_datetime_start'].timetuple()))
+        end_stamp = int(time.mktime(results['_datetime_end'].timetuple()))
         nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=cache_file)
         concurrent_job_info = nerscjobsdb.get_concurrent_jobs(start_stamp, end_stamp, jobhost)
         results['jobsdb_concurrent_jobs'] = concurrent_job_info['numjobs']
@@ -719,11 +720,11 @@ def main(argv=None):
         results = {}
 
     if args.json:
-        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
+        print(json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime))
     else:
         tmp_df = pandas.DataFrame.from_records(json_rows)
         tmp_df.index.name = "index"
-        print tmp_df.to_csv()
+        print(tmp_df.to_csv())
 
 if __name__ == "__main__":
     main()

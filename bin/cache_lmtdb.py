@@ -16,7 +16,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
 
     min_ts_id, max_ts_id = lmtdb.get_ts_ids(datetime_start, datetime_end)
 
-    for lmtdb_table, table_schema in tokio.connectors.lmtdb.LMTDB_TABLES.iteritems():
+    for lmtdb_table, table_schema in tokio.connectors.lmtdb.LMTDB_TABLES.items():
         query_str = 'SELECT * from %s' % lmtdb_table
 
         ### if this table is indexed by time, restrict the time range.
@@ -76,7 +76,7 @@ def main(argv=None):
                 i += 1
             else:
                 break
-    print "Caching to %s" % cache_file
+    print("Caching to %s" % cache_file)
     lmtdb.save_cache(cache_file)
 
 if __name__ == "__main__":

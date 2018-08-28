@@ -31,7 +31,7 @@ def test_h5lmt():
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
     for dataset in DATASETS_1D:
-        print "Testing", dataset
+        print("Testing", dataset)
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 1
         assert hdf5_file[dataset][:].sum() > 0
@@ -41,7 +41,7 @@ def test_h5lmt():
             assert len(hdf5_file.to_dataframe(dataset).index)
 
     for dataset in DATASETS_2D:
-        print "Testing", dataset
+        print("Testing", dataset)
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 2
         assert hdf5_file[dataset][:, :].sum() > 0
@@ -70,7 +70,7 @@ def test_h5lmt_compat():
     """
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
     for dataset_name in tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[None]:
-        print "Checking %s" % dataset_name
+        print("Checking %s" % dataset_name)
         assert hdf5_file[dataset_name] is not None
         assert hdf5_file[dataset_name][0, 0] is not None # make sure we can index 2d
         # check using new names to get dataframes from old files
@@ -107,7 +107,7 @@ def test_mapped_dataset():
     """
     connectors.hdf5 mapped dataset correctness
     """
-    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.items():
         func = _test_mapped_dataset
         func.description = "connectors.hdf5 mapped dataset correctness (%s)" % input_type
         yield func, input_file
@@ -124,24 +124,24 @@ def _test_mapped_dataset(input_file):
     numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
                            edgeitems=5,
                            linewidth=100)
-    print "Testing %s" % input_file
+    print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     readbytes = hdf5_file['datatargets/readbytes']
     readrates = hdf5_file['datatargets/readrates']
     timestamps = hdf5_file.get_timestamps('datatargets/readbytes')[0:2]
     timestep = timestamps[1] - timestamps[0]
 
-    print "Timestep appears to be", timestep
-    print "readbytes is"
-    print readbytes[:, :]
-    print
-    print "readrates is"
-    print readrates[:, :] * timestep
-    print
-    print "Are readrates a factor of %.2f away from readbytes?" % timestep
+    print("Timestep appears to be", timestep)
+    print("readbytes is")
+    print(readbytes[:, :])
+    print()
+    print("readrates is")
+    print(readrates[:, :] * timestep)
+    print()
+    print("Are readrates a factor of %.2f away from readbytes?" % timestep)
 
     equivalency = numpy.isclose(readrates[:, :] * timestep, readbytes[:, :])
-    print (readrates[:, :] * timestep) - readbytes[:, :]
+    print((readrates[:, :] * timestep) - readbytes[:, :])
     assert equivalency.all()
 
 def _test_transpose_mapping(input_file):
@@ -151,7 +151,7 @@ def _test_transpose_mapping(input_file):
     numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
                            edgeitems=5,
                            linewidth=100)
-    print "Testing %s" % input_file
+    print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     interpreted = hdf5_file['datatargets/readrates'][:, :]
     raw = hdf5_file['OSTReadGroup/OSTBulkReadDataSet'][:, :].T
@@ -163,7 +163,7 @@ def test_get_index():
     """
     connectors.hdf5.Hdf5.get_index()
     """
-    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.items():
         func = _test_get_index
         func.description = "connectors.hdf5.Hdf5.get_index() with %s" % input_type
         yield func, input_file
@@ -187,7 +187,7 @@ def _test_get_index(input_file):
                 target_datetime = datetime.datetime.fromtimestamp(timestamps[target_index]) \
                                   + datetime.timedelta(seconds=fuzz)
                 new_index = hdf5_file.get_index(dataset_name, target_datetime)
-                print "%d == %d? %s" % (target_index, new_index, target_index == new_index)
+                print("%d == %d? %s" % (target_index, new_index, target_index == new_index))
                 assert target_index == new_index
                 assert (dataset[new_index] == dataset[target_index]).all()
 
@@ -195,7 +195,7 @@ def test_get_columns():
     """
     connectors.hdf5.Hdf5.get_columns()
     """
-    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.items():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_columns() with %s" % input_type
         yield func, input_file
@@ -204,12 +204,12 @@ def _test_get_columns(input_file):
     """
     Ensure that get_columns() returns valid results
     """
-    print "Testing %s" % input_file
+    print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
-        print "Getting %s from %s" % (dataset_name, hdf5_file.filename)
+        print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
         result = hdf5_file.get(dataset_name)
-        print 'result:', result
+        print('result:', result)
         assert result is not None
         column_names = hdf5_file.get_columns(dataset_name)
         assert len(column_names) > 0
@@ -218,7 +218,7 @@ def test_get_timestamps():
     """
     connectors.hdf5.Hdf5.get_timestamps()
     """
-    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.items():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s" % input_type
         yield func, input_file
@@ -227,7 +227,7 @@ def _test_get_timestamps(input_file):
     """
     Ensure that get_timestamps() returns valid results
     """
-    print "Testing %s" % input_file
+    print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
         assert hdf5_file.get(dataset_name) is not None
@@ -266,7 +266,7 @@ def test_missing_values():
 
     missing_matrix = tokio.connectors.hdf5.missing_values(dataset)
 
-    print "Added %d missing data; missing_matrix contains %d" % (len(remove_list),
-                                                                 missing_matrix.sum())
+    print("Added %d missing data; missing_matrix contains %d" % (len(remove_list),
+                                                                 missing_matrix.sum()))
     assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()

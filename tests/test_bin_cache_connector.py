@@ -6,7 +6,10 @@ Test each connector's standalone CLI cache tool
 import os
 import json
 import sqlite3
-import StringIO
+try:
+    import StringIO as io
+except ImportError:
+    import io
 import datetime
 import pandas
 import nose
@@ -40,23 +43,23 @@ def verify_sqlite(output_str):
             output_file = line.strip().split(None, 3)[-1]
             break
     if output_file is None:
-        print "Could not find cache file name in output:"
-        print output_str
+        print("Could not find cache file name in output:")
+        print(output_str)
         assert output_file is not None
-    print "Using output_file [%s]" % output_file
+    print("Using output_file [%s]" % output_file)
     assert os.path.isfile(output_file)
     tmpdb = sqlite3.connect(output_file)
     cursor = tmpdb.cursor()
     ## Count number of tables
     cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     tables = cursor.fetchall()
-    print "Found %d tables in %s" % (len(tables), output_file)
+    print("Found %d tables in %s" % (len(tables), output_file))
     assert len(tables) > 0
     for table in [x[0] for x in tables]:
         cursor.execute('SELECT count(*) FROM %s' % table)
         rows = cursor.fetchall()
         num_rows = rows[0][0]
-        print "Found %d rows in %s" % (num_rows, table)
+        print("Found %d rows in %s" % (num_rows, table))
         assert len(rows) > 0
 
 def verify_json_zero_ok(json_str):
@@ -81,14 +84,14 @@ def verify_csv(csv_str):
     """
     Ensure that csv is loadable by Pandas
     """
-    data = pandas.read_csv(StringIO.StringIO(csv_str))
+    data = pandas.read_csv(io.StringIO(csv_str))
     assert len(data) > 0
 
 def verify_sacct(csv_str):
     """
     Ensure that native format is vaguely valid (treat it as a |-separated csv)
     """
-    data = pandas.read_csv(StringIO.StringIO(csv_str), sep="|")
+    data = pandas.read_csv(io.StringIO(csv_str), sep="|")
     assert len(data) > 0
 
 def run_connector(binary, argv):
@@ -139,8 +142,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_collectdes.py, cached input',
         'binary':     tokiobin.cache_collectdes,
         'args':       ['--input', tokiotest.SAMPLE_COLLECTDES_FILE,
-                        tokiotest.SAMPLE_COLLECTDES_START,
-                        tokiotest.SAMPLE_COLLECTDES_END],
+                       tokiotest.SAMPLE_COLLECTDES_START,
+                       tokiotest.SAMPLE_COLLECTDES_END],
         'validators': [verify_json,],
     },
     {
@@ -324,8 +327,8 @@ def run_cache_connector(config, to_file=False):
 
     if to_file:
         argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
-        print "Caching to", tokiotest.TEMP_FILE.name
-        print "Executing:", ' '.join(argv)
+        print("Caching to", tokiotest.TEMP_FILE.name)
+        print("Executing:", ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
         # (validate_contents == True) means the associated validator function
@@ -335,8 +338,8 @@ def run_cache_connector(config, to_file=False):
             output_str = tokiotest.TEMP_FILE.read()
     else:
         argv = config['args']
-        print "Caching to stdout"
-        print "Executing:", ' '.join(argv)
+        print("Caching to stdout")
+        print("Executing:", ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
     for validator in config['validators']:

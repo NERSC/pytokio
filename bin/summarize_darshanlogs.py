@@ -54,7 +54,7 @@ def process_log(darshan_log, max_mb=0):
     for posix_file in posix_counters:
         for mount in mount_list:
             if posix_file.startswith(mount):
-                for counters in posix_counters[posix_file].itervalues():
+                for counters in posix_counters[posix_file].values():
                     result[mount]['read_bytes'] += counters.get('BYTES_READ', 0)
                     result[mount]['write_bytes'] += counters.get('BYTES_WRITTEN', 0)
                 break # don't apply these bytes to more than one mount
@@ -152,11 +152,11 @@ def main(argv=None):
                                       max_mb=args.max_mb,
                                       update=existing_data)
     if args.output is None:
-        print json.dumps(global_results, sort_keys=True, indent=4)
+        print(json.dumps(global_results, sort_keys=True, indent=4))
     else:
         with open(args.output, 'w') as output_file:
             json.dump(global_results, output_file)
-            print "Added %d log summaries to %s" % (len(global_results) - starting_ct, args.output)
+            print("Added %d log summaries to %s" % (len(global_results) - starting_ct, args.output))
 
 if __name__ == "__main__":
     main()

@@ -43,9 +43,9 @@ def generate_tts(output_file,
             '--output', output_file,
             init_start,
             init_end]
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_lmtdb.main(argv)
-    print "Created", output_file
+    print("Created", output_file)
 
 def update_tts(output_file, q_start, q_end):
     """
@@ -58,9 +58,9 @@ def update_tts(output_file, q_start, q_end):
             q_start.strftime(tokiotest.SAMPLE_TIMESTAMP_DATE_FMT),
             q_end.strftime(tokiotest.SAMPLE_TIMESTAMP_DATE_FMT)]
 
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_lmtdb.main(argv)
-    print "Updated", output_file
+    print("Updated", output_file)
 
 def summarize_hdf5(hdf5_file):
     """
@@ -108,19 +108,19 @@ def identical_datasets(summary0, summary1):
     # ensure that updating the overlapping data didn't change the contents of the TimeSeries
     num_compared = 0
     for metric in 'sums', 'shapes':
-        for key, value in summary0[metric].iteritems():
+        for key, value in summary0[metric].items():
             num_compared += 1
             assert key in summary1[metric]
-            print "%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value)
+            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
             assert summary1[metric][key] == value
 
     # check to make sure summary1 was modified after summary0 was generated
-    for obj, update in summary0['updates'].iteritems():
+    for obj, update in summary0['updates'].items():
         if update is not None:
             result = summary1['updates'][obj] > summary0['updates'][obj]
-            print "%s newer than %s? %s" % (summary1['updates'][obj],
+            print("%s newer than %s? %s" % (summary1['updates'][obj],
                                             summary0['updates'][obj],
-                                            result)
+                                            result))
             assert result
 
     assert num_compared > 0
@@ -148,7 +148,7 @@ def test_bin_archive_lmtdb_overlaps():
 
         q_start = start + datetime.timedelta(seconds=int(test_range[0] * delta))
         q_end = start + datetime.timedelta(seconds=int(test_range[1] * delta))
-        print "Overwriting %s to %s" % (q_start, q_end)
+        print("Overwriting %s to %s" % (q_start, q_end))
         time.sleep(1.5)
 
         # append an overlapping subset of data to the same HDF5
@@ -218,9 +218,9 @@ class TestArchiveLmtdbCorrectness(object):
                 tokiotest.SAMPLE_LMTDB_END_STAMP
                ]
 
-        print "Running [%s]" % ' '.join(argv)
+        print("Running [%s]" % ' '.join(argv))
         tokiobin.archive_lmtdb.main(argv)
-        print "Created", cls.output_file
+        print("Created", cls.output_file)
 
         cls.generated = h5py.File(cls.output_file, 'r')
         cls.generated_tts = tokio.connectors.hdf5.Hdf5(cls.output_file, 'r')
@@ -247,8 +247,8 @@ class TestArchiveLmtdbCorrectness(object):
             reference (tokio.connectors.hdf5.Hdf5): reference H5LMT file
         """
         dataset_names = []
-        for group_name, group_data in self.generated.iteritems():
-            for dataset_name, dataset in group_data.iteritems():
+        for group_name, group_data in self.generated.items():
+            for dataset_name, dataset in group_data.items():
                 if isinstance(dataset, h5py.Dataset):
                     dataset_names.append("/%s/%s" % (group_name, dataset_name))
 
@@ -262,31 +262,31 @@ class TestArchiveLmtdbCorrectness(object):
             # check the dataset
             func = compare_h5lmt_dataset
             func.description = "bin/archive_lmtdb.py: comparing %s dataset inside h5lmt" % dataset_name
-            print func.description
+            print(func.description)
             yield func, self.generated, self.ref_h5lmt, dataset_name, False
 
             # check the timestamp
             func.description = "bin/archive_lmtdb.py: comparing %s's timestamps dataset inside h5lmt" % dataset_name
-            print func.description
+            print(func.description)
             yield func, self.generated_tts, self.ref_h5lmt, dataset_name, True
             checked_ct += 1
 
-        print "Verified %d datasets against reference" % checked_ct
+        print("Verified %d datasets against reference" % checked_ct)
         assert checked_ct > 0
 
     def test_compare_tts(self):
         """Compare two TOKIO HDF5 files
         """
         checked_ct = 0
-        for group_name, group_data in self.generated.iteritems():
-            for dataset in group_data.itervalues():
+        for group_name, group_data in self.generated.items():
+            for dataset in group_data.values():
                 if not isinstance(dataset, h5py.Dataset):
                     continue
                 dataset_name = dataset.name
 
                 func = compare_tts_dataset
                 func.description = "bin/archive_lmtdb.py: comparing %s to hdf5 reference" % dataset_name
-                print func.description
+                print(func.description)
                 yield func, self.generated, self.ref_hdf5, dataset_name
                 checked_ct += 1
 
@@ -295,7 +295,7 @@ class TestArchiveLmtdbCorrectness(object):
 def compare_tts_dataset(generated, reference, dataset_name):
     """Compare a single dataset between a generated HDF5 and a reference HDF5
     """
-    print "Comparing %s in %s to %s" % (dataset_name, generated.filename, reference.filename)
+    print("Comparing %s in %s to %s" % (dataset_name, generated.filename, reference.filename))
     ref_dataset = reference.get(dataset_name)
     gen_dataset = generated.get(dataset_name)
     if ref_dataset is None:
@@ -307,30 +307,30 @@ def compare_tts_dataset(generated, reference, dataset_name):
         nose.SkipTest(errmsg)
         return
 
-    print "Checking shape: generated %s == reference %s? %s" \
-        % (gen_dataset.shape, ref_dataset.shape, gen_dataset.shape == ref_dataset.shape)
+    print("Checking shape: generated %s == reference %s? %s" \
+        % (gen_dataset.shape, ref_dataset.shape, gen_dataset.shape == ref_dataset.shape))
     assert gen_dataset.shape == ref_dataset.shape
 
     if len(gen_dataset.shape) == 1:
         assert (numpy.isclose(gen_dataset[:], ref_dataset[:])).all()
         sum_gen = gen_dataset[:].sum()
         sum_ref = ref_dataset[:].sum()
-        print "generated %f == reference %f? %s" % (sum_gen, sum_ref,
-                                                    numpy.isclose(sum_gen, sum_ref))
+        print("generated %f == reference %f? %s" % (sum_gen, sum_ref,
+                                                    numpy.isclose(sum_gen, sum_ref)))
         assert numpy.isclose(sum_gen, sum_ref)
         assert sum_gen > 0 or sum_ref == 0
     elif len(gen_dataset.shape) == 2:
         assert (numpy.isclose(gen_dataset[:, :], ref_dataset[:, :])).all()
         sum_gen = gen_dataset[:].sum().sum()
         sum_ref = ref_dataset[:].sum().sum()
-        print "%f == %f? %s" % (sum_gen, sum_ref, numpy.isclose(sum_gen, sum_ref))
+        print("%f == %f? %s" % (sum_gen, sum_ref, numpy.isclose(sum_gen, sum_ref)))
         assert numpy.isclose(sum_gen, sum_ref)
         assert sum_gen > 0 or sum_ref == 0
 
 def compare_h5lmt_dataset(generated, ref_h5lmt, dataset_name, check_timestamps=False):
     """Compare a single dataset between an H5LMT and TOKIO HDF5 file
     """
-    print "Comparing %s in %s to %s" % (dataset_name, generated.filename, ref_h5lmt.filename)
+    print("Comparing %s in %s to %s" % (dataset_name, generated.filename, ref_h5lmt.filename))
 
     ref_dataset = ref_h5lmt.get(dataset_name)
     gen_dataset = generated.get(dataset_name)
@@ -352,7 +352,7 @@ def compare_h5lmt_dataset(generated, ref_h5lmt, dataset_name, check_timestamps=F
     if len(gen_shape) == 1 or check_timestamps:
         sum_gen = gen_dataset[:tokiotest.SAMPLE_LMTDB_MAX_INDEX].sum()
         sum_ref = ref_dataset[:tokiotest.SAMPLE_LMTDB_MAX_INDEX].sum()
-        print "%f == %f? %s" % (sum_gen, sum_ref, numpy.isclose(sum_gen, sum_ref))
+        print("%f == %f? %s" % (sum_gen, sum_ref, numpy.isclose(sum_gen, sum_ref)))
         assert numpy.isclose(sum_gen, sum_ref)
         assert sum_gen > 0
         assert (numpy.isclose(gen_dataset[:tokiotest.SAMPLE_LMTDB_MAX_INDEX],
@@ -365,17 +365,17 @@ def compare_h5lmt_dataset(generated, ref_h5lmt, dataset_name, check_timestamps=F
             ref_slice = (slice(1, tokiotest.SAMPLE_LMTDB_MAX_INDEX + 1), slice(None, None))
             gen_slice = (slice(None, tokiotest.SAMPLE_LMTDB_MAX_INDEX), slice(None, None))
             fudged = True
-            print "%s is fudged; doing imperfect comparisons" % ref_dataset.name
+            print("%s is fudged; doing imperfect comparisons" % ref_dataset.name)
         else:
             ref_slice = (slice(None, tokiotest.SAMPLE_LMTDB_MAX_INDEX), slice(None, None))
             gen_slice = (slice(None, tokiotest.SAMPLE_LMTDB_MAX_INDEX), slice(None, None))
             fudged = False
-            print "%s is not fudged; doing exact comparisons" % ref_dataset.name
+            print("%s is not fudged; doing exact comparisons" % ref_dataset.name)
 
-        print "Comparing gen(%s, %s) to ref(%s, %s)" % (gen_dataset.name,
+        print("Comparing gen(%s, %s) to ref(%s, %s)" % (gen_dataset.name,
                                                         gen_dataset[gen_slice].shape,
                                                         ref_dataset.name,
-                                                        ref_dataset[ref_slice].shape)
+                                                        ref_dataset[ref_slice].shape))
         match_matrix = numpy.isclose(gen_dataset[gen_slice], ref_dataset[ref_slice])
         nmatch = match_matrix.sum()
         nelements = match_matrix.shape[0] * match_matrix.shape[1]
@@ -392,7 +392,7 @@ def compare_h5lmt_dataset(generated, ref_h5lmt, dataset_name, check_timestamps=F
         if sum_ref == 0.0:
             raise nose.SkipTest("reference data does not contain any values")
         pct_diff = abs(sum_gen - sum_ref) / sum_ref
-        print "pct_diff %e < tolerance %e? %s" % (pct_diff, tol, pct_diff < tol)
+        print("pct_diff %e < tolerance %e? %s" % (pct_diff, tol, pct_diff < tol))
         assert pct_diff < tol
 
         # what fraction of elements match?

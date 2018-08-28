@@ -29,8 +29,8 @@ def main(argv=None):
     else:
         nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb()
     nerscjobsdb.get_concurrent_jobs(
-        long(time.mktime(start.timetuple())),
-        long(time.mktime(end.timetuple())),
+        int(time.mktime(start.timetuple())),
+        int(time.mktime(end.timetuple())),
         args.host)
 
     cache_file = args.output
@@ -42,7 +42,7 @@ def main(argv=None):
                 i += 1
             else:
                 break
-    print "Caching to %s" % cache_file
+    print("Caching to %s" % cache_file)
     nerscjobsdb.save_cache(cache_file)
 
 if __name__ == "__main__":

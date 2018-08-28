@@ -41,8 +41,8 @@ def test_bad_log():
             SAMPLE_BAD_DARSHAN_LOG]
     output_str = tokiotest.run_bin(tokiobin.darshan_bad_ost, argv)
     decoded_result = json.loads(output_str)
-    print "Received %d very bad OSTs:" % len(decoded_result)
-    print json.dumps(decoded_result, indent=4)
+    print("Received %d very bad OSTs:" % len(decoded_result))
+    print(json.dumps(decoded_result, indent=4))
     assert len(decoded_result) == 1
 
 @tokiotest.needs_darshan

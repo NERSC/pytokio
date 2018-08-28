@@ -21,7 +21,7 @@ def compare_timeseries(timeseries1, timeseries2, verbose=False):
         if verbose:
             col_sum1 = timeseries1.dataset[:, timeseries1_index].sum()
             col_sum2 = timeseries2.dataset[:, timeseries2_index].sum()
-            print "%-14s: %.16e vs. %.16e" % (column, col_sum1, col_sum2)
+            print("%-14s: %.16e vs. %.16e" % (column, col_sum1, col_sum2))
         assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index],
                                  timeseries2.dataset[:, timeseries2_index])
 
@@ -57,12 +57,12 @@ def test_rearrange():
 
     # test random reordering
     new_col_order = list(timeseries2.columns[:])
-    print new_col_order
+    print(new_col_order)
     random.shuffle(new_col_order)
-    print new_col_order
+    print(new_col_order)
     timeseries2.rearrange_columns(new_col_order)
 
-    print "Comparing before/after rearrange_columns()"
+    print("Comparing before/after rearrange_columns()")
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 def test_sort():
@@ -73,7 +73,7 @@ def test_sort():
     timeseries2 = generate_timeseries()
 
     timeseries2.sort_columns()
-    print "Comparing before/after sort_columns()"
+    print("Comparing before/after sort_columns()")
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 def test_timeseries_deltas():
@@ -100,13 +100,13 @@ def test_timeseries_deltas():
     for irow in range(1, monotonic_values.shape[0]):
         monotonic_values[irow, :] += monotonic_values[irow - 1, :]
 
-    print "Actual monotonic values:"
-    print monotonic_values
-    print
+    print("Actual monotonic values:")
+    print(monotonic_values)
+    print()
 
-    print "Actual deltas:"
-    print actual_deltas
-    print
+    print("Actual deltas:")
+    print(actual_deltas)
+    print()
 
     # Delete some data from our sample monotonically increasing dataset
     # Columns 0-3 are hand-picked to exercise all edge cases
@@ -143,9 +143,9 @@ def test_timeseries_deltas():
     for coordinates in delete_data:
         monotonic_values[coordinates] = 0.0
 
-    print "Matrix after introducing data loss:"
-    print monotonic_values
-    print
+    print("Matrix after introducing data loss:")
+    print(monotonic_values)
+    print()
 
 #   for irow, icol in flip_data:
 #       if irow == 0:
@@ -169,15 +169,15 @@ def test_timeseries_deltas():
     # Check to make sure that the total data moved according to our function
     # matches the logical total obtained by subtracting the largest absolute
     # measurement from the smallest
-    print "Checking each column's sum (missing data)"
+    print("Checking each column's sum (missing data)")
     for icol in range(start_flip):
         truth = actual_deltas[:, icol].sum()
         calculated = calculated_deltas[:, icol].sum()
         total_delta = monotonic_values[:, icol].max() \
                       - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
-        print 'truth=', truth, \
+        print('truth=', truth, \
               'from piecewise deltas=', calculated, \
-              'from total delta=', total_delta
+              'from total delta=', total_delta)
         assert numpy.isclose(calculated, total_delta)
 
         # Calculated delta should either be equal to (no data loss) or less than
@@ -185,24 +185,24 @@ def test_timeseries_deltas():
         # than the ground truth.
         assert numpy.isclose(truth - calculated, 0.0) or ((truth - calculated) > 0)
 
-    print "Checking each column's sum (flipped data)"
+    print("Checking each column's sum (flipped data)")
     for icol in range(start_flip, actual_deltas.shape[1]):
         truth = actual_deltas[:, icol].sum()
         calculated = calculated_deltas[:, icol].sum()
         total_delta = monotonic_values[:, icol].max() \
                       - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
-        print 'truth=', truth, \
+        print('truth=', truth, \
               'from piecewise deltas=', calculated, \
-              'from total delta=', total_delta
+              'from total delta=', total_delta)
         assert numpy.isclose(calculated, total_delta) or ((total_delta - calculated) > 0)
         assert numpy.isclose(truth, calculated) or ((truth - calculated) > 0)
 
 
     # Now do an element-by-element comparison
     close_matrix = numpy.isclose(calculated_deltas, actual_deltas)
-    print "Is each calculated delta close to the ground-truth deltas?"
-    print close_matrix
-    print
+    print("Is each calculated delta close to the ground-truth deltas?")
+    print(close_matrix)
+    print()
 
     # Some calculated values will _not_ be the same because the data loss we
     # induced, well, loses data.  However we can account for known differences
@@ -217,13 +217,13 @@ def test_timeseries_deltas():
 #       if irow == 0:
 #           fix_matrix[irow + 1, icol] = True
 
-    print "Matrix of known deviations from the ground truth:"
-    print fix_matrix
-    print
+    print("Matrix of known deviations from the ground truth:")
+    print(fix_matrix)
+    print()
 
-    print "Non-missing and known-missing data (everything should be True):"
-    print close_matrix | fix_matrix
-    print
+    print("Non-missing and known-missing data (everything should be True):")
+    print(close_matrix | fix_matrix)
+    print()
     assert (close_matrix | fix_matrix).all()
 
 
@@ -245,7 +245,7 @@ def test_commit_dataset():
     timeseries2 = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
 
     # Compare the original to the reprocessed
-    print "Comparing before/after read/write/read"
+    print("Comparing before/after read/write/read")
     compare_timeseries(timeseries2, timeseries1, verbose=True)
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -266,7 +266,7 @@ def test_commit_dataset_bad_bounds():
     # Now trim down the dataset so it no longer spans the same range as the
     # existing HDF5 file - this should work, because the HDF5 will simply retain
     # its start/end since the new data being committed is a complete subset
-    print "Attempting trimmed down dataset"
+    print("Attempting trimmed down dataset")
     timeseries1.trim_rows(3)
     with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
         timeseries1.commit_dataset(hdf5_file)
@@ -274,11 +274,11 @@ def test_commit_dataset_bad_bounds():
     # Add back the rows we took off, and then some - this should NOT work
     # because the data now goes beyond the original maximum timestamp for the
     # file
-    print "Attempting bloated existing dataset"
+    print("Attempting bloated existing dataset")
     timeseries1.add_rows(12)
     with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
-        print 'Global start:', hdf5_file.attrs.get('start')
-        print 'Global end:  ', hdf5_file.attrs.get('end')
+        print('Global start:', hdf5_file.attrs.get('start'))
+        print('Global end:  ', hdf5_file.attrs.get('end'))
         caught = False
         try:
             timeseries1.commit_dataset(hdf5_file)
@@ -288,13 +288,13 @@ def test_commit_dataset_bad_bounds():
 
     # Now commit a completely new dataset that doesn't fit - this should throw
     # a warning (or should we make it throw an exception?)
-    print "Attempting bloated non-existent dataset"
+    print("Attempting bloated non-existent dataset")
     timeseries2.add_rows(12)
     timeseries2.dataset_name = '/blah/blah'
     timeseries2.timestamp_key = '/blah/timestamps'
     with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
-        print 'Global start:', hdf5_file.attrs.get('start')
-        print 'Global end:  ', hdf5_file.attrs.get('end')
+        print('Global start:', hdf5_file.attrs.get('start'))
+        print('Global end:  ', hdf5_file.attrs.get('end'))
         caught = False
         try:
             timeseries2.commit_dataset(hdf5_file)
@@ -329,8 +329,8 @@ def test_add_rows():
             assert new_deltim == prev_deltim
         prev_deltim = new_deltim
 
-    print "Orig timestamps:", orig_row[-5: -1]
-    print "Now timestamps: ", timeseries.timestamps[-5 - add_rows: -1]
+    print("Orig timestamps:", orig_row[-5: -1])
+    print("Now timestamps: ", timeseries.timestamps[-5 - add_rows: -1])
     assert prev_deltim > 0
     assert timeseries.timestamps.shape[0] == timeseries.dataset.shape[0]
     assert (timeseries.timestamps.shape[0] - add_rows) == orig_row_count
@@ -350,38 +350,38 @@ def test_uneven_columns():
         with open(tokiotest.TEMP_FILE.name, 'w') as output_file:
             shutil.copyfileobj(input_file, output_file)
 
-    print "Ensure that the input dataset has even column lengths before we make them uneven"
+    print("Ensure that the input dataset has even column lengths before we make them uneven")
     h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r+')
     dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
     orig_col_names = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
     result = len(orig_col_names) == dataset.shape[1]
-    print orig_col_names
-    print dataset.attrs['columns']
-    print "%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result)
+    print(orig_col_names)
+    print(dataset.attrs['columns'])
+    print("%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result))
     assert result
 
-    print "Test case where there are more column names than shape of dataset"
+    print("Test case where there are more column names than shape of dataset")
     extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
     timeseries.set_columns(extra_columns)
     result = len(timeseries.columns) == timeseries.dataset.shape[1]
-    print "%-3d == %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result)
+    print("%-3d == %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result))
     assert result
     for icol in range(timeseries.dataset.shape[1]):
-        print "%-15s == %15s? %s" % (extra_columns[icol], timeseries.columns[icol],
-                                     extra_columns[icol] == timeseries.columns[icol])
+        print("%-15s == %15s? %s" % (extra_columns[icol], timeseries.columns[icol],
+                                     extra_columns[icol] == timeseries.columns[icol]))
         assert extra_columns[icol] == timeseries.columns[icol]
 
-    print "Test cases where column names are incomplete compared to shape of dataset"
+    print("Test cases where column names are incomplete compared to shape of dataset")
     fewer_columns = orig_col_names[0:-(3*len(orig_col_names)/4)]
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
     timeseries.set_columns(fewer_columns)
     result = len(timeseries.columns) < timeseries.dataset.shape[1]
-    print "%-3d < %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result)
+    print("%-3d < %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result))
     assert result
     for icol, fewer_col in enumerate(fewer_columns):
-        print "%-15s == %15s? %s" % (fewer_col, timeseries.columns[icol],
-                                     fewer_col == timeseries.columns[icol])
+        print("%-15s == %15s? %s" % (fewer_col, timeseries.columns[icol],
+                                     fewer_col == timeseries.columns[icol]))
         assert fewer_col == timeseries.columns[icol]
 
 def test_light_attach():
