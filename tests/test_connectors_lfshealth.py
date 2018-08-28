@@ -71,32 +71,32 @@ def test_ostfullness():
     verify_ost(ostfullness, input_type='ostfullness')
 
 def test_ostmap_from_cache():
-    """lfshealth.LfsOstMap: read from cache file
+    """lfshealth.LfsOstMap: read from compressed cache file
     """
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_FILE)
     verify_ost(ostmap, input_type='ostmap')
 
-def test_ostfullness_from_cache():
-    """lfshealth.LfsOstFullness: read from cache file
+def test_ostfullness_from_cache_gz():
+    """lfshealth.LfsOstFullness: read from compressed cache file
     """
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_FILE)
     verify_ost(ostfullness, input_type='ostfullness')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_from_cache_gz():
-    """lfshealth.LfsOstMap: read from cache gzip
+    """lfshealth.LfsOstMap: read from cache file
     """
     tokiotest.TEMP_FILE.close()
-    tokiotest.gunzip(tokiotest.SAMPLE_LCTL_DL_T_GZ, tokiotest.TEMP_FILE.name)
+    tokiotest.gunzip(tokiotest.SAMPLE_LCTL_DL_T_FILE, tokiotest.TEMP_FILE.name)
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostmap, input_type='ostmap')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_from_cache_gz():
-    """lfshealth.LfsOstFullness: read from cache gzip
+    """lfshealth.LfsOstFullness: read from cache file
     """
     tokiotest.TEMP_FILE.close()
-    tokiotest.gunzip(tokiotest.SAMPLE_LFS_DF_GZ, tokiotest.TEMP_FILE.name)
+    tokiotest.gunzip(tokiotest.SAMPLE_LFS_DF_FILE, tokiotest.TEMP_FILE.name)
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostfullness, input_type='ostfullness')
 
