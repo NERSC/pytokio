@@ -7,7 +7,7 @@ import json
 import random
 import datetime
 import nose
-import matplotlib
+import matplotlib.pyplot
 import tokiotest
 import tokio.analysis.umami
 

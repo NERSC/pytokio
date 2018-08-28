@@ -92,7 +92,6 @@ class Umami(collections.OrderedDict):
             List of axes corresponding to each panel in the UMAMI diagram
         """
         # import here because of various things that can break matplotlib on import
-        import matplotlib
         import matplotlib.pyplot
 
         rows_to_plot = self.keys()
