@@ -9,6 +9,7 @@ converge.
 import json
 import datetime
 import argparse
+import tokio.common
 import tokio.timeseries
 import tokio.connectors.hdf5
 
@@ -149,7 +150,7 @@ def main(argv=None):
         results['columns'] = summarize_columns(hdf5_file)
 
     if args.json:
-        print(json.dumps(results, indent=4, sort_keys=True))
+        print(json.dumps(results, indent=4, sort_keys=True, cls=tokio.common.JSONEncoder))
     else:
         print_tts_hdf5_summary(results['total'])
         if 'timesteps' in results:

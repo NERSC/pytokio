@@ -10,7 +10,7 @@ import time
 import datetime
 import argparse
 import warnings
-import numpy
+import tokio.common
 import tokio.connectors.hdf5
 import tokio.tools.hdf5
 
@@ -24,17 +24,6 @@ DATASETS_TO_BIN_KEYS = {
 BYTES_TO_GIB = 2.0**30
 DATE_FMT = "%Y-%m-%d"
 DATE_FMT_STR = "YYYY-MM-DDTHH:MM:SS"
-
-class TokioSerializer(json.JSONEncoder):
-    """
-    JSONEncoder to convert datetime.datetime into a seconds-since-epoch
-    """
-    def default(self, obj): # pylint: disable=E0202
-        if isinstance(obj, datetime.datetime):
-            return int(time.mktime(obj.timetuple()))
-        elif isinstance(obj, numpy.int64):
-            return int(obj)
-        return json.JSONEncoder.default(self, obj)
 
 def summarize_reduced_data(data):
     """
@@ -449,7 +438,7 @@ def main(argv=None):
         print(json.dumps(to_serialize,
                          sort_keys=True,
                          indent=4,
-                         cls=TokioSerializer))
+                         cls=tokio.common.JSONEncoder))
     elif args.summary:
         sys.stdout.write(print_data_summary(all_binned_data, units=units))
 
