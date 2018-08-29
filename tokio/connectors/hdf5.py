@@ -563,11 +563,18 @@ class Hdf5(h5py.File):
     Create a parsed Hdf5 file class
     """
     def __init__(self, *args, **kwargs):
-        """
+        """Initialize an HDF5 file
+
         This is just an HDF5 file object; the magic is in the additional methods
         and indexing that are provided by the TOKIO Time Series-specific HDF5
         object.
+
+        Args:
+            ignore_version (bool): If true, do not throw KeyError if the HDF5
+                file does not contain a valid version.
         """
+        ignore_version = kwargs.pop('ignore_version', False)
+
         super(Hdf5, self).__init__(*args, **kwargs)
 
         self.version = self.attrs.get('version')
@@ -580,7 +587,7 @@ class Hdf5(h5py.File):
             self.schema = SCHEMA[self.version]
         elif self.version is None:
             self.schema = {}
-        else:
+        elif not ignore_version:
             raise KeyError("Unknown schema version %s" % self.version)
 
         # Connect the schema dataset providers to this object
@@ -665,11 +672,15 @@ class Hdf5(h5py.File):
         if dataset_name is None:
             return self.version
         else:
+            # resolve dataset name
             dataset = self.__getitem__(dataset_name)
             version = dataset.attrs.get("version")
             if version is None:
                 version = self.version
-            return version
+            if isinstance(version, bytes):
+                return version.decode() # for python3
+            else:
+                return version
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
