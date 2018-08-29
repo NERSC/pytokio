@@ -166,8 +166,8 @@ def print_summary(old_isdctfile, new_isdctfile, diff_dict):
     err_buf = summarize_errors(diff_dict, new_isdctfile)
 
     print("=== ISDCT Summary: %s - %s ===" % (
-        datetime.datetime.fromtimestamp(iter(old_isdctfile.values()).next()['timestamp']),
-        datetime.datetime.fromtimestamp(iter(new_isdctfile.values()).next()['timestamp'])))
+        datetime.datetime.fromtimestamp(next(iter(old_isdctfile.values()))['timestamp']),
+        datetime.datetime.fromtimestamp(next(iter(new_isdctfile.values()))['timestamp'])))
 
     if len(err_buf) > 0:
         print("\n*** Errors Detected! ***")

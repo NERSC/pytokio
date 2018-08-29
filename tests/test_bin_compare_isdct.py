@@ -168,7 +168,7 @@ def verify_workload_line(line):
     """
     print("workload line [%s]" % line)
     if line.lower().startswith('read') or line.lower().startswith('written'):
-        assert line.split()[1] > 0.0
+        assert float(line.split()[1]) > 0.0
 
 def verify_nid_line(line):
     """
