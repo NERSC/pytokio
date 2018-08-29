@@ -33,6 +33,7 @@ def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5,
     input
     """
     output_hdf5 = Hdf5(file_name, 'r')
+    print("Creating timeseries from %s" % file_name)
     timeseries = tokio.timeseries.TimeSeries(dataset_name=dataset_name,
                                              hdf5_file=output_hdf5)
     return timeseries
@@ -237,7 +238,10 @@ def test_commit_dataset():
 
     # Connect to the sample input file
     timeseries1 = generate_timeseries()
+
+    # Create a new HDF5 file into which timeseries1 will be copied
     hdf5_file = h5py.File(tokiotest.TEMP_FILE.name, 'w')
+
     # Write the output out as a new HDF5 file
     timeseries1.commit_dataset(hdf5_file)
     hdf5_file.close()
@@ -354,7 +358,7 @@ def test_uneven_columns():
     print("Ensure that the input dataset has even column lengths before we make them uneven")
     h5_file = Hdf5(tokiotest.TEMP_FILE.name, 'r+')
     dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
-    orig_col_names = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
+    orig_col_names = list(h5_file.get_columns(dataset.name))
     result = len(orig_col_names) == dataset.shape[1]
     print(orig_col_names)
     print(dataset.attrs['columns'])
@@ -369,12 +373,16 @@ def test_uneven_columns():
     print("%-3d == %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result))
     assert result
     for icol in range(timeseries.dataset.shape[1]):
-        print("%-15s == %15s? %s" % (extra_columns[icol], timeseries.columns[icol],
-                                     extra_columns[icol] == timeseries.columns[icol]))
+        print("%-15s(%-15s) == %15s(%-15s)? %s" % (
+            extra_columns[icol],
+            type(extra_columns[icol]),
+            timeseries.columns[icol],
+            type(timeseries.columns[icol]),
+            extra_columns[icol] == timeseries.columns[icol]))
         assert extra_columns[icol] == timeseries.columns[icol]
 
     print("Test cases where column names are incomplete compared to shape of dataset")
-    fewer_columns = orig_col_names[0:-(3*len(orig_col_names)/4)]
+    fewer_columns = orig_col_names[0:-(3*len(orig_col_names)//4)]
     timeseries = generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
     timeseries.set_columns(fewer_columns)
     result = len(timeseries.columns) < timeseries.dataset.shape[1]

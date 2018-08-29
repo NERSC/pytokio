@@ -125,14 +125,14 @@ class TimeSeries(object):
 
         self.dataset = dataset if light else dataset[:, :]
 
+        # load and decode version of dataset
+        self.version = hdf5_file.get_version(dataset_name)
+        if isinstance(self.version, bytes):
+            self.version = self.version.decode()
+
         # copy columns into memory
         columns = hdf5_file.get_columns(dataset_name)
         self.set_columns(columns)
-
-        self.schema = hdf5_file.get_version(dataset_name)
-        if isinstance(self.schema, bytes):
-            self.schema = self.schema.decode()
-        print("Got version %s" % self.schema)
 
         # copy metadata into memory
         for key, value in dataset.attrs.items():
@@ -170,9 +170,6 @@ class TimeSeries(object):
         else:
             dataset_hdf5 = hdf5_file.create_dataset(name=self.dataset_name,
                                                     shape=self.dataset.shape,
-                                                    **extra_dataset_args)
-        print("Committed version %s" % self.version)
-
         # Create the timestamps in the HDF5 file (if necessary) and calculate
         # where to insert our data into the HDF5's dataset
         if self.timestamp_key not in hdf5_file:
@@ -224,7 +221,7 @@ class TimeSeries(object):
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
         self.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
-        self.dataset_metadata['version'] = str(self.version)
+        self.dataset_metadata['version'] = self.version
 
         # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
         for key, value in self.dataset_metadata.items():
@@ -236,7 +233,6 @@ class TimeSeries(object):
 
         # Insert/update group metadata
         for key, value in self.group_metadata.items():
-            print("Inserting %s = %s %s" % (key, value, type(value)))
             if isstr(value):
                 dataset_hdf5.parent.attrs[key] = numpy.string_(value)
             else:
