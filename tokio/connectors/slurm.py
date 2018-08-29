@@ -43,10 +43,14 @@ def expand_nodelist(node_string):
             raise type(error)(error[0], "Slurm CLI (%s command) not found" % SCONTROL)
         raise
 
+    if not isstr(output_str):
+        output_str = output_str.decode() # for python3
+
     for line in output_str.splitlines():
         node_name = line.strip()
         if node_name:
             node_names.add(node_name)
+
     return node_names
 
 def compact_nodelist(node_string):
@@ -69,10 +73,14 @@ def compact_nodelist(node_string):
     try:
         node_string = subprocess.check_output([SCONTROL, 'show', 'hostlist', node_string]).strip()
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             # "No such file or directory" from subprocess.check_output
             pass
-    return node_string
+
+    if isstr(node_string):
+        return node_string
+    else:
+        return node_string.decode()
 
 _RECAST_KEY_MAP = {
     'start':    (
