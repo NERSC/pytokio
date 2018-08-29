@@ -19,6 +19,7 @@ import re
 import warnings
 import mimetypes
 import tokio.connectors.lfshealth
+from tokio.common import isstr
 
 _REX_OST_MAP = re.compile(r'^\s*(\d+)\s+(\S+)\s+(\S+)\s+(snx\d+-\S+)\s+(\S+)\s+(\d+)\s+(\S+@\S+)\s*$')
 """Regular expression to match OSC/MDC lines
@@ -96,7 +97,7 @@ class NerscLfsOstMap(dict):
         """
         _, encoding = mimetypes.guess_type(self.cache_file)
         if encoding == 'gzip':
-            input_file = gzip.open(self.cache_file, 'r')
+            input_file = gzip.open(self.cache_file, 'rt')
         else:
             input_file = open(self.cache_file, 'r')
 
@@ -236,7 +237,7 @@ class NerscLfsOstFullness(dict):
         """
         _, encoding = mimetypes.guess_type(self.cache_file)
         if encoding == 'gzip':
-            input_file = gzip.open(self.cache_file, 'r')
+            input_file = gzip.open(self.cache_file, 'rt')
         else:
             input_file = open(self.cache_file, 'r')
 
