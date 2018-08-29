@@ -207,7 +207,7 @@ def needs_darshan(func):
         subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN,
                                 stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_DARSHAN = True
     except subprocess.CalledProcessError:
         # this is ok--there's no way to make darshan-parser return zero without
@@ -235,11 +235,9 @@ def needs_lustre_cli(func):
         subprocess.check_output(tokio.connectors.lfshealth.LCTL_DL_T, stderr=subprocess.STDOUT)
         subprocess.check_output(tokio.connectors.lfshealth.LFS_DF, stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_LFSHEALTH = True
     except subprocess.CalledProcessError:
-        # this is ok--there's no way to make darshan-parser return zero without
-        # giving it a real darshan log
         pass
 
     return func
@@ -264,7 +262,7 @@ def needs_slurm(func):
     try:
         subprocess.check_output(tokio.connectors.slurm.SACCT, stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_SLURM = True
     except subprocess.CalledProcessError:
         pass
