@@ -491,7 +491,11 @@ def parse_counters_fileobj(fileobj, nodename=None):
     parse_mode = 0      # =0 for regular counters, 1 for SMART data
     smart_buffer = {}
     for line in fileobj.readlines():
-        line = line.strip()
+        if not isstr(line):
+            line = line.decode().strip()
+        else:
+            line = line.strip()
+
         if device_sn is None:
             rex_match = re.search(REX_SERIAL_NO, line)
             if rex_match is not None:
