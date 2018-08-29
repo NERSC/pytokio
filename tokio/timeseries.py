@@ -223,13 +223,18 @@ class TimeSeries(object):
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
         self.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
-        self.dataset_metadata['version'] = self.version
 
-        # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
+        # If self.version was never set, don't set a dataset-level version in the HDF5
+        if self.version is not None:
+            hdf5_file.set_version(self.version, dataset_name=self.dataset_name)
+
+        # Insert/update dataset metadata
         for key, value in self.dataset_metadata.items():
             # special hack for column names
             if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY) or isstr(value):
                 dataset_hdf5.attrs[key] = numpy.string_(value)
+            elif value is None:
+                warnings.warn("Skipping attribute %s (null value) for %s" % (key, self.dataset_name))
             else:
                 dataset_hdf5.attrs[key] = value
 
@@ -339,7 +344,7 @@ class TimeSeries(object):
             (t_index, c_index) (long or None)
         """
         timestamp_epoch = int(time.mktime(timestamp.timetuple()))
-        t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
+        t_index = (timestamp_epoch - self.timestamps[0]) // self.timestep
         if t_index >= self.timestamps.shape[0]: # check bounds
             return None, None
 

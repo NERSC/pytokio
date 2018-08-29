@@ -6,7 +6,6 @@ tokio.timeseries.TimeSeries methods
 import random
 import shutil
 import warnings
-import h5py
 import nose
 import numpy
 import tokio
@@ -240,7 +239,7 @@ def test_commit_dataset():
     timeseries1 = generate_timeseries()
 
     # Create a new HDF5 file into which timeseries1 will be copied
-    hdf5_file = h5py.File(tokiotest.TEMP_FILE.name, 'w')
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'w')
 
     # Write the output out as a new HDF5 file
     timeseries1.commit_dataset(hdf5_file)
@@ -265,7 +264,7 @@ def test_commit_dataset_bad_bounds():
     timeseries2 = generate_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET2)
 
     # Write the output as a new HDF5 file (should work like normal)
-    with h5py.File(tokiotest.TEMP_FILE.name, 'w') as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'w') as hdf5_file:
         timeseries1.commit_dataset(hdf5_file)
 
     # Now trim down the dataset so it no longer spans the same range as the
@@ -273,7 +272,7 @@ def test_commit_dataset_bad_bounds():
     # its start/end since the new data being committed is a complete subset
     print("Attempting trimmed down dataset")
     timeseries1.trim_rows(3)
-    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
         timeseries1.commit_dataset(hdf5_file)
 
     # Add back the rows we took off, and then some - this should NOT work
@@ -281,7 +280,7 @@ def test_commit_dataset_bad_bounds():
     # file
     print("Attempting bloated existing dataset")
     timeseries1.add_rows(12)
-    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
         print('Global start:', hdf5_file.attrs.get('start'))
         print('Global end:  ', hdf5_file.attrs.get('end'))
         caught = False
@@ -297,7 +296,7 @@ def test_commit_dataset_bad_bounds():
     timeseries2.add_rows(12)
     timeseries2.dataset_name = '/blah/blah'
     timeseries2.timestamp_key = '/blah/timestamps'
-    with h5py.File(tokiotest.TEMP_FILE.name) as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
         print('Global start:', hdf5_file.attrs.get('start'))
         print('Global end:  ', hdf5_file.attrs.get('end'))
         caught = False
@@ -402,3 +401,12 @@ def test_light_attach():
     full = generate_timeseries()
     light = generate_light_timeseries()
     compare_timeseries(light, full, verbose=True)
+
+def test_get_insert_pos():
+    """TimeSeries.get_insert_pos()
+    """
+    # TODO
+    # 1. ensure correctness of turning timestamp into an index
+    # 2. ensure that create_col=False works
+    # 3. ensure that create_col=True works
+    raise nose.SkipTest("test not implemented")

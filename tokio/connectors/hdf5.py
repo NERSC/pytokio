@@ -685,6 +685,27 @@ class Hdf5(h5py.File):
             else:
                 return version
 
+    def set_version(self, version, dataset_name=None):
+        """Set the version attribute from an HDF5 file dataset
+
+        Provide a portable way to set the global schema version or the version
+        of a specific dataset.
+
+        Args:
+            version (str): The new version to be set
+            dataset_name (str): Name of dataset to set version.  If None,
+                set the global file's version.
+        """
+        if dataset_name is None:
+            self._version = version
+            return self._version
+        else:
+            # resolve dataset name
+            dataset = self.__getitem__(dataset_name)
+            if dataset is None:
+                raise KeyError("Dataset %s does not exist" % dataset_name)
+            dataset.attrs["version"] = version
+
     def get_columns(self, dataset_name):
         """Get the column names of a dataset
 
