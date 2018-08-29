@@ -170,6 +170,8 @@ class TimeSeries(object):
         else:
             dataset_hdf5 = hdf5_file.create_dataset(name=self.dataset_name,
                                                     shape=self.dataset.shape,
+                                                    **extra_dataset_args)
+
         # Create the timestamps in the HDF5 file (if necessary) and calculate
         # where to insert our data into the HDF5's dataset
         if self.timestamp_key not in hdf5_file:
