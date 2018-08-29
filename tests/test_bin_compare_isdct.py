@@ -10,7 +10,7 @@ import tokiobin.compare_isdct
 
 def test_all_json():
     """
-    compare_isdct --all json output
+    bin/compare_isdct.py --all json output
     """
     argv = ['--all',
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
@@ -21,7 +21,7 @@ def test_all_json():
 
 def test_reduced_json():
     """
-    compare_isdct reduced json output
+    bin/compare_isdct.py reduced json output
     """
     argv = [tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
@@ -37,7 +37,7 @@ def test_reduced_json():
 
 def test_all_json_w_zeros():
     """
-    compare_isdct --all --report-zeros json output
+    bin/compare_isdct.py --all --report-zeros json output
     """
     argv = ["--all",
             "--report-zeros",
@@ -49,7 +49,7 @@ def test_all_json_w_zeros():
 
 def test_reduced_json_w_zeros():
     """
-    compare_isdct reduced --report-zeros json output
+    bin/compare_isdct.py reduced --report-zeros json output
     """
     argv = ["--report-zeros",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
@@ -68,7 +68,7 @@ def test_reduced_json_w_zeros():
 
 def test_reduced_json_gibs():
     """
-    compare_isdct reduced --gibs json output
+    bin/compare_isdct.py reduced --gibs json output
     """
     argv = ["--gibs",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
@@ -84,7 +84,7 @@ def test_reduced_json_gibs():
 
 def test_all_json_w_gibs():
     """
-    compare_isdct --all --gibs json output
+    bin/compare_isdct.py --all --gibs json output
     """
     argv = ["--all",
             "--gibs",
@@ -102,7 +102,7 @@ def test_all_json_w_gibs():
 
 def test_summary():
     """
-    compare_isdct --summary human-readable output
+    bin/compare_isdct.py --summary human-readable output
     """
     argv = ["--summary",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
