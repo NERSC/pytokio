@@ -232,8 +232,9 @@ class NerscIsdct(dict):
                 if counter not in old_isdct[serial_no]:
                     warnings.warn("Counter %s does not exist in old_isdct" % counter)
 
-                ### just highlight different strings
-                elif isstr(value):
+                # just highlight different strings, but ignore
+                # endurance_analyzer (which can be numeric or string-like)
+                elif isstr(value) and counter != "endurance_analyzer":
                     if old_isdct[serial_no][counter] != value:
                         diff_value = "+++%s ---%s" % (value, old_isdct[serial_no][counter])
                     else:
@@ -241,7 +242,7 @@ class NerscIsdct(dict):
                     if report_zeros or diff_value != "":
                         diff_dict[counter] = diff_value
 
-                ### subtract numeric counters
+                # subtract numeric counters
                 else:
                     try:
                         diff_value = value - old_isdct[serial_no][counter]

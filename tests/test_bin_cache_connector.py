@@ -343,7 +343,10 @@ def run_cache_connector(config, to_file=False):
         output_str = runfunction(config['binary'], argv)
 
     for validator in config['validators']:
-        validator(output_str)
+        if isinstance(output_str, bytes):
+            validator(output_str.decode())
+        else:
+            validator(output_str)
 
 def craft_description(config, suffix):
     """
