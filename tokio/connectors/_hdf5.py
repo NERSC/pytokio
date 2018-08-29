@@ -201,7 +201,6 @@ def demux_column(hdf5_file, from_key, column, apply_timestep_func=None, *args, *
         errmsg = "Could not find dataset_name %s in %s" % (from_key, hdf5_file.filename)
         raise KeyError(errmsg)
 
-    print(list(hdf5_file.get_columns(from_key.lstrip('/'))))
     column_idx = list(hdf5_file.get_columns(from_key.lstrip('/'))).index(column)
     map_kwargs = {'col_idx': column_idx}
     if apply_timestep_func:

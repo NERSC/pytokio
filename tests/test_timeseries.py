@@ -10,6 +10,7 @@ import h5py
 import nose
 import numpy
 import tokio
+from tokio.connectors.hdf5 import Hdf5
 import tokiotest
 
 def compare_timeseries(timeseries1, timeseries2, verbose=False):
@@ -31,7 +32,7 @@ def generate_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5,
     Return a TimeSeries object that's initialized against the tokiotest sample
     input
     """
-    output_hdf5 = h5py.File(file_name, 'r')
+    output_hdf5 = Hdf5(file_name, 'r')
     timeseries = tokio.timeseries.TimeSeries(dataset_name=dataset_name,
                                              hdf5_file=output_hdf5)
     return timeseries
@@ -42,7 +43,7 @@ def generate_light_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
     input.  Uses light=True when attaching to prevent loading the entire dataset
     into memory.
     """
-    output_hdf5 = h5py.File(file_name, 'r')
+    output_hdf5 = Hdf5(file_name, 'r')
     timeseries = tokio.timeseries.TimeSeries()
 
     timeseries.attach(output_hdf5, dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET, light=True)
@@ -346,12 +347,12 @@ def test_uneven_columns():
 
     tokiotest.TEMP_FILE.close()
     # copy the input file into a new temporary file with which we can tinker
-    with open(tokiotest.SAMPLE_COLLECTDES_HDF5, 'r') as input_file:
-        with open(tokiotest.TEMP_FILE.name, 'w') as output_file:
+    with open(tokiotest.SAMPLE_COLLECTDES_HDF5, 'rb') as input_file:
+        with open(tokiotest.TEMP_FILE.name, 'wb') as output_file:
             shutil.copyfileobj(input_file, output_file)
 
     print("Ensure that the input dataset has even column lengths before we make them uneven")
-    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r+')
+    h5_file = Hdf5(tokiotest.TEMP_FILE.name, 'r+')
     dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
     orig_col_names = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
     result = len(orig_col_names) == dataset.shape[1]

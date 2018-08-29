@@ -571,9 +571,8 @@ class Hdf5(h5py.File):
         super(Hdf5, self).__init__(*args, **kwargs)
 
         self.version = self.attrs.get('version')
-        if self.version is not None:
+        if isinstance(self.version, bytes):
             self.version = self.version.decode()
-        print(self.version, type(self.version))
         self._timesteps = {}
 
         # Connect the schema map to this object
@@ -651,9 +650,26 @@ class Hdf5(h5py.File):
         """
         if self.version is None:
             return self._get_columns_h5lmt(dataset_name)
-        # retrieve the dataset to resolve the schema key or get MappedDataset
         
-        return numpy.array([x.decode() for x in self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]])
+        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
+
+    def get_version(self, dataset_name=None):
+        """Get the version attribute from an HDF5 file dataset
+
+        Args:
+            dataset_name (str): Name of dataset to retrieve version.  If None,
+                return the global file's version.
+        Returns:
+            str: The version string for the specified dataset
+        """
+        if dataset_name is None:
+            return self.version
+        else:
+            dataset = self.__getitem__(dataset_name)
+            version = dataset.attrs.get("version")
+            if version is None:
+                version = self.version
+            return version
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
@@ -664,8 +680,7 @@ class Hdf5(h5py.File):
         if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
             return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
         elif dataset_name in H5LMT_COLUMN_ATTRS:
-            print("decoding %s" % dataset_name)
-            return numpy.array([x.decode() for x in dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]])
+            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]].astype('U')
         elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
             return numpy.array(['_unknown'])
         elif dataset_name == 'FSMissingGroup/FSMissingDataSet':
