@@ -57,7 +57,7 @@ class SubprocessOutputDict(dict):
             output_str = error.output
         except OSError as error:
             if error.errno == errno.ENOENT:
-                raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
+                raise type(error)(error.errno, "%s command not found" % self.subprocess_cmd[0])
             raise
 
         if isstr(output_str):
