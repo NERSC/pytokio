@@ -5,6 +5,7 @@ Test the HDF5 connector
 
 import datetime
 import random
+import nose
 import numpy
 import tokiotest
 import tokio.connectors
@@ -24,6 +25,13 @@ POSITIVE_2D = [
     'MDSOpsGroup/MDSOpsDataSet', 'OSSCPUGroup/OSSCPUDataSet',
     'OSTReadGroup/OSTBulkReadDataSet', 'OSTWriteGroup/OSTBulkWriteDataSet'
 ]
+GET_SET_TRUE_VERSIONS = {
+    '/': 'global',
+    '/a/': 'group',
+    '/a/b': 'dataset_b',
+    '/a/c': 'dataset_c',
+    '/a/d': 'global',
+}
 
 def test_h5lmt():
     """connectors.hdf5.Hdf5() h5lmt support
@@ -271,20 +279,30 @@ def test_missing_values():
     assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()
 
-def test_get_versions():
-    """connectorshdf5.get_version()
+def test_get_versions(hdf5_filename=tokiotest.SAMPLE_VERSIONS_HDF5):
+    """connectors.hdf5.get_version()
     """
-    TRUE_VERSIONS = {
-        '/': 'global',
-        '/a': 'group',
-        '/a/b': 'dataset_b',
-        '/a/c': 'dataset_c',
-        '/a/d': 'global',
-    }
-    hdf5 = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_VERSIONS_HDF5, 'r', ignore_version=True)
-    for groupname, true_version in TRUE_VERSIONS.items():
+    hdf5 = tokio.connectors.hdf5.Hdf5(hdf5_filename, 'r', ignore_version=True)
+    for groupname, true_version in GET_SET_TRUE_VERSIONS.items():
         version = hdf5.get_version(groupname)
         print("Version from HDF5: %s(%s) vs. truth %s(%s)" % (
             version, type(version),
             true_version, type(true_version)))
         assert version == true_version
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_set_versions():
+    """connectors.hdf5.set_version()
+    """
+    hdf5 = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'w', ignore_version=True)
+    for groupname, true_version in GET_SET_TRUE_VERSIONS.items():
+        if not groupname.endswith('/'):
+            hdf5.create_dataset(groupname, (10,))
+            print("Created group %s" % groupname)
+        elif groupname not in hdf5:
+            hdf5.create_group(groupname)
+            print("Created dataset %s" % groupname)
+        hdf5.set_version(version=true_version, dataset_name=groupname)
+
+    hdf5.close()
+    test_get_versions(hdf5_filename=tokiotest.TEMP_FILE.name)
