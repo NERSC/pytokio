@@ -5,6 +5,7 @@ scrolling support.  Output either as native json from ElasticSearch or as
 serialized TOKIO TimeSeries (TTS) HDF5 files.
 """
 
+import os
 import sys
 import gzip
 import json
@@ -19,7 +20,6 @@ import multiprocessing
 import dateutil.parser # because of how ElasticSearch returns time data
 import dateutil.tz
 import numpy
-import h5py
 
 import tokio.debug
 import tokio.timeseries
@@ -295,23 +295,33 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
     Take pages from ElasticSearch query and store them in output_file
     """
     datasets = {}
-    hdf5_file = h5py.File(output_file)
 
-    schema_version = hdf5_file.attrs.get('version', SCHEMA_VERSION)
+    file_exists = False
+    if os.path.isfile(output_file):
+        file_exists = True
+
+    hdf5_file = tokio.connectors.hdf5.Hdf5(output_file)
+    schema_version = hdf5_file.get_version()
+
+    # New files have a blank slate and should use the latest; existing files may
+    # have orphaned duplicate data if two schemata are encoded at once
+    if file_exists and schema_version != SCHEMA_VERSION:
+        warnings.warn("%s existing version %s will be upgraded in-place to %s"
+            % (output_file, schema_version, SCHEMA_VERSION))
+
+    # Update to the latest schema version no matter what
+    schema_version = SCHEMA_VERSION
+    hdf5_file.attrs['version'] = SCHEMA_VERSION
     schema = tokio.connectors.hdf5.SCHEMA.get(schema_version)
     if schema is None:
-        raise KeyError("Schema version %d is not known by connectors.hdf5" % SCHEMA_VERSION)
-
-    # Immediately write back the version so that tokio.timeseries can detect it
-    # when it commits data
-    hdf5_file.attrs['version'] = SCHEMA_VERSION
+        raise KeyError("Schema version %d in %s is not known by connectors.hdf5" % (SCHEMA_VERSION, output_file))
 
     # Initialize datasets
     for dataset_name in DATASETS:
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
             if '/_' not in dataset_name:
-                warnings.warn("Dataset %s is not in schema (passing through)" % dataset_name)
+                warnings.warn("Dataset %s in %s is not in schema version %s (passing through)" % (dataset_name, output_file, schema_version))
             hdf5_dataset_name = dataset_name
         if dataset_name.lstrip('/').startswith('datatargets'):
             num_columns = num_servers * devices_per_server
