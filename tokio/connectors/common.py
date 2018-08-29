@@ -55,8 +55,14 @@ class SubprocessOutputDict(dict):
             warnings.warn("%s returned nonzero exit code (%d)" % (cmd, error.returncode))
             output_str = error.output
         except OSError as error:
-            if error[0] == errno.ENOENT:
-                raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
+            try:
+                # Python 3 code path
+                if error is FileNotFoundError:
+                    raise error("%s command not found" % self.subprocess_cmd[0])
+            except NameError:
+                # Python 2 code path
+                if error[0] == errno.ENOENT:
+                    raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
             raise
 
         self.load_str(output_str)
@@ -66,7 +72,7 @@ class SubprocessOutputDict(dict):
         """
         _, encoding = mimetypes.guess_type(self.cache_file)
         if encoding == 'gzip':
-            input_fp = gzip.open(self.cache_file, 'r')
+            input_fp = gzip.open(self.cache_file, 'rt')
         else:
             input_fp = open(self.cache_file, 'r')
         self.load_str(input_fp.read())
