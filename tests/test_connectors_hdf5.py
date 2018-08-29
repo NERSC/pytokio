@@ -270,3 +270,21 @@ def test_missing_values():
                                                                  missing_matrix.sum()))
     assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()
+
+def test_get_versions():
+    """connectorshdf5.get_version()
+    """
+    TRUE_VERSIONS = {
+        '/': 'global',
+        '/a': 'group',
+        '/a/b': 'dataset_b',
+        '/a/c': 'dataset_c',
+        '/a/d': 'global',
+    }
+    hdf5 = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_VERSIONS_HDF5, 'r', ignore_version=True)
+    for groupname, true_version in TRUE_VERSIONS.items():
+        version = hdf5.get_version(groupname)
+        print("Version from HDF5: %s(%s) vs. truth %s(%s)" % (
+            version, type(version),
+            true_version, type(true_version)))
+        assert version == true_version
