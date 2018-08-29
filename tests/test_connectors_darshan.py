@@ -39,7 +39,7 @@ def verify_base_counters(darshan_data):
     posix_record = darshan_data['counters']['posix'][first_base_key]
     assert posix_record
     # Ensure that it contains an OPENS counter
-    assert 'OPENS' in posix_record.values()[0]
+    assert 'OPENS' in next(iter(posix_record.values()))
     # Ensure that multiple modules were found (STDIO should always exist too)
     assert 'stdio' in darshan_data['counters']
 

@@ -9,6 +9,7 @@ import errno
 import warnings
 import mimetypes
 import subprocess
+from tokio.common import isstr
 
 class SubprocessOutputDict(dict):
     """Generic class to support connectors that parse the output of a subprocess
@@ -65,7 +66,12 @@ class SubprocessOutputDict(dict):
                     raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
             raise
 
-        self.load_str(output_str)
+        if isstr(output_str):
+            # Python 2 - subprocess.check_output returns a string
+            self.load_str(output_str)
+        else:
+            # Python 3 - subprocess.check_output returns encoded bytes
+            self.load_str(output_str.decode())
 
     def load_cache(self):
         """Load subprocess output from a cached text file
