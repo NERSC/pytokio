@@ -56,14 +56,8 @@ class SubprocessOutputDict(dict):
             warnings.warn("%s returned nonzero exit code (%d)" % (cmd, error.returncode))
             output_str = error.output
         except OSError as error:
-            try:
-                # Python 3 code path
-                if error is FileNotFoundError:
-                    raise error("%s command not found" % self.subprocess_cmd[0])
-            except NameError:
-                # Python 2 code path
-                if error[0] == errno.ENOENT:
-                    raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
+            if error.errno == errno.ENOENT:
+                raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
             raise
 
         if isstr(output_str):
