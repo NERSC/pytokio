@@ -559,8 +559,25 @@ H5LMT_COLUMN_ATTRS = {
 }
 
 class Hdf5(h5py.File):
-    """
-    Create a parsed Hdf5 file class
+    """Hdf5 file class with extra hooks to parse different schemas
+
+    Provides an h5py.File-like class with added methods to provide a generic
+    API that can decode different schemata used to store file system load
+    data.
+
+    Attributes:
+        dataset_providers (dict): Map of logical dataset names (keys) to dicts
+            that describe the functions used to convert underlying literal
+            dataset data into the format expected when dereferencing the logical
+            dataset name.
+        schema (dict): Map of logical dataset names (keys) to the literal
+            dataset names in the underlying file (values)
+        _version (str): Defined and used at initialization time to determine
+            what schema to apply to map the HDF5 connector API to the underlying
+            HDF5 file.
+        _timesteps (dict): Keyed by dataset name (str) and has values
+            corresponding to the timestep (in seconds) between each sampled
+            datum in that dataset.
     """
     def __init__(self, *args, **kwargs):
         """Initialize an HDF5 file
@@ -577,22 +594,22 @@ class Hdf5(h5py.File):
 
         super(Hdf5, self).__init__(*args, **kwargs)
 
-        self.version = self.attrs.get('version')
-        if isinstance(self.version, bytes):
-            self.version = self.version.decode()
+        self._version = self.attrs.get('version')
+        if isinstance(self._version, bytes):
+            self._version = self._version.decode()
         self._timesteps = {}
 
         # Connect the schema map to this object
-        if self.version in SCHEMA:
-            self.schema = SCHEMA[self.version]
-        elif self.version is None:
+        if self._version in SCHEMA:
+            self.schema = SCHEMA[self._version]
+        elif self._version is None:
             self.schema = {}
         elif not ignore_version:
-            raise KeyError("Unknown schema version %s" % self.version)
+            raise KeyError("Unknown schema version %s" % self._version)
 
         # Connect the schema dataset providers to this object
-        if self.version in SCHEMA_DATASET_PROVIDERS:
-            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self.version]
+        if self._version in SCHEMA_DATASET_PROVIDERS:
+            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self._version]
         else:
             self.dataset_providers = {}
 
@@ -646,20 +663,6 @@ class Hdf5(h5py.File):
             errmsg = "Unknown key %s in %s" % (key, self.filename)
             raise KeyError(errmsg)
 
-    def get_columns(self, dataset_name):
-        """Get the column names of a dataset
-
-        Args:
-            dataset_name (str): name of dataset whose columns will be retrieved
-
-        Returns:
-            numpy.ndarray of column names, or empty if no columns defined
-        """
-        if self.version is None:
-            return self._get_columns_h5lmt(dataset_name)
-        
-        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
-
     def get_version(self, dataset_name=None):
         """Get the version attribute from an HDF5 file dataset
 
@@ -670,17 +673,31 @@ class Hdf5(h5py.File):
             str: The version string for the specified dataset
         """
         if dataset_name is None:
-            return self.version
+            return self._version
         else:
             # resolve dataset name
             dataset = self.__getitem__(dataset_name)
             version = dataset.attrs.get("version")
             if version is None:
-                version = self.version
+                version = self._version
             if isinstance(version, bytes):
                 return version.decode() # for python3
             else:
                 return version
+
+    def get_columns(self, dataset_name):
+        """Get the column names of a dataset
+
+        Args:
+            dataset_name (str): name of dataset whose columns will be retrieved
+
+        Returns:
+            numpy.ndarray of column names, or empty if no columns defined
+        """
+        if self.get_version(dataset_name=dataset_name) is None:
+            return self._get_columns_h5lmt(dataset_name)
+        
+        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
@@ -736,7 +753,7 @@ class Hdf5(h5py.File):
             numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
                 absence of specific elements
         """
-        if self.version is None:
+        if self.get_version(dataset_name=dataset_name) is None:
             return self._get_missing_h5lmt(dataset_name, inverse=inverse)
         return missing_values(self[dataset_name][:], inverse)
 
@@ -778,7 +795,7 @@ class Hdf5(h5py.File):
             timestamps, columns labeled appropriately, and values from the
             dataset
         """
-        if self.version is None:
+        if self.get_version(dataset_name=dataset_name) is None:
             return self._to_dataframe_h5lmt(dataset_name)
         return self._to_dataframe(dataset_name)
 
