@@ -11,6 +11,7 @@ import datetime
 import warnings
 import numpy
 import tokio.connectors.hdf5
+from tokio.common import isstr
 
 class TimeSeries(object):
     """
@@ -125,19 +126,25 @@ class TimeSeries(object):
         self.dataset = dataset if light else dataset[:, :]
 
         # copy columns into memory
-        if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset.attrs:
-            columns = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
-            self.set_columns(columns)
-        else:
-            warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
+        columns = hdf5_file.get_columns(dataset_name)
+        self.set_columns(columns)
 
-        self.schema = dataset.attrs.get('version')
+        self.schema = hdf5_file.get_version(dataset_name)
+        if isinstance(self.schema, bytes):
+            self.schema = self.schema.decode()
+        print("Got version %s" % self.schema)
 
         # copy metadata into memory
         for key, value in dataset.attrs.items():
-            self.dataset_metadata[key] = value
+            if isinstance(value, bytes):
+                self.dataset_metadata[key] = value.decode()
+            else:
+                self.dataset_metadata[key] = value
         for key, value in dataset.parent.attrs.items():
-            self.group_metadata[key] = value
+            if isinstance(value, bytes):
+                self.group_metadata[key] = value.decode()
+            else:
+                self.group_metadata[key] = value
 
         self.timestamp_key = tokio.connectors.hdf5.get_timestamps_key(hdf5_file, dataset_name)
         self.timestamps = hdf5_file[self.timestamp_key]
@@ -164,6 +171,7 @@ class TimeSeries(object):
             dataset_hdf5 = hdf5_file.create_dataset(name=self.dataset_name,
                                                     shape=self.dataset.shape,
                                                     **extra_dataset_args)
+        print("Committed version %s" % self.version)
 
         # Create the timestamps in the HDF5 file (if necessary) and calculate
         # where to insert our data into the HDF5's dataset
@@ -206,7 +214,7 @@ class TimeSeries(object):
         # If we're updating an existing HDF5, use its column names and ordering.
         # Otherwise sort the columns before committing them.
         if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset_hdf5.attrs:
-            self.rearrange_columns(list(dataset_hdf5.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY]))
+            self.rearrange_columns(self.columns)
         else:
             self.sort_columns()
 
@@ -220,11 +228,19 @@ class TimeSeries(object):
 
         # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
         for key, value in self.dataset_metadata.items():
-            dataset_hdf5.attrs[key] = value
+            # special hack for column names
+            if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY) or isstr(value):
+                dataset_hdf5.attrs[key] = numpy.string_(value)
+            else:
+                dataset_hdf5.attrs[key] = value
 
         # Insert/update group metadata
         for key, value in self.group_metadata.items():
-            dataset_hdf5.parent.attrs[key] = value
+            print("Inserting %s = %s %s" % (key, value, type(value)))
+            if isstr(value):
+                dataset_hdf5.parent.attrs[key] = numpy.string_(value)
+            else:
+                dataset_hdf5.parent.attrs[key] = value
 
     def update_column_map(self):
         """
@@ -427,23 +443,23 @@ def sorted_nodenames(nodenames, sort_hex=False):
         """
         return list(map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string)))
 
-    def natural_comp(arg1, arg2):
-        """
-        Cast the parts of a string that look like integers into integers, then
-        sort based on strings and integers rather than only strings
-        """
-        return cmp(natural_compare(arg1), natural_compare(arg2))
+#   def natural_comp(arg1, arg2):
+#       """
+#       Cast the parts of a string that look like integers into integers, then
+#       sort based on strings and integers rather than only strings
+#       """
+#       return cmp(natural_compare(arg1), natural_compare(arg2))
 
-    def natural_hex_comp(arg1, arg2):
-        """
-        Cast the parts of a string that look like hex into integers, then
-        sort based on strings and integers rather than only strings.
-        """
-        return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
+#   def natural_hex_comp(arg1, arg2):
+#       """
+#       Cast the parts of a string that look like hex into integers, then
+#       sort based on strings and integers rather than only strings.
+#       """
+#       return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
 
     if sort_hex:
-        return sorted(nodenames, natural_hex_comp)
-    return sorted(nodenames, natural_comp)
+        return sorted(nodenames, key=natural_hex_compare)
+    return sorted(nodenames, key=natural_compare)
 
 def timeseries_deltas(dataset):
     """Convert monotonically increasing values into deltas
@@ -503,7 +519,7 @@ def get_insert_indices(my_timestamps, existing_timestamps):
         raise Exception("Existing dataset has different timestep (mine=%d, existing=%d)"
                         % (my_timestep, existing_timestep))
 
-    my_offset = (my_timestamps[0] - existing_timestamps[0]) / existing_timestep
+    my_offset = (my_timestamps[0] - existing_timestamps[0]) // existing_timestep
     my_end = my_offset + len(my_timestamps)
 
     return my_offset, my_end
