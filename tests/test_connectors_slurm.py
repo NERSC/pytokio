@@ -116,8 +116,8 @@ def expand_nodelist(min_nid, max_nid):
         # scontrol is not available
         raise nose.SkipTest(error)
 
-    print("node range is", min_nid, max_nid)
-    print("length of node list is", len(node_list))
+    print("node range is %s to %s" % (min_nid, max_nid))
+    print("length of node list is %s" % len(node_list))
     assert len(node_list) == num_nodes
 
 def test_expand_nodelist():

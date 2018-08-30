@@ -37,7 +37,7 @@ def exec_cmd(argv):
     """
     Execute the command with some arguments
     """
-    print("Executing", " ".join(argv))
+    print("Executing %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_tts_hdf5, argv)
 
     assert len(output_str) > 0

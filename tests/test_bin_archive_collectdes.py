@@ -56,7 +56,7 @@ def generate_tts(output_file,
             query_end]
     print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print("Created", output_file)
+    print("Created %s" % output_file)
 
 def update_tts(output_file,
                input_file=tokiotest.SAMPLE_COLLECTDES_FILE2,
@@ -73,7 +73,7 @@ def update_tts(output_file,
 
     print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print("Updated", output_file)
+    print("Updated %s" % output_file)
 
 def summarize_hdf5(hdf5_file):
     """

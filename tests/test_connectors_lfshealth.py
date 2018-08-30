@@ -124,7 +124,7 @@ def test_ostfullness_serializer():
     # Serialize the object, then re-read it and verify it
     print("Caching to %s" % tokiotest.TEMP_FILE.name)
     ostfullness.save_cache(tokiotest.TEMP_FILE.name)
-    print("Cache file has size", os.path.getsize(tokiotest.TEMP_FILE.name))
+    print("Cache file has size %s" % os.path.getsize(tokiotest.TEMP_FILE.name))
     # Open a second file handle to this cached file to load it
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.TEMP_FILE.name)
     print(ostfullness)

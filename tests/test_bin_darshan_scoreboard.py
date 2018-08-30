@@ -25,7 +25,7 @@ def test_input_dir():
     warnings.filterwarnings('ignore')
     tokiotest.check_darshan()
     argv = [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
     decoded_result = json.loads(output_str)
     assert len(decoded_result) > 0
@@ -36,7 +36,7 @@ def test_input_file():
     """
     tokiotest.check_darshan()
     argv = [SAMPLE_DARSHAN_LOGS[0]]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
     decoded_result = json.loads(output_str)
     assert len(decoded_result) > 0
@@ -47,7 +47,7 @@ def test_input_files():
     """
     tokiotest.check_darshan()
     argv = SAMPLE_DARSHAN_LOGS
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
     decoded_result = json.loads(output_str)
     assert len(decoded_result) > 0
@@ -58,7 +58,7 @@ def test_multithreaded():
     """
     tokiotest.check_darshan()
     argv = ['--threads', '4'] + SAMPLE_DARSHAN_LOGS
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
     decoded_result = json.loads(output_str)
     assert len(decoded_result) > 0
@@ -70,11 +70,11 @@ def test_scoreboard():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = [tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     assert len(output_str.splitlines()) > 5
 
@@ -85,14 +85,14 @@ def test_scoreboard_json():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
-    print("Result:", decoded_result)
+    print("Result: %s" % decoded_result)
     assert len(decoded_result) > 0
 
 @tokiotest.needs_darshan
@@ -102,14 +102,14 @@ def test_scoreboard_limit_user():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--limit-user', tokiotest.SAMPLE_DARSHAN_LOG_USER, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
-    print("Result:", decoded_result)
+    print("Result: %s" % decoded_result)
     assert decoded_result['per_user']
 
 @tokiotest.needs_darshan
@@ -119,14 +119,14 @@ def test_scoreboard_exclude_user():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--exclude-user', "%s" % tokiotest.SAMPLE_DARSHAN_LOG_USER, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
-    print("Result:", decoded_result)
+    print("Result: %s" % decoded_result)
     assert not decoded_result['per_user']
     assert not decoded_result['per_exe']
     assert not decoded_result['per_fs']
@@ -138,14 +138,14 @@ def test_scoreboard_limit_fs():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--limit-fs', tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
-    print("Result:", decoded_result)
+    print("Result: %s" % decoded_result)
     assert decoded_result['per_user']
     assert decoded_result['per_fs']
     assert decoded_result['per_exe']
@@ -157,11 +157,11 @@ def test_scoreboard_exclude_fs():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--exclude-fs', "%s" % tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
     print(decoded_result)
@@ -176,14 +176,14 @@ def test_scoreboard_limit_fs_logical():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--limit-fs', tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
-    print("Result:", decoded_result)
+    print("Result: %s" % decoded_result)
     assert decoded_result['per_user']
     assert decoded_result['per_fs']
     assert decoded_result['per_exe']
@@ -195,11 +195,11 @@ def test_scoreboard_exclude_fs_logical():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     argv = ['--json', '--exclude-fs', "%s" % tokiotest.SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL, tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
     print(decoded_result)
@@ -214,16 +214,16 @@ def test_scoreboard_limit_exe():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     # try to get back a few specific exes that we know exist (FILTER_FOR_EXE)
     for appname in FILTER_FOR_EXE + [','.join(FILTER_FOR_EXE)]:
         argv = ['--json', '--limit-exe', appname, tokiotest.TEMP_FILE.name]
-        print("Executing:", " ".join(argv))
+        print("Executing: %s" % " ".join(argv))
         output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
         decoded_result = json.loads(output_str)
-        print("Result:", decoded_result)
+        print("Result: %s" % decoded_result)
 
         wanted_apps = appname.split(',')
         # make sure that we got back the same number of apps as we queried for
@@ -240,22 +240,22 @@ def test_scoreboard_exclude_exe():
     """
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + LOGS_FROM_DIR
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokiobin.summarize_darshanlogs, argv)
 
     # get a reference dataset without anything removed
     argv = ['--json', tokiotest.TEMP_FILE.name]
-    print("Executing:", " ".join(argv))
+    print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
     reference_result = json.loads(output_str)
-    print("Result:", reference_result) 
+    print("Result: %s" % reference_result) 
 
     for appname in FILTER_FOR_EXE + [','.join(FILTER_FOR_EXE)]:
         argv = ['--json', '--exclude-exe', appname, tokiotest.TEMP_FILE.name]
-        print("Executing:", " ".join(argv))
+        print("Executing: %s" % " ".join(argv))
         output_str = tokiotest.run_bin(tokiobin.darshan_scoreboard, argv)
         decoded_result = json.loads(output_str)
-        print("Result:", decoded_result)
+        print("Result: %s" % decoded_result)
 
         # make sure the app is not included in the results
         assert appname not in decoded_result['per_exe']

@@ -32,7 +32,7 @@ def verify_base_counters(darshan_data):
     first_base_key = None
     for key in darshan_data['counters']['posix']:
         if key not in ('_perf', '_total'):
-            print("Found first base key", key)
+            print("Found first base key %s" % key)
             first_base_key = key
             break
     assert first_base_key is not None
