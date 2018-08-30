@@ -31,10 +31,14 @@
     ],
     "isdct_files": "inputs/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
     "lfsstatus_fullness_files": [
+        "inputs/%Y-%m-%d/osts.txt.gz",
+        "inputs/%Y-%m-%d/osts_edison.txt.gz",
         "inputs/%Y-%m-%d/osts.txt",
         "inputs/%Y-%m-%d/osts_edison.txt"
     ],
     "lfsstatus_map_files": [
+        "inputs/%Y-%m-%d/ost-map.txt.gz",
+        "inputs/%Y-%m-%d/ost-map_edison.txt.gz",
         "inputs/%Y-%m-%d/ost-map.txt",
         "inputs/%Y-%m-%d/ost-map_edison.txt"
     ],
