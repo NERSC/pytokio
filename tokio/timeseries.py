@@ -132,6 +132,7 @@ class TimeSeries(object):
 
         # copy columns into memory
         columns = hdf5_file.get_columns(dataset_name)
+        print("loaded %d columns from %s" % (len(columns), dataset_name))
         self.set_columns(columns)
 
         # copy metadata into memory
@@ -231,7 +232,14 @@ class TimeSeries(object):
         # Insert/update dataset metadata
         for key, value in self.dataset_metadata.items():
             # special hack for column names
-            if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY) or isstr(value):
+            if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY):
+                # note: the behavior of numpy.string_(x) where
+                # type(x) == numpy.array is _different_ in python2 vs. python3.
+                # Python3 happily converts each element to a numpy.string_,
+                # while Python2 first calls a.__repr__ to turn it into a single
+                # string, then converts that to numpy.string_.
+                dataset_hdf5.attrs[key] = numpy.array([numpy.string_(x) for x in value])
+            elif isstr(value):
                 dataset_hdf5.attrs[key] = numpy.string_(value)
             elif value is None:
                 warnings.warn("Skipping attribute %s (null value) for %s" % (key, self.dataset_name))
