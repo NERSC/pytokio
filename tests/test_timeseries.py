@@ -176,9 +176,10 @@ def test_timeseries_deltas():
         calculated = calculated_deltas[:, icol].sum()
         total_delta = monotonic_values[:, icol].max() \
                       - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
-        print('truth=', truth, \
-              'from piecewise deltas=', calculated, \
-              'from total delta=', total_delta)
+        print('truth=%s from piecewise deltas=%s from total delta=%s' % (
+            truth,
+            calculated,
+            total_delta))
         assert numpy.isclose(calculated, total_delta)
 
         # Calculated delta should either be equal to (no data loss) or less than
@@ -192,9 +193,10 @@ def test_timeseries_deltas():
         calculated = calculated_deltas[:, icol].sum()
         total_delta = monotonic_values[:, icol].max() \
                       - numpy.matrix([x for x in monotonic_values[:, icol] if x > 0.0]).min()
-        print('truth=', truth, \
-              'from piecewise deltas=', calculated, \
-              'from total delta=', total_delta)
+        print('truth=%s from piecewise deltas=%s from total delta=%s' % (
+            truth,
+            calculated,
+            total_delta))
         assert numpy.isclose(calculated, total_delta) or ((total_delta - calculated) > 0)
         assert numpy.isclose(truth, calculated) or ((truth - calculated) > 0)
 
@@ -281,8 +283,8 @@ def test_commit_dataset_bad_bounds():
     print("Attempting bloated existing dataset")
     timeseries1.add_rows(12)
     with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
-        print('Global start:', hdf5_file.attrs.get('start'))
-        print('Global end:  ', hdf5_file.attrs.get('end'))
+        print('Global start: %s' % hdf5_file.attrs.get('start'))
+        print('Global end:   %s' % hdf5_file.attrs.get('end'))
         caught = False
         try:
             timeseries1.commit_dataset(hdf5_file)
@@ -297,8 +299,8 @@ def test_commit_dataset_bad_bounds():
     timeseries2.dataset_name = '/blah/blah'
     timeseries2.timestamp_key = '/blah/timestamps'
     with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
-        print('Global start:', hdf5_file.attrs.get('start'))
-        print('Global end:  ', hdf5_file.attrs.get('end'))
+        print('Global start: %s' % hdf5_file.attrs.get('start'))
+        print('Global end:   %s' % hdf5_file.attrs.get('end'))
         caught = False
         try:
             timeseries2.commit_dataset(hdf5_file)
@@ -333,8 +335,8 @@ def test_add_rows():
             assert new_deltim == prev_deltim
         prev_deltim = new_deltim
 
-    print("Orig timestamps:", orig_row[-5: -1])
-    print("Now timestamps: ", timeseries.timestamps[-5 - add_rows: -1])
+    print("Orig timestamps: %s" % orig_row[-5: -1])
+    print("Now timestamps:  %s" % timeseries.timestamps[-5 - add_rows: -1])
     assert prev_deltim > 0
     assert timeseries.timestamps.shape[0] == timeseries.dataset.shape[0]
     assert (timeseries.timestamps.shape[0] - add_rows) == orig_row_count

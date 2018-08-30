@@ -39,7 +39,7 @@ def test_h5lmt():
     hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
 
     for dataset in DATASETS_1D:
-        print("Testing", dataset)
+        print("Testing %s" % dataset)
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 1
         assert hdf5_file[dataset][:].sum() > 0
@@ -49,7 +49,7 @@ def test_h5lmt():
             assert len(hdf5_file.to_dataframe(dataset).index)
 
     for dataset in DATASETS_2D:
-        print("Testing", dataset)
+        print("Testing %s" % dataset)
         assert dataset in hdf5_file
         assert len(hdf5_file[dataset].shape) == 2
         assert hdf5_file[dataset][:, :].sum() > 0
@@ -139,7 +139,7 @@ def _test_mapped_dataset(input_file):
     timestamps = hdf5_file.get_timestamps('datatargets/readbytes')[0:2]
     timestep = timestamps[1] - timestamps[0]
 
-    print("Timestep appears to be", timestep)
+    print("Timestep appears to be %s" % timestep)
     print("readbytes is")
     print(readbytes[:, :])
     print()
@@ -217,7 +217,7 @@ def _test_get_columns(input_file):
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
         print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
         result = hdf5_file.get(dataset_name)
-        print('result:', result)
+        print('result: %s' % result)
         assert result is not None
         column_names = hdf5_file.get_columns(dataset_name)
         assert len(column_names) > 0

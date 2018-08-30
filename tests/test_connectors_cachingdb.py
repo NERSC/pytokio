@@ -119,7 +119,7 @@ def verify_cache_functionality(test_db):
 
     ### Cache all TEST_TABLES to a single file
     test_db.save_cache(tokiotest.TEMP_FILE.name)
-    print("Created", tokiotest.TEMP_FILE.name)
+    print("Created %s" % tokiotest.TEMP_FILE.name)
 
     ### Destroy any residual state, just in case
     test_db.close()

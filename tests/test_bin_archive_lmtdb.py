@@ -45,7 +45,7 @@ def generate_tts(output_file,
             init_end]
     print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_lmtdb.main(argv)
-    print("Created", output_file)
+    print("Created %s" % output_file)
 
 def update_tts(output_file, q_start, q_end):
     """
@@ -60,7 +60,7 @@ def update_tts(output_file, q_start, q_end):
 
     print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_lmtdb.main(argv)
-    print("Updated", output_file)
+    print("Updated %s" % output_file)
 
 def summarize_hdf5(hdf5_file):
     """
@@ -220,7 +220,7 @@ class TestArchiveLmtdbCorrectness(object):
 
         print("Running [%s]" % ' '.join(argv))
         tokiobin.archive_lmtdb.main(argv)
-        print("Created", cls.output_file)
+        print("Created %s" % cls.output_file)
 
         cls.generated = h5py.File(cls.output_file, 'r')
         cls.generated_tts = tokio.connectors.hdf5.Hdf5(cls.output_file, 'r')

@@ -327,8 +327,8 @@ def run_cache_connector(config, to_file=False):
 
     if to_file:
         argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
-        print("Caching to", tokiotest.TEMP_FILE.name)
-        print("Executing:", ' '.join(argv))
+        print("Caching to %s" % tokiotest.TEMP_FILE.name)
+        print("Executing: %s" % ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
         # (validate_contents == True) means the associated validator function
@@ -339,7 +339,7 @@ def run_cache_connector(config, to_file=False):
     else:
         argv = config['args']
         print("Caching to stdout")
-        print("Executing:", ' '.join(argv))
+        print("Executing: %s" % ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
     for validator in config['validators']:

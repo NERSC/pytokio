@@ -173,7 +173,7 @@ def cleanup_untar(input_filename):
     for member in tar.getmembers():
         fq_name = os.path.join(tokiotest.INPUT_DIR, member.name)
         if os.path.exists(fq_name) and fq_name.startswith(tokiotest.INPUT_DIR): # one final backstop
-            print("Removing", fq_name)
+            print("Removing %s" % fq_name)
             if member.isdir():
                 shutil.rmtree(fq_name)
             else:
