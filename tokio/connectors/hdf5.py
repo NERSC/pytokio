@@ -11,6 +11,7 @@ import datetime
 import h5py
 import numpy
 import pandas
+from tokio.common import isstr
 from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unused-import
                                     map_dataset,
                                     demux_column,
@@ -558,31 +559,57 @@ H5LMT_COLUMN_ATTRS = {
 }
 
 class Hdf5(h5py.File):
-    """
-    Create a parsed Hdf5 file class
+    """Hdf5 file class with extra hooks to parse different schemas
+
+    Provides an h5py.File-like class with added methods to provide a generic
+    API that can decode different schemata used to store file system load
+    data.
+
+    Attributes:
+        dataset_providers (dict): Map of logical dataset names (keys) to dicts
+            that describe the functions used to convert underlying literal
+            dataset data into the format expected when dereferencing the logical
+            dataset name.
+        schema (dict): Map of logical dataset names (keys) to the literal
+            dataset names in the underlying file (values)
+        _version (str): Defined and used at initialization time to determine
+            what schema to apply to map the HDF5 connector API to the underlying
+            HDF5 file.
+        _timesteps (dict): Keyed by dataset name (str) and has values
+            corresponding to the timestep (in seconds) between each sampled
+            datum in that dataset.
     """
     def __init__(self, *args, **kwargs):
-        """
+        """Initialize an HDF5 file
+
         This is just an HDF5 file object; the magic is in the additional methods
         and indexing that are provided by the TOKIO Time Series-specific HDF5
         object.
+
+        Args:
+            ignore_version (bool): If true, do not throw KeyError if the HDF5
+                file does not contain a valid version.
         """
+        ignore_version = kwargs.pop('ignore_version', False)
+
         super(Hdf5, self).__init__(*args, **kwargs)
 
-        self.version = self.attrs.get('version')
+        self._version = self.attrs.get('version')
+        if isinstance(self._version, bytes):
+            self._version = self._version.decode()
         self._timesteps = {}
 
         # Connect the schema map to this object
-        if self.version in SCHEMA:
-            self.schema = SCHEMA[self.version]
-        elif self.version is None:
+        if self._version in SCHEMA:
+            self.schema = SCHEMA[self._version]
+        elif self._version is None:
             self.schema = {}
-        else:
-            raise KeyError("Unknown schema version %s" % self.version)
+        elif not ignore_version:
+            raise KeyError("Unknown schema version %s" % self._version)
 
         # Connect the schema dataset providers to this object
-        if self.version in SCHEMA_DATASET_PROVIDERS:
-            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self.version]
+        if self._version in SCHEMA_DATASET_PROVIDERS:
+            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self._version]
         else:
             self.dataset_providers = {}
 
@@ -623,7 +650,7 @@ class Hdf5(h5py.File):
 
         except KeyError:
             # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isinstance(key, basestring) else key
+            key = key.lstrip('/') if isstr(key) else key
             if key in self.schema:
                 hdf5_key = self.schema.get(key)
                 if super(Hdf5, self).__contains__(hdf5_key):
@@ -636,6 +663,49 @@ class Hdf5(h5py.File):
             errmsg = "Unknown key %s in %s" % (key, self.filename)
             raise KeyError(errmsg)
 
+    def get_version(self, dataset_name=None):
+        """Get the version attribute from an HDF5 file dataset
+
+        Args:
+            dataset_name (str): Name of dataset to retrieve version.  If None,
+                return the global file's version.
+        Returns:
+            str: The version string for the specified dataset
+        """
+        if dataset_name is None:
+            return self._version
+        else:
+            # resolve dataset name
+            dataset = self.__getitem__(dataset_name)
+            version = dataset.attrs.get("version")
+            if version is None:
+                version = self._version
+            if isinstance(version, bytes):
+                return version.decode() # for python3
+            else:
+                return version
+
+    def set_version(self, version, dataset_name=None):
+        """Set the version attribute from an HDF5 file dataset
+
+        Provide a portable way to set the global schema version or the version
+        of a specific dataset.
+
+        Args:
+            version (str): The new version to be set
+            dataset_name (str): Name of dataset to set version.  If None,
+                set the global file's version.
+        """
+        if dataset_name is None:
+            self._version = version
+            return self._version
+        else:
+            # resolve dataset name
+            dataset = self.__getitem__(dataset_name)
+            if dataset is None:
+                raise KeyError("Dataset %s does not exist" % dataset_name)
+            dataset.attrs["version"] = version
+
     def get_columns(self, dataset_name):
         """Get the column names of a dataset
 
@@ -645,10 +715,10 @@ class Hdf5(h5py.File):
         Returns:
             numpy.ndarray of column names, or empty if no columns defined
         """
-        if self.version is None:
+        if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
-        # retrieve the dataset to resolve the schema key or get MappedDataset
-        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY]
+        
+        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
@@ -659,7 +729,7 @@ class Hdf5(h5py.File):
         if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
             return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
         elif dataset_name in H5LMT_COLUMN_ATTRS:
-            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]]
+            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]].astype('U')
         elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
             return numpy.array(['_unknown'])
         elif dataset_name == 'FSMissingGroup/FSMissingDataSet':
@@ -685,7 +755,7 @@ class Hdf5(h5py.File):
         timestamps = self.get_timestamps(dataset_name)[0:2]
         timestep = self.get_timestep(dataset_name, timestamps)
         t_start = datetime.datetime.fromtimestamp(timestamps[0])
-        return long((target_datetime - t_start).total_seconds() / timestep)
+        return int((target_datetime - t_start).total_seconds() / timestep)
 
     def get_timestamps(self, dataset_name):
         """
@@ -704,7 +774,7 @@ class Hdf5(h5py.File):
             numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
                 absence of specific elements
         """
-        if self.version is None:
+        if self.get_version(dataset_name=dataset_name) is None:
             return self._get_missing_h5lmt(dataset_name, inverse=inverse)
         return missing_values(self[dataset_name][:], inverse)
 
@@ -746,7 +816,7 @@ class Hdf5(h5py.File):
             timestamps, columns labeled appropriately, and values from the
             dataset
         """
-        if self.version is None:
+        if self.get_version(dataset_name=dataset_name) is None:
             return self._to_dataframe_h5lmt(dataset_name)
         return self._to_dataframe(dataset_name)
 

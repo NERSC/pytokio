@@ -90,7 +90,7 @@ class Darshan(SubprocessOutputDict):
         Returns:
             str: JSON representation of the object
         """
-        return json.dumps(self.values())
+        return json.dumps(list(self.values()))
 
     def load(self):
         if self.from_string is not None:
@@ -232,7 +232,7 @@ class Darshan(SubprocessOutputDict):
                 if '.' in value:
                     value = float(value)
                 else:
-                    value = long(value)
+                    value = int(value)
                 insert_base[counter] = value
 
         section = None
@@ -246,17 +246,17 @@ class Darshan(SubprocessOutputDict):
             # Why do we look at section, refactorize failed
             if section is None and line.startswith("# darshan log version:"):
                 section = "header"
-                if section not in self.keys():
+                if section not in list(self.keys()):
                     self[section] = {}
 
             elif section == "header" and line.startswith("# mounted file systems"):
                 section = "mounts"
-                if section not in self.keys():
+                if section not in list(self.keys()):
                     self[section] = {}
 
             elif section == "mounts" and line.startswith("# **********************"):  # understand the utility of these stars
                 section = "counters"
-                if section not in self.keys():
+                if section not in list(self.keys()):
                     self[section] = {}
 
             # otherwise use the appropriate parser for this section
@@ -346,11 +346,11 @@ def parse_header(line):
     elif line.startswith("# jobid:"):
         return 'jobid', line.split()[-1]
     elif line.startswith("# start_time:"):
-        return 'start_time', long(line.split()[2])
+        return 'start_time', int(line.split()[2])
     elif line.startswith("# start_time_asci:"):
         return 'start_time_string', line.split(None, 2)[-1].strip()
     elif line.startswith("# end_time:"):
-        return 'end_time', long(line.split()[2])
+        return 'end_time', int(line.split()[2])
     elif line.startswith("# end_time_asci:"):
         return 'end_time_string', line.split(None, 2)[-1].strip()
     elif line.startswith("# nprocs:"):

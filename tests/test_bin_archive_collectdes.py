@@ -8,6 +8,7 @@ import datetime
 import warnings
 import nose
 import h5py
+import tokio.connectors.hdf5
 import tokiotest
 import tokiobin.archive_collectdes
 
@@ -53,9 +54,9 @@ def generate_tts(output_file,
             '--output', output_file,
             query_start,
             query_end]
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print "Created", output_file
+    print("Created %s" % output_file)
 
 def update_tts(output_file,
                input_file=tokiotest.SAMPLE_COLLECTDES_FILE2,
@@ -70,9 +71,9 @@ def update_tts(output_file,
             query_start,
             query_end]
 
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     tokiobin.archive_collectdes.main(argv)
-    print "Updated", output_file
+    print("Updated %s" % output_file)
 
 def summarize_hdf5(hdf5_file):
     """
@@ -89,12 +90,8 @@ def summarize_hdf5(hdf5_file):
         if isinstance(obj_data, h5py.Dataset):
             summary['shapes'][obj_name] = obj_data.shape
             # note that this will break if the hdf5 file contains non-numeric datasets
-            if len(obj_data.shape) == 1:
-                summary['sums'][obj_name] = obj_data[:].sum()
-            elif len(obj_data.shape) == 2:
-                summary['sums'][obj_name] = obj_data[:, :].sum()
-            elif len(obj_data.shape) == 3:
-                summary['sums'][obj_name] = obj_data[:, :, :].sum()
+            summary['sums'][obj_name] = obj_data[...].sum()
+            print("dataset %s version = %s" % (obj_name, hdf5_file.get_version(obj_name)))
 
     hdf5_file.visititems(characterize_object)
 
@@ -115,7 +112,7 @@ def test_idempotency():
                  query_start=tokiotest.SAMPLE_COLLECTDES_START,
                  query_end=tokiotest.SAMPLE_COLLECTDES_END)
 
-    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
+    h5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'r')
     summary0 = summarize_hdf5(h5_file)
     h5_file.close()
 
@@ -124,17 +121,17 @@ def test_idempotency():
                input_file=tokiotest.SAMPLE_COLLECTDES_CPULOAD,
                query_start=tokiotest.SAMPLE_COLLECTDES_START,
                query_end=tokiotest.SAMPLE_COLLECTDES_END)
-    h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
+    h5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'r')
     summary1 = summarize_hdf5(h5_file)
     h5_file.close()
 
     # ensure that updating the overlapping data didn't change the contents of the TimeSeries
     num_compared = 0
     for metric in 'sums', 'shapes':
-        for key, value in summary0[metric].iteritems():
+        for key, value in summary0[metric].items():
             num_compared += 1
             assert key in summary1[metric]
-            print "%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value)
+            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
             assert summary1[metric][key] == value
 
     assert num_compared > 0
@@ -166,9 +163,9 @@ def test_out_of_bounds():
             '--output', tokiotest.TEMP_FILE.name,
             tokiotest.SAMPLE_COLLECTDES_START,
             tokiotest.SAMPLE_COLLECTDES_END]
-    print "Running [%s]" % ' '.join(argv)
+    print("Running [%s]" % ' '.join(argv))
     with warnings.catch_warnings(record=True) as warn:
         warnings.simplefilter("always")
         tokiobin.archive_collectdes.main(argv)
-        print "Caught %d warnings" % len(warn)
+        print("Caught %d warnings" % len(warn))
         assert len(warn) > 0

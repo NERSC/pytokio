@@ -34,15 +34,15 @@ def main(argv=None):
     # Serialize the object
     cache_file = args.output
     if cache_file is not None:
-        print "Caching to %s" % cache_file
+        print("Caching to %s" % cache_file)
 
     if cache_file is None:
         if args.csv:
-            print (slurm_data.to_dataframe()).to_csv()
+            print((slurm_data.to_dataframe()).to_csv())
         elif args.json:
-            print slurm_data.to_json(indent=4, sort_keys=True)
+            print(slurm_data.to_json(indent=4, sort_keys=True))
         elif args.native:
-            print str(slurm_data)
+            print(str(slurm_data))
         else:
             raise Exception("No output format specified")
     else:

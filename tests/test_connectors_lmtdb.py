@@ -21,14 +21,14 @@ QUERY_RANGE = SAMPLE_QUERY[1] - SAMPLE_QUERY[0]
 SAMPLE_QUERIES = [
     (
         SAMPLE_QUERY[0],
-        SAMPLE_QUERY[0] + long(QUERY_RANGE / 3)
+        SAMPLE_QUERY[0] + int(QUERY_RANGE / 3)
     ),
     (
-        SAMPLE_QUERY[0] + long(QUERY_RANGE / 3) + 1,
-        SAMPLE_QUERY[0] + long(QUERY_RANGE * 2 / 3)
+        SAMPLE_QUERY[0] + int(QUERY_RANGE / 3) + 1,
+        SAMPLE_QUERY[0] + int(QUERY_RANGE * 2 / 3)
     ),
     (
-        SAMPLE_QUERY[0] + long(QUERY_RANGE * 2 / 3) + 1,
+        SAMPLE_QUERY[0] + int(QUERY_RANGE * 2 / 3) + 1,
         SAMPLE_QUERY[1]
     ),
 ]
@@ -82,10 +82,10 @@ def test_ts_id():
     dt_end = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_END)
 
     start, end = lmtdb.get_ts_ids(dt_start, dt_end)
-    print "Intended start: %s" % dt_start
-    print "Actual start:   %s" % start
-    print "Intended end: %s" % dt_end
-    print "Actual end:   %s" % end
+    print("Intended start: %s" % dt_start)
+    print("Actual start:   %s" % start)
+    print("Intended end: %s" % dt_end)
+    print("Actual end:   %s" % end)
 
 def test_get_timeseries_data():
     """
@@ -109,4 +109,4 @@ def test_get_timeseries_data():
                                         dt_end,
                                         datetime.timedelta(seconds=60))
     assert result0 == result1 == result2 == result3
-    print result0
+    print(result0)

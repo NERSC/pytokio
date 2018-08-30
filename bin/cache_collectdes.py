@@ -101,9 +101,9 @@ def main(argv=None):
         output_file = gzip.open(args.output, 'w') if encoding == 'gzip' else open(args.output, 'w')
         json.dump(pages, output_file)
         output_file.close()
-        print "Wrote output to %s" % args.output
+        print("Wrote output to %s" % args.output)
     else:
-        print json.dumps(pages, indent=4, sort_keys=True)
+        print(json.dumps(pages, indent=4, sort_keys=True))
 
 if __name__ == '__main__':
     main()
