@@ -98,7 +98,7 @@ def verify_cache_functionality(test_db):
     1. save_cache works when table_schema is only provided once, and not on the
        final query
     """
-    for test_table, test_table_schema in TEST_TABLES.iteritems():
+    for test_table, test_table_schema in TEST_TABLES.items():
         sum_limits = 0
         for iteration, limit in enumerate(LIMIT_CYCLES):
             sum_limits += limit
@@ -110,16 +110,16 @@ def verify_cache_functionality(test_db):
                 query_str='SELECT * from %s LIMIT %d' % (test_table, limit),
                 table=test_table,
                 table_schema=schema_param)
-            print "Got %d records from a limit of %d in %s" % (
+            print("Got %d records from a limit of %d in %s" % (
                 len(result),
                 limit,
-                test_table)
+                test_table))
             assert len(result) == limit
             assert len(test_db.saved_results[test_table]['rows']) == sum_limits
 
     ### Cache all TEST_TABLES to a single file
     test_db.save_cache(tokiotest.TEMP_FILE.name)
-    print "Created", tokiotest.TEMP_FILE.name
+    print("Created %s" % tokiotest.TEMP_FILE.name)
 
     ### Destroy any residual state, just in case
     test_db.close()
@@ -130,16 +130,16 @@ def verify_cache_functionality(test_db):
 
     ### Confirm that all tables were written
     result = test_db.query("SELECT COUNT(name) from sqlite_master WHERE type='table'")
-    print "Found %d tables in %s" % (result[0][0], test_db.cache_file)
+    print("Found %d tables in %s" % (result[0][0], test_db.cache_file))
     assert result[0][0] == len(TEST_TABLES)
 
     ### Confirm that the size of each table is correct
-    for test_table, test_table_schema in TEST_TABLES.iteritems():
+    for test_table, test_table_schema in TEST_TABLES.items():
         result = test_db.query(
             query_str='SELECT * from %s' % (test_table),
             table=test_table,
             table_schema=schema_param)
-        print "Found table %s with %d records" % (test_table, len(result))
+        print("Found table %s with %d records" % (test_table, len(result)))
         assert len(result) == LIMIT_CYCLES[-1]
 
 TEST_FUNCTIONS = [

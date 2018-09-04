@@ -5,7 +5,10 @@ Test the bin/summarize_job.py tool
 
 import os
 import json
-import StringIO
+try:
+    import StringIO as io
+except ImportError:
+    import io
 import pandas
 import tokiotest
 import tokiobin.summarize_job
@@ -20,8 +23,8 @@ def verify_output_json(output_str, key=None, value=None):
     """
     for parsed_data in json.loads(output_str):
         if key is not None:
-            print "Checking if %s is present" % key
-            assert key in parsed_data.keys()
+            print("Checking if %s is present" % key)
+            assert key in list(parsed_data.keys())
             if value is not None:
                 assert parsed_data[key] == value
 
@@ -32,7 +35,7 @@ def verify_output_csv(output_str, key=None, value=None, expected_rows=None):
     Given the stdout of summarize_job.py, ensure that it is re-readable by
     pandas.read_csv and ensure that a given column (key) is present
     """
-    dataframe = pandas.read_csv(StringIO.StringIO(output_str))
+    dataframe = pandas.read_csv(io.StringIO(output_str))
     if key is not None:
         assert key in dataframe.columns
 

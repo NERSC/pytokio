@@ -108,7 +108,7 @@ def verify_fullness(result):
     """
     Verify correctness of get_fullness_at_datetime()
     """
-    print json.dumps(result, indent=4, sort_keys=True)
+    print(json.dumps(result, indent=4, sort_keys=True))
     assert result['ost_avg_full_kib'] > 0
     assert 0.0 < result['ost_avg_full_pct'] < 100.0
     assert result['ost_count'] > 1
@@ -120,7 +120,7 @@ def verify_failures(result):
     """
     Verify correctness of get_failures_at_datetime()
     """
-    print json.dumps(result, indent=4, sort_keys=True)
+    print(json.dumps(result, indent=4, sort_keys=True))
     assert result['ost_next_timestamp'] > result['ost_actual_timestamp']
     assert result['ost_overloaded_oss_count'] == tokiotest.SAMPLE_OSTMAP_OVERLOAD_OSS
     ### ensure that ost_avg_overloaded_ost_per_oss is calculated correctly
@@ -132,7 +132,7 @@ def test_get_functions():
     """
     Iterate over all test cases
     """
-    for func, tests in TEST_CONDITIONS.iteritems():
+    for func, tests in TEST_CONDITIONS.items():
         for config in tests:
             test_func = func
             test_func.description = config['description'] + ", no cache"

@@ -12,9 +12,9 @@ import subprocess
 import datetime
 
 try:
-    import cStringIO as StringIO
+    import StringIO as io
 except ImportError:
-    import StringIO
+    import io
 
 import nose
 
@@ -82,6 +82,7 @@ SAMPLE_LMTDB_NONMONO_START_STAMP = "2018-04-18T00:00:00"
 SAMPLE_LMTDB_NONMONO_END_STAMP = "2018-04-19T00:00:00"
 SAMPLE_XTDB2PROC_FILE = os.path.join(INPUT_DIR, 'sample.xtdb2proc.gz')
 SAMPLE_H5LMT_FILE = os.path.join(INPUT_DIR, 'sample.h5lmt')
+SAMPLE_VERSIONS_HDF5 = os.path.join(INPUT_DIR, 'versions_test.hdf5')
 SAMPLE_H5LMT_DATES = ['2017-03-20', '2017-03-21']
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_TIMESERIES_FILES = {
@@ -162,8 +163,8 @@ class CaptureOutputs(object):
     def __enter__(self):
         self.actual_stdout = sys.stdout
         self.actual_stderr = sys.stderr
-        self.stdout = StringIO.StringIO()
-        self.stderr = StringIO.StringIO()
+        self.stdout = io.StringIO()
+        self.stderr = io.StringIO()
         sys.stdout = self.stdout
         sys.stderr = self.stderr
         return self
@@ -207,7 +208,7 @@ def needs_darshan(func):
         subprocess.check_output(tokio.connectors.darshan.DARSHAN_PARSER_BIN,
                                 stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_DARSHAN = True
     except subprocess.CalledProcessError:
         # this is ok--there's no way to make darshan-parser return zero without
@@ -235,11 +236,9 @@ def needs_lustre_cli(func):
         subprocess.check_output(tokio.connectors.lfshealth.LCTL_DL_T, stderr=subprocess.STDOUT)
         subprocess.check_output(tokio.connectors.lfshealth.LFS_DF, stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_LFSHEALTH = True
     except subprocess.CalledProcessError:
-        # this is ok--there's no way to make darshan-parser return zero without
-        # giving it a real darshan log
         pass
 
     return func
@@ -264,7 +263,7 @@ def needs_slurm(func):
     try:
         subprocess.check_output(tokio.connectors.slurm.SACCT, stderr=subprocess.STDOUT)
     except OSError as error:
-        if error[0] == errno.ENOENT:
+        if error.errno == errno.ENOENT:
             SKIP_SLURM = True
     except subprocess.CalledProcessError:
         pass
@@ -310,7 +309,7 @@ def gunzip(input_filename, output_filename):
     with gzip.open(input_filename, 'rb') as input_file:
         file_content = input_file.read()
     with open(output_filename, 'w+b') as output_file:
-        print "Creating %s" % output_filename
+        print("Creating %s" % output_filename)
         output_file.write(file_content)
 
 def try_unlink(output_filename):
@@ -318,5 +317,5 @@ def try_unlink(output_filename):
     Destroy a temporarily decompressed input file
     """
     if os.path.exists(output_filename):
-        print "Destroying %s" % output_filename
+        print("Destroying %s" % output_filename)
         os.unlink(output_filename)

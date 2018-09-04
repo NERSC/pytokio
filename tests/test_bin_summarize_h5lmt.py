@@ -45,9 +45,9 @@ def run_summarize_h5lmt(args):
     """
     Run an instance of summarize_h5lmt.py
     """
-    print "Running %s %s" % ('bin/summarize_h5lmt.py', ' '.join(args))
+    print("Running %s %s" % ('bin/summarize_h5lmt.py', ' '.join(args)))
     output_str = tokiotest.run_bin(tokiobin.summarize_h5lmt, args)
-    assert output_str > 0
+    assert len(output_str) > 0
 
     if '--json' in args:
         if '--summary' in args:
@@ -59,7 +59,7 @@ def test_all():
     """
     Run through the different test conditions
     """
-    for descr, args in INPUT_PARAMS.iteritems():
+    for descr, args in INPUT_PARAMS.items():
         func = run_summarize_h5lmt
         func.description = 'bin/summarize_h5lmt.py ' + descr
         yield func, args

@@ -42,7 +42,7 @@ def process_darshan_perfs(summary_jsons,
     results['per_exe'] = collections.defaultdict(lambda: collections.defaultdict(int))
     results['per_user_exe_fs'] = collections.defaultdict(lambda: collections.defaultdict(int))
 
-    for darshan_log, counters in summary.iteritems():
+    for darshan_log, counters in summary.items():
         darshan_log_bn = os.path.basename(darshan_log)
         regex_match = regex_filename.search(darshan_log_bn)
         if regex_match:
@@ -64,16 +64,16 @@ def process_darshan_perfs(summary_jsons,
 
         # precompile regular expressions
         mount_to_fsname = {}
-        for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).iteritems():
+        for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
             mount_to_fsname[re.compile(rex_str)] = fsname
 
-        for mount in counters.keys():
+        for mount in counters:
             if mount == '/':
                 continue
 
             # try to map mount to a logical file system name
             fs_key = None
-            for mount_rex, fsname in mount_to_fsname.iteritems():
+            for mount_rex, fsname in mount_to_fsname.items():
                 match = mount_rex.match(mount)
                 if match:
                     fs_key = fsname
@@ -121,7 +121,7 @@ def print_top(categorized_data, max_show=10):
     }
 
     categories = 0
-    for category, rankings in categorized_data.iteritems():
+    for category, rankings in categorized_data.items():
         print_buffer = ""
         name = names.get(category, category)
         if categories > 0:
@@ -190,7 +190,7 @@ def main(argv=None):
 
     results = process_darshan_perfs(args.summaryjson, **kwargs)
     if args.json:
-        print json.dumps(results, indent=4, sort_keys=True)
+        print(json.dumps(results, indent=4, sort_keys=True))
     else:
         print_top(results, max_show=args.max_show)
 

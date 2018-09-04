@@ -11,7 +11,7 @@ import tokiobin.find_darshanlogs
 def wrap_function(test_input):
     """Allow named args to pass through nosetests
     """
-    print "Running:", test_input['descr']
+    print("Running: %s" % test_input['descr'])
 
     argv = []
     if test_input['params']['datetime_start'] is not None:
@@ -27,7 +27,7 @@ def wrap_function(test_input):
         argv += ['--load', test_input['params']['which']]
     argv += [test_input['params']['darshan_log_dir']]
 
-    print "Test args:", argv
+    print("Test args: %s" % argv)
 
     expected_exception = test_input.get('expect_exception')
     if expected_exception:
