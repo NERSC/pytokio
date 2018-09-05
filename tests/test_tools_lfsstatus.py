@@ -30,75 +30,75 @@ SAMPLE_OSTMAP_HALFWAY = SAMPLE_OSTMAP_START + SAMPLE_OSTMAP_DELTA
 SAMPLE_OSTMAP_BEFORE = SAMPLE_OSTMAP_START - datetime.timedelta(seconds=1)
 SAMPLE_OSTMAP_AFTER = SAMPLE_OSTMAP_END + datetime.timedelta(seconds=1)
 
-def wrap_get_fullness_at_datetime(datetime_target, cache_file):
+def wrap_get_fullness(datetime_target, cache_file):
     """
-    Encapsulate test and validation of lfsstatus.get_fullness_at_datetime into a
+    Encapsulate test and validation of lfsstatus.get_fullness into a
     single function
     """
-    result = lfsstatus.get_fullness_at_datetime(
+    result = lfsstatus.get_fullness(
         SAMPLE_DARSHAN_SONEXION_ID,
         datetime_target,
-        cache_file)
+        cache_file=cache_file)
     verify_fullness(result)
 
-def wrap_get_failures_at_datetime(datetime_target, cache_file):
+def wrap_get_failures(datetime_target, cache_file):
     """
-    Encapsulate test and validation of lfsstatus.get_failures_at_datetime into a
+    Encapsulate test and validation of lfsstatus.get_failures into a
     single function
     """
-    result = lfsstatus.get_failures_at_datetime(
+    result = lfsstatus.get_failures(
         SAMPLE_DARSHAN_SONEXION_ID,
         datetime_target,
-        cache_file)
+        cache_file=cache_file)
     verify_failures(result)
 
 CACHE_FILES = {
-    wrap_get_fullness_at_datetime: SAMPLE_OSTFULLNESS_FILE,
-    wrap_get_failures_at_datetime: SAMPLE_OSTMAP_FILE,
+    wrap_get_fullness: SAMPLE_OSTFULLNESS_FILE,
+    wrap_get_failures: SAMPLE_OSTMAP_FILE,
 }
 
 TEST_CONDITIONS = {
-    wrap_get_fullness_at_datetime: [
+    wrap_get_fullness: [
         {
-            'description': "lfsstatus.get_fullness_at_datetime() baseline functionality",
+            'description': "lfsstatus.get_fullness() baseline functionality",
             'datetime_target': SAMPLE_OSTFULLNESS_HALFWAY,
         },
         {
-            'description': "lfsstatus.get_fullness_at_datetime() first timestamp",
+            'description': "lfsstatus.get_fullness() first timestamp",
             'datetime_target': SAMPLE_OSTFULLNESS_START,
         },
         {
-            'description': "lfsstatus.get_fullness_at_datetime() last timestamp",
+            'description': "lfsstatus.get_fullness() last timestamp",
             'datetime_target': SAMPLE_OSTFULLNESS_END,
         },
         {
-            'description': "lfsstatus.get_fullness_at_datetime() before first timestamp",
+            'description': "lfsstatus.get_fullness() before first timestamp",
             'datetime_target': SAMPLE_OSTFULLNESS_BEFORE,
         },
         {
-            'description': "lfsstatus.get_fullness_at_datetime() after file",
+            'description': "lfsstatus.get_fullness() after file",
             'datetime_target': SAMPLE_OSTFULLNESS_AFTER,
         },
     ],
-    wrap_get_failures_at_datetime: [
+    wrap_get_failures: [
         {
-            'description': "lfsstatus.get_failures_at_datetime() baseline functionality",
+            'description': "lfsstatus.get_failures() baseline functionality",
             'datetime_target': SAMPLE_OSTMAP_HALFWAY,
         },
         {
-            'description': "lfsstatus.get_failures_at_datetime() first timestamp",
+            'description': "lfsstatus.get_failures() first timestamp",
             'datetime_target': SAMPLE_OSTMAP_START,
         },
         {
-            'description': "lfsstatus.get_failures_at_datetime() last timestamp",
+            'description': "lfsstatus.get_failures() last timestamp",
             'datetime_target': SAMPLE_OSTMAP_END,
         },
         {
-            'description': "lfsstatus.get_failures_at_datetime() before file",
+            'description': "lfsstatus.get_failures() before file",
             'datetime_target': SAMPLE_OSTMAP_BEFORE,
         },
         {
-            'description': "lfsstatus.get_failures_at_datetime() after file",
+            'description': "lfsstatus.get_failures() after file",
             'datetime_target': SAMPLE_OSTMAP_AFTER,
         },
     ],
@@ -106,7 +106,7 @@ TEST_CONDITIONS = {
 
 def verify_fullness(result):
     """
-    Verify correctness of get_fullness_at_datetime()
+    Verify correctness of get_fullness()
     """
     print(json.dumps(result, indent=4, sort_keys=True))
     assert result['ost_avg_full_kib'] > 0
@@ -118,7 +118,7 @@ def verify_fullness(result):
 
 def verify_failures(result):
     """
-    Verify correctness of get_failures_at_datetime()
+    Verify correctness of get_failures()
     """
     print(json.dumps(result, indent=4, sort_keys=True))
     assert result['ost_next_timestamp'] > result['ost_actual_timestamp']
