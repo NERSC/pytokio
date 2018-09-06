@@ -566,6 +566,9 @@ class Hdf5(h5py.File):
     data.
 
     Attributes:
+        always_translate (bool): If True, looking up datasets by keys will
+            always attempt to map that key to a new dataset according to the
+            schema even if the key matches the name of an existing dataset.
         dataset_providers (dict): Map of logical dataset names (keys) to dicts
             that describe the functions used to convert underlying literal
             dataset data into the format expected when dereferencing the logical
@@ -594,6 +597,10 @@ class Hdf5(h5py.File):
 
         super(Hdf5, self).__init__(*args, **kwargs)
 
+        # If True, always translate __getitem__ requests according to the
+        # schema, even if __getitem__ requests a dataset that exists
+        self.always_translate = False
+
         self._version = self.attrs.get('version')
         if isinstance(self._version, bytes):
             self._version = self._version.decode()
@@ -621,10 +628,17 @@ class Hdf5(h5py.File):
                    numpy.ndarray if key maps to a provider function that can
                                  calculate the requested data
         """
+        if not self.always_translate and super(Hdf5, self).__contains__(key):
+            # If the dataset exists in the underlying HDF5 file, just return it
+            return super(Hdf5, self).__getitem__(key)
+
         resolved_key, provider = self._resolve_schema_key(key)
+
         if resolved_key:
+            # Otherwise, attempt to map the logical key to a literal key
             return super(Hdf5, self).__getitem__(resolved_key)
         elif provider:
+            # Or run the value through a key provider
             provider_func = provider.get('func')
             provider_args = provider.get('args', {})
             if provider_func is None:
@@ -633,7 +647,7 @@ class Hdf5(h5py.File):
             else:
                 return provider_func(self, **provider_args)
         else:
-            # this should never be hit based on the possible outputs of _resolve_schema_key
+            # This should never be hit based on the possible outputs of _resolve_schema_key
             errmsg = "_resolve_schema_key: undefined output from %s" % key
             raise KeyError(errmsg)
 
@@ -646,20 +660,20 @@ class Hdf5(h5py.File):
         if super(Hdf5, self).__contains__(key):
             # If the dataset exists in the underlying HDF5 file, just return it
             return key, None
-        else:
-            # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isstr(key) else key
-            if key in self.schema:
-                hdf5_key = self.schema.get(key)
-                if super(Hdf5, self).__contains__(hdf5_key):
-                    return hdf5_key, None
 
-            # Key maps to a transformation
-            if key in self.dataset_providers:
-                return None, self.dataset_providers[key]
+        # Straight mapping between the key and a dataset
+        key = key.lstrip('/') if isstr(key) else key
+        if key in self.schema:
+            hdf5_key = self.schema.get(key)
+            if super(Hdf5, self).__contains__(hdf5_key):
+                return hdf5_key, None
 
-            errmsg = "Unknown key %s in %s" % (key, self.filename)
-            raise KeyError(errmsg)
+        # Key maps to a transformation
+        if key in self.dataset_providers:
+            return None, self.dataset_providers[key]
+
+        errmsg = "Unknown key %s in %s" % (key, self.filename)
+        raise KeyError(errmsg)
 
     def get_version(self, dataset_name=None):
         """Get the version attribute from an HDF5 file dataset
