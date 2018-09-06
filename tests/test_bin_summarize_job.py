@@ -54,6 +54,7 @@ def test_get_biggest_fs():
     """
     tokiotest.check_darshan()
     argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_biggest_read_fs')
 
@@ -64,6 +65,7 @@ def test_get_biggest_api():
     """
     tokiotest.check_darshan()
     argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
 
@@ -74,6 +76,7 @@ def test_json():
     """
     tokiotest.check_darshan()
     argv = ['--json', tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
@@ -87,6 +90,7 @@ def test_csv():
     """
     tokiotest.check_darshan()
     argv = [tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
@@ -100,6 +104,7 @@ def test_darshan_summaries():
     """
     tokiotest.check_darshan()
     argv = [tokiotest.SAMPLE_DARSHAN_LOG, SAMPLE_DARSHAN_LOG_2]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
@@ -117,6 +122,7 @@ def test_bogus_darshans():
             tokiotest.SAMPLE_XTDB2PROC_FILE,    # not valid log
             SAMPLE_DARSHAN_LOG_2,               # valid log
             'garbagefile']                      # file doesn't exist
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_csv(output_str, key='darshan_agg_perf_by_slowest_posix', expected_rows=2)
     assert verify_output_csv(output_str, key='darshan_biggest_read_api')
@@ -136,6 +142,7 @@ def test_with_topology():
             '--slurm-jobid', tokiotest.SAMPLE_SLURM_CACHE_FILE,
             '--json',
             tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
@@ -154,6 +161,7 @@ def test_with_lfsstatus():
             '--ost-fullness', tokiotest.SAMPLE_OSTFULLNESS_FILE,
             '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
             tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
@@ -171,6 +179,7 @@ def test_with_nersc_jobsdb():
             '--concurrentjobs', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
             '--jobhost', tokiotest.SAMPLE_DARSHAN_JOBHOST,
             tokiotest.SAMPLE_DARSHAN_LOG]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='darshan_agg_perf_by_slowest_posix')
     assert verify_output_json(output_str, key='darshan_biggest_read_api')
@@ -187,6 +196,7 @@ def test_without_darshan():
             '--start-time', tokiotest.SAMPLE_DARSHAN_START_TIME,
             '--end-time', tokiotest.SAMPLE_DARSHAN_END_TIME,
             '--file-system', tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='fs_tot_gibs_written')
 
@@ -208,6 +218,7 @@ def test_most_without_darshan():
             '--ost-map', tokiotest.SAMPLE_OSTMAP_FILE,
 
             '--topology', tokiotest.SAMPLE_XTDB2PROC_FILE]
+    print("Executing: %s" % ' '.join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_job, argv)
     assert verify_output_json(output_str, key='fs_tot_gibs_written')
     assert verify_output_json(output_str, key='jobsdb_concurrent_nodehrs')

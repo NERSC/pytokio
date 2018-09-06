@@ -32,7 +32,11 @@ def get_fullness(file_system, datetime_target, **kwargs):
     for provider in providers:
         if provider == 'hdf5':
             match = True
-            fullness = get_fullness_hdf5(file_system, datetime_target)
+            try:
+                fullness = get_fullness_hdf5(file_system, datetime_target)
+            except KeyError:
+                # get_fullness_hdf5 throws KeyError if fullness data is not available
+                match = False
             if fullness:
                 return fullness
         if provider == 'nersc_lfsstate':
@@ -50,14 +54,15 @@ def get_fullness(file_system, datetime_target, **kwargs):
 
     raise Exception("No valid lfsstatus fullness providers found")
 
+
 def get_failures(file_system, datetime_target, **kwargs):
     """Get file system failures
 
     Is a convenience wrapper for `get_summary`.
 
     Args:
-        file_system (str): Name of file system whose data should be retrieved
-            (e.g., snx11168)
+        file_system (str): Logical name of file system whose data should be
+            retrieved (e.g., cscratch)
         datetime_target (datetime.datetime): Time at which requested data
             should be retrieved
         cache_file (str): Basename of file to search for the requested data
@@ -65,7 +70,9 @@ def get_failures(file_system, datetime_target, **kwargs):
     Returns:
         dict: various statistics about the file system fullness
     """
-    return get_summary_lfsstate(file_system, datetime_target, "failures", **kwargs)
+    fsname = tokio.config.CONFIG.get('fsname_to_backend_name', {}).get(file_system)
+    return get_summary_lfsstate(fsname if fsname else file_system, datetime_target, "failures", **kwargs)
+
 
 def get_summary_lfsstate(file_system, datetime_target, metric, cache_file=None):
     """Get file system fullness or failures
