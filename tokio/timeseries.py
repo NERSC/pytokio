@@ -117,9 +117,9 @@ class TimeSeries(object):
         """
         self.dataset_name = dataset_name
 
-        if dataset_name in hdf5_file:
+        try:
             dataset = hdf5_file[dataset_name]
-        else:
+        except KeyError:
             # can't attach because dataset doesn't exist; pass this back to caller so it can init
             return False
 
