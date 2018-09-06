@@ -564,27 +564,25 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         fs_key = results.get('_file_system')
         if fs_key is None or fs_key not in tokio.config.CONFIG.get('fsname_to_backend_name', {}):
             return results
-        snx_name = tokio.config.CONFIG['fsname_to_backend_name'][fs_key]
 
         # Get the OST fullness summary
         try:
-            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_fullness)
+            module_results = tokio.tools.lfsstatus.get_fullness(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_fullness)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
         merge_dicts(results, module_results, prefix='fshealth_')
 
         # Get the OST failure status
-        # Note that get_failures_at_datetime will clobber the
-        # ost_timestamp_* keys from get_fullness_at_datetime above;
-        # these aren't used for correlation analysis and should be
-        # pretty close anyway.
+        # Note that get_failures will clobber the ost_timestamp_* keys from
+        # get_fullness above; these aren't used for correlation analysis and
+        # should be pretty close anyway.
         try:
-            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_map)
+            module_results = tokio.tools.lfsstatus.get_failures(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_map)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
