@@ -643,12 +643,10 @@ class Hdf5(h5py.File):
         directly, or return a provider function and arguments to generate the
         dataset dynamically
         """
-        try:
+        if super(Hdf5, self).__contains__(key):
             # If the dataset exists in the underlying HDF5 file, just return it
-            super(Hdf5, self).__getitem__(key)
             return key, None
-
-        except KeyError:
+        else:
             # Straight mapping between the key and a dataset
             key = key.lstrip('/') if isstr(key) else key
             if key in self.schema:

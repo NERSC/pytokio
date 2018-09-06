@@ -86,6 +86,23 @@ def test_h5lmt_compat():
         assert len(dataframed) > 0
         assert len(dataframed.columns) > 0
 
+@nose.tools.raises(KeyError)
+def test_h5lmt_invalid_dataset():
+    """connectors.hdf5.Hdf5() h5lmt support, non-existent dataset
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    dataset_name = '/abc/def'
+    print("Checking %s" % dataset_name)
+    dataset = hdf5_file[dataset_name]
+
+def test_h5lmt_invalid_dataset_get():
+    """connectors.hdf5.Hdf5() h5lmt support, .get(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    dataset_name = '/abc/def'
+    print("Checking %s" % dataset_name)
+    assert hdf5_file.get(dataset_name) is None
+
 def _test_to_dataframe(hdf5_file, dataset_name):
     """Exercise to_dataframe() and check basic correctness
     """
@@ -110,6 +127,25 @@ def test_tts():
     connectors.hdf5.Hdf5() TOKIO Time Series support
     """
     assert tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+
+def test_invalid_dataset_get():
+    """
+    connectors.hdf5.get(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    dataset_name = '/abc/def'
+    print("Checking %s" % dataset_name)
+    assert hdf5_file.get(dataset_name) is None
+
+@nose.tools.raises(KeyError)
+def test_invalid_dataset():
+    """
+    connectors.hdf5, non-existent dataset
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    dataset_name = '/abc/def'
+    print("Checking %s" % dataset_name)
+    dataset = hdf5_file[dataset_name]
 
 def test_mapped_dataset():
     """
