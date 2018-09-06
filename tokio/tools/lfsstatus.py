@@ -42,10 +42,10 @@ def get_fullness(file_system, datetime_target, **kwargs):
         if provider == 'nersc_lfsstate':
             match = True
             fsname = tokio.config.CONFIG.get('fsname_to_backend_name', {}).get(file_system)
-            fullness = get_summary_lfsstate(fsname if fsname else file_system,
-                                            datetime_target,
-                                            "fullness",
-                                            **kwargs)
+            fullness = get_lfsstate(fsname if fsname else file_system,
+                                    datetime_target,
+                                    "fullness",
+                                    **kwargs)
             if fullness:
                 return fullness
 
@@ -71,10 +71,44 @@ def get_failures(file_system, datetime_target, **kwargs):
         dict: various statistics about the file system fullness
     """
     fsname = tokio.config.CONFIG.get('fsname_to_backend_name', {}).get(file_system)
-    return get_summary_lfsstate(fsname if fsname else file_system, datetime_target, "failures", **kwargs)
+    return get_lfsstate(fsname if fsname else file_system, datetime_target, "failures", **kwargs)
 
 
-def get_summary_lfsstate(file_system, datetime_target, metric, cache_file=None):
+def get_fullness_lfsstate(file_system, datetime_target, cache_file=None):
+    """Get file system fullness from nersc_lfsstate connector
+
+    Wrapper around the generic get_lfsstate function.
+
+    Args:
+        file_system (str): Lustre file system name of the file system whose
+            data should be retrieved (e.g., snx11025)
+        datetime_target (datetime.datetime): Time at which requested data
+            should be retrieved
+        cache_file (str): Basename of file to search for the requested data
+
+    Returns:
+        Whatever is returned by get_lfsstate
+    """
+    return get_lfsstate(file_system, datetime_target, 'fullness', cache_file)
+
+def get_failures_lfsstate(file_system, datetime_target, cache_file=None):
+    """Get file system failures from nersc_lfsstate connector
+
+    Wrapper around the generic get_lfsstate function.
+
+    Args:
+        file_system (str): Lustre file system name of the file system whose
+            data should be retrieved (e.g., snx11025)
+        datetime_target (datetime.datetime): Time at which requested data
+            should be retrieved
+        cache_file (str): Basename of file to search for the requested data
+
+    Returns:
+        Whatever is returned by get_lfsstate
+    """
+    return get_lfsstate(file_system, datetime_target, 'failures', cache_file)
+
+def get_lfsstate(file_system, datetime_target, metric, cache_file=None):
     """Get file system fullness or failures
 
     Given a file system name (e.g., snx11168) and a datetime object
@@ -85,7 +119,8 @@ def get_summary_lfsstate(file_system, datetime_target, metric, cache_file=None):
         3. return summary statistics about the OST fullness or OST failures
 
     Args:
-        file_system (str): Name of file system whose data should be retrieved
+        file_system (str): Lustre file system name of the file system whose
+            data should be retrieved (e.g., snx11025)
         datetime_target (datetime.datetime): Time at which requested data
             should be retrieved
         metric (str): either "fullness" or "failures"
@@ -160,9 +195,9 @@ def get_summary_lfsstate(file_system, datetime_target, metric, cache_file=None):
     fs_data = ost_health[timestamps[target_index]][file_system]
 
     if metric == "fullness":
-        results = summarize_fullness(fs_data)
+        results = _summarize_fullness(fs_data)
     if metric == "failures":
-        results = summarize_failover(fs_data)
+        results = _summarize_failover(fs_data)
 
     # In case you want to interpolate--hope is that we have enough data points
     # where OST volumes will not change significantly enough to require
@@ -211,7 +246,7 @@ def get_fullness_hdf5(file_system, datetime_target):
     # Find closest matching timestamp
     iloc = df_bytes.index.get_loc(datetime_target, method='nearest')
 
-    # Build a dictionary that summarize_fullness will accept as input
+    # Build a dictionary that _summarize_fullness will accept as input
     results = {}
     for ostname, value in df_bytes.iloc[iloc].items():
         ostname_key = ostname.split('-')[-1]
@@ -227,7 +262,7 @@ def get_fullness_hdf5(file_system, datetime_target):
             'target_index': target_index,
         }
 
-    summarized_data = summarize_fullness(results)
+    summarized_data = _summarize_fullness(results)
 
     # for interpolation and error bounding
     if iloc < len(df_bytes.index):
@@ -241,7 +276,7 @@ def get_fullness_hdf5(file_system, datetime_target):
     return summarized_data
 
 
-def summarize_fullness(fs_data):
+def _summarize_fullness(fs_data):
     """Summarize fullness data for a single time record
 
     Given an fs_data dict, generate a dict of summary statistics.  Expects
@@ -314,7 +349,7 @@ def summarize_fullness(fs_data):
     return results
 
 
-def summarize_failover(fs_data):
+def _summarize_failover(fs_data):
     """Summarize failover data for a single time record
 
     Given an fs_data dict, generate a dict of summary statistics. Expects
