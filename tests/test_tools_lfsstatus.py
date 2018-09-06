@@ -3,9 +3,10 @@
 Test the lfsstatus tool API
 """
 
-import os
 import json
 import datetime
+
+import nose
 import tokiotest
 from tokiotest import SAMPLE_OSTMAP_FILE, SAMPLE_OSTFULLNESS_FILE, SAMPLE_DARSHAN_SONEXION_ID
 import tokio
@@ -128,16 +129,94 @@ def verify_failures(result):
         int(float(result['ost_overloaded_ost_count']) / result['ost_overloaded_oss_count'])
     assert 'ost_requested_timestamp' in result
 
-def test_get_functions():
+@nose.tools.nottest
+def run_test_matrix(func):
+    """Iterate over all test cases
     """
-    Iterate over all test cases
-    """
-    for func, tests in TEST_CONDITIONS.items():
-        for config in tests:
-            test_func = func
-            test_func.description = config['description'] + ", no cache"
-            yield test_func, config['datetime_target'], None
+    for config in TEST_CONDITIONS[func]:
+        test_func = func
+        test_func.description = config['description'] + ", no cache"
+        yield test_func, config['datetime_target'], None
 
-            test_func = func
-            test_func.description = config['description'] + ", cache"
-            yield test_func, config['datetime_target'], CACHE_FILES[func]
+        test_func = func
+        test_func.description = config['description'] + ", cache"
+        yield test_func, config['datetime_target'], CACHE_FILES[func]
+
+def test_get_fullness_hdf5():
+    """tools.lfsstatus.get_fullness, HDF5
+    """
+    raise nose.SkipTest("No valid sample input")
+    tokio.config.CONFIG["lfsstatus_fullness_providers"] = ["hdf5"]
+    func = wrap_get_fullness
+    for test_func in run_test_matrix(func):
+        test_func[0].description += " via HDF5"
+        yield test_func 
+
+def test_get_fullness_lfsstate():
+    """tools.lfsstatus.get_fullness, nersc_lfsstate
+    """
+    tokio.config.CONFIG["lfsstatus_fullness_providers"] = ["nersc_lfsstate"]
+    func = wrap_get_fullness
+    for test_func in run_test_matrix(func):
+        test_func[0].description += " via nersc_lfsstate"
+        yield test_func 
+
+def test_get_failures_lfsstate():
+    """tools.lfsstatus.get_failures, nersc_lfsstate
+    """
+    func = wrap_get_failures
+    for test_func in run_test_matrix(func):
+        test_func[0].description += " via nersc_lfsstate"
+        yield test_func 
+
+def test_get_fullness_hdf5_fallthru():
+    """tools.lfsstatus.get_fullness, invalid hdf5 -> nersc_lfsstate
+    """
+    tokio.config.CONFIG["lfsstatus_fullness_providers"] = [
+        "hdf5",
+        "nersc_lfsstate"
+    ]
+    tmp = tokio.config.CONFIG["hdf5_files"]
+    tokio.config.CONFIG["hdf5_files"] = "xxx"
+
+    func = wrap_get_fullness
+    for test_func in run_test_matrix(func):
+        test_func[0].description += " via invalid hdf5 -> nersc_lfsstate"
+        yield test_func 
+
+    tokio.config.CONFIG["hdf5_files"] = tmp
+
+def test_get_fullness_lfsstate_fallthru():
+    """tools.lfsstatus.get_fullness, invalid nersc_lfsstate -> hdf5
+    """
+    raise nose.SkipTest("No valid sample input")
+    tokio.config.CONFIG["lfsstatus_fullness_providers"] = [
+        "nersc_lfsstate",
+        "hdf5",
+    ]
+    tmp = tokio.config.CONFIG["lfsstatus_fullness_files"]
+    tokio.config.CONFIG["lfsstatus_fullness_files"] = "xxx"
+
+    func = wrap_get_fullness
+    for test_func in run_test_matrix(func):
+        test_func[0].description += " via invalid nersc_lfsstate -> hdf5"
+        yield test_func 
+
+    tokio.config.CONFIG["lfsstatus_fullness_files"] = tmp
+
+def swap_config_param(key, value):
+    """Decorator to swap config values
+    """
+    def wrap_function(func):
+        def wrapped_function(*args, **kwargs):
+            old_value = tokio.config.CONFIG.get(key)
+            tokio.config.CONFIG[key] = value
+
+            func(*args, **kwargs)
+
+            if old_value is not None:
+                tokio.config.CONFIG[key] = old_value
+            else:
+                del tokio.config.CONFIG[key]
+        return wrapped_function
+    return wrap_function
