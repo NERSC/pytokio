@@ -25,8 +25,12 @@ def get_fullness(file_system, datetime_target, **kwargs):
 
     Returns:
         dict: various statistics about the file system fullness
+
+    Raises:
+        tokio.ConfigError: When no valid providers are found
     """
     providers = tokio.config.CONFIG.get('lfsstatus_fullness_providers', DEFAULT_FULLNESS_PROVIDERS)
+    print("Resolving via providers %s" % ", ".join(providers))
     match = False
     fullness = {}
     for provider in providers:
@@ -42,17 +46,21 @@ def get_fullness(file_system, datetime_target, **kwargs):
         if provider == 'nersc_lfsstate':
             match = True
             fsname = tokio.config.CONFIG.get('fsname_to_backend_name', {}).get(file_system)
-            fullness = get_lfsstate(fsname if fsname else file_system,
-                                    datetime_target,
-                                    "fullness",
-                                    **kwargs)
+            try:
+                fullness = get_lfsstate(fsname if fsname else file_system,
+                                        datetime_target,
+                                        "fullness",
+                                        **kwargs)
+            except IOError:
+                # get_lfsstate raises IOError if fullness data is not available
+                match = False
             if fullness:
                 return fullness
 
     if match:
         return fullness
 
-    raise Exception("No valid lfsstatus fullness providers found")
+    raise tokio.ConfigError("No valid lfsstatus fullness providers found")
 
 
 def get_failures(file_system, datetime_target, **kwargs):
@@ -128,13 +136,18 @@ def get_lfsstate(file_system, datetime_target, metric, cache_file=None):
 
     Returns:
         dict: various statistics about the file system fullness
+
+    Raises:
+        ValueError: if ``metric`` does not contain a valid option
+        IOError: when no valid data sources can be found for the given date
     """
+    print("get_lfsstate: %s" % tokio.config.CONFIG['lfsstatus_fullness_files'])
     if metric == "fullness":
         template_path = tokio.config.CONFIG['lfsstatus_fullness_files']
     elif metric == "failures":
         template_path = tokio.config.CONFIG['lfsstatus_map_files']
     else:
-        raise Exception("unknown metric " + metric)
+        raise ValueError("unknown metric " + metric)
 
     if cache_file is None:
         # We assume a 1 day lookbehind.  Very wasteful, but we index on dates in
@@ -154,7 +167,7 @@ def get_lfsstate(file_system, datetime_target, metric, cache_file=None):
         ost_health_files = [cache_file]
 
     if not ost_health_files:
-        raise Exception("No OST health files found in %s for %s" % (
+        raise IOError("No OST health files found in %s for %s" % (
             template_path,
             str(datetime_target)))
 
@@ -224,6 +237,10 @@ def get_fullness_hdf5(file_system, datetime_target):
 
     Returns:
         dict: various statistics about the file system fullness
+
+    Raises:
+        ValueError: if an OST name is encountered which does not conform to
+            a naming convention from which an OST index can be derived
     """
     # For concordance with the lfsstate version, assume a generous lookbehind
     # that captures at least a few timesteps.  Lookahead does not need to be as

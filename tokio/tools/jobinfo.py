@@ -24,6 +24,9 @@ def get_job_startend(jobid, cache_file=None):
     Returns:
         tuple of datetime.datetime: Two-item tuple of (earliest start time,
             latest end time)
+
+    Raises:
+        tokio.ConfigError: When no valid providers are found
     """
     jobid_providers = config.CONFIG.get('jobinfo_jobid_providers', DEFAULT_JOBID_PROVIDERS)
     for jobid_provider in jobid_providers:
@@ -40,9 +43,8 @@ def get_job_startend(jobid, cache_file=None):
             start, end = nersc_jobsdb.get_job_startend(jobid=jobid, nersc_host=nersc_host)
             return datetime.datetime.fromtimestamp(start), datetime.datetime.fromtimestamp(end)
         else:
-            # TODO: this needs a better exception
-            raise Exception("No valid jobid providers found")
-    raise Exception("No valid jobid providers found")
+            raise tokio.ConfigError("No valid jobid providers found")
+    raise tokio.ConfigError("No valid jobid providers found")
 
 def get_job_nodes(jobid, cache_file=None):
     """Return a list of all job nodes used.
@@ -51,6 +53,9 @@ def get_job_nodes(jobid, cache_file=None):
 
     Returns:
         set: Set of node names used by the job described by this object
+
+    Raises:
+        tokio.ConfigError: When no valid providers are found
     """
     jobnodes_providers = config.CONFIG.get('jobinfo_jobnodes_providers', DEFAULT_JOBNODES_PROVIDERS)
     for jobnodes_provider in jobnodes_providers:
@@ -58,6 +63,5 @@ def get_job_nodes(jobid, cache_file=None):
             slurm_job = tokio.connectors.slurm.Slurm(jobid=jobid, cache_file=cache_file)
             return slurm_job.get_job_nodes()
         else:
-            # TODO: this needs a better exception
-            raise Exception("No valid jobnodes providers found")
-    raise Exception("No valid jobnodes providers found")
+            raise tokio.ConfigError("No valid jobnodes providers found")
+    raise tokio.ConfigError("No valid jobnodes providers found")

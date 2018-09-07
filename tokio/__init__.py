@@ -11,3 +11,6 @@ import tokio.debug
 import tokio.connectors
 import tokio.tools
 import tokio.analysis
+
+# Exceptions
+from tokio.common import ConfigError
