@@ -219,7 +219,7 @@ def _test_get_index(input_file):
         dataset = hdf5_file.get(dataset_name)
         assert dataset is not None
 
-        timestamps = hdf5_file.get_timestamps(dataset_name)
+        timestamps = hdf5_file.get_timestamps(dataset_name)[...]
         timestep = timestamps[1] - timestamps[0]
         num_stamps = len(timestamps)
         target_indices = [0, num_stamps//4, num_stamps//2, 3*num_stamps//4, num_stamps-1]
