@@ -501,11 +501,13 @@ def retrieve_lmt_data(results, file_system):
                 results['_datetime_end']),
             'getattr'
         ))
-        # Missing data
+        # Missing data - this requires using a key that directly maps to a
+        # dataset, since any transformation may destroy information on what data
+        # are missing.
         module_results.update(summarize_missing_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
                 results['_file_system'],
-                '/FSMissingGroup/FSMissingDataSet',
+                '/datatargets/readbytes',
                 results['_datetime_start'],
                 results['_datetime_end'])))
     except IOError as error:
