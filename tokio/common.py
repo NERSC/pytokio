@@ -6,6 +6,9 @@ import json
 import datetime
 import numpy
 
+class ConfigError(RuntimeError):
+    pass
+
 def isstr(obj):
     """Determine if an object is a string or string-derivative
 

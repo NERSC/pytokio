@@ -14,17 +14,17 @@ def main(argv=None):
     """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--slurm-cache", default=None, type=str,
-                       help="path to slurm job cache file")
-    parser.add_argument("--craysdb-cache", default=None, type=str,
+    group.add_argument("--jobinfo-cache", default=None, type=str,
+                       help="path to jobinfo (e.g., Slurm) cache file")
+    parser.add_argument("--nodemap-cache", default=None, type=str,
                         help="path to xtdb2proc cache file")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     group.add_argument("jobid", nargs='?', default=None, help="Slurm job id of interest")
     args = parser.parse_args(argv)
 
     topology_result = tokio.tools.topology.get_job_diameter(jobid=args.jobid,
-                                                            craysdb_cache_file=args.craysdb_cache,
-                                                            slurm_cache_file=args.slurm_cache)
+                                                            nodemap_cache_file=args.nodemap_cache,
+                                                            jobinfo_cache_file=args.jobinfo_cache)
     # Serialize the object
     cache_file = args.output
     if cache_file is None:

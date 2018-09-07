@@ -45,8 +45,10 @@ class TimeSeries(object):
         self.timestamp_key = timestamp_key
         # True = natural sort columns assuming hex-encoded numbers; False = only recognize decimals
         self.sort_hex = sort_hex
-        # string describing schema version
+        # string describing dataset version
         self.version = None
+        # string describing schema version
+        self.global_version = None
 
         # attempt to attach the object if requested.
         if dataset_name is not None:
@@ -98,10 +100,20 @@ class TimeSeries(object):
         self.dataset = numpy.full((len(self.timestamps), num_columns), -0.0)
         self.set_columns(column_names)
 
+        self.set_timestamp_key(timestamp_key, safe=True)
+
+    def set_timestamp_key(self, timestamp_key, safe=False):
+        """Set the timestamp key
+
+        Args:
+            timestamp_key (str or None): The key for the timestamp dataset.  If
+                None, use the default
+            safe (bool): If true, do not overwrite an existing timestamp key
+        """
         # Root the timestamp_key at the same parent as the dataset
-        if self.timestamp_key is None:
+        if not safe or self.timestamp_key is None:
             if timestamp_key is None:
-                self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] \
+                self.timestamp_key = '/'.join(self.dataset_name.split('/')[0:-1] \
                                      + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
             else:
                 self.timestamp_key = timestamp_key
@@ -117,22 +129,22 @@ class TimeSeries(object):
         """
         self.dataset_name = dataset_name
 
-        if dataset_name in hdf5_file:
+        try:
             dataset = hdf5_file[dataset_name]
-        else:
+        except KeyError:
             # can't attach because dataset doesn't exist; pass this back to caller so it can init
             return False
 
         self.dataset = dataset if light else dataset[:, :]
 
-        # load and decode version of dataset
+        # load and decode version of dataset and file schema
+        self.global_version = hdf5_file['/'].attrs.get('version')
         self.version = hdf5_file.get_version(dataset_name)
         if isinstance(self.version, bytes):
             self.version = self.version.decode()
 
         # copy columns into memory
         columns = hdf5_file.get_columns(dataset_name)
-        print("loaded %d columns from %s" % (len(columns), dataset_name))
         self.set_columns(columns)
 
         # copy metadata into memory
@@ -228,6 +240,10 @@ class TimeSeries(object):
         # If self.version was never set, don't set a dataset-level version in the HDF5
         if self.version is not None:
             hdf5_file.set_version(self.version, dataset_name=self.dataset_name)
+
+        # Set the file's global version to indicate its schema
+        if self.global_version is not None:
+            hdf5_file['/'].attrs['version'] = self.global_version
 
         # Insert/update dataset metadata
         for key, value in self.dataset_metadata.items():

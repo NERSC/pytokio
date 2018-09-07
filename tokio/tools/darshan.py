@@ -5,6 +5,7 @@ Tools to find Darshan logs within a system-wide repository
 import os
 import glob
 import tokio.tools.common
+import tokio.tools.jobinfo
 import tokio.connectors.darshan
 import tokio.connectors.slurm
 
@@ -98,8 +99,7 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
         if jobid is None:
             raise TypeError("datetime_start must be defined if jobid is not")
         else:
-            job_data = tokio.connectors.slurm.Slurm(jobid=jobid)
-            datetime_start, _ = job_data.get_job_startend()
+            datetime_start, _ = tokio.tools.jobinfo.get_job_startend(jobid=jobid)
 
     if datetime_end is None:
         datetime_end = datetime_start

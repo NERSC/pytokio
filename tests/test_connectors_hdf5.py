@@ -33,6 +33,8 @@ GET_SET_TRUE_VERSIONS = {
     '/a/d': 'global',
 }
 
+INVALID_DATASET = '/abc/def'
+
 def test_h5lmt():
     """connectors.hdf5.Hdf5() h5lmt support
     """
@@ -86,6 +88,21 @@ def test_h5lmt_compat():
         assert len(dataframed) > 0
         assert len(dataframed.columns) > 0
 
+def test_h5lmt_invalid_dataset_get():
+    """connectors.hdf5.Hdf5() h5lmt support, get(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    print("Checking %s" % INVALID_DATASET)
+    assert hdf5_file.get(INVALID_DATASET) is None
+
+@nose.tools.raises(KeyError)
+def test_h5lmt_invalid_dataset():
+    """connectors.hdf5.Hdf5() h5lmt support, __getitem__(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)
+    print("Checking %s" % INVALID_DATASET)
+    dataset = hdf5_file[INVALID_DATASET]
+
 def _test_to_dataframe(hdf5_file, dataset_name):
     """Exercise to_dataframe() and check basic correctness
     """
@@ -110,6 +127,23 @@ def test_tts():
     connectors.hdf5.Hdf5() TOKIO Time Series support
     """
     assert tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+
+def test_invalid_dataset_get():
+    """
+    connectors.hdf5.get(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    print("Checking %s" % INVALID_DATASET)
+    assert hdf5_file.get(INVALID_DATASET) is None
+
+@nose.tools.raises(KeyError)
+def test_invalid_dataset():
+    """
+    connectors.hdf5.__getitem__(non-existent dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    print("Checking %s" % INVALID_DATASET)
+    dataset = hdf5_file[INVALID_DATASET]
 
 def test_mapped_dataset():
     """
@@ -185,7 +219,7 @@ def _test_get_index(input_file):
         dataset = hdf5_file.get(dataset_name)
         assert dataset is not None
 
-        timestamps = hdf5_file.get_timestamps(dataset_name)
+        timestamps = hdf5_file.get_timestamps(dataset_name)[...]
         timestep = timestamps[1] - timestamps[0]
         num_stamps = len(timestamps)
         target_indices = [0, num_stamps//4, num_stamps//2, 3*num_stamps//4, num_stamps-1]
@@ -222,6 +256,14 @@ def _test_get_columns(input_file):
         column_names = hdf5_file.get_columns(dataset_name)
         assert len(column_names) > 0
 
+@nose.tools.raises(KeyError)
+def test_get_columns_invalid():
+    """
+    connectors.hdf5.Hdf5.get_columns(invalid dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    hdf5_file.get_columns(INVALID_DATASET)
+
 def test_get_timestamps():
     """
     connectors.hdf5.Hdf5.get_timestamps()
@@ -249,6 +291,14 @@ def _test_get_timestamps(input_file):
             if prev_delta is not None:
                 assert prev_delta == delta
             prev_delta = delta
+
+@nose.tools.raises(KeyError)
+def test_get_timestamps_invalid():
+    """
+    connectors.hdf5.Hdf5.get_timestamps(invalid dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    hdf5_file.get_timestamps(INVALID_DATASET)
 
 def test_missing_values():
     """
@@ -279,6 +329,18 @@ def test_missing_values():
     assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()
 
+def test_missing_getitem():
+    """
+    connectors.hdf5 missing values via __getitem__ API
+    """
+    hdf5 = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_TOKIOTS_FILE, 'r')
+    for dset_name in ['/datatargets/readbytes', '/datatargets/writebytes']:
+        missing_dset_name = dset_name + "/missing"
+        values = hdf5[missing_dset_name][...]
+
+        assert ((values == 1) | (values == 0)).all()
+        assert (values == hdf5.get_missing(dset_name)).all()
+
 def test_get_versions(hdf5_filename=tokiotest.SAMPLE_VERSIONS_HDF5):
     """connectors.hdf5.get_version()
     """
@@ -289,6 +351,14 @@ def test_get_versions(hdf5_filename=tokiotest.SAMPLE_VERSIONS_HDF5):
             version, type(version),
             true_version, type(true_version)))
         assert version == true_version
+
+@nose.tools.raises(KeyError)
+def test_get_versions_invalid():
+    """
+    connectors.hdf5.Hdf5.get_version(invalid dataset)
+    """
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_COLLECTDES_HDF5)
+    hdf5_file.get_version(INVALID_DATASET)
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_set_versions():

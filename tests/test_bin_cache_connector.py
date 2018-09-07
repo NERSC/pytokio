@@ -220,8 +220,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'description': 'bin/cache_topology.py',
         'binary':     tokiobin.cache_topology,
         'args':       [
-            '--craysdb-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
-            '--slurm-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
+            '--nodemap-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
+            '--jobinfo-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
         ],
         'validators': [verify_json,],
     },

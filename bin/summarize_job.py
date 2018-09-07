@@ -501,11 +501,13 @@ def retrieve_lmt_data(results, file_system):
                 results['_datetime_end']),
             'getattr'
         ))
-        # Missing data
+        # Missing data - this requires using a key that directly maps to a
+        # dataset, since any transformation may destroy information on what data
+        # are missing.
         module_results.update(summarize_missing_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
                 results['_file_system'],
-                '/FSMissingGroup/FSMissingDataSet',
+                '/datatargets/readbytes',
                 results['_datetime_start'],
                 results['_datetime_end'])))
     except IOError as error:
@@ -514,31 +516,29 @@ def retrieve_lmt_data(results, file_system):
     merge_dicts(results, module_results, prefix='fs_')
     return results
 
-def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
+def retrieve_topology_data(results, jobinfo_cache_file, nodemap_cache_file):
     """
     Get the diameter of the job (Cray XC)
     """
-    if craysdb_cache_file is not None:
+    if nodemap_cache_file is not None:
         if '_jobid' not in results:
             # bail out
             return results
 
-        # verify craysdb cache file
-        if craysdb_cache_file == "":
-            craysdb_cache_file = None
-        else:
-            craysdb_cache_file = craysdb_cache_file
+        # verify nodemap cache file
+        if nodemap_cache_file == "":
+            nodemap_cache_file = None
 
         # verify slurm cache file
-        if slurm_cache_file == "" \
-        or slurm_cache_file is None \
-        or not os.path.isfile(slurm_cache_file):
-            slurm_cache_file = None
+        if jobinfo_cache_file == "" \
+        or jobinfo_cache_file is None \
+        or not os.path.isfile(jobinfo_cache_file):
+            jobinfo_cache_file = None
 
         module_results = tokio.tools.topology.get_job_diameter(
             results['_jobid'],
-            slurm_cache_file=slurm_cache_file,
-            craysdb_cache_file=craysdb_cache_file)
+            jobinfo_cache_file=jobinfo_cache_file,
+            nodemap_cache_file=nodemap_cache_file)
         merge_dicts(results, module_results, prefix='topology_')
     return results
 
@@ -566,27 +566,25 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
         fs_key = results.get('_file_system')
         if fs_key is None or fs_key not in tokio.config.CONFIG.get('fsname_to_backend_name', {}):
             return results
-        snx_name = tokio.config.CONFIG['fsname_to_backend_name'][fs_key]
 
         # Get the OST fullness summary
         try:
-            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_fullness)
+            module_results = tokio.tools.lfsstatus.get_fullness(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_fullness)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
         merge_dicts(results, module_results, prefix='fshealth_')
 
         # Get the OST failure status
-        # Note that get_failures_at_datetime will clobber the
-        # ost_timestamp_* keys from get_fullness_at_datetime above;
-        # these aren't used for correlation analysis and should be
-        # pretty close anyway.
+        # Note that get_failures will clobber the ost_timestamp_* keys from
+        # get_fullness above; these aren't used for correlation analysis and
+        # should be pretty close anyway.
         try:
-            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_map)
+            module_results = tokio.tools.lfsstatus.get_failures(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_map)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
@@ -699,20 +697,15 @@ def main(argv=None):
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
-        try:
-            # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
-            if len(args.files) > 0:
-                results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
-            results = retrieve_lmt_data(results, args.file_system)
-            results = retrieve_topology_data(results,
-                                             slurm_cache_file=args.slurm_jobid,
-                                             craysdb_cache_file=args.topology)
-            results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-            results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
-        except:
-            # print out file name to aid debugging when processing multiple logs
-            warnings.warn("Unhandled exception while processing %s" % args.files[i])
-            raise
+        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+        if len(args.files) > 0:
+            results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
+        results = retrieve_lmt_data(results, args.file_system)
+        results = retrieve_topology_data(results,
+                                         jobinfo_cache_file=args.slurm_jobid,
+                                         nodemap_cache_file=args.topology)
+        results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
+        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
 
         # don't append empty rows
         if len(results) > 0:

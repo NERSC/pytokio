@@ -566,6 +566,9 @@ class Hdf5(h5py.File):
     data.
 
     Attributes:
+        always_translate (bool): If True, looking up datasets by keys will
+            always attempt to map that key to a new dataset according to the
+            schema even if the key matches the name of an existing dataset.
         dataset_providers (dict): Map of logical dataset names (keys) to dicts
             that describe the functions used to convert underlying literal
             dataset data into the format expected when dereferencing the logical
@@ -594,6 +597,10 @@ class Hdf5(h5py.File):
 
         super(Hdf5, self).__init__(*args, **kwargs)
 
+        # If True, always translate __getitem__ requests according to the
+        # schema, even if __getitem__ requests a dataset that exists
+        self.always_translate = False
+
         self._version = self.attrs.get('version')
         if isinstance(self._version, bytes):
             self._version = self._version.decode()
@@ -614,17 +621,47 @@ class Hdf5(h5py.File):
             self.dataset_providers = {}
 
     def __getitem__(self, key):
+        """Resolve dataset names into actual data
+
+        Provides a single interface through which standard keys can be
+        dereferenced and a semantically consistent view of data is returned
+        regardless of the schema of the underlying HDF5 file.
+
+        Passes through the underlying h5py.Dataset via direct access or a 1:1
+        mapping between standardized key and an underlying dataset name, or a
+        numpy array if an underlying h5py.Dataset must be transformed to match the
+        structure and semantics of the data requested.
+
+        Can also suffix datasets with special meta-dataset names
+        (e.g., "/missing") to access data that is related to the root
+        dataset.
+
+        Args:
+            key (str): The standard name of a dataset to be accessed.
+
+        Returns:
+            h5py.Dataset if key is a literal dataset name
+            h5py.Dataset if key maps directly to a literal dataset name
+                given the file schema version
+            numpy.ndarray if key maps to a provider function that can
+                calculate the requested data
         """
-        Return the h5py.Dataset if key is a literal dataset name
-                   h5py.Dataset if key maps directly to a literal dataset name
-                                given the file schema version
-                   numpy.ndarray if key maps to a provider function that can
-                                 calculate the requested data
-        """
+        if not self.always_translate and super(Hdf5, self).__contains__(key):
+            # If the dataset exists in the underlying HDF5 file, just return it
+            return super(Hdf5, self).__getitem__(key)
+
+        # Quirky way to access the missing data of a dataset through the
+        # __getitem__ API via recursion
+        if key.endswith('/missing'):
+            return self.get_missing(key.rpartition('/')[0])
+
         resolved_key, provider = self._resolve_schema_key(key)
+
         if resolved_key:
+            # Otherwise, attempt to map the logical key to a literal key
             return super(Hdf5, self).__getitem__(resolved_key)
         elif provider:
+            # Or run the value through a key provider
             provider_func = provider.get('func')
             provider_args = provider.get('args', {})
             if provider_func is None:
@@ -633,7 +670,7 @@ class Hdf5(h5py.File):
             else:
                 return provider_func(self, **provider_args)
         else:
-            # this should never be hit based on the possible outputs of _resolve_schema_key
+            # This should never be hit based on the possible outputs of _resolve_schema_key
             errmsg = "_resolve_schema_key: undefined output from %s" % key
             raise KeyError(errmsg)
 
@@ -643,25 +680,23 @@ class Hdf5(h5py.File):
         directly, or return a provider function and arguments to generate the
         dataset dynamically
         """
-        try:
+        if super(Hdf5, self).__contains__(key):
             # If the dataset exists in the underlying HDF5 file, just return it
-            super(Hdf5, self).__getitem__(key)
             return key, None
 
-        except KeyError:
-            # Straight mapping between the key and a dataset
-            key = key.lstrip('/') if isstr(key) else key
-            if key in self.schema:
-                hdf5_key = self.schema.get(key)
-                if super(Hdf5, self).__contains__(hdf5_key):
-                    return hdf5_key, None
+        # Straight mapping between the key and a dataset
+        key = key.lstrip('/') if isstr(key) else key
+        if key in self.schema:
+            hdf5_key = self.schema.get(key)
+            if super(Hdf5, self).__contains__(hdf5_key):
+                return hdf5_key, None
 
-            # Key maps to a transformation
-            if key in self.dataset_providers:
-                return None, self.dataset_providers[key]
+        # Key maps to a transformation
+        if key in self.dataset_providers:
+            return None, self.dataset_providers[key]
 
-            errmsg = "Unknown key %s in %s" % (key, self.filename)
-            raise KeyError(errmsg)
+        errmsg = "Unknown key %s in %s" % (key, self.filename)
+        raise KeyError(errmsg)
 
     def get_version(self, dataset_name=None):
         """Get the version attribute from an HDF5 file dataset
@@ -758,8 +793,20 @@ class Hdf5(h5py.File):
         return int((target_datetime - t_start).total_seconds() / timestep)
 
     def get_timestamps(self, dataset_name):
-        """
-        Return timestamps dataset corresponding to given dataset name
+        """Return timestamps dataset corresponding to given dataset name
+
+        This method returns a dataset, not a numpy array, so you can face severe
+        performance penalties trying to iterate directly on the return value!
+        To iterate over timestamps, it is almost always better to dereference
+        the dataset to get a numpy array and iterate over that in memory.
+
+        Args:
+            dataset_name (str): Logical name of dataset whose timestamps should
+                be retrieved
+
+        Returns:
+            h5py.File: The dataset containing the timestamps corresponding to
+                dataset_name.
         """
         return get_timestamps(self, dataset_name)
 
@@ -825,7 +872,7 @@ class Hdf5(h5py.File):
         """
         values = self[dataset_name][:]
         columns = self.get_columns(dataset_name)
-        timestamps = self.get_timestamps(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[...]
         if len(columns) < values.shape[1]:
             columns.resize(values.shape[1])
         dataframe = pandas.DataFrame(data=values,
@@ -850,7 +897,7 @@ class Hdf5(h5py.File):
             columns = None
 
         # Get timestamps through regular API
-        timestamps = self.get_timestamps(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[...]
 
         # Retrieve and transform data using H5LMT schema directly
         if normed_name == 'FSStepsGroup/FSStepsDataSet':

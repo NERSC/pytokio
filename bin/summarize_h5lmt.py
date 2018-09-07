@@ -210,7 +210,7 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
     if dataset is None:
         return []
 
-    timestamps = hdf5_file.get_timestamps(dataset_name)
+    timestamps = hdf5_file.get_timestamps(dataset_name)[...]
     columns = hdf5_file.get_columns(dataset_name)
 
     if hdf5_file.schema:
