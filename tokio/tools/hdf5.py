@@ -34,26 +34,24 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     output = []
 
     for h5lmt_file in h5lmt_files:
-        hdf5 = tokio.connectors.hdf5.Hdf5(h5lmt_file, mode="r")
+        with tokio.connectors.hdf5.Hdf5(h5lmt_file, mode="r") as hdf5:
+            i_0 = 0
+            timestamps = hdf5.get_timestamps(dataset_name)
+            if datetime.datetime.fromtimestamp(timestamps[0]) <= datetime_start:
+                i_0 = hdf5.get_index(dataset_name, datetime_start) # This is the first day's hdf5
 
-        i_0 = 0
-        timestamps = hdf5.get_timestamps(dataset_name)
-        if datetime.datetime.fromtimestamp(timestamps[0]) <= datetime_start:
-            i_0 = hdf5.get_index(dataset_name, datetime_start) # This is the first day's hdf5
+            i_f = -1
+            if datetime.datetime.fromtimestamp(timestamps[-1]) >= datetime_end:
+                # This is the last day's hdf5
+                i_f = hdf5.get_index(dataset_name, datetime_end) - 1
+                # -1 because datetime_end should be exclusive
+                #
+                # If the last timestamp is on the first datapoint of a new day,
+                # just drop the whole day to maintain exclusivity of the last
+                # timestamp
+                if i_f < 0:
+                    continue
 
-        i_f = -1
-        if datetime.datetime.fromtimestamp(timestamps[-1]) >= datetime_end:
-            # This is the last day's hdf5
-            i_f = hdf5.get_index(dataset_name, datetime_end) - 1
-            # -1 because datetime_end should be exclusive
-            #
-            # If the last timestamp is on the first datapoint of a new day,
-            # just drop the whole day to maintain exclusivity of the last
-            # timestamp
-            if i_f < 0:
-                continue
-
-        hdf5.close()
         output.append((h5lmt_file, i_0, i_f))
     return output
 
