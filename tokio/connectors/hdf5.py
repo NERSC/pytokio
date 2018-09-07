@@ -793,8 +793,20 @@ class Hdf5(h5py.File):
         return int((target_datetime - t_start).total_seconds() / timestep)
 
     def get_timestamps(self, dataset_name):
-        """
-        Return timestamps dataset corresponding to given dataset name
+        """Return timestamps dataset corresponding to given dataset name
+
+        This method returns a dataset, not a numpy array, so you can face severe
+        performance penalties trying to iterate directly on the return value!
+        To iterate over timestamps, it is almost always better to dereference
+        the dataset to get a numpy array and iterate over that in memory.
+
+        Args:
+            dataset_name (str): Logical name of dataset whose timestamps should
+                be retrieved
+
+        Returns:
+            h5py.File: The dataset containing the timestamps corresponding to
+                dataset_name.
         """
         return get_timestamps(self, dataset_name)
 

@@ -82,7 +82,7 @@ def summarize_timesteps(hdf5_file):
     """
     results = {}
     for dataset_name in '/datatargets/writebytes', '/datatargets/readbytes':
-        timestamps = hdf5_file.get_timestamps(dataset_name)[:]
+        timestamps = hdf5_file.get_timestamps(dataset_name)[...]
         sum_bytes = hdf5_file[dataset_name][:, :].sum(axis=1)
         for index, timestamp in enumerate(timestamps):
             output_key = 'read_bytes' if 'read' in dataset_name else 'write_bytes'
