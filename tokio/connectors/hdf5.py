@@ -621,16 +621,39 @@ class Hdf5(h5py.File):
             self.dataset_providers = {}
 
     def __getitem__(self, key):
-        """
-        Return the h5py.Dataset if key is a literal dataset name
-                   h5py.Dataset if key maps directly to a literal dataset name
-                                given the file schema version
-                   numpy.ndarray if key maps to a provider function that can
-                                 calculate the requested data
+        """Resolve dataset names into actual data
+
+        Provides a single interface through which standard keys can be
+        dereferenced and a semantically consistent view of data is returned
+        regardless of the schema of the underlying HDF5 file.
+
+        Passes through the underlying h5py.Dataset via direct access or a 1:1
+        mapping between standardized key and an underlying dataset name, or a
+        numpy array if an underlying h5py.Dataset must be transformed to match the
+        structure and semantics of the data requested.
+
+        Can also suffix datasets with special meta-dataset names
+        (e.g., "/missing") to access data that is related to the root
+        dataset.
+
+        Args:
+            key (str): The standard name of a dataset to be accessed.
+
+        Returns:
+            h5py.Dataset if key is a literal dataset name
+            h5py.Dataset if key maps directly to a literal dataset name
+                given the file schema version
+            numpy.ndarray if key maps to a provider function that can
+                calculate the requested data
         """
         if not self.always_translate and super(Hdf5, self).__contains__(key):
             # If the dataset exists in the underlying HDF5 file, just return it
             return super(Hdf5, self).__getitem__(key)
+
+        # Quirky way to access the missing data of a dataset through the
+        # __getitem__ API via recursion
+        if key.endswith('/missing'):
+            return self.get_missing(key.rpartition('/')[0])
 
         resolved_key, provider = self._resolve_schema_key(key)
 

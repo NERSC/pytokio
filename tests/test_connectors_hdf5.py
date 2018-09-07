@@ -329,6 +329,18 @@ def test_missing_values():
     assert len(remove_list) == missing_matrix.sum()
     assert ((missing_matrix == 0.0) | inverse).all()
 
+def test_missing_getitem():
+    """
+    connectors.hdf5 missing values via __getitem__ API
+    """
+    hdf5 = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_TOKIOTS_FILE, 'r')
+    for dset_name in ['/datatargets/readbytes', '/datatargets/writebytes']:
+        missing_dset_name = dset_name + "/missing"
+        values = hdf5[missing_dset_name][...]
+
+        assert ((values == 1) | (values == 0)).all()
+        assert (values == hdf5.get_missing(dset_name)).all()
+
 def test_get_versions(hdf5_filename=tokiotest.SAMPLE_VERSIONS_HDF5):
     """connectors.hdf5.get_version()
     """
