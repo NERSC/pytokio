@@ -18,12 +18,13 @@ setup(
     description= 'Total Knowledge of I/O',
     version='0.9',
     author='Glenn K. Lockwood',
-    author_email = 'glock@lbl.gov',
-    license='None',
-    packages=['tokio', 'tokio.connectors', 'tokio.tools'],
+    author_email='glock@lbl.gov',
+    license='BSD',
+    packages=['tokio', 'tokio.connectors', 'tokio.tools', 'tokio.analysis'],
     classifiers=[
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.6',
     ],
     package_data={'tokio': ['site.json']},
-    keywords='I/O NERSC performance'
+    keywords='I/O performance monitoring'
 )
