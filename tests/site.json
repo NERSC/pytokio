@@ -19,11 +19,26 @@
         "fakefs": "snx11035"
     },
     "hdf5_files": {
-        "scratch1": "inputs/%Y-%m-%d/edison_snx11025.h5lmt",
-        "scratch2": "inputs/%Y-%m-%d/edison_snx11035.h5lmt",
-        "scratch3": "inputs/%Y-%m-%d/edison_snx11036.h5lmt",
-        "cscratch": "inputs/%Y-%m-%d/cori_snx11168.h5lmt",
-        "fakefs": "inputs/%Y-%m-%d/sample.h5lmt"
+        "scratch1": [
+            "inputs/%Y-%m-%d/snx11025.hdf5",
+            "inputs/%Y-%m-%d/edison_snx11025.h5lmt"
+        ],
+        "scratch2": [
+            "inputs/%Y-%m-%d/snx11035.hdf5",
+            "inputs/%Y-%m-%d/edison_snx11035.h5lmt"
+        ],
+        "scratch3": [
+            "inputs/%Y-%m-%d/snx11036.hdf5",
+            "inputs/%Y-%m-%d/edison_snx11036.h5lmt"
+        ],
+        "cscratch": [
+            "inputs/%Y-%m-%d/snx11168.hdf5",
+            "inputs/%Y-%m-%d/cori_snx11168.h5lmt"
+        ],
+        "fakefs": [
+            "inputs/%Y-%m-%d/sample.hdf5",
+            "inputs/%Y-%m-%d/sample.h5lmt"
+        ]
     },
     "test_list": [
         "inputs/%Y-%m-%d/file1",
