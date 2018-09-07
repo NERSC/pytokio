@@ -185,3 +185,22 @@ intersphinx_mapping = {
     'https://docs.python.org/2': None,
     'http://pandas.pydata.org/pandas-docs/stable': None,
 }
+
+def run_apidoc(_):
+    import os
+    argv = [
+        '-o',
+        '.',
+        os.path.join('..', 'tokio')
+    ]
+
+    try:
+        import sphinx.ext.apidoc
+        sphinx.ext.apidoc.main(argv)
+    except ImportError:
+        import sphinx.apidoc
+        argv.insert(0, sphinx.apidoc.__file__)
+        sphinx.apidoc.main(argv)
+
+def setup(app):
+    app.connect('builder-inited', run_apidoc)
