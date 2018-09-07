@@ -885,7 +885,7 @@ class Hdf5(h5py.File):
             columns = None
 
         # Get timestamps through regular API
-        timestamps = self.get_timestamps(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[...]
 
         # Retrieve and transform data using H5LMT schema directly
         if normed_name == 'FSStepsGroup/FSStepsDataSet':
