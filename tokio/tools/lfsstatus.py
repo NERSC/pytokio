@@ -30,7 +30,6 @@ def get_fullness(file_system, datetime_target, **kwargs):
         tokio.ConfigError: When no valid providers are found
     """
     providers = tokio.config.CONFIG.get('lfsstatus_fullness_providers', DEFAULT_FULLNESS_PROVIDERS)
-    print("Resolving via providers %s" % ", ".join(providers))
     match = False
     fullness = {}
     for provider in providers:
@@ -141,7 +140,6 @@ def get_lfsstate(file_system, datetime_target, metric, cache_file=None):
         ValueError: if ``metric`` does not contain a valid option
         IOError: when no valid data sources can be found for the given date
     """
-    print("get_lfsstate: %s" % tokio.config.CONFIG['lfsstatus_fullness_files'])
     if metric == "fullness":
         template_path = tokio.config.CONFIG['lfsstatus_fullness_files']
     elif metric == "failures":
