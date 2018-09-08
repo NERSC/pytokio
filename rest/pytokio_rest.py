@@ -21,6 +21,9 @@ APP = flask.Flask(__name__)
 
 DEFAULT_HDF5_DURATION_SECS = 60 * 15 # by default, retrieve data for 15 minutes (of previous hour)
 MAX_HDF5_DURATION = datetime.timedelta(days=1)
+SCHEMA_VERSION = "1"
+FS_GROUPS = list(tokio.connectors.hdf5.SCHEMA[SCHEMA_VERSION].keys()) + \
+            list(tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[SCHEMA_VERSION].keys())
 
 def format_output(result):
     """
@@ -29,7 +32,7 @@ def format_output(result):
     APP.logger.debug('accepts json? ' + str(flask.request.accept_mimetypes.accept_json))
     APP.logger.debug('accepts html? ' + str(flask.request.accept_mimetypes.accept_html))
     APP.logger.debug('accepts xhtml? ' + str(flask.request.accept_mimetypes.accept_xhtml))
-    APP.logger.debug('accepts: ' + ' '.join([x for x in flask.request.accept_mimetypes.itervalues()]))
+    APP.logger.debug('accepts: ' + ' '.join([x for x in flask.request.accept_mimetypes.values()]))
     if flask.request.accept_mimetypes.accept_html:
         APP.logger.debug("Returning html")
         return flask.render_template('json.html', return_data=result)
@@ -72,11 +75,11 @@ def validate_file_system(file_system):
     """
     ### Return list of valid file systems
     if file_system is None:
-        response = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
+        response = list(tokio.config.CONFIG['hdf5_files'].keys())
         return format_output(response), response
 
     ### Verify that specified file system is valid
-    file_name = tokio.config.FSNAME_TO_H5LMT_FILE.get(file_system, None)
+    file_name = tokio.config.CONFIG['hdf5_files'].get(file_system, None)
     if file_name is None:
         return rest_error(400, "Unknown file system")
 
@@ -89,12 +92,13 @@ def validate_hdf5_resource(resource_name):
     """
     ### Return list of valid file systems
     if resource_name is None:
-        response = tokio.connectors.hdf5.V1_GROUPNAME.keys()
+        response = FS_GROUPS
         return format_output(response), response
 
     ### Verify that specified file system is valid
-    hdf5_resource = tokio.connectors.hdf5.V1_GROUPNAME.get(resource_name, None)
-    if hdf5_resource is None:
+    if resource_name in FS_GROUPS:
+        hdf5_resource = resource_name
+    else:
         return rest_error(400, "Unknown HDF5 resource")
 
     response = {"hdf5_resource": hdf5_resource}
@@ -150,8 +154,8 @@ def hdf5_resource_route(file_system, resource):
     ### Get start and end time and sanitize input
 
     try:
-        end_time = long(flask.request.args.get('end', time.time() - 3600))
-        start_time = long(flask.request.args.get('start', end_time - DEFAULT_HDF5_DURATION_SECS))
+        end_time = int(flask.request.args.get('end', time.time() - 3600))
+        start_time = int(flask.request.args.get('start', end_time - DEFAULT_HDF5_DURATION_SECS))
     except ValueError:
         return rest_error(400, "Non-numeric start/end time")
 

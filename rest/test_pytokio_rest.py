@@ -35,9 +35,9 @@ def verify_json_result(result, expected_status=200):
     """
     Ensure that result contains valid json and a good status code
     """
-    print expected_status, result.status_code
+    print("Expected status %s, got %s" % (expected_status, result.status_code))
     assert result.status_code == expected_status
-    print result.data
+    print("Retrieved data: %s" % result.data)
     try:
         return json.loads(result.data)
     except ValueError:
@@ -60,7 +60,7 @@ def test_hdf5_index():
     global APP
     result = APP.get('/hdf5')
     result_obj = verify_json_result(result)
-    valid_fsnames = tokio.config.FSNAME_TO_H5LMT_FILE.keys()
+    valid_fsnames = tokio.config.CONFIG['hdf5_files'].keys()
     for fsname in result_obj:
         assert fsname in valid_fsnames
 
@@ -70,7 +70,7 @@ def test_file_system_route():
     File system index
     """
     global APP
-    for file_system_name in tokio.config.FSNAME_TO_H5LMT_FILE.keys():
+    for file_system_name in tokio.config.CONFIG['hdf5_files'].keys():
         result = APP.get('/hdf5/' + file_system_name + '/')
         result_obj = verify_json_result(result)
 
@@ -93,15 +93,15 @@ def test_hdf5_resource_route():
                                             "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_END_TIME,
                                           "%Y-%m-%d %H:%M:%S")
-    start_time = long(time.mktime(start_time.timetuple()))
-    end_time = long(time.mktime(end_time.timetuple()))
+    start_time = int(time.mktime(start_time.timetuple()))
+    end_time = int(time.mktime(end_time.timetuple()))
     rest_options = "?start=%d&end=%d" % (start_time, end_time)
     file_system_name = tokiotest.SAMPLE_DARSHAN_FILE_SYSTEM
 
     for group_name in tokio.connectors.hdf5.V1_GROUPNAME:
         route = '/'.join(['', 'hdf5', file_system_name, group_name])
         route += rest_options
-        print "Testing", route
+        print("Testing %s" % route)
         result = APP.get(route)
         verify_json_result(result)
 
@@ -116,8 +116,8 @@ def test_hdf5_invalid_opts():
                                             "%Y-%m-%d %H:%M:%S")
     end_time = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_END_TIME,
                                           "%Y-%m-%d %H:%M:%S")
-    start_time = long(time.mktime(start_time.timetuple()))
-    end_time = long(time.mktime(end_time.timetuple()))
+    start_time = int(time.mktime(start_time.timetuple()))
+    end_time = int(time.mktime(end_time.timetuple()))
     ### note: intentionally reversing start/end time
     fail_tests = [
         "?start=%d&end=%d" % (end_time, start_time),
@@ -129,6 +129,6 @@ def test_hdf5_invalid_opts():
         for rest_options in fail_tests:
             route = '/'.join(['', 'hdf5', file_system_name, group_name])
             route += rest_options
-            print "Testing", route
+            print("Testing %s" % route)
             result = APP.get(route)
             verify_json_result(result, 400)
