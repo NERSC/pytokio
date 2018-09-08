@@ -16,24 +16,24 @@ a cache database.
 
 import os
 import warnings
-import sqlite3
-try:
-    import pymysql
-    pymysql.install_as_MySQLdb()
-except ImportError:
-    pass
-try:
-    import MySQLdb
-except ImportError:
-    pass
-import cachingdb
+import tokio.connectors.cachingdb as cachingdb
 
-CACHE_TABLE_SCHEMA = """
-create table if not exists
-    summary(stepid primary key, hostname, start integer, completion integer, numnodes integer)
+NERSC_JOBSDB_SCHEMA = {
+    'columns': ['STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES'],
+    'primary_key': ['STEPID'],
+}
+NERSC_JOBSDB_QUERY = """
+SELECT
+    s.stepid,
+    s.hostname,
+    s.start,
+    s.completion,
+    s.numnodes
+FROM
+    summary AS s
 """
 
-HIT_MEMORY   = 0
+HIT_MEMORY = 0
 HIT_CACHE_DB = 1
 HIT_REMOTE_DB = 2
 
@@ -84,6 +84,38 @@ class NerscJobsDb(cachingdb.CachingDb):
         super(NerscJobsDb, self).drop_cache()
         self.cached_queries = {}
 
+    def query(self, query_str, query_variables=(), nocache=False):
+        """
+        Pass a query through all layers of cache and return on the first hit.
+        """
+
+        ### Collapse query string to remove extraneous whitespace
+        query_str = ' '.join(query_str.split())
+        cache_key = query_str % {'ps': '%s'} % query_variables
+
+        ### FIRST: check cache for the results of this query--we can get away
+        ### with this because the NERSC Jobs DB is append-only
+        if cache_key in self.cached_queries and not nocache:
+            index_start, index_end = self.cached_queries[cache_key]
+            results = self.saved_results['summary']['rows'][index_start:index_end]
+            self.last_hit = HIT_MEMORY
+        else:
+            if 'summary' not in self.saved_results:
+                index_start = 0
+            else:
+                index_start = len(self.saved_results['summary']['rows'])
+            results = super(NerscJobsDb, self).query(
+                query_str,
+                query_variables,
+                table='summary',
+                table_schema=NERSC_JOBSDB_SCHEMA)
+            index_end = len(self.saved_results['summary']['rows'])
+            if not nocache:
+                self.cached_queries[cache_key] = (index_start, index_end)
+
+        self.last_results = results # for debugging
+        return results
+
     def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
         """
         Grab all of the jobs that were running, in part or in full, during the
@@ -92,15 +124,7 @@ class NerscJobsDb(cachingdb.CachingDb):
         core hours that were burned overall during the start/end time of
         interest.
         """
-        query_str = """
-        SELECT
-            s.stepid,
-            s.hostname,
-            s.start,
-            s.completion,
-            s.numnodes
-        FROM
-            summary AS s
+        query_str = NERSC_JOBSDB_QUERY + """
         WHERE
             s.hostname = %(ps)s
         AND s.completion > %(ps)s
@@ -129,35 +153,34 @@ class NerscJobsDb(cachingdb.CachingDb):
 
         return totals
 
-    def query(self, query_str, query_variables=(), nocache=False):
+#   def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
+    def get_job_startend(self, jobid, nersc_host):
+        """Return start and end time for a given job id
+
+        Retrieves the time a job started and completed.
+
+        Args:
+            jobid (str): Job ID of interest
+            nersc_host (str): NERSC host to which job ID of interest maps
+
+        Returns:
+            tuple of datetime.datetime: Two-item tuple of (start time,
+                end time)
         """
-        Pass a query through all layers of cache and return on the first hit.
+        query_str = NERSC_JOBSDB_QUERY + """
+        WHERE
+            s.stepid LIKE %(ps)s
+        AND s.hostname = %(ps)s
+        ORDER BY s.completion
         """
 
-        ### Collapse query string to remove extraneous whitespace
-        query_str = ' '.join(query_str.split())
-        cache_key = query_str % {'ps': '%s'} % query_variables
+        results = self.query(query_str, query_variables=("%s.%%" % jobid, nersc_host))
 
-        ### FIRST: check cache for the results of this query--we can get away
-        ### with this because the NERSC Jobs DB is append-only
-        if cache_key in self.cached_queries and not nocache:
-            index_start, index_end = self.cached_queries[cache_key]
-            results = self.saved_results['summary']['rows'][index_start:index_end]
-            self.cached_queries[cache_key]
-            self.last_hit = HIT_MEMORY
-        else:
-            if 'summary' not in self.saved_results:
-                index_start = 0
-            else:
-                index_start = len(self.saved_results['summary']['rows'])
-            results = super(NerscJobsDb, self).query(
-                query_str,
-                query_variables,
-                table='summary',
-                table_schema=CACHE_TABLE_SCHEMA)
-            index_end = len(self.saved_results['summary']['rows'])
-            if not nocache:
-                self.cached_queries[cache_key] = (index_start, index_end)
-
-        self.last_results = results # for debugging
-        return results
+        start = None
+        end = None
+        for (_, _, this_start, this_end, _) in results:
+            if start is not None:
+                warnings.warn("Multiple start+end times found for job %s" % jobid)
+            start = this_start
+            end = this_end
+        return (start, end)

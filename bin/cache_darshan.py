@@ -7,7 +7,7 @@ import json
 import argparse
 import tokio.connectors.darshan
 
-def cache_darshan():
+def main(argv=None):
     """
     CLI wrapper around the Darshan connector's I/O methods
     """
@@ -17,7 +17,7 @@ def cache_darshan():
     parser.add_argument('--total', action='store_true', help='aggregated darshan field data')
     parser.add_argument('--perf', action='store_true', help='derived perf data')
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     darshan = tokio.connectors.darshan.Darshan(args.logfile)
     if args.total:
@@ -32,10 +32,10 @@ def cache_darshan():
     # Serialize the object
     cache_file = args.output
     if cache_file is None:
-        print json.dumps(darshan, indent=4, sort_keys=True)
+        print(json.dumps(darshan, indent=4, sort_keys=True))
     else:
-        print "Caching to %s" % cache_file
+        print("Caching to %s" % cache_file)
         json.dump(darshan, open(cache_file, 'w'))
 
 if __name__ == '__main__':
-    cache_darshan()
+    main()

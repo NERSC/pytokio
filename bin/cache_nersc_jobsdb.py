@@ -9,7 +9,7 @@ import datetime
 import argparse
 import tokio.connectors.nersc_jobsdb
 
-def cache_nersc_jobsdb():
+def main(argv=None):
     """
     CLI wrapper around NerscJobsDb object's I/O methods
     """
@@ -19,7 +19,7 @@ def cache_nersc_jobsdb():
     parser.add_argument("host", type=str, help="return jobs running on this NERSC host")
     parser.add_argument("-i", "--input", type=str, default=None, help="input cache db file")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     start = datetime.datetime.strptime(args.start, "%Y-%m-%dT%H:%M:%S")
     end = datetime.datetime.strptime(args.end, "%Y-%m-%dT%H:%M:%S")
@@ -29,8 +29,8 @@ def cache_nersc_jobsdb():
     else:
         nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb()
     nerscjobsdb.get_concurrent_jobs(
-        long(time.mktime(start.timetuple())),
-        long(time.mktime(end.timetuple())),
+        int(time.mktime(start.timetuple())),
+        int(time.mktime(end.timetuple())),
         args.host)
 
     cache_file = args.output
@@ -42,8 +42,8 @@ def cache_nersc_jobsdb():
                 i += 1
             else:
                 break
-    print "Caching to %s" % cache_file
+    print("Caching to %s" % cache_file)
     nerscjobsdb.save_cache(cache_file)
 
 if __name__ == "__main__":
-    cache_nersc_jobsdb()
+    main()

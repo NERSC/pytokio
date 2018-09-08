@@ -30,16 +30,16 @@ def verify_base_counters(darshan_data):
     """
     # Examine the first POSIX file record containing base counters
     first_base_key = None
-    for key in darshan_data['counters']['posix'].keys():
+    for key in darshan_data['counters']['posix']:
         if key not in ('_perf', '_total'):
-            print "Found first base key", key
+            print("Found first base key %s" % key)
             first_base_key = key
             break
     assert first_base_key is not None
     posix_record = darshan_data['counters']['posix'][first_base_key]
     assert posix_record
     # Ensure that it contains an OPENS counter
-    assert 'OPENS' in posix_record.itervalues().next()
+    assert 'OPENS' in next(iter(posix_record.values()))
     # Ensure that multiple modules were found (STDIO should always exist too)
     assert 'stdio' in darshan_data['counters']
 
@@ -66,8 +66,8 @@ def verify_perf_counters(darshan_data):
     assert 'total_bytes' in darshan_data['counters']['posix']['_perf']
     assert 'agg_perf_by_slowest' in darshan_data['counters']['posix']['_perf']
     # Make sure all counters appear in all modules
-    for module in darshan_data['counters'].keys():
-        for counter in darshan_data['counters']['posix']['_perf'].keys():
+    for module in darshan_data['counters']:
+        for counter in darshan_data['counters']['posix']['_perf']:
             # the lustre module does not provide any perf information
             assert module == 'lustre' or counter in darshan_data['counters'][module]['_perf']
 

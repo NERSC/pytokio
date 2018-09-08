@@ -21,32 +21,60 @@ _DB_DBNAME = os.environ.get('TEST_DB_DBNAME', 'testdb')
 ### records)
 LIMIT_CYCLES = [8, 16, 24]
 
-TEST_TABLES = [
-    (
-        'OSS_DATA',
-        'OSS_ID, TS_ID, PCT_CPU, PCT_MEMORY, PRIMARY KEY (OSS_ID, TS_ID)',
-    ),
-    (
-        'OSS_INFO',
-        'OSS_ID, FILESYSTEM_ID, HOSTNAME, FAILOVERHOST, PRIMARY KEY(OSS_ID, HOSTNAME)',
-    ),
-    (
-        'OST_DATA',
-        """OST_ID, TS_ID, READ_BYTES, WRITE_BYTES, PCT_CPU, KBYTES_FREE,
-           KBYTES_USED, INODES_FREE, INODES_USED, PRIMARY KEY(OST_ID, TS_ID)""",
-    ),
-    (
-        'OST_INFO',
-        'OST_ID, OSS_ID, OST_NAME, HOSTNAME, OFFLINE, DEVICE_NAME, PRIMARY KEY (OST_ID)',
-    ),
-]
-
+TEST_TABLES = {
+    "OSS_DATA": {
+        'columns': [
+            'OSS_ID',
+            'TS_ID',
+            'PCT_CPU',
+            'PCT_MEMORY'
+        ],
+        'primary_key': ['OSS_ID', 'TS_ID'],
+    },
+    "OSS_INFO": {
+        'columns': [
+            'OSS_ID',
+            'FILESYSTEM_ID',
+            'HOSTNAME',
+            'FAILOVERHOST'
+        ],
+        'primary_key': [
+            'OSS_ID',
+            'HOSTNAME'
+        ],
+    },
+    "OST_DATA": {
+        'columns': [
+            'OST_ID',
+            'TS_ID',
+            'READ_BYTES',
+            'WRITE_BYTES',
+            'PCT_CPU',
+            'KBYTES_FREE',
+            'KBYTES_USED',
+            'INODES_FREE',
+            'INODES_USED'
+        ],
+        'primary_key': ['OST_ID', 'TS_ID'],
+    },
+    "OST_INFO": {
+        'columns': [
+            'OST_ID',
+            'OSS_ID',
+            'OST_NAME',
+            'HOSTNAME',
+            'OFFLINE',
+            'DEVICE_NAME'
+        ],
+        'primary_key': ['OST_ID'],
+    },
+}
 
 def query_without_saving(test_db):
     """
     cachingdb does not save results when table=None
     """
-    for test_table, _ in TEST_TABLES:
+    for test_table in TEST_TABLES:
         limit = 10
         result = test_db.query(
             query_str='SELECT * from %s LIMIT %d' % (test_table, limit))
@@ -70,30 +98,28 @@ def verify_cache_functionality(test_db):
     1. save_cache works when table_schema is only provided once, and not on the
        final query
     """
-    for test_table, test_table_schema in TEST_TABLES:
+    for test_table, test_table_schema in TEST_TABLES.items():
         sum_limits = 0
         for iteration, limit in enumerate(LIMIT_CYCLES):
             sum_limits += limit
             if iteration == 0:
-                schema_param = 'CREATE TABLE IF NOT EXISTS %s (%s)' % (
-                    test_table,
-                    test_table_schema)
+                schema_param = test_table_schema
             else:
                 schema_param = None
             result = test_db.query(
                 query_str='SELECT * from %s LIMIT %d' % (test_table, limit),
                 table=test_table,
                 table_schema=schema_param)
-            print "Got %d records from a limit of %d in %s" % (
+            print("Got %d records from a limit of %d in %s" % (
                 len(result),
                 limit,
-                test_table)
+                test_table))
             assert len(result) == limit
             assert len(test_db.saved_results[test_table]['rows']) == sum_limits
 
     ### Cache all TEST_TABLES to a single file
     test_db.save_cache(tokiotest.TEMP_FILE.name)
-    print "Created", tokiotest.TEMP_FILE.name
+    print("Created %s" % tokiotest.TEMP_FILE.name)
 
     ### Destroy any residual state, just in case
     test_db.close()
@@ -104,16 +130,16 @@ def verify_cache_functionality(test_db):
 
     ### Confirm that all tables were written
     result = test_db.query("SELECT COUNT(name) from sqlite_master WHERE type='table'")
-    print "Found %d tables in %s" % (result[0][0], test_db.cache_file)
+    print("Found %d tables in %s" % (result[0][0], test_db.cache_file))
     assert result[0][0] == len(TEST_TABLES)
 
     ### Confirm that the size of each table is correct
-    for test_table, test_table_schema in TEST_TABLES:
+    for test_table, test_table_schema in TEST_TABLES.items():
         result = test_db.query(
             query_str='SELECT * from %s' % (test_table),
             table=test_table,
             table_schema=schema_param)
-        print "Found table %s with %d records" % (test_table, len(result))
+        print("Found table %s with %d records" % (test_table, len(result)))
         assert len(result) == LIMIT_CYCLES[-1]
 
 TEST_FUNCTIONS = [
@@ -132,11 +158,17 @@ def test_remote_db():
     Verify functionality when connecting to a remote database
     """
     try:
+        tokio.connectors.cachingdb.MySQLdb
+    except AttributeError as error:
+        raise nose.SkipTest(error)
+
+    try:
         test_db = tokio.connectors.cachingdb.CachingDb(
             dbhost=_DB_HOST,
             dbuser=_DB_USER,
             dbpassword=_DB_PASSWORD,
             dbname=_DB_DBNAME)
+
     except tokio.connectors.cachingdb.MySQLdb.OperationalError as error:
         raise nose.SkipTest(error)
 

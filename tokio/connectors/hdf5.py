@@ -1,14 +1,562 @@
 #!/usr/bin/env python
+"""
+Provide a TOKIO-aware HDF5 class that knows how to interpret schema versions
+encoded in a TOKIO HDF5 file and translate a universal schema into file-specific
+schemas.  Also supports dynamically mapping static HDF5 datasets into new
+derived datasets dynamically.
+"""
 
-import time
+import math
 import datetime
 import h5py
-import numpy as np
-import pandas as pd
-from ..debug import debug_print as _debug_print
-from ..config import LMT_TIMESTEP
+import numpy
+import pandas
+from tokio.common import isstr
+from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unused-import
+                                    map_dataset,
+                                    demux_column,
+                                    get_timestamps,
+                                    get_timestamps_key,
+                                    DEFAULT_TIMESTAMP_DATASET,
+                                    TIMESTAMP_KEY,
+                                    COLUMN_NAME_KEY)
 
-_NATIVE_VERSION = 1
+SCHEMA = {
+    None: {},
+    "1": {
+        "datatargets/readbytes": "/datatargets/readbytes",
+        "datatargets/writebytes": "/datatargets/writebytes",
+        "datatargets/readrates": "/datatargets/readrates",
+        "datatargets/writerates": "/datatargets/writerates",
+        "datatargets/readops": "/datatargets/readops",
+        "datatargets/writeops": "/datatargets/writeops",
+        "datatargets/readoprates": "/datatargets/readoprates",
+        "datatargets/writeoprates": "/datatargets/writeoprates",
+        "mdtargets/opens": "/mdtargets/opens",
+        "mdtargets/openrates": "/mdtargets/openrates",
+        "mdtargets/closes": "/mdtargets/closes",
+        "mdtargets/closerates": "/mdtargets/closerates",
+        "mdtargets/mknods": "/mdtargets/mknods",
+        "mdtargets/mknodrates": "/mdtargets/mknodrates",
+        "mdtargets/links": "/mdtargets/links",
+        "mdtargets/linkrates": "/mdtargets/linkrates",
+        "mdtargets/unlinks": "/mdtargets/unlinks",
+        "mdtargets/unlinkrates": "/mdtargets/unlinkrates",
+        "mdtargets/mkdirs": "/mdtargets/mkdirs",
+        "mdtargets/mkdirrates": "/mdtargets/mkdirrates",
+        "mdtargets/rmdirs": "/mdtargets/rmdirs",
+        "mdtargets/rmdirrates": "/mdtargets/rmdirrates",
+        "mdtargets/renames": "/mdtargets/renames",
+        "mdtargets/renamerates": "/mdtargets/renamerates",
+        "mdtargets/getxattrs": "/mdtargets/getxattrs",
+        "mdtargets/getxattrrates": "/mdtargets/getxattrrates",
+        "mdtargets/statfss": "/mdtargets/statfss",
+        "mdtargets/statfsrates": "/mdtargets/statfsrates",
+        "mdtargets/setattrs": "/mdtargets/setattrs",
+        "mdtargets/setattrrates": "/mdtargets/setattrrates",
+        "mdtargets/getattrs": "/mdtargets/getattrs",
+        "mdtargets/getattrrates": "/mdtargets/getattrrates",
+        "mdservers/cpuuser": "/mdservers/cpuuser",
+        "mdservers/cpusys": "/mdservers/cpusys",
+        "mdservers/cpuidle": "/mdservers/cpuidle",
+        "mdservers/cpuload": "/mdservers/cpuload",
+        "mdservers/memfree": "/mdservers/memfree",
+        "mdservers/memused": "/mdservers/memused",
+        "mdservers/memcached": "/mdservers/memcached",
+        "mdservers/membuffered": "/mdservers/membuffered",
+        "mdservers/memslab": "/mdservers/memslab",
+        "mdservers/memslab_unrecl": "/mdservers/memslab_unrecl",
+        "mdservers/memtotal": "/mdservers/memtotal",
+        "dataservers/cpuuser": "/dataservers/cpuuser",
+        "dataservers/cpusys": "/dataservers/cpusys",
+        "dataservers/cpuidle": "/dataservers/cpuidle",
+        "dataservers/cpuload": "/dataservers/cpuload",
+        "dataservers/memfree": "/dataservers/memfree",
+        "dataservers/memused": "/dataservers/memused",
+        "dataservers/memcached": "/dataservers/memcached",
+        "dataservers/membuffered": "/dataservers/membuffered",
+        "dataservers/memslab": "/dataservers/memslab",
+        "dataservers/memslab_unrecl": "/dataservers/memslab_unrecl",
+        "dataservers/memtotal": "/dataservers/memtotal",
+        "fullness/bytes": "/fullness/bytes",
+        "fullness/bytestotal": "/fullness/bytestotal",
+        "fullness/inodes": "/fullness/inodes",
+        "fullness/inodestotal": "/fullness/inodestotal",
+        "failover/datatargets": "/failover/datatargets",
+        "failover/mdtargets": "/failover/mdtargets",
+    },
+}
+
+# Map keys which don't exist as datasets in the underlying HDF5 but can be
+# calculated from datasets that _do_ exist to the functions that do these
+# conversions.  This table is only consulted when a dataset is not found
+# directly in the underlying HDF5 _and_ a mapping from the SCHEMA table
+# above does not return a match, so this table contains what appear to be
+# some circular references (e.g., both datatargets/readbytes and
+# datatargets/readrates).  This allows any valid HDF5 file to contain either
+# bytes or rates but have them all present the same datasets to the downstream
+# application.
+SCHEMA_DATASET_PROVIDERS = {
+    None: {
+        "datatargets/readbytes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'OSTReadGroup/OSTBulkReadDataSet',
+                'to_rates': False,
+                'transpose': True,
+            },
+        },
+        "datatargets/writebytes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'OSTWriteGroup/OSTBulkWriteDataSet',
+                'to_rates': False,
+                'transpose': True,
+            },
+        },
+        "datatargets/readrates": {
+            'func': map_dataset,
+            'args': {
+                'from_key': "/OSTReadGroup/OSTBulkReadDataSet",
+                'transpose': True,
+            },
+        },
+        "datatargets/writerates": {
+            'func': map_dataset,
+            'args': {
+                'from_key': "/OSTWriteGroup/OSTBulkWriteDataSet",
+                'transpose': True,
+            },
+        },
+        "dataservers/cpuload": {
+            'func': map_dataset,
+            'args': {
+                'from_key': "/OSSCPUGroup/OSSCPUDataSet",
+                'transpose': True,
+            },
+        },
+        "mdservers/cpuload": {
+            'func': map_dataset,
+            'args': {
+                'from_key': "/MDSCPUGroup/MDSCPUDataSet",
+                'transpose': True,
+                'force2d': True,
+            },
+        },
+
+        ### MDSOpsGroup, as counts per timestep
+        "mdtargets/opens": {
+            'func': demux_column,
+            'args': {
+                'from_key': "/MDSOpsGroup/MDSOpsDataSet",
+                'column': 'open',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True
+            },
+        },
+        "mdtargets/closes": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'close',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/mknods": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mknod',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/links": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'link',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/unlinks": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'unlink',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/mkdirs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mkdir',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/rmdirs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rmdir',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/renames": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rename',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/getxattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getxattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/statfss": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'statfs',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/setattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'setattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        "mdtargets/getattrs": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getattr',
+                'apply_timestep_func': lambda x, timestep: x * timestep,
+                'transpose': True,
+            },
+        },
+        ### MDSOpsGroup, as counts per second
+        "mdtargets/openrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': "/MDSOpsGroup/MDSOpsDataSet",
+                'column': 'open',
+                'transpose': True
+            },
+        },
+        "mdtargets/closerates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'close',
+                'transpose': True,
+            },
+        },
+        "mdtargets/mknodrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mknod',
+                'transpose': True,
+            },
+        },
+        "mdtargets/linkrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'link',
+                'transpose': True,
+            },
+        },
+        "mdtargets/unlinkrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'unlink',
+                'transpose': True,
+            },
+        },
+        "mdtargets/mkdirrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'mkdir',
+                'transpose': True,
+            },
+        },
+        "mdtargets/rmdirrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rmdir',
+                'transpose': True,
+            },
+        },
+        "mdtargets/renamerates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'rename',
+                'transpose': True,
+            },
+        },
+        "mdtargets/getxattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getxattr',
+                'transpose': True,
+            },
+        },
+        "mdtargets/statfsrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'statfs',
+                'transpose': True,
+            },
+        },
+        "mdtargets/setattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'setattr',
+                'transpose': True,
+            },
+        },
+        "mdtargets/getattrrates": {
+            'func': demux_column,
+            'args': {
+                'from_key': '/MDSOpsGroup/MDSOpsDataSet',
+                'column': 'getattr',
+                'transpose': True,
+            },
+        },
+    },
+    "1": {
+        "datatargets/readbytes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'datatargets/readrates',
+                'to_rates': False,
+            },
+        },
+        "datatargets/writebytes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'datatargets/writerates',
+                'to_rates': False,
+            },
+        },
+        "datatargets/readrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'datatargets/readbytes',
+                'to_rates': True,
+            },
+        },
+        "datatargets/writerates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': 'datatargets/writebytes',
+                'to_rates': True,
+            },
+        },
+        "mdtargets/opens": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/openrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/closes": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/closerates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/mknods": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mknodrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/links": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/linkrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/unlinks": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/unlinkrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/mkdirs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mkdirrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/rmdirs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/rmdirrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/renames": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/renamerates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/getxattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getxattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/statfss": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/statfsrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/setattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/setattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/getattrs": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getattrrates",
+                'to_rates': True,
+            },
+        },
+        "mdtargets/openrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/opens",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/closerates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/closes",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/mknodrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mknods",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/linkrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/links",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/unlinkrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/unlinks",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/mkdirrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/mkdirs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/rmdirrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/rmdirs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/renamerates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/renames",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/getxattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getxattrs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/statfsrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/statfss",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/setattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/setattrs",
+                'to_rates': False,
+            },
+        },
+        "mdtargets/getattrrates": {
+            'func': convert_counts_rates,
+            'args': {
+                'from_key': "mdtargets/getattrs",
+                'to_rates': False,
+            },
+        },
+    },
+}
+
+H5LMT_COLUMN_ATTRS = {
+    'MDSOpsGroup/MDSOpsDataSet': 'OpNames',
+    'OSTReadGroup/OSTBulkReadDataSet': 'OSTNames',
+    'OSTWriteGroup/OSTBulkWriteDataSet': 'OSTNames',
+    'OSSCPUGroup/OSSCPUDataSet': 'OSSNames',
+}
 
 # TODO - all references to group names hereafter should reference this dict
 V1_GROUPNAME = {
@@ -22,248 +570,389 @@ V1_GROUPNAME = {
 }
 
 class Hdf5(h5py.File):
-    """
-    Create a parsed Hdf5 file class 
+    """Hdf5 file class with extra hooks to parse different schemas
+
+    Provides an h5py.File-like class with added methods to provide a generic
+    API that can decode different schemata used to store file system load
+    data.
+
+    Attributes:
+        always_translate (bool): If True, looking up datasets by keys will
+            always attempt to map that key to a new dataset according to the
+            schema even if the key matches the name of an existing dataset.
+        dataset_providers (dict): Map of logical dataset names (keys) to dicts
+            that describe the functions used to convert underlying literal
+            dataset data into the format expected when dereferencing the logical
+            dataset name.
+        schema (dict): Map of logical dataset names (keys) to the literal
+            dataset names in the underlying file (values)
+        _version (str): Defined and used at initialization time to determine
+            what schema to apply to map the HDF5 connector API to the underlying
+            HDF5 file.
+        _timesteps (dict): Keyed by dataset name (str) and has values
+            corresponding to the timestep (in seconds) between each sampled
+            datum in that dataset.
     """
     def __init__(self, *args, **kwargs):
-        super(Hdf5,self).__init__(*args, **kwargs)
+        """Initialize an HDF5 file
 
-        # Timestanp that will help to sort hdf5 files  
-        if 'FSStepsGroup/FSStepsDataSet' in self:
-            self.first_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
-            self.last_timestamp = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][-1])
+        This is just an HDF5 file object; the magic is in the additional methods
+        and indexing that are provided by the TOKIO Time Series-specific HDF5
+        object.
+
+        Args:
+            ignore_version (bool): If true, do not throw KeyError if the HDF5
+                file does not contain a valid version.
+        """
+        ignore_version = kwargs.pop('ignore_version', False)
+
+        super(Hdf5, self).__init__(*args, **kwargs)
+
+        # If True, always translate __getitem__ requests according to the
+        # schema, even if __getitem__ requests a dataset that exists
+        self.always_translate = False
+
+        self._version = self.attrs.get('version')
+        if isinstance(self._version, bytes):
+            self._version = self._version.decode()
+        self._timesteps = {}
+
+        # Connect the schema map to this object
+        if self._version in SCHEMA:
+            self.schema = SCHEMA[self._version]
+        elif self._version is None:
+            self.schema = {}
+        elif not ignore_version:
+            raise KeyError("Unknown schema version %s" % self._version)
+
+        # Connect the schema dataset providers to this object
+        if self._version in SCHEMA_DATASET_PROVIDERS:
+            self.dataset_providers = SCHEMA_DATASET_PROVIDERS[self._version]
         else:
-            self.first_timestamp = None
-            self.last_timestamp = None
+            self.dataset_providers = {}
 
-        # Timestep saving 
-        self.timestep = self['/'].attrs.get('timestep')
-        if self.timestep is None:
-            self.timestep = LMT_TIMESTEP
-        
-        # Define the version format of the object
-        if self['/'].attrs.get('version') is None:
-            self.version = _NATIVE_VERSION
+    def __getitem__(self, key):
+        """Resolve dataset names into actual data
+
+        Provides a single interface through which standard keys can be
+        dereferenced and a semantically consistent view of data is returned
+        regardless of the schema of the underlying HDF5 file.
+
+        Passes through the underlying h5py.Dataset via direct access or a 1:1
+        mapping between standardized key and an underlying dataset name, or a
+        numpy array if an underlying h5py.Dataset must be transformed to match the
+        structure and semantics of the data requested.
+
+        Can also suffix datasets with special meta-dataset names
+        (e.g., "/missing") to access data that is related to the root
+        dataset.
+
+        Args:
+            key (str): The standard name of a dataset to be accessed.
+
+        Returns:
+            h5py.Dataset if key is a literal dataset name
+            h5py.Dataset if key maps directly to a literal dataset name
+                given the file schema version
+            numpy.ndarray if key maps to a provider function that can
+                calculate the requested data
+        """
+        if not self.always_translate and super(Hdf5, self).__contains__(key):
+            # If the dataset exists in the underlying HDF5 file, just return it
+            return super(Hdf5, self).__getitem__(key)
+
+        # Quirky way to access the missing data of a dataset through the
+        # __getitem__ API via recursion
+        if key.endswith('/missing'):
+            return self.get_missing(key.rpartition('/')[0])
+
+        resolved_key, provider = self._resolve_schema_key(key)
+
+        if resolved_key:
+            # Otherwise, attempt to map the logical key to a literal key
+            return super(Hdf5, self).__getitem__(resolved_key)
+        elif provider:
+            # Or run the value through a key provider
+            provider_func = provider.get('func')
+            provider_args = provider.get('args', {})
+            if provider_func is None:
+                errmsg = "No provider function for %s" % key
+                raise KeyError(errmsg)
+            else:
+                return provider_func(self, **provider_args)
         else:
-            self.version = self.attrs.get('version')
-    
-    #=================================================#
-         
-    def init_datasets(self, oss_names, ost_names, mds_op_names, num_timesteps, host='unknown', filesystem='unknown'):
+            # This should never be hit based on the possible outputs of _resolve_schema_key
+            errmsg = "_resolve_schema_key: undefined output from %s" % key
+            raise KeyError(errmsg)
+
+    def _resolve_schema_key(self, key):
         """
-        Create datasets if they do not exist, and set the appropriate attributes
-       
+        Given a key, either return a key that can be used to index self
+        directly, or return a provider function and arguments to generate the
+        dataset dynamically
         """
-        ### Notes:
-        ### 1. We do square chunking here because there are times when we
-        ###    want to both iterate over time (rows), such as when collecting
-        ###    aggregate file system metrics, as well as iterate over STs,
-        ###    such as when trying to subselect STs participating in a
-        ###    specific job.
-        ### 2. v1 has num_timesteps+1 for reasons unknown.  Strict v1 leaves
-        ###    the first timestep zero and includes the first timestep from
-        ###    the following day as the (num_timesteps+1)th row, but we
-        ###    simply leave the (num_timesteps+1)th zero and correctly populate
-        ###    the first datapoints of the day instead.
-        num_osses = len(oss_names)
-        num_osts = len(ost_names)
-        num_mds_ops = len(mds_op_names)
-        _V1_SCHEMA = {
-            '/FSMissingGroup/FSMissingDataSet' : {
-                'shape': (num_osses, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'i4',
-            },
-            '/FSStepsGroup/FSStepsDataSet' : {
-                'shape': (num_timesteps+1,),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'i4',
-            },
-            '/MDSCPUGroup/MDSCPUDataSet' : {
-                'shape': (num_timesteps+1,),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/MDSOpsGroup/MDSOpsDataSet' : {
-                'shape': (num_mds_ops,num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSSCPUGroup/OSSCPUDataSet' : {
-                'shape': (num_osses, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSTReadGroup/OSTBulkReadDataSet' : {
-                'shape': (num_osts, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-            '/OSTWriteGroup/OSTBulkWriteDataSet' : {
-                'shape': (num_osts, num_timesteps+1),
-                'chunks': True,
-                'compression': 'gzip',
-                'dtype': 'f8',
-            },
-        }
+        if super(Hdf5, self).__contains__(key):
+            # If the dataset exists in the underlying HDF5 file, just return it
+            return key, None
 
-        # Version 1 format - datasets
-        for dset_name, dset_params in _V1_SCHEMA.iteritems():
-            if dset_name not in self:
-                hard_name = '/version1/' + dset_name
-                self.create_dataset(name=hard_name,**dset_params)
-                self[dset_name] = h5py.SoftLink(hard_name)
-                _debug_print( "creating softlink %s -> %s" % ( dset_name, hard_name ) )
+        # Straight mapping between the key and a dataset
+        key = key.lstrip('/') if isstr(key) else key
+        if key in self.schema:
+            hdf5_key = self.schema.get(key)
+            if super(Hdf5, self).__contains__(hdf5_key):
+                return hdf5_key, None
 
-        # Version 1 format - metadata
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['fs'] = filesystem
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['host'] = host
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['day'] = ""
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = ""
-        self['/MDSOpsGroup/MDSOpsDataSet'].attrs['OpNames'] = mds_op_names
-        self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames'] = oss_names
-        self['/OSTReadGroup/OSTBulkReadDataSet'].attrs['OSTNames'] = ost_names
-        self['/OSTWriteGroup/OSTBulkWriteDataSet'].attrs['OSTNames'] = ost_names
+        # Key maps to a transformation
+        if key in self.dataset_providers:
+            return None, self.dataset_providers[key]
 
-        # Version 2 format
-        for x in ['ost_bytes_read', 'ost_bytes_written']:
-            if x not in self:
-                self.create_dataset(name=x, shape=(num_timesteps, num_osts),
-                                    chunks=True, compression="gzip", dtype='f8')
-        self.attrs['host'] = host
-        self.attrs['filesystem'] = filesystem
+        errmsg = "Unknown key %s in %s" % (key, self.filename)
+        raise KeyError(errmsg)
 
-    def init_timestamps(self, t_start, t_stop, timestep=LMT_TIMESTEP, fs=None, host=None):
+    def get_version(self, dataset_name=None):
+        """Get the version attribute from an HDF5 file dataset
+
+        Args:
+            dataset_name (str): Name of dataset to retrieve version.  If None,
+                return the global file's version.
+        Returns:
+            str: The version string for the specified dataset
         """
-        Initialize timestamps for the whole Hdf5 file.  Version 1 populates an
-        entire dataset with equally spaced epoch timestamps, while version 2
-        only sets a global timestamp for the first row of each dataset and a
-        timestep thereafter.
+        if dataset_name is None:
+            return self._version
+        else:
+            # resolve dataset name
+            dataset = self.__getitem__(dataset_name)
+            version = dataset.attrs.get("version")
+            if version is None:
+                version = self._version
+            if isinstance(version, bytes):
+                return version.decode() # for python3
+            else:
+                return version
+
+    def set_version(self, version, dataset_name=None):
+        """Set the version attribute from an HDF5 file dataset
+
+        Provide a portable way to set the global schema version or the version
+        of a specific dataset.
+
+        Args:
+            version (str): The new version to be set
+            dataset_name (str): Name of dataset to set version.  If None,
+                set the global file's version.
+        """
+        if dataset_name is None:
+            self._version = version
+            return self._version
+        else:
+            # resolve dataset name
+            dataset = self.__getitem__(dataset_name)
+            if dataset is None:
+                raise KeyError("Dataset %s does not exist" % dataset_name)
+            dataset.attrs["version"] = version
+
+    def get_columns(self, dataset_name):
+        """Get the column names of a dataset
+
+        Args:
+            dataset_name (str): name of dataset whose columns will be retrieved
+
+        Returns:
+            numpy.ndarray of column names, or empty if no columns defined
+        """
+        if self.get_version(dataset_name=dataset_name) is None:
+            return self._get_columns_h5lmt(dataset_name)
         
+        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
+
+    def _get_columns_h5lmt(self, dataset_name):
+        """Get the column names of an h5lmt dataset
         """
-        t0_day = t_start.replace(hour=0,minute=0,second=0,microsecond=0)
-        t0_epoch = time.mktime(t0_day.timetuple()) # truncate t_start
-        ts_ct = int((t_stop - t_start).total_seconds() / timestep)
+        dataset = self.__getitem__(dataset_name)
+        orig_dataset_name = dataset_name.lstrip('/')
+        dataset_name = dataset.name.lstrip('/')
+        if dataset_name == 'MDSOpsGroup/MDSOpsDataSet' and orig_dataset_name != dataset_name:
+            return numpy.array([SCHEMA_DATASET_PROVIDERS[None][orig_dataset_name]['args']['column']])
+        elif dataset_name in H5LMT_COLUMN_ATTRS:
+            return dataset.attrs[H5LMT_COLUMN_ATTRS[dataset_name]].astype('U')
+        elif dataset_name == 'MDSCPUGroup/MDSCPUDataSet':
+            return numpy.array(['_unknown'])
+        elif dataset_name == 'FSMissingGroup/FSMissingDataSet':
+            return numpy.array(['_unknown%04d' % i for i in range(dataset.shape[1])])
+        else:
+            raise KeyError('Unknown h5lmt dataset %s' % dataset_name)
 
-        # Version 1 format - create a full dataset of timestamps
-        ts_map = np.empty(shape=(ts_ct+1,), dtype='i8')
-        for t in range( ts_ct ):
-            ts_map[t] = t0_epoch + t * timestep
-        ts_map[ts_ct] = t0_epoch + ts_ct * timestep # for the final extraneous v1 point...
-        self['/FSStepsGroup/FSStepsDataSet'][:] = ts_map[:]
-        del ts_map ### free the array from memory
-
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['day'] = t_start.strftime("%Y-%m-%d")
-        self['/FSStepsGroup/FSStepsDataSet'].attrs['nextday'] = (t0_day + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
-
-        # Version 2 format - just store the first timestamp and the timestep
-        self.first_timestamp = int(t0_epoch)
-        self.attrs['first_timestamp'] = self.first_timestamp
-        self.timestep = timestep
-        self.attrs['timestep'] = self.timestep
-        self.last_timestamp = self.first_timestamp + self.timestep * ts_ct
-
-
-    def get_ost_data(self, t_start, t_stop):
+    def get_timestep(self, dataset_name, timestamps=None):
         """
-        Return a generator that produces tuples of (timestamp, read_bytes,
-        write_bytes) between t_start (inclusive) and t_stop (exclusive)
-        
+        Cache or calculate the timestep for a dataset
         """
-        idx0 = self.get_index(t_start)
-        idxf = self.get_index(t_stop)
-        assert(idx0 <= idxf)
+        if dataset_name not in self._timesteps:
+            if timestamps is None:
+                timestamps = self.get_timestamps(dataset_name)[0:2]
+            self._timesteps[dataset_name] = timestamps[1] - timestamps[0]
+        return self._timesteps[dataset_name]
 
-        # Load the entire output slice into memory to avoid doing a lot of
-        # tiny I/Os.  May have to optimize this for memory later on down the
-        # road.
-        ts_array = self['FSStepsGroup/FSStepsDataSet'][idx0:idxf]
-        r_array = self['OSTReadGroup/OSTBulkReadDataSet'][:, idx0:idxf]
-        w_array = self['OSTWriteGroup/OSTBulkWriteDataSet'][:, idx0:idxf]
-        assert(r_array.shape[0] == w_array.shape[0])
-        
-        # Generator core
-        for t_idx in range( 0, idxf - idx0 ):
-            for ost_idx in range(r_array.shape[0]):
-                yield (ts_array[t_idx], 
-                       r_array[ost_idx,t_idx] * self.timestep, 
-                       w_array[ost_idx,t_idx] * self.timestep)
-
-    def get_index(self, t, safe=False):
+    def get_index(self, dataset_name, target_datetime):
         """
         Turn a datetime object into an integer that can be used to reference
         specific times in datasets.
-        
         """
-        # Initialize our timestep if we don't already have this
-        if self.timestep is None:
-            if 'timestep' in self.attrs: 
-                self.timestep = self.attrs['timestep']
-            elif 'FSStepsGroup/FSStepsDataSet' in self and len(self['FSStepsGroup/FSStepsDataSet']) > 1:
-                self.timestep = self['FSStepsGroup/FSStepsDataSet'][1] - self['FSStepsGroup/FSStepsDataSet'][0]
-            else:
-                self.timestep = LMT_TIMESTEP
-        
-        if 'first_timestamp' in self.attrs: 
-            t0 = datetime.datetime.fromtimestamp(self.attrs['first_timestamp'])
+        timestamps = self.get_timestamps(dataset_name)[0:2]
+        timestep = self.get_timestep(dataset_name, timestamps)
+        t_start = datetime.datetime.fromtimestamp(timestamps[0])
+        return int((target_datetime - t_start).total_seconds() / timestep)
+
+    def get_timestamps(self, dataset_name):
+        """Return timestamps dataset corresponding to given dataset name
+
+        This method returns a dataset, not a numpy array, so you can face severe
+        performance penalties trying to iterate directly on the return value!
+        To iterate over timestamps, it is almost always better to dereference
+        the dataset to get a numpy array and iterate over that in memory.
+
+        Args:
+            dataset_name (str): Logical name of dataset whose timestamps should
+                be retrieved
+
+        Returns:
+            h5py.File: The dataset containing the timestamps corresponding to
+                dataset_name.
+        """
+        return get_timestamps(self, dataset_name)
+
+    def get_missing(self, dataset_name, inverse=False):
+        """Convert a dataset into a matrix indicating the abscence of data
+
+        Args:
+            dataset_name (str): name of dataset to access
+            inverse (bool): return 0 for missing and 1 for present if True
+
+        Return:
+            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+                absence of specific elements
+        """
+        if self.get_version(dataset_name=dataset_name) is None:
+            return self._get_missing_h5lmt(dataset_name, inverse=inverse)
+        return missing_values(self[dataset_name][:], inverse)
+
+    def _get_missing_h5lmt(self, dataset_name, inverse=False):
+        """Return the FSMissingGroup dataset from an H5LMT file
+
+        Encodes a hot mess of hacks to return something that looks like what
+        `get_missing()` would return for a real dataset.
+
+        Args:
+            dataset_name (str): name of dataset to access
+            inverse (bool): return 0 for missing and 1 for present if True
+
+        Return:
+            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+                absence of specific elements
+        """
+        dataset = self.__getitem__(dataset_name)
+        missing_dataset = self.get('/FSMissingGroup/FSMissingDataSet')
+        if len(dataset.shape) == 1:
+            result = numpy.zeros((dataset.shape[0], 1), dtype=numpy.int8)
+        elif dataset.shape == missing_dataset.shape:
+            result = missing_dataset[:, :].astype('i8').T
         else:
-            t0 = datetime.datetime.fromtimestamp(self['FSStepsGroup/FSStepsDataSet'][0])
+            result = numpy.zeros(dataset[:, :].shape, dtype=numpy.int8).T
 
-        return int((t - t0).total_seconds()) / int(self.timestep)
+        if inverse:
+            return (~result.astype(bool)).astype('i8')
+        return result
 
-    def to_dataframe(self, dataset_name=None):
+    def to_dataframe(self, dataset_name):
+        """Convert a dataset into a dataframe
+
+        Args:
+            dataset_name (str): dataset name to conver to DataFrame
+
+        Returns:
+            Pandas DataFrame indexed by datetime objects corresponding to
+            timestamps, columns labeled appropriately, and values from the
+            dataset
         """
-        Convert the hdf5 class in a pandas dataframe 
-        """
-        # Convenience:may put in lower case
-        _INDEX_DATASET_NAME = '/FSStepsGroup/FSStepsDataSet'
-        if dataset_name is None:
-            dataset_name = _INDEX_DATASET_NAME
-        # Normalize to absolute path
-        if not dataset_name.startswith('/'):
-            dataset_name = '/' + dataset_name
+        if self.get_version(dataset_name=dataset_name) is None:
+            return self._to_dataframe_h5lmt(dataset_name)
+        return self._to_dataframe(dataset_name)
 
-        if dataset_name in ('/OSTReadGroup/OSTBulkReadDataSet',
-                          '/OSTWriteGroup/OSTBulkWriteDataSet'):
-            col_header_key = 'OSTNames'
-        elif dataset_name == '/MDSOpsGroup/MDSOpsDataSet':
-            col_header_key = 'OpNames'
-        elif dataset_name == '/OSSCPUGroup/OSSCPUDataSet':
-            col_header_key = 'OSSNames'
-        else:
-            col_header_key = None
-        
-        # Get column header from col_header_key
+    def _to_dataframe(self, dataset_name):
+        """Convert a dataset into a dataframe via TOKIO HDF5 schema
+        """
+        values = self[dataset_name][:]
+        columns = self.get_columns(dataset_name)
+        timestamps = self.get_timestamps(dataset_name)[...]
+        if len(columns) < values.shape[1]:
+            columns.resize(values.shape[1])
+        dataframe = pandas.DataFrame(data=values,
+                                     index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
+                                     columns=columns)
+        return dataframe
+
+    def _to_dataframe_h5lmt(self, dataset_name):
+        """Convert a dataset into a dataframe via H5LMT native schema
+        """
+        normed_name = dataset_name.lstrip('/')
+        col_header_key = H5LMT_COLUMN_ATTRS.get(normed_name)
+
+        # Hack around datasets that lack column headers to retrieve column names
         if col_header_key is not None:
-            col_header = self[dataset_name].attrs[col_header_key]
-        elif dataset_name == '/FSMissingGroup/FSMissingDataSet' \
-        and '/OSSCPUGroup/OSSCPUDataSet' in self:
-            # Because FSMissingDataSet lacks the appropriate metadata in v1...
-            col_header = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
+            columns = self[dataset_name].attrs[col_header_key]
+        elif normed_name == 'FSMissingGroup/FSMissingDataSet':
+            columns = self['/OSSCPUGroup/OSSCPUDataSet'].attrs['OSSNames']
+        elif normed_name == 'MDSCPUGroup/MDSCPUDataSet':
+            columns = ['unknown_mds']
         else:
-            col_header = None
+            columns = None
 
-        # Retrieve timestamp indexes
-        index = self[_INDEX_DATASET_NAME][:]
+        # Get timestamps through regular API
+        timestamps = self.get_timestamps(dataset_name)[...]
 
-        # Retrieve hdf5 values
-        if dataset_name == _INDEX_DATASET_NAME:
+        # Retrieve and transform data using H5LMT schema directly
+        if normed_name == 'FSStepsGroup/FSStepsDataSet':
             values = None
         else:
             num_dims = len(self[dataset_name].shape)
             if num_dims == 1:
                 values = self[dataset_name][:]
             elif num_dims == 2:
-                values = self[dataset_name][:,:].T
+                # only transpose if dataset_name refers to a native type
+                if normed_name in SCHEMA_DATASET_PROVIDERS[None]:
+                    values = self[dataset_name][:]
+                    columns = self.get_columns(normed_name)
+                else:
+                    values = self[dataset_name][:].T
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
-        return pd.DataFrame(data=values,
-                            index=[datetime.datetime.fromtimestamp(tstamp) for tstamp in index],
-                            columns=col_header)
+        return pandas.DataFrame(data=values,
+                                index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
+                                columns=columns)
+
+def missing_values(dataset, inverse=False):
+    """Identify matrix values that are missing
+
+    Because we initialize datasets with -0.0, we can scan the sign bit of every
+    element of an array to determine how many data were never populated.  This
+    converts negative zeros to ones and all other data into zeros then count up
+    the number of missing elements in the array.
+
+    Args:
+        dataset: dataset to access
+        inverse (bool): return 0 for missing and 1 for present if True
+
+    Return:
+        numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
+            absence of specific elements
+    """
+    zero = numpy.int8(0)
+    one = numpy.int8(1)
+    if inverse:
+        converter = numpy.vectorize(lambda x:
+                                    zero if (x == 0.0 and math.copysign(1, x) < 0.0) else one)
+    else:
+        converter = numpy.vectorize(lambda x:
+                                    one if (x == 0.0 and math.copysign(1, x) < 0.0) else zero)
+    return converter(dataset)

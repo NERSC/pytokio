@@ -11,14 +11,12 @@ import tokio.tools.hdf5
 import tokio.connectors.hdf5
 from test_connectors_hdf5 import DATASETS_1D, DATASETS_2D
 
-### For tokio.tools.hdf5, which is used by summarize_job.py
-tokio.config.H5LMT_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
-tokio.config.LFSSTATUS_BASE_DIR = os.path.join(tokiotest.INPUT_DIR, "%Y-%m-%d")
 
 SAMPLE_H5LMT_FILE_BN = os.path.basename(tokiotest.SAMPLE_H5LMT_FILE)
-TIMESTAMPS_DATASET = 'FSStepsGroup/FSStepsDataSet'
+FAKE_FSNAME = 'fakefs'
 
-TIME_0, TIME_1 = tokio.connectors.Hdf5(tokiotest.SAMPLE_H5LMT_FILE)[TIMESTAMPS_DATASET][0:2]
+TIMESTAMPS = tokio.connectors.hdf5.Hdf5(tokiotest.SAMPLE_H5LMT_FILE).get_timestamps('/datatargets/readbytes')[...]
+TIME_0, TIME_1 = TIMESTAMPS[0:2]
 LMT_TIMESTEP = int(TIME_1 - TIME_0)
 
 # Tuple of (offset relative to start of first day, duration)
@@ -38,22 +36,34 @@ TIME_OFFSETS = [
      datetime.timedelta(days=0, hours=12, minutes=0, seconds=0)),
 ]
 
-def check_get_files_and_indices(start_offset, duration):
+def check_get_files_and_indices(dataset_name, start_offset, duration):
     """
     Enumerate input files from time range
     """
+    print("TIME_0 =", TIME_0)
+    print("TIME_1 =", TIME_1)
+    print("LMT_TIMESTEP=", LMT_TIMESTEP)
+
     start_time = datetime.datetime.fromtimestamp(TIME_0) + start_offset
     end_time = start_time + duration
+    print("Getting [%s to %s)" % (start_time, end_time))
     # Make sure we're touching at least two files
     assert (end_time.date() - start_time.date()).days == 1
 
-    files_and_indices = tokio.tools.hdf5.get_files_and_indices(SAMPLE_H5LMT_FILE_BN,
-                                                               start_time,
-                                                               end_time)
+    files_and_indices = tokio.tools.hdf5.get_files_and_indices(
+        fsname=FAKE_FSNAME,
+        dataset_name=dataset_name,
+        datetime_start=start_time,
+        datetime_end=end_time)
+
+    assert len(files_and_indices) > 0
+
     for (file_name, istart, iend) in files_and_indices:
-        with tokio.connectors.Hdf5(file_name, mode='r') as hdf_file:
-            derived_start = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][istart])
-            derived_end = datetime.datetime.fromtimestamp(hdf_file[TIMESTAMPS_DATASET][iend])
+        with tokio.connectors.hdf5.Hdf5(file_name, mode='r') as hdf_file:
+            timestamps = hdf_file.get_timestamps('/datatargets/readbytes')[...]
+            derived_start = datetime.datetime.fromtimestamp(timestamps[istart])
+            derived_end = datetime.datetime.fromtimestamp(timestamps[iend])
+
             assert (derived_start == start_time) or istart == 0
             assert (derived_end == end_time - datetime.timedelta(seconds=LMT_TIMESTEP)) \
                 or iend == -1
@@ -66,10 +76,15 @@ def check_get_df_from_time_range(dataset_name, start_offset, duration):
     end_time = start_time + duration
     # Make sure we're touching at least two files
     assert (end_time.date() - start_time.date()).days == 1
-    result = tokio.tools.hdf5.get_dataframe_from_time_range(SAMPLE_H5LMT_FILE_BN,
-                                                            dataset_name,
-                                                            start_time,
-                                                            end_time)
+
+    result = tokio.tools.hdf5.get_dataframe_from_time_range(
+        fsname=FAKE_FSNAME,
+        dataset_name=dataset_name,
+        datetime_start=start_time,
+        datetime_end=end_time)
+
+    assert len(result) > 0
+
     assert result.index[0] == start_time
     assert result.index[-1] == end_time - datetime.timedelta(seconds=LMT_TIMESTEP)
 
@@ -78,10 +93,13 @@ def test():
     Correctness of tools.hdf5 edge cases
     """
     for (description, start_offset, duration) in TIME_OFFSETS:
-        func = check_get_files_and_indices
-        func.description = "tools.hdf5 (files): " + description
-        yield func, start_offset, duration
-        for dataset_name in DATASETS_1D + DATASETS_2D:
+        for dataset_name in tokiotest.TIMESERIES_DATASETS_MOST:
+            func = check_get_files_and_indices
+            func.description = "tools.hdf5.get_files_and_indices(%s): %s" % (dataset_name,
+                                                                             description)
+            yield func, dataset_name, start_offset, duration
+
             func = check_get_df_from_time_range
-            func.description = "tools.hdf5 (dataframe): " + description
+            func.description = "tools.hdf5.get_df_from_time_range(%s): %s" % (dataset_name,
+                                                                              description)
             yield func, dataset_name, start_offset, duration

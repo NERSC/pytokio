@@ -50,7 +50,7 @@ def estimate_darshan_perf(ranks_data):
     """
     max_io_time = 0.0
     sum_bytes = 0.0
-    for counter_data in ranks_data.itervalues():
+    for counter_data in ranks_data.values():
         this_io_time = counter_data['F_WRITE_TIME'] + \
                        counter_data['F_READ_TIME'] + \
                        counter_data['F_META_TIME']
@@ -77,12 +77,15 @@ def summarize_darshan_perf(darshan_logs):
         if 'counters' not in darshan_data:
             warnings.warn("Invalid Darshan log %s" % darshan_log)
             continue
+        elif 'posix' not in darshan_data['counters']:
+            warnings.warn("Darshan log %s does not contain POSIX module data" % darshan_log)
+            continue
         elif 'lustre' not in darshan_data['counters']:
             warnings.warn("Darshan log %s does not contain Lustre module data" % darshan_log)
             continue
         counters = darshan_data['counters']
 
-        for logged_file_path, ranks_data in counters['posix'].iteritems():
+        for logged_file_path, ranks_data in counters['posix'].items():
             # encode the darshan log's name in addition to the file path in case
             # multiple Darshan logs with identical file paths (but different
             # striping) are being processed
@@ -95,7 +98,7 @@ def summarize_darshan_perf(darshan_logs):
             ost_list = set([])
             if logged_file_path not in counters['lustre']:
                 continue
-            for counter_data in counters['lustre'][logged_file_path].itervalues():
+            for counter_data in counters['lustre'][logged_file_path].values():
                 for ost_id in range(counter_data['STRIPE_WIDTH']):
                     key = "OST_ID_%d" % ost_id
                     ost_list.add(counter_data[key])
@@ -145,7 +148,7 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
 
     return pandas.DataFrame(pre_dataframe)
 
-def darshan_bad_ost():
+def main(argv=None):
     """
     Parse command line arguments and dispatch analysis
     """
@@ -156,7 +159,7 @@ def darshan_bad_ost():
     parser.add_argument("-c", "--c-threshold", type=float, default=0.0,
                         help="coefficient below which abs(correlations) will not be displayed")
     parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     results = correlate_ost_performance(args.darshanlogs)
 
@@ -166,12 +169,13 @@ def darshan_bad_ost():
             if result['p-value'] < args.p_threshold \
             and abs(result['coefficient']) > args.c_threshold:
                 filtered_results.append(result)
-        print json.dumps(filtered_results, indent=4, sort_keys=True)
+        print(json.dumps(filtered_results, indent=4, sort_keys=True))
     else:
+        print("%-10s %12s %10s" % ("OST Name", "Correlation", "P-Value"))
         for result in sorted(results, key=lambda k: k['coefficient']):
             if result['p-value'] < args.p_threshold \
             and abs(result['coefficient']) > args.c_threshold:
-                print "%(ost_name)-12s %(coefficient)10.6f %(p-value)10.4g" % result
+                print("%(ost_name)-10s %(coefficient)12.3f %(p-value)10.4g" % result)
 
 if __name__ == "__main__":
-    darshan_bad_ost()
+    main()

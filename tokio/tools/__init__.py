@@ -1,12 +1,33 @@
 #!/usr/bin/env python
 """
-Miscellaneous tools that are functionally handy for dealing with files and data
-sources used by the TOKIO framework.  This particular package is not intended to
-have a stable API; as different functions prove themselves here, they will be
-incorporated into the formal TOKIO package API.
+A higher-level interface that wraps various connectors and site-dependent
+configuration to provide convenient abstractions upon which analysis tools can
+be portably built.
 """
 
 ### Subpackages to include in the tokio.tools.* namespace
-from hdf5 import *
-import topology
-import lfsstatus
+try:
+    import tokio.tools.darshan
+except ImportError:
+    pass
+
+try:
+    import tokio.tools.hdf5
+except ImportError:
+    pass
+
+try:
+    import tokio.tools.topology
+except ImportError:
+    pass
+
+try:
+    import tokio.tools.lfsstatus
+except ImportError:
+    pass
+
+### For backwards compatibility
+try:
+    import tokio.analysis.umami as umami
+except ImportError:
+    pass

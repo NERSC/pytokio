@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 """
-TODO: add support for external configuration
+The Total Knowledge of I/O (TOKIO) reference implementation, pytokio.
 """
 
-try:
-    from .connectors.hdf5 import HDF5
-except ImportError:
-    pass
-try:
-    from .connectors.lmtdb import LMTDB
-except ImportError:
-    pass
+import tokio.common
+import tokio.timeseries
+import tokio.config
+import tokio.debug
 
-from .config import *
-from .debug import *
+import tokio.connectors
+import tokio.tools
+import tokio.analysis
+
+# Exceptions
+from tokio.common import ConfigError
