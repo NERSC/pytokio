@@ -22,8 +22,9 @@ APP = flask.Flask(__name__)
 DEFAULT_HDF5_DURATION_SECS = 60 * 15 # by default, retrieve data for 15 minutes (of previous hour)
 MAX_HDF5_DURATION = datetime.timedelta(days=1)
 SCHEMA_VERSION = "1"
-FS_GROUPS = list(tokio.connectors.hdf5.SCHEMA[SCHEMA_VERSION].keys()) + \
-            list(tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[SCHEMA_VERSION].keys())
+FS_DATASETS = list(tokio.connectors.hdf5.SCHEMA[SCHEMA_VERSION].keys()) + \
+              list(tokio.connectors.hdf5.SCHEMA_DATASET_PROVIDERS[SCHEMA_VERSION].keys())
+FS_GROUPS = list(set([x.partition('/')[0] for x in FS_DATASETS]))
 
 def format_output(result):
     """
@@ -75,7 +76,7 @@ def validate_file_system(file_system):
     """
     ### Return list of valid file systems
     if file_system is None:
-        response = list(tokio.config.CONFIG['hdf5_files'].keys())
+        response = sorted(list(tokio.config.CONFIG['hdf5_files'].keys()))
         return format_output(response), response
 
     ### Verify that specified file system is valid
@@ -86,17 +87,33 @@ def validate_file_system(file_system):
     response = {"file_name": file_name}
     return format_output(response), response
 
-def validate_hdf5_resource(resource_name):
+def validate_hdf5_group(group_name):
+    """Verify that a given group is valid
+
+    Return:
+        tuple: (str, object) where str is the json formatted return data and
+            object is the Python object
+    """
+    if group_name is None:
+        response = sorted(list(set([x.partition('/')[0] for x in FS_DATASETS])))
+        return format_output(response), response
+
+    if group_name in FS_GROUPS:
+        return validate_hdf5_resource(group_name, None)
+    else:
+        return rest_error(400, "Unknown file system component")
+
+def validate_hdf5_resource(group_name, resource_name):
     """
     Verify that HDF5 resource is valid and return (json, object) tuple
     """
     ### Return list of valid file systems
     if resource_name is None:
-        response = FS_GROUPS
+        response = sorted([x.partition('/')[-1] for x in FS_DATASETS if x.startswith(group_name)])
         return format_output(response), response
 
     ### Verify that specified file system is valid
-    if resource_name in FS_GROUPS:
+    if resource_name in FS_DATASETS:
         hdf5_resource = resource_name
     else:
         return rest_error(400, "Unknown HDF5 resource")
@@ -131,8 +148,67 @@ def tokio_tool_hdf5(file_name, hdf5_resource, start, end):
     except ValueError as error:
         return rest_error(400, str(error))
 
-@APP.route('/hdf5/<file_system>/<resource>')
-def hdf5_resource_route(file_system, resource):
+@APP.route('/')
+def index_to_list():
+    """
+    GET to generate list of endpoints
+    """
+    routes = []
+    for rule in flask.current_app.url_map.iter_rules():
+        route = rule.rule.lstrip('/')
+        if route == '' or route.startswith('static'):
+            continue
+        
+        ### Only display the top-level routes
+        if len(route.split('/')) != 1:
+            continue
+
+        routes.append(route)
+    return format_output(routes)
+
+@APP.route('/hdf5/')
+def hdf5_index():
+    """
+    GET file system time series data resources
+    """
+    ### Return list of valid file systems
+    response_json, _ = validate_file_system(None)
+    return response_json
+
+@APP.route('/hdf5/<file_system>/')
+def file_system_route(file_system):
+    """
+    GET data from given file system
+    """
+    ### Validate file_system
+    response_json, response = validate_file_system(file_system)
+    file_name = response.get('file_name')
+
+    ### If valid file name given, return list of valid resources
+    if file_name is not None:
+        response_json, _ = validate_hdf5_group(None)
+
+    return response_json
+
+@APP.route('/hdf5/<file_system>/<group_name>')
+def hdf5_group_route(file_system, group_name):
+    """List valid datasets for a given group
+    """
+    # Validate file system
+    response_json, response = validate_file_system(file_system)
+    file_name = response.get('file_name')
+    if file_name is None:
+        return format_output(response)
+
+    # Validate group
+    response_json, response = validate_hdf5_group(group_name)
+    if isinstance(response, list):
+        response_json, _ = validate_hdf5_resource(group_name, None)
+
+    return response_json
+
+@APP.route('/hdf5/<file_system>/<group_name>/<dataset>')
+def hdf5_dataset_route(file_system, group_name, dataset):
     """
     GET data from a specific resource on a given file system
 
@@ -146,13 +222,13 @@ def hdf5_resource_route(file_system, resource):
     if file_name is None:
         return format_output(response)
 
-    response_json, response = validate_hdf5_resource(resource)
+    resource = '%s/%s' % (group_name, dataset)
+    response_json, response = validate_hdf5_resource(group_name, resource)
     hdf5_resource = response.get('hdf5_resource')
     if hdf5_resource is None:
         return format_output(response)
 
     ### Get start and end time and sanitize input
-
     try:
         end_time = int(flask.request.args.get('end', time.time() - 3600))
         start_time = int(flask.request.args.get('start', end_time - DEFAULT_HDF5_DURATION_SECS))
@@ -171,51 +247,9 @@ def hdf5_resource_route(file_system, resource):
             (datetime_end - datetime_start).total_seconds(),
             str(MAX_HDF5_DURATION)))
 
-    APP.logger.debug("Querying %s to %s" % (datetime_start, datetime_end))
+    APP.logger.debug("Querying %s for %s to %s" % (file_system, datetime_start, datetime_end))
 
-    return tokio_tool_hdf5(file_name, hdf5_resource, datetime_start, datetime_end)
-
-@APP.route('/hdf5/<file_system>/')
-def file_system_route(file_system):
-    """
-    GET data from given file system
-    """
-    ### Validate file_system
-    response_json, response = validate_file_system(file_system)
-    file_name = response.get('file_name')
-
-    ### If valid file name given, return list of valid resources
-    if file_name is not None:
-        response_json, _ = validate_hdf5_resource(None)
-
-    return response_json
-
-@APP.route('/hdf5')
-def hdf5_index():
-    """
-    GET file system time series data resources
-    """
-    ### Return list of valid file systems
-    response_json, _ = validate_file_system(None)
-    return response_json
-
-@APP.route('/')
-def index_to_list():
-    """
-    GET to generate list of endpoints
-    """
-    routes = []
-    for rule in flask.current_app.url_map.iter_rules():
-        route = rule.rule.lstrip('/')
-        if route == '' or route.startswith('static'):
-            continue
-        
-        ### Only display the top-level routes
-        if len(route.split('/')) != 1:
-            continue
-
-        routes.append(route)
-    return format_output(routes)
+    return tokio_tool_hdf5(file_system, hdf5_resource, datetime_start, datetime_end)
 
 def index_to_dict():
     """
