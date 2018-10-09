@@ -16,7 +16,7 @@ from distutils.core import setup
 setup(
     name='pytokio',
     description= 'Total Knowledge of I/O',
-    version='0.9',
+    version='0.10',
     author='Glenn K. Lockwood',
     author_email='glock@lbl.gov',
     license='BSD',
