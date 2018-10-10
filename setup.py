@@ -27,6 +27,9 @@ https://pytokio.readthedocs.io/en/latest/ for the full documentation.
 import os
 import re
 import glob
+import subprocess
+
+RELEASE = False # set to True when building a release distribution
 
 REQUIREMENTS = [
     "h5py>=2.7",
@@ -41,23 +44,6 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 if os.path.exists('MANIFEST'):
     os.remove('MANIFEST')
-
-def find_version():
-    """Extract the package version number from __init__.py
-
-    See https://packaging.python.org/guides/single-sourcing-package-version
-    """
-    init_file = os.path.join(BASE_DIR, "tokio", "__init__.py")
-    if os.path.isfile(init_file):
-        match = re.search(r"^__version__\s*=\s*['\"]([^'\"]+?)['\"]",
-                          open(init_file, 'r').read(),
-                          re.M)
-        if match:
-            return match.group(1)
-        else:
-            raise RuntimeError("Unable to find version string")
-    else:
-        raise RuntimeError("Unable to find version string")
 
 def setup_package():
     import setuptools
@@ -108,6 +94,52 @@ def setup_package():
     )
 
     setuptools.setup(**METADATA)
+
+def find_version():
+    """Extract the package version number from __init__.py
+
+    See https://packaging.python.org/guides/single-sourcing-package-version
+    """
+    init_file = os.path.join(BASE_DIR, "tokio", "__init__.py")
+    if os.path.isfile(init_file):
+        match = re.search(r"^__version__\s*=\s*['\"]([^'\"]+?)['\"]",
+                          open(init_file, 'r').read(),
+                          re.M)
+        if match:
+            version = match.group(1)
+            if not RELEASE:
+                revision = git_version()
+                version = "%s.dev0+%s" % (version, revision[:7])
+            return version
+        else:
+            raise RuntimeError("Unable to find version string")
+    else:
+        raise RuntimeError("Unable to find version string")
+
+
+# Return the git revision as a string
+def git_version():
+    def _minimal_ext_cmd(cmd):
+        # construct minimal environment
+        env = {}
+        for k in ['SYSTEMROOT', 'PATH', 'HOME']:
+            v = os.environ.get(k)
+            if v is not None:
+                env[k] = v
+        # LANGUAGE is used on win32
+        env['LANGUAGE'] = 'C'
+        env['LANG'] = 'C'
+        env['LC_ALL'] = 'C'
+        out = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env).communicate()[0]
+        return out
+
+    try:
+        out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
+        revision = out.strip().decode('ascii')
+    except OSError:
+        revision = "unknown"
+
+    return revision
 
 if __name__ == "__main__":
     setup_package()
