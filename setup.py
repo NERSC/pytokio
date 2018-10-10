@@ -16,7 +16,13 @@ https://pytokio.readthedocs.io/en/latest/ for the full documentation.
 #  To install: python setup.py install
 #              python setup.py install --prefix=/path/to/prefix
 #
-#  To create an egg: python setup.py bdist_egg
+#  To package: python setup.py sdist
+#                              bdist
+#                              bdist_egg
+#
+#  Making bdists is not supported because site.json cannot be correctly
+#  resolved.  If you choose to use a bdist, you must explicitly set
+#  PYTOKIO_CONFIG to point to a valid site.json.
 #
 import os
 import re
@@ -73,6 +79,12 @@ def setup_package():
 #       packages=['tokio', 'tokio.connectors', 'tokio.tools', 'tokio.analysis'],
         packages=setuptools.find_packages(exclude=['bin']),
         scripts=include_scripts, # TODO: convert to console_scripts
+        # If we want to keep site.json at the top-level and copy it in during
+        # install time.  This would force users to correctly install pytokio
+        # before it could be used though, which is not strictly necessary for
+        # any other purpose.
+        # data_files=[('tokio', ['site.json'])],
+        data_files=[('tokio', ['tokio/site.json'])],
         platforms=["Linux", "MacOS-X"],
         install_requires=REQUIREMENTS,
         extras_require={
