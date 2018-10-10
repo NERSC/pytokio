@@ -1,11 +1,9 @@
 language: python
 sudo: required
 install:
-    - pip install .
-    - pip install -r requirements.txt
-    - pip install coverage
-    - pip install elasticsearch
-    - (cat .travis-certs | sudo tee -a  /etc/ssl/certs/ca-certificates.crt)
+    - pip install coverage elasticsearch setuptools
+    - python setup.py sdist
+    - pip install dist/*
     - git clone -b darshan-3.1.5 https://xgitlab.cels.anl.gov/darshan/darshan.git || git clone -b darshan-3.1.5 https://github.com/glennklockwood/darshan.git
     - (cd darshan/darshan-util && ./configure && make darshan-parser)
     - export "PATH=${PWD}/darshan/darshan-util:$PATH"
