@@ -54,7 +54,7 @@ def find_version():
         raise RuntimeError("Unable to find version string")
 
 def setup_package():
-    from setuptools import setup
+    import setuptools
 
     include_scripts = [os.path.relpath(x, BASE_DIR) for x in glob.glob(os.path.join(BASE_DIR, 'bin', '*')) if '__init__' not in x]
     print("Including scripts:")
@@ -70,7 +70,8 @@ def setup_package():
         url="http://www.nersc.gov/research-and-development/tokio/",
         download_url="https://www.github.com/nersc/pytokio",
         license='BSD',
-        packages=['tokio', 'tokio.connectors', 'tokio.tools', 'tokio.analysis'],
+#       packages=['tokio', 'tokio.connectors', 'tokio.tools', 'tokio.analysis'],
+        packages=setuptools.find_packages(exclude=['bin']),
         scripts=include_scripts, # TODO: convert to console_scripts
         platforms=["Linux", "MacOS-X"],
         install_requires=REQUIREMENTS,
@@ -91,7 +92,7 @@ def setup_package():
         keywords='I/O performance monitoring'
     )
 
-    setup(**METADATA)
+    setuptools.setup(**METADATA)
 
 if __name__ == "__main__":
     setup_package()
