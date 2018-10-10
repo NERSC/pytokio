@@ -7,7 +7,7 @@ import json
 import random
 import datetime
 import nose
-import matplotlib
+import matplotlib.pyplot
 import tokiotest
 import tokio.analysis.umami
 
@@ -54,7 +54,7 @@ def test_umami_plot_to_file():
     """
     umami = build_umami_from_sample()
     fig = umami.plot(output_file=tokiotest.TEMP_FILE.name)
-    print "Wrote output to %s" % tokiotest.TEMP_FILE.name
+    print("Wrote output to %s" % tokiotest.TEMP_FILE.name)
     verify_umami_fig(fig)
 
 def test_umami_to_dict():
@@ -63,16 +63,16 @@ def test_umami_to_dict():
     """
     umami = build_umami_from_sample()
     umami_dict = umami.to_dict()
-    print umami_dict
+    print(umami_dict)
 
-    for metric, measurement in umami_dict.iteritems():
+    for metric, measurement in umami_dict.items():
         # get the corresponding SAMPLE_DATA row number from the metric name,
         # which should be test_metric_XX
         row_num = int(metric.split('_')[-1])
 
         # walk list of values to ensure they are correct
         for index, value in enumerate(measurement['values']):
-            print row_num, index, value, SAMPLE_DATA[row_num][index]
+            print(row_num, index, value, SAMPLE_DATA[row_num][index])
             assert value == SAMPLE_DATA[row_num][index]
 
         # walk list of timestamps
@@ -86,7 +86,7 @@ def test_umami_to_json():
     """
     # Don't bother checking correctness.  Just make sure json.dumps doesn't fail
     umami = build_umami_from_sample()
-    print umami.to_json()
+    print(umami.to_json())
 
 def test_umami_to_df():
     """
@@ -94,13 +94,13 @@ def test_umami_to_df():
     """
     umami = build_umami_from_sample()
     umami_df = umami.to_dataframe()
-    print umami_df
+    print(umami_df)
     for metric in umami_df:
         # get the corresponding SAMPLE_DATA row number from the metric name,
         # which should be test_metric_XX
         row_num = int(metric.split('_')[-1])
         index = 0
-        for timestamp, value in umami_df[metric].iteritems():
+        for timestamp, value in umami_df[metric].items():
             assert timestamp == SAMPLE_TIMES[index]
             assert value == SAMPLE_DATA[row_num][index]
             index += 1
@@ -111,7 +111,7 @@ def test_umamimetric_pop():
     """
     umami = build_umami_from_sample()
     row_num = 0
-    for umami_metric in umami.itervalues():
+    for umami_metric in umami.values():
         index = -1
         while len(umami_metric.values) > 0:
             # prevent an infinite loop...
@@ -135,9 +135,9 @@ def test_umamimetric_append():
             values=[],
             label="Test Metric %d" % index,
             big_is_good=True)
-        print "%d: sample_data is %d units long (%s)" % (index,
+        print("%d: sample_data is %d units long (%s)" % (index,
                                                          len(sample_data),
-                                                         json.dumps(sample_data))
+                                                         json.dumps(sample_data)))
         for jndex, sample_datum in enumerate(sample_data):
             umami_metric.append(SAMPLE_TIMES[jndex], sample_datum)
         umami_metrics.append(umami_metric)
@@ -155,5 +155,5 @@ def test_umamimetric_to_json():
     """
     # Don't bother checking correctness.  Just make sure json.dumps doesn't fail
     umami = build_umami_from_sample()
-    for umamimetric in umami.itervalues():
-        print umamimetric.to_json()
+    for umamimetric in umami.values():
+        print(umamimetric.to_json())

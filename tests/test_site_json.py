@@ -21,13 +21,13 @@ def test_site_config():
 
     # Ensure that all the keys present in the test configuration are also
     # present in the stock configuration
-    for key in test_config.keys():
+    for key in test_config:
         if key not in stock_config and not key.startswith('test'):
-            print "%s in test_config but not stock_config" % key
+            print("%s in test_config but not stock_config" % key)
             assert key in stock_config
 
     # and vice versa
-    for key in stock_config.keys():
+    for key in stock_config:
         if key not in test_config:
-            print "%s in stock_config but not test_config" % key
+            print("%s in stock_config but not test_config" % key)
             assert key in test_config

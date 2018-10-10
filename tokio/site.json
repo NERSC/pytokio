@@ -2,14 +2,19 @@
     "lmt_timestep": 5,
     "mount_to_fsname": {
         "^/projects/radix-io": "mira-fs1",
-        "^/scratch1" : "scratch1",
-        "^/scratch2" : "scratch2",
-        "^/scratch3" : "scratch3",
-        "^/global/cscratch1" : "cscratch",
-        "^/var/opt/cray/dws/mounts/.*/ss/" : "bb-shared",
-        "^/var/opt/cray/dws/mounts/.*/ps/" : "bb-private",
-        "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch/" : "bb-shared",
-        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch/" : "bb-private"
+        "^/scratch1": "scratch1",
+        "^/scratch2": "scratch2",
+        "^/scratch3": "scratch3",
+        "^/global/cscratch1": "cscratch",
+        "^/var/opt/cray/dws/mounts/.*/ss": "bb-shared",
+        "^/var/opt/cray/dws/mounts/.*/ps": "bb-private",
+        "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch": "bb-shared",
+        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch": "bb-private",
+        "^/global/project": "project2",
+        "^/global/projectb": "projectb",
+        "^/global/projecta": "projecta",
+        "^/global/u1": "homes-u1",
+        "^/global/u2": "homes-u2"
     },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",
@@ -25,12 +30,25 @@
     },
     "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
     "lfsstatus_fullness_files": [
+        "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts.txt.gz",
+        "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts_edison.txt.gz",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts.txt",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/osts_edison.txt"
     ],
     "lfsstatus_map_files": [
+        "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map.txt.gz",
+        "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt.gz",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map.txt",
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
+
     ],
-    "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d"
+    "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d",
+    "jobinfo_jobid_providers": [
+        "slurm",
+        "nersc_jobsdb"
+    ],
+    "lfsstatus_fullness_providers": [
+        "hdf5",
+        "nersc_lfsstate"
+    ]
 }

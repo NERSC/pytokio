@@ -11,6 +11,7 @@ import h5py
 import tokio.debug
 import tokio.timeseries
 import tokio.connectors.lmtdb
+from tokio.common import isstr
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
@@ -166,8 +167,8 @@ class DatasetDict(dict):
         they have been populated.  Such actions are configured entirely in
         self.config and require no external input.
         """
-        self.convert_deltas(self.config.keys())
-        self.set_timeseries_metadata(self.config.keys())
+        self.convert_deltas(list(self.config.keys()))
+        self.set_timeseries_metadata(list(self.config.keys()))
 
     def convert_deltas(self, dataset_names):
         """Convert datasets from absolute values to values per timestep
@@ -236,7 +237,7 @@ class DatasetDict(dict):
 
         # Loop through all the results of the timeseries query
         for row in results:
-            if isinstance(row[col_map['TIMESTAMP']], basestring):
+            if isstr(row[col_map['TIMESTAMP']]):
                 # SQLite stores timestamps as a unicode string
                 timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
                                                        "%Y-%m-%d %H:%M:%S")
@@ -284,7 +285,7 @@ class DatasetDict(dict):
             'setattr': 'mdtargets/setattrs',
             'getattr': 'mdtargets/getattrs',
         }
-        dataset_names = list(opname_to_dataset_name.itervalues())
+        dataset_names = list(opname_to_dataset_name.values())
 
         self.init_datasets(dataset_names, lmtdb.mds_names)
 
@@ -300,7 +301,7 @@ class DatasetDict(dict):
 
         # Loop through all the results of the timeseries query
         for row in results:
-            if isinstance(row[col_map['TIMESTAMP']], basestring):
+            if isstr(row[col_map['TIMESTAMP']]):
                 # SQLite stores timestamps as a unicode string
                 timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
                                                        "%Y-%m-%d %H:%M:%S")
@@ -358,7 +359,7 @@ class DatasetDict(dict):
 
         # Loop through all the results of the timeseries query
         for row in results:
-            if isinstance(row[col_map['TIMESTAMP']], basestring):
+            if isstr(row[col_map['TIMESTAMP']]):
                 # SQLite stores timestamps as a unicode string
                 timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
                                                        "%Y-%m-%d %H:%M:%S")
@@ -414,7 +415,7 @@ class DatasetDict(dict):
 
         # Loop through all the results of the timeseries query
         for row in results:
-            if isinstance(row[col_map['TIMESTAMP']], basestring):
+            if isstr(row[col_map['TIMESTAMP']]):
                 # SQLite stores timestamps as a unicode string
                 timestamp = datetime.datetime.strptime(row[col_map['TIMESTAMP']],
                                                        "%Y-%m-%d %H:%M:%S")
@@ -448,7 +449,7 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
     Initialize the datasets at full dimensions in the HDF5 file if necessary
     """
     schema = tokio.connectors.hdf5.SCHEMA.get(SCHEMA_VERSION)
-    for dataset_name, dataset in datasets.iteritems():
+    for dataset_name, dataset in datasets.items():
         hdf5_dataset_name = schema.get(dataset_name)
         if hdf5_dataset_name is None:
             if '/_' not in dataset_name:
@@ -462,10 +463,10 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
                                                       num_columns=dataset.dataset.shape[1],
                                                       hdf5_file=hdf5_file)
             new_dataset.commit_dataset(hdf5_file)
-            print "Initialized %s in %s with size %s" % (
+            print("Initialized %s in %s with size %s" % (
                 hdf5_dataset_name,
                 hdf5_file.name,
-                new_dataset.dataset.shape)
+                new_dataset.dataset.shape))
 
 def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end):
     """
@@ -486,8 +487,8 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
 
         init_hdf5_file(datasets, init_start, init_end, hdf5_file)
 
-        for dataset in datasets.itervalues():
-            print "Writing out %s" % dataset.dataset_name
+        for dataset in datasets.values():
+            print("Writing out %s" % dataset.dataset_name)
             dataset.commit_dataset(hdf5_file)
 
     tokio.debug.debug_print("Wrote output to %s" % output_file)

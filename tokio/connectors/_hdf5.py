@@ -218,10 +218,8 @@ def get_timestamps_key(hdf5_file, dataset_name):
     Read into an HDF5 file and extract the name of the dataset containing the
     timestamps correspond to the given dataset_name
     """
-    # Get dataset out of HDF5 file
-    hdf5_dataset = hdf5_file.get(dataset_name)
-    if hdf5_dataset is None:
-        return None
+    # Get dataset out of HDF5 file.  If dataset doesn't exist, throw exception
+    hdf5_dataset = hdf5_file[dataset_name]
 
     if hdf5_file.attrs.get('version') is None and '/FSStepsGroup/FSStepsDataSet' in hdf5_file:
         return '/FSStepsGroup/FSStepsDataSet'

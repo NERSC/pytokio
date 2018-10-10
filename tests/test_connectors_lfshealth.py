@@ -4,6 +4,7 @@ Test the NERSC Lustre health data connector
 """
 
 import os
+import tempfile
 import nose
 import tokiotest
 import tokio.connectors.lfshealth
@@ -19,19 +20,19 @@ def verify_ost(fs_data, input_type):
         tmp_os = 'ost'
 
     assert fs_data
-    print "Found %d file systems" % len(fs_data)
-    for target_name, obd_data in fs_data.iteritems():
+    print("Found %d file systems" % len(fs_data))
+    for target_name, obd_data in fs_data.items():
         assert obd_data
-        print "Found %d OBD IDs" % len(obd_data)
+        print("Found %d OBD IDs" % len(obd_data))
         obd_data = fs_data[target_name]
         found_roles = set()
-        for obd_name, keyvalues in obd_data.iteritems():
+        for obd_name, keyvalues in obd_data.items():
             if input_type == 'ostmap':
                 verify_ostmap(obd_name, keyvalues, target_name)
             elif input_type == 'ostfullness':
                 verify_ostfullness(keyvalues)
 
-            found_roles.add(unicode(keyvalues['role']))
+            found_roles.add(str(keyvalues['role']))
         # Every Lustre file system should have at least one OSC
         assert tmp_os in found_roles
 
@@ -70,27 +71,33 @@ def test_ostfullness():
     verify_ost(ostfullness, input_type='ostfullness')
 
 def test_ostmap_from_cache():
-    """lfshealth.LfsOstMap: read from cache file
+    """lfshealth.LfsOstMap: read from compressed cache file
     """
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_FILE)
     verify_ost(ostmap, input_type='ostmap')
 
-def test_ostfullness_from_cache():
-    """lfshealth.LfsOstFullness: read from cache file
+def test_ostfullness_from_cache_gz():
+    """lfshealth.LfsOstFullness: read from compressed cache file
     """
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_FILE)
     verify_ost(ostfullness, input_type='ostfullness')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_from_cache_gz():
-    """lfshealth.LfsOstMap: read from cache gzip
+    """lfshealth.LfsOstMap: read from cache file
     """
-    ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_GZ)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_LCTL_DL_T_FILE, tokiotest.TEMP_FILE.name)
+    ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostmap, input_type='ostmap')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_from_cache_gz():
-    """lfshealth.LfsOstMap: read from cache gzip
+    """lfshealth.LfsOstFullness: read from cache file
     """
-    ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_GZ)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_LFS_DF_FILE, tokiotest.TEMP_FILE.name)
+    ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.TEMP_FILE.name)
     verify_ost(ostfullness, input_type='ostfullness')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -100,7 +107,7 @@ def test_ostmap_serializer():
     # Read from a cache file
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.SAMPLE_LCTL_DL_T_FILE)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     ostmap.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
     ostmap = tokio.connectors.lfshealth.LfsOstMap(cache_file=tokiotest.TEMP_FILE.name)
@@ -113,13 +120,13 @@ def test_ostfullness_serializer():
     """
     # Read from a cache file
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.SAMPLE_LFS_DF_FILE)
-    print ostfullness
+    print(ostfullness)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     ostfullness.save_cache(tokiotest.TEMP_FILE.name)
-    print "Cache file has size", os.path.getsize(tokiotest.TEMP_FILE.name)
+    print("Cache file has size %s" % os.path.getsize(tokiotest.TEMP_FILE.name))
     # Open a second file handle to this cached file to load it
     ostfullness = tokio.connectors.lfshealth.LfsOstFullness(cache_file=tokiotest.TEMP_FILE.name)
-    print ostfullness
+    print(ostfullness)
     tokiotest.TEMP_FILE.close()
     verify_ost(ostfullness, input_type='ostfullness')

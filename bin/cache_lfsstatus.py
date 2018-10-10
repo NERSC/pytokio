@@ -19,18 +19,18 @@ def main(argv=None):
     group.add_argument("--failure", nargs='?', const="", type=str,
                        help="path to ost_map text file; summarize failure state of OSSes and OSTs")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
-    parser.add_argument("filesystem", help="file system identifier (e.g., snx11168)")
+    parser.add_argument("filesystem", help="logical file system name (e.g., cscratch)")
     parser.add_argument("datetime", help="date and time of interest in YYYY-MM-DDTHH:MM:SS format")
     args = parser.parse_args(argv)
 
     target_datetime = datetime.datetime.strptime(args.datetime, "%Y-%m-%dT%H:%M:%S")
     if args.failure is not None:
-        results = lfsstatus.get_failures_at_datetime(
+        results = lfsstatus.get_failures(
             args.filesystem,
             target_datetime,
             cache_file=args.failure if args.failure != "" else None)
     elif args.fullness is not None:
-        results = lfsstatus.get_fullness_at_datetime(
+        results = lfsstatus.get_fullness(
             args.filesystem,
             target_datetime,
             cache_file=args.fullness if args.fullness != "" else None)
@@ -40,9 +40,9 @@ def main(argv=None):
     # Serialize the object
     cache_file = args.output
     if cache_file is None:
-        print json.dumps(results, indent=4, sort_keys=True)
+        print(json.dumps(results, indent=4, sort_keys=True))
     else:
-        print "Caching to %s" % cache_file
+        print("Caching to %s" % cache_file)
         json.dump(results, open(cache_file, 'w'))
 
 if __name__ == "__main__":

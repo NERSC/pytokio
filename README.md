@@ -2,7 +2,7 @@ TOKIO - Total Knowledge of I/O
 ================================================================================
 
 This a reference implementation of the TOKIO framework composed as a Python
-package.  The full documentation is located on the [pytokio GitHub wiki][].
+package.  The [full documentation][] is hosted by Read the Docs.
 
 Installation
 --------------------------------------------------------------------------------
@@ -28,6 +28,9 @@ or
 To create an egg file,
 
     $ python -c "import setuptools; execfile('setup.py')" bdist_egg
+
+pytokio supports both Python 2.7 and 3.6 and, at minimum, requires h5py, numpy,
+and pandas.  The full requirements are listed in `requirements.txt`.
 
 Quick Start
 --------------------------------------------------------------------------------
@@ -64,5 +67,6 @@ perform publicly and display publicly, and to permit other to do so.
 For license terms, please see `LICENSE.md` included in this repository.
 
 [![Build Status](https://travis-ci.org/NERSC/pytokio.svg?branch=master)](https://travis-ci.org/NERSC/pytokio)
+[![Documentation Status](https://readthedocs.org/projects/pytokio-gkl/badge/?version=latest)](https://pytokio-gkl.readthedocs.io/en/latest/?badge=latest)
 
-[pytokio GitHub wiki]: https://github.com/NERSC/pytokio/wiki
+[full documentation]: https://pytokio.readthedocs.io/en/latest/

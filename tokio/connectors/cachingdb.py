@@ -166,7 +166,7 @@ class CachingDb(object):
                 omitted, flush all tables in cache.
         """
         drop_caches = set([])
-        for table in self.saved_results.keys():
+        for table in self.saved_results:
             if tables is None or table in tables:
                 drop_caches.add(table)
 
@@ -206,7 +206,7 @@ class CachingDb(object):
 
         ### Commit each table we've retained in memory
         drop_caches = set([])
-        for table, table_info in self.saved_results.iteritems():
+        for table, table_info in self.saved_results.items():
             if len(self.saved_results[table]['rows']) < 1:
                 warnings.warn("table %s has no rows" % table)
                 continue

@@ -26,7 +26,7 @@ def test_tts():
     """
     bin/summarize_tts_hdf5.py
     """
-    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.iteritems():
+    for input_type, input_file in tokiotest.SAMPLE_TIMESERIES_FILES.items():
         for args in INPUT_ARGS:
             func = exec_cmd
             func.description = "bin/summarize_tts_hdf5.py %s (%s)" % (" ".join(args), input_type)
@@ -37,7 +37,7 @@ def exec_cmd(argv):
     """
     Execute the command with some arguments
     """
-    print "Executing", " ".join(argv)
+    print("Executing %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokiobin.summarize_tts_hdf5, argv)
 
     assert len(output_str) > 0

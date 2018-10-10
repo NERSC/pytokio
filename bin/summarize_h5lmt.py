@@ -10,6 +10,7 @@ import time
 import datetime
 import argparse
 import warnings
+import tokio.common
 import tokio.connectors.hdf5
 import tokio.tools.hdf5
 
@@ -23,15 +24,6 @@ DATASETS_TO_BIN_KEYS = {
 BYTES_TO_GIB = 2.0**30
 DATE_FMT = "%Y-%m-%d"
 DATE_FMT_STR = "YYYY-MM-DDTHH:MM:SS"
-
-class DateTimeToEpoch(json.JSONEncoder):
-    """
-    JSONEncoder to convert datetime.datetime into a seconds-since-epoch
-    """
-    def default(self, obj): # pylint: disable=E0202
-        if isinstance(obj, datetime.datetime):
-            return long(time.mktime(obj.timetuple()))
-        return json.JSONEncoder.default(self, obj)
 
 def summarize_reduced_data(data):
     """
@@ -166,7 +158,7 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
             # loop over aggregate metrics in a single bin
             #   key = ave_mds_cpu
             #   value = { 0.86498, 0.80356 }
-            for key, value in counters.iteritems():
+            for key, value in counters.items():
                 # look for keys that appear in multiple datasets.  only record
                 # values for the first dataset in which the key is encountered
                 if key in found_metrics:
@@ -185,7 +177,7 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
 
             # append the value to its metric counter in bins_by_index
             if 'tstart' in counters:
-                index_key = long(time.mktime(counters['tstart'].timetuple()))
+                index_key = int(time.mktime(counters['tstart'].timetuple()))
                 if index_key not in bins_by_index:
                     bins_by_index[index_key] = {}
                 bins_by_index[index_key].update(counters)
@@ -218,7 +210,7 @@ def bin_dataset(hdf5_file, dataset_name, num_bins):
     if dataset is None:
         return []
 
-    timestamps = hdf5_file.get_timestamps(dataset_name)
+    timestamps = hdf5_file.get_timestamps(dataset_name)[...]
     columns = hdf5_file.get_columns(dataset_name)
 
     if hdf5_file.schema:
@@ -411,7 +403,7 @@ def main(argv=None):
                           + hdf5_basename)
         hdf5_filenames = [x[0] for x in tokio.tools.hdf5.get_files_and_indices(
             hdf5_basename,
-            DATASETS_TO_BIN_KEYS.keys()[0],
+            list(DATASETS_TO_BIN_KEYS.keys())[0],
             datetime.datetime.strptime(args.start, DATE_FMT),
             datetime.datetime.strptime(args.end, DATE_FMT))]
     else:
@@ -424,13 +416,13 @@ def main(argv=None):
     for hdf5_filename in hdf5_filenames:
         hdf5_file = tokio.connectors.hdf5.Hdf5(hdf5_filename, 'r')
         binned_data = bin_datasets(hdf5_file=hdf5_file,
-                                   dataset_names=DATASETS_TO_BIN_KEYS.keys(),
+                                   dataset_names=list(DATASETS_TO_BIN_KEYS.keys()),
                                    orient='index',
                                    num_bins=args.bins)
 
         if not args.json:
             for timestamp in sorted(binned_data.keys()):
-                print print_datum(binned_data[timestamp], units=units).strip()
+                print(print_datum(binned_data[timestamp], units=units).strip())
 
         all_binned_data.update(binned_data)
 
@@ -443,10 +435,10 @@ def main(argv=None):
             }
         else:
             to_serialize = {'bins': all_binned_data}
-        print json.dumps(to_serialize,
+        print(json.dumps(to_serialize,
                          sort_keys=True,
                          indent=4,
-                         cls=DateTimeToEpoch)
+                         cls=tokio.common.JSONEncoder))
     elif args.summary:
         sys.stdout.write(print_data_summary(all_binned_data, units=units))
 

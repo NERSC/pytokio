@@ -83,12 +83,12 @@ def summarize_darshan_posix(darshan_data):
     mins = {}
     maxes = {}
     num_files = 0
-    for recordname, recorddata in posix_data.iteritems():
+    for recordname, recorddata in posix_data.items():
         if recordname.startswith('_'):
             continue
         num_files += 1
-        for rankdata in recorddata.itervalues():
-            for counter, value in rankdata.iteritems():
+        for rankdata in recorddata.values():
+            for counter, value in rankdata.items():
                 totals[counter] = totals.get(counter, 0) + value
                 counts[counter] = counts.get(counter, 0) + 1
                 if counter not in mins or mins[counter] > value:
@@ -115,17 +115,17 @@ def get_biggest_api(darshan_data):
         return {}
 
     biggest_api = {}
-    for api_name in darshan_data['counters'].keys():
+    for api_name in darshan_data['counters']:
         biggest_api[api_name] = {
             'write': 0,
             'read': 0,
             'write_files': 0,
             'read_files': 0,
         }
-        for file_path, records in darshan_data['counters'][api_name].iteritems():
+        for file_path, records in darshan_data['counters'][api_name].items():
             if file_path.startswith('_'):
                 continue
-            for record in records.itervalues():
+            for record in records.values():
                 bytes_read = record.get('BYTES_READ')
                 if bytes_read: # bytes_read is not None and bytes_read > 0:
                     biggest_api[api_name]['read'] += bytes_read
@@ -160,12 +160,12 @@ def get_biggest_fs(darshan_data):
         biggest_write_api = darshan_data['biggest_write_api']
 
     biggest_fs = {}
-    mounts = darshan_data['mounts'].keys()
+    mounts = list(darshan_data['mounts'].keys())
     for api_name in biggest_read_api, biggest_write_api:
         for file_path in darshan_data['counters'][api_name]:
             if file_path in ('_perf', '_total'): # only consider file records
                 continue
-            for record in darshan_data['counters'][api_name][file_path].itervalues():
+            for record in darshan_data['counters'][api_name][file_path].values():
                 key = _identify_fs_from_path(file_path, mounts)
                 if key is None:
                     key = '_unknown' ### for stuff like STDIO
@@ -284,7 +284,7 @@ def merge_dicts(dict1, dict2, assertion=True, prefix=None):
     after adding a prefix to every key.
 
     """
-    for key, value in dict2.iteritems():
+    for key, value in dict2.items():
         if prefix is not None:
             new_key = prefix + key
         else:
@@ -330,7 +330,7 @@ def retrieve_darshan_data(results, darshan_log_file, silent_errors=False):
     results['_datetime_start'] = datetime.datetime.fromtimestamp(
         int(darshan_data['header']['start_time']))
     results['_datetime_end'] = datetime.datetime.fromtimestamp(
-        int(darshan_data['header']['end_time']) + tokio.config.LMT_TIMESTEP)
+        int(darshan_data['header']['end_time']) + tokio.config.CONFIG.get('lmt_timestep', 5))
 
     if '_jobid' not in results:
         results['_jobid'] = darshan_data['header']['jobid']
@@ -345,8 +345,9 @@ def retrieve_lmt_data(results, file_system):
     Figure out the H5LMT file corresponding to this run
     """
     if file_system is None:
-        if 'darshan_biggest_write_fs_bytes' not in results.keys() \
-        or 'darshan_biggest_read_fs_bytes' not in results.keys():
+        keys = list(results.keys())
+        if 'darshan_biggest_write_fs_bytes' not in keys \
+        or 'darshan_biggest_read_fs_bytes' not in keys:
             return results
 
         # Attempt to divine file system from Darshan log
@@ -355,7 +356,7 @@ def retrieve_lmt_data(results, file_system):
             fs_key = 'darshan_biggest_write_fs'
         else:
             fs_key = 'darshan_biggest_read_fs'
-        for fs_path, fs_name in tokio.config.MOUNT_TO_FSNAME.iteritems():
+        for fs_path, fs_name in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
             if re.search(fs_path, results[fs_key]) is not None:
                 results['_file_system'] = fs_name
                 break
@@ -500,11 +501,13 @@ def retrieve_lmt_data(results, file_system):
                 results['_datetime_end']),
             'getattr'
         ))
-        # Missing data
+        # Missing data - this requires using a key that directly maps to a
+        # dataset, since any transformation may destroy information on what data
+        # are missing.
         module_results.update(summarize_missing_df(
             tokio.tools.hdf5.get_dataframe_from_time_range(
                 results['_file_system'],
-                '/FSMissingGroup/FSMissingDataSet',
+                '/datatargets/readbytes',
                 results['_datetime_start'],
                 results['_datetime_end'])))
     except IOError as error:
@@ -513,31 +516,29 @@ def retrieve_lmt_data(results, file_system):
     merge_dicts(results, module_results, prefix='fs_')
     return results
 
-def retrieve_topology_data(results, slurm_cache_file, craysdb_cache_file):
+def retrieve_topology_data(results, jobinfo_cache_file, nodemap_cache_file):
     """
     Get the diameter of the job (Cray XC)
     """
-    if craysdb_cache_file is not None:
+    if nodemap_cache_file is not None:
         if '_jobid' not in results:
             # bail out
             return results
 
-        # verify craysdb cache file
-        if craysdb_cache_file == "":
-            craysdb_cache_file = None
-        else:
-            craysdb_cache_file = craysdb_cache_file
+        # verify nodemap cache file
+        if nodemap_cache_file == "":
+            nodemap_cache_file = None
 
         # verify slurm cache file
-        if slurm_cache_file == "" \
-        or slurm_cache_file is None \
-        or not os.path.isfile(slurm_cache_file):
-            slurm_cache_file = None
+        if jobinfo_cache_file == "" \
+        or jobinfo_cache_file is None \
+        or not os.path.isfile(jobinfo_cache_file):
+            jobinfo_cache_file = None
 
         module_results = tokio.tools.topology.get_job_diameter(
             results['_jobid'],
-            slurm_cache_file=slurm_cache_file,
-            craysdb_cache_file=craysdb_cache_file)
+            jobinfo_cache_file=jobinfo_cache_file,
+            nodemap_cache_file=nodemap_cache_file)
         merge_dicts(results, module_results, prefix='topology_')
     return results
 
@@ -563,29 +564,27 @@ def retrieve_ost_data(results, ost, ost_fullness=None, ost_map=None):
     if ost:
         # Divine the sonexion name from the file system map
         fs_key = results.get('_file_system')
-        if fs_key is None or fs_key not in tokio.config.FSNAME_TO_BACKEND_NAME:
+        if fs_key is None or fs_key not in tokio.config.CONFIG.get('fsname_to_backend_name', {}):
             return results
-        snx_name = tokio.config.FSNAME_TO_BACKEND_NAME[fs_key]
 
         # Get the OST fullness summary
         try:
-            module_results = tokio.tools.lfsstatus.get_fullness_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_fullness)
+            module_results = tokio.tools.lfsstatus.get_fullness(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_fullness)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
         merge_dicts(results, module_results, prefix='fshealth_')
 
         # Get the OST failure status
-        # Note that get_failures_at_datetime will clobber the
-        # ost_timestamp_* keys from get_fullness_at_datetime above;
-        # these aren't used for correlation analysis and should be
-        # pretty close anyway.
+        # Note that get_failures will clobber the ost_timestamp_* keys from
+        # get_fullness above; these aren't used for correlation analysis and
+        # should be pretty close anyway.
         try:
-            module_results = tokio.tools.lfsstatus.get_failures_at_datetime(snx_name,
-                                                                            results['_datetime_start'],
-                                                                            cache_file=ost_map)
+            module_results = tokio.tools.lfsstatus.get_failures(fs_key,
+                                                                results['_datetime_start'],
+                                                                cache_file=ost_map)
         except KeyError as error:
             warnings.warn("KeyError: %s for %s" % (str(error), results['_datetime_start']))
             module_results = {}
@@ -628,8 +627,8 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
         else:
             cache_file = concurrentjobs
 
-        start_stamp = long(time.mktime(results['_datetime_start'].timetuple()))
-        end_stamp = long(time.mktime(results['_datetime_end'].timetuple()))
+        start_stamp = int(time.mktime(results['_datetime_start'].timetuple()))
+        end_stamp = int(time.mktime(results['_datetime_end'].timetuple()))
         nerscjobsdb = tokio.connectors.nersc_jobsdb.NerscJobsDb(cache_file=cache_file)
         concurrent_job_info = nerscjobsdb.get_concurrent_jobs(start_stamp, end_stamp, jobhost)
         results['jobsdb_concurrent_jobs'] = concurrent_job_info['numjobs']
@@ -698,20 +697,15 @@ def main(argv=None):
     # If --jobid is specified, override whatever is in the Darshan log
     results = retrieve_jobid(results, args.slurm_jobid, len(args.files))
     for i in range(records_to_process):
-        try:
-            # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
-            if len(args.files) > 0:
-                results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
-            results = retrieve_lmt_data(results, args.file_system)
-            results = retrieve_topology_data(results,
-                                             slurm_cache_file=args.slurm_jobid,
-                                             craysdb_cache_file=args.topology)
-            results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
-            results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
-        except:
-            # print out file name to aid debugging when processing multiple logs
-            warnings.warn("Unhandled exception while processing %s" % args.files[i])
-            raise
+        # records_to_process == 1 but len(args.files) == 0 when no darshan log is given
+        if len(args.files) > 0:
+            results = retrieve_darshan_data(results, args.files[i], silent_errors=args.silent_errors)
+        results = retrieve_lmt_data(results, args.file_system)
+        results = retrieve_topology_data(results,
+                                         jobinfo_cache_file=args.slurm_jobid,
+                                         nodemap_cache_file=args.topology)
+        results = retrieve_ost_data(results, args.ost, args.ost_fullness, args.ost_map)
+        results = retrieve_concurrent_job_data(results, args.jobhost, args.concurrentjobs)
 
         # don't append empty rows
         if len(results) > 0:
@@ -719,11 +713,11 @@ def main(argv=None):
         results = {}
 
     if args.json:
-        print json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime)
+        print(json.dumps(json_rows, indent=4, sort_keys=True, default=serialize_datetime))
     else:
         tmp_df = pandas.DataFrame.from_records(json_rows)
         tmp_df.index.name = "index"
-        print tmp_df.to_csv()
+        print(tmp_df.to_csv())
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,7 @@ import datetime
 import warnings
 import numpy
 import tokio.connectors.hdf5
+from tokio.common import isstr
 
 class TimeSeries(object):
     """
@@ -44,8 +45,10 @@ class TimeSeries(object):
         self.timestamp_key = timestamp_key
         # True = natural sort columns assuming hex-encoded numbers; False = only recognize decimals
         self.sort_hex = sort_hex
-        # string describing schema version
+        # string describing dataset version
         self.version = None
+        # string describing schema version
+        self.global_version = None
 
         # attempt to attach the object if requested.
         if dataset_name is not None:
@@ -84,8 +87,8 @@ class TimeSeries(object):
         # Calculate the hours in a day in epoch-seconds since Python datetime
         # and timedelta doesn't understand DST
         time_list = []
-        end_epoch = long(time.mktime(end.timetuple()))
-        timestamp = long(time.mktime(start.timetuple()))
+        end_epoch = int(time.mktime(end.timetuple()))
+        timestamp = int(time.mktime(start.timetuple()))
         while timestamp < end_epoch:
             time_list.append(timestamp)
             timestamp += timestep
@@ -97,10 +100,20 @@ class TimeSeries(object):
         self.dataset = numpy.full((len(self.timestamps), num_columns), -0.0)
         self.set_columns(column_names)
 
+        self.set_timestamp_key(timestamp_key, safe=True)
+
+    def set_timestamp_key(self, timestamp_key, safe=False):
+        """Set the timestamp key
+
+        Args:
+            timestamp_key (str or None): The key for the timestamp dataset.  If
+                None, use the default
+            safe (bool): If true, do not overwrite an existing timestamp key
+        """
         # Root the timestamp_key at the same parent as the dataset
-        if self.timestamp_key is None:
+        if not safe or self.timestamp_key is None:
             if timestamp_key is None:
-                self.timestamp_key = '/'.join(dataset_name.split('/')[0:-1] \
+                self.timestamp_key = '/'.join(self.dataset_name.split('/')[0:-1] \
                                      + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
             else:
                 self.timestamp_key = timestamp_key
@@ -116,28 +129,35 @@ class TimeSeries(object):
         """
         self.dataset_name = dataset_name
 
-        if dataset_name in hdf5_file:
+        try:
             dataset = hdf5_file[dataset_name]
-        else:
+        except KeyError:
             # can't attach because dataset doesn't exist; pass this back to caller so it can init
             return False
 
         self.dataset = dataset if light else dataset[:, :]
 
-        # copy columns into memory
-        if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset.attrs:
-            columns = list(dataset.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY])
-            self.set_columns(columns)
-        else:
-            warnings.warn("attaching to a columnless dataset (%s)" % self.dataset_name)
+        # load and decode version of dataset and file schema
+        self.global_version = hdf5_file['/'].attrs.get('version')
+        self.version = hdf5_file.get_version(dataset_name)
+        if isinstance(self.version, bytes):
+            self.version = self.version.decode()
 
-        self.schema = dataset.attrs.get('version')
+        # copy columns into memory
+        columns = hdf5_file.get_columns(dataset_name)
+        self.set_columns(columns)
 
         # copy metadata into memory
-        for key, value in dataset.attrs.iteritems():
-            self.dataset_metadata[key] = value
-        for key, value in dataset.parent.attrs.iteritems():
-            self.group_metadata[key] = value
+        for key, value in dataset.attrs.items():
+            if isinstance(value, bytes):
+                self.dataset_metadata[key] = value.decode()
+            else:
+                self.dataset_metadata[key] = value
+        for key, value in dataset.parent.attrs.items():
+            if isinstance(value, bytes):
+                self.group_metadata[key] = value.decode()
+            else:
+                self.group_metadata[key] = value
 
         self.timestamp_key = tokio.connectors.hdf5.get_timestamps_key(hdf5_file, dataset_name)
         self.timestamps = hdf5_file[self.timestamp_key]
@@ -206,7 +226,7 @@ class TimeSeries(object):
         # If we're updating an existing HDF5, use its column names and ordering.
         # Otherwise sort the columns before committing them.
         if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset_hdf5.attrs:
-            self.rearrange_columns(list(dataset_hdf5.attrs[tokio.connectors.hdf5.COLUMN_NAME_KEY]))
+            self.rearrange_columns(self.columns)
         else:
             self.sort_columns()
 
@@ -215,16 +235,39 @@ class TimeSeries(object):
 
         # Copy column names into metadata before committing metadata
         self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
-        self.dataset_metadata['updated'] = long(time.mktime(datetime.datetime.now().timetuple()))
-        self.dataset_metadata['version'] = str(self.version)
+        self.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
 
-        # Insert/update dataset metadata (note: must convert unicode to simpler strings for h5py)
-        for key, value in self.dataset_metadata.iteritems():
-            dataset_hdf5.attrs[key] = value
+        # If self.version was never set, don't set a dataset-level version in the HDF5
+        if self.version is not None:
+            hdf5_file.set_version(self.version, dataset_name=self.dataset_name)
+
+        # Set the file's global version to indicate its schema
+        if self.global_version is not None:
+            hdf5_file['/'].attrs['version'] = self.global_version
+
+        # Insert/update dataset metadata
+        for key, value in self.dataset_metadata.items():
+            # special hack for column names
+            if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY):
+                # note: the behavior of numpy.string_(x) where
+                # type(x) == numpy.array is _different_ in python2 vs. python3.
+                # Python3 happily converts each element to a numpy.string_,
+                # while Python2 first calls a.__repr__ to turn it into a single
+                # string, then converts that to numpy.string_.
+                dataset_hdf5.attrs[key] = numpy.array([numpy.string_(x) for x in value])
+            elif isstr(value):
+                dataset_hdf5.attrs[key] = numpy.string_(value)
+            elif value is None:
+                warnings.warn("Skipping attribute %s (null value) for %s" % (key, self.dataset_name))
+            else:
+                dataset_hdf5.attrs[key] = value
 
         # Insert/update group metadata
-        for key, value in self.group_metadata.iteritems():
-            dataset_hdf5.parent.attrs[key] = value
+        for key, value in self.group_metadata.items():
+            if isstr(value):
+                dataset_hdf5.parent.attrs[key] = numpy.string_(value)
+            else:
+                dataset_hdf5.parent.attrs[key] = value
 
     def update_column_map(self):
         """
@@ -324,8 +367,8 @@ class TimeSeries(object):
         Returns:
             (t_index, c_index) (long or None)
         """
-        timestamp_epoch = long(time.mktime(timestamp.timetuple()))
-        t_index = (timestamp_epoch - self.timestamps[0]) / self.timestep
+        timestamp_epoch = int(time.mktime(timestamp.timetuple()))
+        t_index = (timestamp_epoch - self.timestamps[0]) // self.timestep
         if t_index >= self.timestamps.shape[0]: # check bounds
             return None, None
 
@@ -417,7 +460,7 @@ def sorted_nodenames(nodenames, sort_hex=False):
         """
         Tokenize string into alternating strings/ints if possible
         """
-        return map(extract_int, re.findall(r'(\d+|\D+)', string))
+        return list(map(extract_int, re.findall(r'(\d+|\D+)', string)))
 
     def natural_hex_compare(string):
         """
@@ -425,25 +468,25 @@ def sorted_nodenames(nodenames, sort_hex=False):
         recognizes hex, so be careful with ambiguous nodenames like "bb234",
         which is valid hex.
         """
-        return map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string))
+        return list(map(extract_int, re.findall(r'([0-9a-fA-F]+|[^0-9a-fA-F]+)', string)))
 
-    def natural_comp(arg1, arg2):
-        """
-        Cast the parts of a string that look like integers into integers, then
-        sort based on strings and integers rather than only strings
-        """
-        return cmp(natural_compare(arg1), natural_compare(arg2))
+#   def natural_comp(arg1, arg2):
+#       """
+#       Cast the parts of a string that look like integers into integers, then
+#       sort based on strings and integers rather than only strings
+#       """
+#       return cmp(natural_compare(arg1), natural_compare(arg2))
 
-    def natural_hex_comp(arg1, arg2):
-        """
-        Cast the parts of a string that look like hex into integers, then
-        sort based on strings and integers rather than only strings.
-        """
-        return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
+#   def natural_hex_comp(arg1, arg2):
+#       """
+#       Cast the parts of a string that look like hex into integers, then
+#       sort based on strings and integers rather than only strings.
+#       """
+#       return cmp(natural_hex_compare(arg1), natural_hex_compare(arg2))
 
     if sort_hex:
-        return sorted(nodenames, natural_hex_comp)
-    return sorted(nodenames, natural_comp)
+        return sorted(nodenames, key=natural_hex_compare)
+    return sorted(nodenames, key=natural_compare)
 
 def timeseries_deltas(dataset):
     """Convert monotonically increasing values into deltas
@@ -503,7 +546,7 @@ def get_insert_indices(my_timestamps, existing_timestamps):
         raise Exception("Existing dataset has different timestep (mine=%d, existing=%d)"
                         % (my_timestep, existing_timestep))
 
-    my_offset = (my_timestamps[0] - existing_timestamps[0]) / existing_timestep
+    my_offset = (my_timestamps[0] - existing_timestamps[0]) // existing_timestep
     my_end = my_offset + len(my_timestamps)
 
     return my_offset, my_end

@@ -15,12 +15,23 @@ a cache database.
 """
 
 import os
+import warnings
 import tokio.connectors.cachingdb as cachingdb
 
 NERSC_JOBSDB_SCHEMA = {
     'columns': ['STEPID', 'HOSTNAME', 'START', 'COMPLETION', 'NUMNODES'],
     'primary_key': ['STEPID'],
 }
+NERSC_JOBSDB_QUERY = """
+SELECT
+    s.stepid,
+    s.hostname,
+    s.start,
+    s.completion,
+    s.numnodes
+FROM
+    summary AS s
+"""
 
 HIT_MEMORY = 0
 HIT_CACHE_DB = 1
@@ -73,51 +84,6 @@ class NerscJobsDb(cachingdb.CachingDb):
         super(NerscJobsDb, self).drop_cache()
         self.cached_queries = {}
 
-    def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
-        """
-        Grab all of the jobs that were running, in part or in full, during the
-        time window bounded by start_timestamp and end_timestamp.  Then
-        calculate the fraction overlap for each job to calculate the number of
-        core hours that were burned overall during the start/end time of
-        interest.
-        """
-        query_str = """
-        SELECT
-            s.stepid,
-            s.hostname,
-            s.start,
-            s.completion,
-            s.numnodes
-        FROM
-            summary AS s
-        WHERE
-            s.hostname = %(ps)s
-        AND s.completion > %(ps)s
-        AND s.start < %(ps)s
-        """
-
-        totals = {
-            'nodehrs': 0.0,
-            'numnodes': 0,
-            'numjobs': 0,
-        }
-
-        results = self.query(
-            query_str,
-            (nersc_host, start_timestamp, end_timestamp))
-
-        for (_, _, this_start, this_end, nnodes) in results:
-            real_start = max(this_start, start_timestamp)
-            real_end = min(this_end, end_timestamp)
-            delta_t = real_end - real_start
-            totals['nodehrs'] += nnodes * delta_t
-            totals['numnodes'] += nnodes
-            totals['numjobs'] += 1
-
-        totals['nodehrs'] /= 3600.0
-
-        return totals
-
     def query(self, query_str, query_variables=(), nocache=False):
         """
         Pass a query through all layers of cache and return on the first hit.
@@ -149,3 +115,72 @@ class NerscJobsDb(cachingdb.CachingDb):
 
         self.last_results = results # for debugging
         return results
+
+    def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
+        """
+        Grab all of the jobs that were running, in part or in full, during the
+        time window bounded by start_timestamp and end_timestamp.  Then
+        calculate the fraction overlap for each job to calculate the number of
+        core hours that were burned overall during the start/end time of
+        interest.
+        """
+        query_str = NERSC_JOBSDB_QUERY + """
+        WHERE
+            s.hostname = %(ps)s
+        AND s.completion > %(ps)s
+        AND s.start < %(ps)s
+        """
+
+        totals = {
+            'nodehrs': 0.0,
+            'numnodes': 0,
+            'numjobs': 0,
+        }
+
+        results = self.query(
+            query_str,
+            (nersc_host, start_timestamp, end_timestamp))
+
+        for (_, _, this_start, this_end, nnodes) in results:
+            real_start = max(this_start, start_timestamp)
+            real_end = min(this_end, end_timestamp)
+            delta_t = real_end - real_start
+            totals['nodehrs'] += nnodes * delta_t
+            totals['numnodes'] += nnodes
+            totals['numjobs'] += 1
+
+        totals['nodehrs'] /= 3600.0
+
+        return totals
+
+#   def get_concurrent_jobs(self, start_timestamp, end_timestamp, nersc_host):
+    def get_job_startend(self, jobid, nersc_host):
+        """Return start and end time for a given job id
+
+        Retrieves the time a job started and completed.
+
+        Args:
+            jobid (str): Job ID of interest
+            nersc_host (str): NERSC host to which job ID of interest maps
+
+        Returns:
+            tuple of datetime.datetime: Two-item tuple of (start time,
+                end time)
+        """
+        query_str = NERSC_JOBSDB_QUERY + """
+        WHERE
+            s.stepid LIKE %(ps)s
+        AND s.hostname = %(ps)s
+        ORDER BY s.completion
+        """
+
+        results = self.query(query_str, query_variables=("%s.%%" % jobid, nersc_host))
+
+        start = None
+        end = None
+        for (_, _, this_start, this_end, _) in results:
+            if start is not None:
+                warnings.warn("Multiple start+end times found for job %s" % jobid)
+            start = this_start
+            end = this_end
+        return (start, end)
