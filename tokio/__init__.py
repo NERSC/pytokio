@@ -10,3 +10,5 @@ import tokio.debug
 import tokio.connectors
 import tokio.tools
 import tokio.analysis
+
+__version__ = '0.10.1'
