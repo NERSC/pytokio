@@ -8,25 +8,34 @@ import os
 import json
 from tokio.common import isstr
 
-PYTOKIO_CONFIG = ""
-"""Path to configuration file to load
-"""
-
 CONFIG = {}
 """Global variable for the parsed configuration
 """
 
+PYTOKIO_CONFIG_FILE = ""
+"""Path to configuration file to load
+"""
+
+DEFAULT_CONFIG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json')
+"""Path of default site configuration file
+"""
+
 def init_config():
-    global PYTOKIO_CONFIG
     global CONFIG
+    global PYTOKIO_CONFIG_FILE
+    global DEFAULT_CONFIG_FILE
 
     # Load a pytokio config from a special location
-    PYTOKIO_CONFIG = os.environ.get(
-        'PYTOKIO_CONFIG',
-        os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
+    PYTOKIO_CONFIG_FILE = os.environ.get('PYTOKIO_CONFIG', DEFAULT_CONFIG_FILE)
+
+    try:
+        with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
+            loaded_config = json.load(config_file)
+    except (OSError, IOError):
+        loaded_config = {}
 
     # Load pytokio config file and convert its keys into a set of constants
-    for _key, _value in json.load(open(PYTOKIO_CONFIG, 'r')).items():
+    for _key, _value in loaded_config.items():
         # config keys beginning with an underscore get skipped
         if _key.startswith('_'):
             pass

@@ -16,18 +16,17 @@ and the naming conventions.  Most of these parameters are only required for the
 higher-level convenience tools, so editing this is not essential to getting
 started.
 
-Then simply
+Once you've edited `tokio/site.json` to your liking, simply do
 
     $ pip install .
-    $ pip install -r requirements.txt
 
 or
 
     $ python setup.py install --prefix=/path/to/installdir
 
-To create an egg file,
-
-    $ python -c "import setuptools; execfile('setup.py')" bdist_egg
+Alternatively, pytokio does not technically require a proper installation and it
+is sufficient to clone the git repo, add it to `PYTHONPATH`, and `import tokio`
+from there.
 
 pytokio supports both Python 2.7 and 3.6 and, at minimum, requires h5py, numpy,
 and pandas.  The full requirements are listed in `requirements.txt`.
@@ -35,17 +34,19 @@ and pandas.  The full requirements are listed in `requirements.txt`.
 Quick Start
 --------------------------------------------------------------------------------
 
-pytokio is a python library that does not do anything by itself; it provides the
-APIs necessary to develop analysis routines.  However several simple utilities
-are included to demonstrate how pytokio can be used.
+pytokio is a Python library that provides the APIs necessary to develop analysis
+routines that combine data from different I/O monitoring tools that may be
+available in your data center.  However several simple utilities are included to
+demonstrate how pytokio can be used in the `bin/` directory.
 
-- `bin/` directory contains useful tools implemented on top of pytokio
+Additionally, the pytokio git repository contains several other examples and
+tests to demonstrate the ways in which pytokio can be used.
+
 - `examples/` contains standalone Jupyter notebooks and scripts that illustrate
   different aspects of the pytokio API that do useful things.  They are designed
   to run on NERSC systems via https://jupyter.nersc.gov/.
 - `tests/` contains unit and integration tests for the pytokio library and
    the scripts bundled in `/bin`
-- `tokio/` is the importable Python package itself
 
 Copyright and License
 --------------------------------------------------------------------------------

@@ -18,7 +18,7 @@ export TZ=America/Los_Angeles
 
 # nosetests cannot reliably pass environment variables between tests
 export NERSC_HOST="edison"
-export PYTOKIO_CONFIG="${TEST_DIR}/site.json"
+export PYTOKIO_CONFIG="${TEST_DIR}/inputs/site.json"
 echo "Test environment will load configuration from $PYTOKIO_CONFIG"
 
 nosetests --cover-package=tokio,tokiobin $@
