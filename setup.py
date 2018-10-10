@@ -77,7 +77,7 @@ def setup_package():
         install_requires=REQUIREMENTS,
         extras_require={
             'collectdes': ['elasticsearch>=5.4'],
-        }
+        },
         python_requires=">=2.7",
         classifiers=[
             'Intended Audience :: Science/Research',
