@@ -8,7 +8,11 @@ import os
 import sys
 import json
 
-PYTOKIO_CONFIG = ""
+CONFIG = {}
+"""Global variable for the parsed configuration
+"""
+
+PYTOKIO_CONFIG_FILE = ""
 """Path to configuration file to load
 """
 
@@ -16,17 +20,27 @@ _LOADED_CONFIG = {}
 """Global variable for the parsed configuration file; used for unit testing
 """
 
+DEFAULT_CONFIG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json')
+"""Path of default site configuration file
+"""
+
 def init_config():
-    global PYTOKIO_CONFIG
+    global PYTOKIO_CONFIG_FILE
     global _LOADED_CONFIG
+    global CONFIG
+    global DEFAULT_CONFIG_FILE
 
     # Load a pytokio config from a special location
-    PYTOKIO_CONFIG = os.environ.get(
-        'PYTOKIO_CONFIG',
-        os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
+    PYTOKIO_CONFIG_FILE = os.environ.get('PYTOKIO_CONFIG', DEFAULT_CONFIG_FILE)
+
+    try:
+        with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
+            _LOADED_CONFIG = json.load(config_file)
+    except (OSError, IOError):
+        _LOADED_CONFIG = {}
 
     # Load pytokio config file and convert its keys into a set of constants
-    _LOADED_CONFIG = json.load(open(PYTOKIO_CONFIG, 'r'))
+    _LOADED_CONFIG = json.load(open(PYTOKIO_CONFIG_FILE, 'r'))
     for _key, _value in _LOADED_CONFIG.iteritems():
         # config keys beginning with an underscore get skipped
         if _key.startswith('_'):

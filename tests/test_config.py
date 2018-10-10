@@ -94,8 +94,8 @@ def compare_config_to_runtime(config_file):
     """
 
     # Verify that the config file tokio.config loaded is a real file
-    assert tokio.config.PYTOKIO_CONFIG
-    assert os.path.isfile(tokio.config.PYTOKIO_CONFIG)
+    assert tokio.config.PYTOKIO_CONFIG_FILE
+    assert os.path.isfile(tokio.config.PYTOKIO_CONFIG_FILE)
 
     # Verify that the loaded config wasn't empty
     assert len(tokio.config._LOADED_CONFIG) > 0 #pylint: disable=protected-access
@@ -121,7 +121,7 @@ def test_default_config():
     reload(tokio.config)
 
     # Verify the loaded attributes are what was in the config file
-    compare_config_to_runtime(tokio.config.PYTOKIO_CONFIG)
+    compare_config_to_runtime(tokio.config.PYTOKIO_CONFIG_FILE)
 
 @nose.tools.with_setup(setup=flush_env, teardown=restore_env)
 def test_configfile_env():
@@ -133,9 +133,10 @@ def test_configfile_env():
     os.environ["PYTOKIO_CONFIG"] = config_file
     print "Set PYTOKIO_CONFIG to %s" % os.environ["PYTOKIO_CONFIG"]
     reload(tokio.config)
-    print "tokio.config.PYTOKIO_CONFIG = %s" % tokio.config.PYTOKIO_CONFIG
 
-    assert tokio.config.PYTOKIO_CONFIG == config_file
+    print("tokio.config.PYTOKIO_CONFIG = %s" % tokio.config.PYTOKIO_CONFIG_FILE)
+
+    assert tokio.config.PYTOKIO_CONFIG_FILE == config_file
     compare_config_to_runtime(config_file)
     assert getattr(tokio.config, DEADBEEF_KEY.upper()) == DEADBEEF_VALUE
 

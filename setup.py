@@ -62,21 +62,23 @@ def setup_package():
         url="http://www.nersc.gov/research-and-development/tokio/",
         download_url="https://www.github.com/nersc/pytokio",
         license='BSD',
-#       packages=['tokio', 'tokio.connectors', 'tokio.tools', 'tokio.analysis'],
+        platforms=["Linux", "MacOS-X"],
+
         packages=setuptools.find_packages(exclude=['bin']),
         scripts=include_scripts, # TODO: convert to console_scripts
+
         # If we want to keep site.json at the top-level and copy it in during
         # install time.  This would force users to correctly install pytokio
         # before it could be used though, which is not strictly necessary for
         # any other purpose.
-        # data_files=[('tokio', ['site.json'])],
-        data_files=[('tokio', ['tokio/site.json'])],
-        platforms=["Linux", "MacOS-X"],
+        # data_files=[('etc', ['site.json'])],
+        include_package_data=True,
+
+        # Dependencies
         install_requires=REQUIREMENTS,
-        extras_require={
-            'collectdes': ['elasticsearch>=5.4'],
-        },
+        extras_require={'collectdes': ['elasticsearch>=5.4']},
         python_requires=">=2.7",
+
         classifiers=[
             'Intended Audience :: Science/Research',
             'Programming Language :: Python',
@@ -108,8 +110,17 @@ def find_version():
         if match:
             version = match.group(1)
             if not RELEASE:
+                revision_cache = os.path.join(BASE_DIR, '.revision')
                 revision = git_version()
-                version = "%s.dev0+%s" % (version, revision[:7])
+                if revision == "unknown" and os.path.isfile(revision_cache):
+                    with open(revision_cache, 'r') as revision_cache_f:
+                        revision = revision_cache_f.read().strip()
+                if revision and revision != "unknown":
+                    version = "%s.dev0+%s" % (version, revision[:7])
+                    with open(revision_cache, 'w') as revision_cache_f:
+                        revision_cache_f.write(revision)
+                else:
+                    version = "%s.dev0+unknown" % (version)
             return version
         else:
             raise RuntimeError("Unable to find version string")
