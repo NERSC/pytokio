@@ -68,6 +68,6 @@ perform publicly and display publicly, and to permit other to do so.
 For license terms, please see `LICENSE.md` included in this repository.
 
 [![Build Status](https://travis-ci.org/NERSC/pytokio.svg?branch=master)](https://travis-ci.org/NERSC/pytokio)
-[![Documentation Status](https://readthedocs.org/projects/pytokio-gkl/badge/?version=latest)](https://pytokio-gkl.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/pytokio-gkl/badge/?version=latest)](https://pytokio.readthedocs.io/en/latest/?badge=latest)
 
 [full documentation]: https://pytokio.readthedocs.io/en/latest/
