@@ -1,3 +1,4 @@
 include .revision
 include tokio/site.json
 include LICENSE README.md
+include requirements.txt
