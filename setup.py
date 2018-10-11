@@ -31,16 +31,10 @@ import subprocess
 
 RELEASE = False # set to True when building a release distribution
 
-REQUIREMENTS = [
-    "h5py>=2.7",
-    "matplotlib>=2.0.0",
-    "numpy>=1.13",
-    "pandas>=0.20",
-    "scipy>=0.19",
-]
 
-DOCLINES = (__doc__ or '').split("\n")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DOCLINES = (__doc__ or '').split("\n")
+REQUIREMENTS = open(os.path.join(BASE_DIR, 'requirements.txt'), 'r').readlines()
 
 if os.path.exists('MANIFEST'):
     os.remove('MANIFEST')
