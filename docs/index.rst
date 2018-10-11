@@ -17,6 +17,7 @@ Welcome to pytokio's documentation!
 
 .. toctree::
     :caption: API Documentation
+    :maxdepth: 2
 
     modules
 
