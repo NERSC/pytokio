@@ -1,5 +1,5 @@
 .. pytokio documentation master file, created by
-   sphinx-quickstart on Sun Apr  8 09:48:36 2018.
+   sphinx-quickstart on Wed Oct 10 16:47:48 2018.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -10,7 +10,13 @@ Welcome to pytokio's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-.. include:: modules.rst
+.. toctree::
+    :maxdepth: 1
+    :caption: Developer Documentation
+
+    developer/release
+
+.. .. include:: modules.rst
 
 Indices and tables
 ==================
