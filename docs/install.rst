@@ -3,29 +3,61 @@ Installation
 
 Quick Start
 --------------------------------------------------------------------------------
-pytokio has a single site-specific configuration file::
 
-    tokio/site.json
+**Step 1. Download pytokio**: Download the latest pytokio from the
+`pytokio release page`_ and unpack it somewhere::
 
-which you may wish to edit and configure to match your site's file system names
-and the naming conventions.  Most of these parameters are only required for the
-higher-level convenience tools, so editing this is not essential to getting
-started.
+    $ wget https://github.com/NERSC/pytokio/releases/download/v0.10.1/pytokio-0.10.1.tar.gz
+    $ tar -zxf pytokio-0.10.1.tar.gz
 
-Once you've edited ``tokio/site.json`` to your liking, simply do::
+**Step 2. (Optional): Configure `site.json`**: pytokio ships with a ``site.json``
+configuration file that's located in the tarball's ``tokio/`` subdirectory.  You
+can edit this to reflect the location of various data sources and configurations
+on your system::
 
-    $ pip install .
+    $ vi pytokio-0.10.1/tokio/site.json
+    ...
+
+However it is also perfectly fine to not worry about this now, as this file is
+only used for higher-level interfaces.
+
+**Step 3. Install pytokio**: Install the pytokio package using your favorite
+package installation mechanism::
+
+    $ pwd
+    .../pytokio-0.10.1
+
+    $ pip install pytokio-0.10.1/
 
 or::
 
+    $ cd pytokio-0.10.1/
     $ python setup.py install --prefix=/path/to/installdir
+
+or::
+
+    $ cd pytokio-0.10.1/
+    $ pip install --user .
 
 Alternatively, pytokio does not technically require a proper installation and it
 is sufficient to clone the git repo, add it to ``PYTHONPATH``, and
-``import tokio`` from there.
+``import tokio`` from there::
+
+    $ cd pytokio-0.10.1/
+    $ export PYTHONPATH=$PYTHONPATH:`pwd`
+    $ python
+
+Then verify that pytokio can be imported::
+
+    $ python
+    >>> import tokio
+    >>> tokio.__version__
+    '0.10.1'
 
 pytokio supports both Python 2.7 and 3.6 and, at minimum, requires h5py, numpy,
 and pandas.  The full requirements are listed in ``requirements.txt``.
+
+.. _pytokio release page: https://github.com/NERSC/pytokio/releases
 
 Code Distributions
 --------------------------------------------------------------------------------
