@@ -121,6 +121,9 @@ specified (or set to a valid value), as each key is only consulted when a
 specific tool requests it.  If you simply never use a tool, its configuration
 keys will never be examined.
 
+Configuration Options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 As of pytokio 0.10, the following keys can be defined:
 
 - lmt_timestep
@@ -161,6 +164,10 @@ As of pytokio 0.10, the following keys can be defined:
 - lfsstatus_fullness_providers
     *Provider list* to inform which TOKIO connectors should be used to find file
     system fullness data through the :mod:`tokio.tools.lfsstatus` API
+
+
+Special Configuration Values
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 There are two special types of value described above:
 
@@ -206,14 +213,54 @@ The provider list for this tool would look like
 where ``slurm`` and ``nersc_jobsdb`` are magic strings recognized by the
 :meth:`tokio.tools.jobinfo.get_job_startend` function.
 
-2. Installing pytokio
+3. Installing pytokio
 --------------------------------------------------------------------------------
 
-* bdists are not currently supported
+pytokio can be used either as an installed Python package or as just an
+unraveled tarball.  It has no components that require compilation and its only
+path-dependent component is ``site.json`` which can be overridden using the
+``PYTOKIO_CONFIG`` environment variable.
 
-3. Testing the Installation
+As described above, installing the Python package is accomplished by any one of
+the following::
+
+    $ pip install /path/to/pytokio-0.10.1/
+    $ pip install --user /path/to/pytokio-0.10.1/
+    $ cd /path/to/pytokio-0.10.1/ && python setup.py install --prefix=/path/to/installdir
+
+You may also wish to install a single packaged blob.  In these cases though,
+you will not be able to edit the default ``site.json`` and will have to create
+an external ``site.json`` and define its path in the ``PYTOKIO_CONFIG``
+environment variable::
+
+    $ pip install pytokio
+    $ pip install /path/to/pytokio-0.10.1.tar.gz
+    $ vi ~/pytokio-config.json
+    ...
+    $ export PYTOKIO_CONFIG=$HOME/pytokio-config.json
+
+For this reason, pytokio is not distributed as wheels or eggs.  While they
+should work without problems when ``PYTOKIO_CONFIG`` is defined (or you never
+use any features that require looking up configuration values), installing
+such bdists is not officially supported.
+
+4. Testing the Installation
 --------------------------------------------------------------------------------
 
-* download the test suite
+The `pytokio git repository`_ contains a comprehensive, self-contained test
+suite in its tests/ subdirectory that can be run after installation if `nose`_
+is installed::
+
+    $ pip install /path/to/pytokio-0.10.1
+    ...
+    $ git clone https://github.com/nersc/pytokio
+    $ cd pytokio/tests
+    $ ./run_tests.sh
+    ........
+
+This test suite also contains a number of small sample inputs in the
+tests/inputs/ subdirectory that may be helpful for basic testing.
 
 .. _pytokio release page: https://github.com/NERSC/pytokio/releases
+.. _pytokio git repository: https://github.com/NERSC/pytokio
+.. _nose: https://nose.readthedocs.io
