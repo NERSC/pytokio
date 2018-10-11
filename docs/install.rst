@@ -45,7 +45,6 @@ is sufficient to clone the git repo, add it to ``PYTHONPATH``, and
 
     $ cd pytokio-0.10.1/
     $ export PYTHONPATH=$PYTHONPATH:`pwd`
-    $ python
 
 Then verify that pytokio can be imported::
 
@@ -56,6 +55,41 @@ Then verify that pytokio can be imported::
 
 pytokio supports both Python 2.7 and 3.6 and, at minimum, requires h5py, numpy,
 and pandas.  The full requirements are listed in ``requirements.txt``.
+
+**Step 4. (Optional) Test pytokio CLI tools**: pytokio includes some basic CLI
+wrappers around many of its interfaces which are installed in your Python
+package install directory's ``bin/`` directory::
+
+    $ export PATH=$PATH:/path/to/installdir/bin
+    $ cache_darshanlogs.py --perf /path/to/a/darshanlog.darshan
+    {
+        "counters": {
+            "mpiio": {
+                ...
+
+Because pytokio is a *framework* for tying together different data sources,
+exactly which CLI tools will work on your system is dependent on what data
+sources are available to you.  Darshan is perhaps the most widely deployed
+source of data.  If you have Darshan logs collected in a central location on
+your system, you can try using pytokio's ``summarize_darshanlogs.py`` tool to
+create an index of all logs generated on a single day::
+
+    $ summarize_darshanlogs.py /global/darshanlogs/2018/10/8/fbench_*.darshan
+{
+    "/global//darshanlogs/2018/10/8/fbench_IOR_CORI2_id15540806_10-8-6559-7673881787757600104_1.darshan": {
+        "/global/project": {
+            "read_bytes": 0, 
+            "write_bytes": 206144000000
+        }
+    }, 
+    ...
+
+All pytokio CLI tools' options can be displayed by running them with the ``-h``
+option.
+
+Finally, if you have downloaded the entire pytokio repository, there are some
+sample Darshan logs (and other files) in the ``tests/inputs`` directory which
+you can also use to verify basic functionality.
 
 .. _pytokio release page: https://github.com/NERSC/pytokio/releases
 
