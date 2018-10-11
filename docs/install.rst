@@ -123,51 +123,44 @@ keys will never be examined.
 
 As of pytokio 0.10, the following keys can be defined:
 
-.. list-table::
-    :header-rows: 1
-    :widths: 40 60
-
-    * - Key
-      - Value
-    * - lmt_timestep
-      - Number of seconds between successive measurements contained in the LMT
-        database.  Only used by ``summarize_job`` tool to establish padding to
-        account for cache flushes.
-    * - mount_to_fsname
-      - Dictionary that maps mount points (expressed as regular expressions) to
-        logical file system names.  Used by several CLI tools to made output
-        more digestible for humans.
-    * - fsname_to_backend_name
-      - Dictionary that maps logical file system names to backend file system
-        names.  Needed for cases where the name of a file system as described to
-        users (e.g., "the scratch file system") has a different backend name
-        ("snx11168") that monitoring tools may use.  Allows users to access data
-        from file systems without knowing names used only by system admins.
-    * - hdf5_files
-      - *Time-indexed file path template* describing where TOKIO Time Series
-        HDF5 files are stored, and where in the file path their timestamp is
-        encoded.
-    * - isdct_files
-      - *Time-indexed file path template* describing where NERSC-style ISDCT
-        tar files files are stored, and where in the file path their timestamp is
-        encoded.
-    * - lfsstatus_fullness_files
-      - *Time-indexed file path template* describing where NERSC-style Lustre
-        file system fullness logs are stored, and where in the file path their
-        timestamp is encoded.
-    * - lfsstatus_map_files
-      - *Time-indexed file path template* describing where NERSC-style Lustre
-        file system OSS-OST mapping logs are stored, and where in the file path
-        their timestamp is encoded.
-    * - hpss_report_files
-      - *Time-indexed file path template* describing where HPSS daily report
-        logs are stored, and where in the file path their timestamp is encoded.
-    * - jobinfo_jobid_providers
-      - *Provider list* to inform which TOKIO connectors should be used to
-        find job info through the tools.jobinfo API
-    * - lfsstatus_fullness_providers
-      - *Provider list* to inform which TOKIO connectors should be used to
-        find file system fullness data through the tools.lfsstatus API
+- lmt_timestep
+    Number of seconds between successive measurements contained in
+    the LMT database.  Only used by ``summarize_job`` tool to
+    establish padding to account for cache flushes.
+- mount_to_fsname
+    Dictionary that maps mount points (expressed as regular expressions) to
+    logical file system names.  Used by several CLI tools to made output more
+    digestible for humans.
+- fsname_to_backend_name
+    Dictionary that maps logical file system names to backend file system names.
+    Needed for cases where the name of a file system as described to users
+    (e.g., "the scratch file system") has a different backend name ("snx11168")
+    that monitoring tools may use.  Allows users to access data from file
+    systems without knowing names used only by system admins.
+- hdf5_files
+    *Time-indexed file path template* describing where TOKIO Time Series HDF5
+    files are stored, and where in the file path their timestamp is encoded.
+- isdct_files
+    *Time-indexed file path template* describing where NERSC-style ISDCT tar
+    files files are stored, and where in the file path their timestamp is
+    encoded.
+- lfsstatus_fullness_files
+    *Time-indexed file path template* describing where NERSC-style Lustre file
+    system fullness logs are stored, and where in the file path their timestamp
+    is encoded.
+- lfsstatus_map_files
+    *Time-indexed file path template* describing where NERSC-style Lustre file
+    system OSS-OST mapping logs are stored, and where in the file path their
+    timestamp is encoded.
+- hpss_report_files
+    *Time-indexed file path template* describing where HPSS daily report logs
+    are stored, and where in the file path their timestamp is encoded.
+- jobinfo_jobid_providers
+    *Provider list* to inform which TOKIO connectors should be used to find job
+    info through the :mod:`tokio.tools.jobinfo` API
+- lfsstatus_fullness_providers
+    *Provider list* to inform which TOKIO connectors should be used to find file
+    system fullness data through the :mod:`tokio.tools.lfsstatus` API
 
 There are two special types of value described above:
 
@@ -176,9 +169,9 @@ that is passed through ``strftime`` with a user-specified time to resolve
 where pytokio can find a specific file containing data relevant to that
 time. Consider the following example: 
 
-.. code-block: python
+.. code-block:: none
 
-    "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
+        "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
 
 If pytokio is asked to find the ISDCT log file generated for January 14, 2017, it
 will use this template string and try to extract the requested data from the
@@ -191,11 +184,27 @@ dicts as well with the following behavior:
 
 - str: search for files matching this template
 - list of str: search for files matching each template
-- dict: use `lookup_key` to determine the element in the dictionary
-  to use as the template.  That value is treated as a new `template`
-  object and is processed recursively.
+- dict: use the key to determine the element in the dictionary to use as the
+  template.  That value is treated as a new template and is processed
+  recursively.
 
 This is documented in more detail in :meth:`tokio.tools.common.enumerate_dated_files`.
+
+**Provider lists** are used by tools that can extract the same piece of
+information from multiple data sources.  For example, :mod:`tokio.tools.jobinfo`
+provides an API to convert a job id into a start and end time, and it can do this
+by either consulting Slurm's `sacct` command or a site-specific jobs database.
+The provider list for this tool would look like
+
+.. code-block:: none
+
+    "jobinfo_jobid_providers": [
+        "slurm",
+        "nersc_jobsdb"
+    ],
+
+where ``slurm`` and ``nersc_jobsdb`` are magic strings recognized by the
+:meth:`tokio.tools.jobinfo.get_job_startend` function.
 
 2. Installing pytokio
 --------------------------------------------------------------------------------
