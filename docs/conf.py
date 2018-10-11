@@ -242,3 +242,8 @@ def run_apidoc(_):
 
 def setup(app):
     app.connect('builder-inited', run_apidoc)
+
+# Allow inserting |version| into rst files
+rst_prolog = """
+.. |version| replace:: %s
+""" % version
