@@ -110,11 +110,11 @@ def find_version():
                     with open(revision_cache, 'r') as revision_cache_f:
                         revision = revision_cache_f.read().strip()
                 if revision and revision != "unknown":
-                    version = "%s.dev0+%s" % (version, revision[:7])
+                    version = "%s+%s" % (version, revision[:7])
                     with open(revision_cache, 'w') as revision_cache_f:
                         revision_cache_f.write(revision)
                 else:
-                    version = "%s.dev0+unknown" % (version)
+                    version = "%s+unknown" % (version)
             return version
         else:
             raise RuntimeError("Unable to find version string")
