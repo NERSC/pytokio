@@ -8,22 +8,32 @@ import os
 import json
 from tokio.common import isstr
 
-CONFIG = {}
-"""Global variable for the parsed configuration
-"""
+#: Global variable containing the configuration
+CONFIG = {} 
 
-PYTOKIO_CONFIG_FILE = ""
-"""Path to configuration file to load
-"""
+#: Path to configuration file to load
+PYTOKIO_CONFIG_FILE = "" 
 
-DEFAULT_CONFIG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json')
-"""Path of default site configuration file
-"""
+#: Path of default site configuration file
+DEFAULT_CONFIG_FILE = ""
 
 def init_config():
+    """Loads the global configuration.
+
+    Loads the site-wide configuration file, then inspects relevant environment
+    variables for overrides.
+    """
     global CONFIG
     global PYTOKIO_CONFIG_FILE
     global DEFAULT_CONFIG_FILE
+
+    # Escape hatch for cases where we want to load the module without initalizing
+    if os.environ.get('PYTOKIO_SKIP_CONFIG') is not None:
+        return
+
+    # Set the default config path - set here rather than in the global namespace
+    # so site-specific paths don't get baked into the autodoc documentation
+    DEFAULT_CONFIG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json')
 
     # Load a pytokio config from a special location
     PYTOKIO_CONFIG_FILE = os.environ.get('PYTOKIO_CONFIG', DEFAULT_CONFIG_FILE)

@@ -68,7 +68,7 @@ from setup import git_version
 # -- Project information -----------------------------------------------------
 
 project = 'pytokio'
-copyright = '2018, Glenn K. Lockwood'
+copyright = 'The Regents of the University of California'
 author = 'Glenn K. Lockwood'
 
 # The short X.Y version
@@ -222,13 +222,22 @@ texinfo_documents = [
 intersphinx_mapping = {
     'https://docs.python.org/': None,
     'http://pandas.pydata.org/pandas-docs/stable': None,
+    'http://docs.scipy.org/doc/numpy': None,
+    'http://docs.h5py.org/en/latest': None,
+    'http://matplotlib.org': None,
 }
 
 def run_apidoc(_):
+    """Need to explicitly run autodoc from within conf.py to enable generation
+    of API documentation on RTD
+    """
     import os
     argv = [
-        '-o',
-        '.',
+        '-o', './api',
+        '--separate',
+        '--no-toc',
+        '--private',
+        '--module-first',
         os.path.join('..', 'tokio')
     ]
 
@@ -247,3 +256,6 @@ def setup(app):
 rst_prolog = """
 .. |version| replace:: %s
 """ % version
+
+# Prevent the default configs from being loaded into the documentation
+os.environ['PYTOKIO_SKIP_CONFIG'] = "1"

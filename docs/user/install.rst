@@ -18,6 +18,8 @@ If you are just kicking the tires on pytokio, download #1.  If you want to
 create your own connectors or tools, contribute to development, or run into any
 issues that you would like to debug, install #2.
 
+.. _install-site-json:
+
 Editing the Site Configuration
 --------------------------------------------------------------------------------
 

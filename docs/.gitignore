@@ -1,6 +1,2 @@
 _build/
-modules.rst
-tokio.analysis.rst
-tokio.connectors.rst
-tokio.rst
-tokio.tools.rst
+api/
