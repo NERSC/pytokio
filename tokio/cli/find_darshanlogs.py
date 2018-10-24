@@ -1,4 +1,6 @@
-"""Command-line wrapper for the tokio.tools.darshan function
+"""
+Provides CLI interface for the :meth:`tokio.tools.darshan.load_darshanlogs` tool
+which locates darshan logs in the system-wide repository.
 """
 
 import sys
@@ -11,7 +13,7 @@ DATE_FMT = "%Y-%m-%d"
 DATE_FMT_PRINT = "YYYY-MM-DD"
 
 def main(argv=None):
-    """Find darshan logs in the system-wide repository
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--start', type=str, default=None,

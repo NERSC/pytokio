@@ -1,5 +1,6 @@
 """
-Generate summary metrics from an h5lmt file
+Generate summary metrics from an h5lmt file.  Will be eventually replaced by the
+summarize_tts command-line tool.
 """
 
 import os
@@ -121,12 +122,13 @@ def bin_datasets(hdf5_file, dataset_names, orient='columns', num_bins=24):
 
     Returns:
         Dictionary of lists.  Keys are metrics, and values (lists) are the
-        aggregated value of that metric in a single timestep bin.  For example,
+        aggregated value of that metric in a single timestep bin.  For example::
 
             {
                 "sum_some_metric":      [  0,   2,   3,   1],
                 "sum_someother_metric": [9.9, 2.3, 5.1, 0.2],
             }
+
     """
     bins_by_columns = {}
     bins_by_index = {}
@@ -358,8 +360,7 @@ def print_data_summary(data, units='TiB'):
     return print_str
 
 def main(argv=None):
-    """
-    CLI tool to summarize the contents of an H5LMT file
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser(
         description='aggregate bytes in/out from h5lmt file every hour')

@@ -1,5 +1,5 @@
 """
-CLI tool that wraps the lfsstatus tool interface
+Provides CLI interfaces into the :mod:tokio.tools.lfsstatus tool.
 """
 
 import argparse
@@ -8,8 +8,7 @@ import json
 import tokio.tools.lfsstatus as lfsstatus
 
 def main(argv=None):
-    """
-    CLI wrapper around the tools.lfsstatus I/O methods
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)

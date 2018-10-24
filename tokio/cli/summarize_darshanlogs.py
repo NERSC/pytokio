@@ -126,8 +126,7 @@ def sum_bytes_per_fs(log_list, threads=1, max_mb=0, update=None):
     return global_results
 
 def main(argv=None):
-    """
-    CLI wrapper around sum_bytes_per_fs
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")

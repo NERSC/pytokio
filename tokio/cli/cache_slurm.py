@@ -1,5 +1,7 @@
 """
-Parse and cache a Slurm job record to simply reanalysis and sharing its data.
+Provides CLI interfaces for
+:meth:`tokio.connectors.slurm.Slurm.to_dataframe` and
+:meth:`tokio.connectors.slurm.Slurm.to_json`.
 """
 
 import os
@@ -7,8 +9,7 @@ import argparse
 import tokio.connectors.slurm
 
 def main(argv=None):
-    """
-    CLI wrapper around the tokio.connectors.slurm.Slurm's serialization functions
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("slurm_jobid", type=str, help="slurm jobid to process")

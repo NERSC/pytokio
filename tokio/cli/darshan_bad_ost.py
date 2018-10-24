@@ -148,8 +148,7 @@ def darshanlogs_to_ost_dataframe(darshan_logs):
     return pandas.DataFrame(pre_dataframe)
 
 def main(argv=None):
-    """
-    Parse command line arguments and dispatch analysis
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-j", "--json", action="store_true", help="return output in JSON format")

@@ -493,8 +493,7 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
     tokio.debug.debug_print("Wrote output to %s" % output_file)
 
 def main(argv=None):
-    """
-    Verify functionality when connecting to a remote database
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, default=None,

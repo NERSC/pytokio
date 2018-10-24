@@ -1,13 +1,13 @@
 """
-Parse and cache an ISDCT dump to simply reanalysis and sharing its data.
+Provide a CLI interface for :meth:`tokio.connectors.nersc_isdct.NerscIsdct.to_dataframe`
+and :meth:`tokio.connectors.nersc_isdct.NerscIsdct.save_cache` methods.
 """
 
 import argparse
 import tokio.connectors.nersc_isdct
 
 def main(argv=None):
-    """
-    CLI wrapper around the NerscIsdct object's I/O methods
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("isdctfile", type=str, help="darshan logs to process")

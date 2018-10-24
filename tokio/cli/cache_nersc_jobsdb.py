@@ -1,5 +1,5 @@
 """
-Parse and cache parts of the NERSC jobs database.
+Provides CLI interfaces for :meth:`tokio.connectors.nersc_jobsdb.NerscJobsDb.get_concurrent_jobs`
 """
 
 import os
@@ -9,8 +9,7 @@ import argparse
 import tokio.connectors.nersc_jobsdb
 
 def main(argv=None):
-    """
-    CLI wrapper around NerscJobsDb object's I/O methods
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")

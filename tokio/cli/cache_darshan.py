@@ -1,5 +1,6 @@
 """
-Parse and cache a Darshan log to simplify reanalysis and sharing its data.
+Expose several methods of :class:`tokio.connectors.darshan.Darshan` via a
+command-line interface.
 """
 
 import json
@@ -7,8 +8,7 @@ import argparse
 import tokio.connectors.darshan
 
 def main(argv=None):
-    """
-    CLI wrapper around the Darshan connector's I/O methods
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser(description='parse a darshan log')
     parser.add_argument('logfile', metavar='N', type=str, help='darshan log file to parse')

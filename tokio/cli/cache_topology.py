@@ -1,5 +1,5 @@
 """
-Simple CLI wrapper around the tools.topology interface
+Provides CLI interface for :meth:`tokio.tools.topology.get_job_diameter`.
 """
 
 import json
@@ -7,9 +7,7 @@ import argparse
 import tokio.tools.topology
 
 def main(argv=None):
-    """
-    Take either a jobid or a Slurm cache file and return the summary provided by
-    the topology tool
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)

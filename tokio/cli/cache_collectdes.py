@@ -19,8 +19,7 @@ import tokio.connectors.collectd_es
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
 def main(argv=None):
-    """
-    CLI interface for cache_collectdes
+    """Entry point for the CLI interface
     """
     warnings.simplefilter('always', UserWarning) # One warning per invalid file
 

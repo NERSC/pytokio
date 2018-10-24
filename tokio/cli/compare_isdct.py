@@ -187,7 +187,7 @@ def print_summary(old_isdctfile, new_isdctfile, diff_dict):
         print(diff_buf)
 
 def main(argv=None):
-    """Parse command line arguments and dispatch analysis
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--all", action='store_true',

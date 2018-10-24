@@ -33,8 +33,7 @@ def retrieve_tables(lmtdb, datetime_start, datetime_end, limit=None):
             table_schema=table_schema)
 
 def main(argv=None):
-    """
-    Verify functionality when connecting to a remote database
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("start", type=str, help="start time in YYYY-MM-DDTHH:MM:SS format")

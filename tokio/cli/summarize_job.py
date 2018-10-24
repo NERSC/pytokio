@@ -1,8 +1,8 @@
 """
-Take a darshan log, extract the performance data from it, then use the
-start/stop time from Darshan to extract the LMT data.  Relies on the
-tokio.tool package, which uses H5LMT_HOME to determine where the LMT
-HDF5 files are stored on the local system.
+Take a darshan log or job start/end time and pull scalar data from every
+available TOKIO connector/tool configured for the system to present a single
+system-wide view of performance for the time during which that job was
+running.
 """
 
 import re
@@ -14,8 +14,6 @@ import argparse
 import warnings
 import pandas
 
-# cannot do blanket "import tokio" because tokiobin tests will fail
-#import tokio
 import tokio.config
 import tokio.connectors.darshan
 import tokio.connectors.slurm
@@ -636,10 +634,7 @@ def retrieve_concurrent_job_data(results, jobhost, concurrentjobs):
     return results
 
 def main(argv=None):
-    """
-    CLI wrapper around process that pulls in data from a variety of connectors
-    and reports a summary of data from all connectors for a time range of
-    interest.
+    """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--topology", nargs='?', const="", type=str,
