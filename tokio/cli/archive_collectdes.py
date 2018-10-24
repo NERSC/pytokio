@@ -64,10 +64,10 @@ def metadataset2dataset_key(metadataset_name):
     maps a metadataset name to its corresponding dataset name.
 
     Args:
-        metadataset_name (str): name of a metadataset
+        metadataset_name (str): Name of a metadataset
     Returns:
-        str: name of corresponding dataset name, or None if `metadataset_name`
-            does not appear to be a metadataset name.
+        str: Name of corresponding dataset name, or None if `metadataset_name`
+        does not appear to be a metadataset name.
     """
     if '/_num_' not in metadataset_name:
         return None
@@ -78,10 +78,10 @@ def dataset2metadataset_key(dataset_key):
     """Return the metadataset name corresponding to a dataset name
 
     Args:
-        dataset_name (str): name of a dataset
+        dataset_name (str): Name of a dataset
 
     Returns:
-        str: name of corresponding metadataset name
+        str: Name of corresponding metadataset name
     """
     return dataset_key.replace('/', '/_num_', 1)
 
@@ -180,8 +180,45 @@ def process_page(page):
     return inserts
 
 def update_datasets(inserts, datasets):
-    """
-    Given a list of tuples to insert into a dataframe, insert those data serially
+    """Insert list of tuples into a dataset
+
+    Insert a list of tuples into a :class:`tokio.timeseries.TimeSeries` object serially
+
+    Args:
+        inserts (list of tuples): List of tuples which should be serially
+            inserted into a dataset.  The tuples can be of the form
+
+                * dataset name (str)
+                * timestamp (:class:`datetime.datetime`)
+                * column name (str)
+                * value
+
+            or
+
+                * dataset name (str)
+                * timestamp (:class:`datetime.datetime`)
+                * column name (str)
+                * value
+                * reducer name (str)
+
+            where
+
+                * `dataset name` is the key used to retrieve a target
+                  :class:`tokio.timeseries.TimeSeries` object from the `datasets`
+                  argument
+                * `timestamp` and `column name` reference the element to be udpated
+                * value is the new value to insert into the given (`timestamp`,
+                  `column name`) location within `dataset`.
+                * `reducer name` is None (to just replace whatever value
+                  currently exists in the (`timestamp`, `column name`) location,
+                  or 'sum' to add `value` to the existing value.
+
+        datasets (dict): Dictionary mapping dataset names (str) to
+            :class:`tokio.timeseries.TimeSeries` objects
+
+    Returns:
+        int: number of elements in `inserts` which were not inserted because
+        their timestamp value was out of the range of the dataset to be updated.
     """
     data_volume = {}
     errors = {}
@@ -231,10 +268,10 @@ def update_datasets(inserts, datasets):
     return index_errors
 
 def reset_timeseries(timeseries, start, end, value=-0.0):
-    """Zero out a region of a tokio.TimeSeries dataset
+    """Zero out a region of a tokio.timeseries.TimeSeries dataset
 
     Args:
-        timeseries (tokio.TimeSeries): data from a subset should be zeroed
+        timeseries (tokio.timeseries.TimeSeries): data from a subset should be zeroed
         start (datetime.datetime): Time at which zeroing of all columns in
             `timeseries` should begin
         end (datetime.datetime): Time at which zeroing all columns in
@@ -259,6 +296,7 @@ def normalize_cpu_datasets(inserts, datasets):
         inserts (list of tuples): list of inserts that were used to populate
             datasets
         datasets (dict of TimeSeries): all of the datasets being populated
+
     Returns:
         Nothing
     """
@@ -401,8 +439,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
         print("Committed data to disk in %.4f seconds" % (time.time() - _time0))
 
 def main(argv=None):
-    """
-    CLI interface for cache_collectdes
+    """Entry point for the CLI interface
     """
     warnings.simplefilter('always', UserWarning) # One warning per invalid file
 
