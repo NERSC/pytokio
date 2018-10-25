@@ -1,5 +1,6 @@
 """Test tools.darshan interfaces
 """
+import sys
 import nose.tools
 import datetime
 import tokio.tools.darshan
@@ -47,7 +48,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -59,7 +59,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -71,7 +70,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': 'invaliduser',
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -83,7 +81,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -95,7 +92,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID_2,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -107,7 +103,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID_2,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -119,7 +114,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': 5,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -131,7 +125,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': None,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) >= tokiotest.SAMPLE_DARSHAN_LOGS_PER_DIR,
     },
@@ -143,7 +136,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': None,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) >= (2 * tokiotest.SAMPLE_DARSHAN_LOGS_PER_DIR),
     },
@@ -155,7 +147,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'base'
         },
         'pass_criteria': lambda x: len(x) > 0,
@@ -168,7 +159,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'base,perf,total'
         },
         'pass_criteria': lambda x: len(x) > 0,
@@ -181,11 +171,34 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'asdflkj'
         },
         'pass_criteria': lambda x: len(x) > 0,
         'expect_exception': TypeError,
+    },
+    {
+        'descr': "valid jobid w/ valid user, valid log dir key",
+        'test_function': wrap_find_darshanlogs,
+        'params': {
+            'datetime_start': DATETIME_START,
+            'datetime_end': None,
+            'log_dir_key': tokiotest.SAMPLE_DARSHAN_LOG_DIR_KEY,
+            'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
+            'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
+        },
+        'pass_criteria': lambda x: len(x) > 0,
+    },
+    {
+        'descr': "valid jobid w/ valid user, invalid log dir key",
+        'test_function': wrap_find_darshanlogs,
+        'params': {
+            'datetime_start': DATETIME_START,
+            'datetime_end': None,
+            'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
+            'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
+            'log_dir_key': 'invalid key',
+        },
+        'pass_criteria': lambda x: len(x) == 0,
     },
 ]
 

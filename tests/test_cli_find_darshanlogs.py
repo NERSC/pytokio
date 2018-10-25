@@ -25,7 +25,8 @@ def wrap_function(test_input):
     if 'which' in test_input['params']:
         tokiotest.check_darshan()
         argv += ['--load', test_input['params']['which']]
-    argv += [test_input['params']['darshan_log_dir']]
+    if 'log_dir_key' in test_input['params']:
+        argv += ['--host', test_input['params']['log_dir_key']]
 
     print("Test args: %s" % argv)
 

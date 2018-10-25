@@ -27,6 +27,7 @@ MAGIC_VARIABLES = {
     'lfsstatus_fullness_files': os.path.join('ghi', 'klmno', 'p'),
     'lfsstatus_map_files': os.path.join('y', 'z', ''),
     'isdct_files': os.path.join('qrs', 'tuv', 'wx'),
+    'darshan_log_dirs': os.path.join('hello', 'world'),
 }
 
 def delete_pytokio_vars(backup=True):

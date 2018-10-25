@@ -28,15 +28,19 @@ def main(argv=None):
                         help="jobid of Darshan log")
     parser.add_argument("-l", "--load", type=str, default=None,
                          help='load each Darshan log; must be {base[,total][,perf]}')
-    parser.add_argument('logdir', type=str,
-                        help='path to DARSHAN_LOG_DIR (exclusive of dated subdirectories)')
+    parser.add_argument('--logdir', type=str,
+                        help='path to DARSHAN_LOG_DIR, exclusive of dated subdirectories (default: use site config value)')
+    parser.add_argument('--host', type=str,
+                        help="hostname; only required if --logdir is not specified and site config contains multiple darshan_log_dirs")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Enable debug messages")
     args = parser.parse_args(argv)
 
     try:
         if args.start:
             start = datetime.datetime.strptime(args.start, DATE_FMT)
         else:
-            start = None
+            raise TypeError("--start must be defined if --jobid is not given")
         if args.end:
             end = datetime.datetime.strptime(args.end, DATE_FMT)
         else:
@@ -49,13 +53,17 @@ def main(argv=None):
     if start > end:
         raise Exception('query_start >= query_end')
 
+    if args.verbose:
+        tokio.debug.DEBUG = True
+
     if args.load:
         results = tokio.tools.darshan.load_darshanlogs(datetime_start=start,
                                                        datetime_end=end,
                                                        username=args.username,
                                                        jobid=args.jobid,
                                                        which=args.load,
-                                                       darshan_log_dir=args.logdir)
+                                                       log_dir=args.logdir,
+                                                       log_dir_key=args.host)
         print(json.dumps(results, indent=4, sort_keys=True))
 
     else:
@@ -63,5 +71,6 @@ def main(argv=None):
                                                             datetime_end=end,
                                                             username=args.username,
                                                             jobid=args.jobid,
-                                                            darshan_log_dir=args.logdir):
+                                                            log_dir=args.logdir,
+                                                            log_dir_key=args.host):
             print(logfile)

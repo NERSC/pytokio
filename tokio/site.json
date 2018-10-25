@@ -42,6 +42,10 @@
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
 
     ],
+    "darshan_log_dirs": {
+        "cori": "/global/cscratch1/sd/darshanlogs",
+        "edison": "/global/cscratch1/sd/darshanlogs/edison"
+    },
     "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d",
     "jobinfo_jobid_providers": [
         "slurm",

@@ -57,6 +57,9 @@
         "inputs/%Y-%m-%d/ost-map.txt",
         "inputs/%Y-%m-%d/ost-map_edison.txt"
     ],
+    "darshan_log_dirs": {
+        "testsystem": "inputs/darshanlogs"
+    },
     "hpss_report_files": "inputs/hpss_daily_%Y%m%d",
     "jobinfo_jobid_providers": [
         "slurm",

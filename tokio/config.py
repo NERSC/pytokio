@@ -61,7 +61,7 @@ def init_config():
 
     # Check for magic environment variables to override the contents of the config
     # file at runtime
-    for _magic_variable in ['HDF5_FILES', 'ISDCT_FILES', 'LFSSTATUS_FULLNESS_FILES', 'LFSSTATUS_MAP_FILES']:
+    for _magic_variable in ['HDF5_FILES', 'ISDCT_FILES', 'LFSSTATUS_FULLNESS_FILES', 'LFSSTATUS_MAP_FILES', 'DARSHAN_LOG_DIRS']:
         _magic_value = os.environ.get("PYTOKIO_" + _magic_variable)
         if _magic_value is not None:
             try:
