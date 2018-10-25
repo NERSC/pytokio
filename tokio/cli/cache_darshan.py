@@ -1,5 +1,5 @@
 """
-Expose several methods of :class:`tokio.connectors.darshan.Darshan` via a
+Expose several methods of :mod:`tokio.connectors.darshan` via a
 command-line interface.
 """
 

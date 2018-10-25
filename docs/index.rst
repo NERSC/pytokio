@@ -24,7 +24,7 @@ been documented in the `pytokio architecture paper`_ presented at the
 
     user/install
     user/architecture
-    Command Line Tools <api/tokio.cli>
+    user/command-line
 
 .. toctree::
     :caption: API Documentation

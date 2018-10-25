@@ -1,5 +1,7 @@
 """
-Provides CLI interfaces into the :mod:tokio.tools.lfsstatus tool.
+Provides CLI interfaces into the :mod:`tokio.tools.lfsstatus` tool's
+:meth:`tokio.tools.lfsstatus.get_failures` and
+:meth:`tokio.tools.lfsstatus.get_fullness` methods.
 """
 
 import argparse

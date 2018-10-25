@@ -1,7 +1,19 @@
 """
 Given one or more Darshan logs containing both POSIX and Lustre counters,
-attempt to determine the performance each file saw, and try to correlate poorly
+attempt to determine the performance each file saw and try to correlate poorly
 performing files with specific Lustre OSTs.
+
+This tool first estimates per-file I/O bandwidths by dividing the total bytes
+read/written to each file by the time the application spent performing I/O to
+that file.  It then uses data from Darshan's Lustre module to map these
+performance estimates to the OSTs over which each file was striped.
+With the list of OSTs and performance measurements corresponding to each OST,
+the Pearson correlation coefficient is then calculated between performance and
+each individual OST.
+
+Multiple Darshan logs can be passed to increase the number of observations used
+for correlation.  This tool does not work unless the Darshan log(s) contain
+data from the Lustre module.
 """
 
 import json

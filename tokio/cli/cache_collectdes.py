@@ -1,7 +1,10 @@
 """
 Dump a lot of data out of ElasticSearch using the Python API and native
-scrolling support.  Output either as native json from ElasticSearch or as
-serialized TOKIO TimeSeries (TTS) HDF5 files.
+scrolling support.
+
+Instantiates a :class:`tokio.connectors.collectd_es.CollectdEs` object and
+relies on the :meth:`tokio.connectors.collectd_es.CollectdEs.query_timeseries`
+method to populate a data structure that is then serialized to JSON.
 """
 
 import sys
