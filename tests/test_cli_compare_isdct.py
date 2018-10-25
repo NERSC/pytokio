@@ -1,31 +1,31 @@
 #!/usr/bin/env python
 """
-Test the bin/compare_isdct.py tool
+Test the tokio.cli.compare_isdct tool
 """
 
 import json
 import tokiotest
 import test_connectors_nersc_isdct
-import tokiobin.compare_isdct
+import tokio.cli.compare_isdct
 
 def test_all_json():
     """
-    bin/compare_isdct.py --all json output
+    cli.compare_isdct --all json output
     """
     argv = ['--all',
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     test_connectors_nersc_isdct.validate_diff(result, report_zeros=False)
 
 def test_reduced_json():
     """
-    bin/compare_isdct.py reduced json output
+    cli.compare_isdct reduced json output
     """
     argv = [tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     for reduction in ('ave', 'count', 'min', 'max', 'sum'):
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
@@ -37,24 +37,24 @@ def test_reduced_json():
 
 def test_all_json_w_zeros():
     """
-    bin/compare_isdct.py --all --report-zeros json output
+    cli.compare_isdct --all --report-zeros json output
     """
     argv = ["--all",
             "--report-zeros",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     test_connectors_nersc_isdct.validate_diff(result, report_zeros=True)
 
 def test_reduced_json_w_zeros():
     """
-    bin/compare_isdct.py reduced --report-zeros json output
+    cli.compare_isdct reduced --report-zeros json output
     """
     argv = ["--report-zeros",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     for reduction in ('ave', 'min', 'max', 'sum'):
         for counter in tokiotest.SAMPLE_NERSCISDCT_DIFF_MONOTONICS:
@@ -68,12 +68,12 @@ def test_reduced_json_w_zeros():
 
 def test_reduced_json_gibs():
     """
-    bin/compare_isdct.py reduced --gibs json output
+    cli.compare_isdct reduced --gibs json output
     """
     argv = ["--gibs",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     success = 0
     for counter in list(result.keys()):
@@ -84,13 +84,13 @@ def test_reduced_json_gibs():
 
 def test_all_json_w_gibs():
     """
-    bin/compare_isdct.py --all --gibs json output
+    cli.compare_isdct --all --gibs json output
     """
     argv = ["--all",
             "--gibs",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
     result = json.loads(output_str)
     success = 0
     for counters in result['devices'].values():
@@ -102,34 +102,34 @@ def test_all_json_w_gibs():
 
 def test_summary():
     """
-    bin/compare_isdct.py --summary human-readable output
+    cli.compare_isdct --summary human-readable output
     """
     argv = ["--summary",
             tokiotest.SAMPLE_NERSCISDCT_PREV_FILE,
             tokiotest.SAMPLE_NERSCISDCT_DIFF_FILE]
-    output_str = tokiotest.run_bin(tokiobin.compare_isdct, argv)
+    output_str = tokiotest.run_bin(tokio.cli.compare_isdct, argv)
 
     ### look for a section on devices removed
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_RM > 0:
         func = validate_summary_section
-        func.description = "bin/compare_isdct.py --summary device removal"
+        func.description = "cli.compare_isdct --summary device removal"
         yield func, output_str, 'devices removed', verify_nid_line
 
     ### look for a section on devices added
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_ADD > 0:
         func = validate_summary_section
-        func.description = "bin/compare_isdct.py --summary device installation"
+        func.description = "cli.compare_isdct --summary device installation"
         yield func, output_str, 'devices installed', verify_nid_line
 
     ### look for a section on errors detected
     if tokiotest.SAMPLE_NERSCISDCT_DIFF_ERRS > 0:
         func = validate_summary_section
-        func.description = "bin/compare_isdct.py --summary error detection"
+        func.description = "cli.compare_isdct --summary error detection"
         yield func, output_str, 'errors detected', verify_errors_line
 
     ### look for a section with the workload statistics
     func = validate_summary_section
-    func.description = "bin/compare_isdct.py --summary workload statistics"
+    func.description = "cli.compare_isdct --summary workload statistics"
     yield func, output_str, 'workload statistics', verify_workload_line
 
 def validate_summary_section(output_str, section_header, line_verify_func):

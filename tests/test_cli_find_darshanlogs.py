@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """
-Test the bin/darshan_bad_ost.py tool
+Test the cli.darshan_bad_ost tool
 """
 
 import nose.tools
 import test_tools_darshan
 import tokiotest
-import tokiobin.find_darshanlogs
+import tokio.cli.find_darshanlogs
 
 def wrap_function(test_input):
     """Allow named args to pass through nosetests
@@ -33,16 +33,16 @@ def wrap_function(test_input):
     if expected_exception:
         # assert_raises doesn't seem to work correctly here
 #       nose.tools.assert_raises(expected_exception,
-#                                tokiotest.run_bin(tokiobin.find_darshanlogs, argv))
+#                                tokiotest.run_bin(tokio.cli.find_darshanlogs, argv))
         caught = False
         try:
-            output_str = tokiotest.run_bin(tokiobin.find_darshanlogs, argv)
+            output_str = tokiotest.run_bin(tokio.cli.find_darshanlogs, argv)
         except expected_exception:
             caught = True
         assert caught
 
     else:
-        output_str = tokiotest.run_bin(tokiobin.find_darshanlogs, argv)
+        output_str = tokiotest.run_bin(tokio.cli.find_darshanlogs, argv)
         results = output_str.splitlines()
         assert (test_input['pass_criteria'])(results)
 
@@ -53,5 +53,5 @@ def test_bin_find_darshanlogs():
 
     for test in test_tools_darshan.TEST_MATRIX:
         test_func = tokiotest.needs_darshan(wrap_function)
-        test_func.description = 'bin/find_darshanlogs.py: ' + test['descr']
+        test_func.description = 'cli.find_darshanlogs: ' + test['descr']
         yield test_func, test

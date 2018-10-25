@@ -10,7 +10,7 @@ import nose
 import h5py
 import tokio.connectors.hdf5
 import tokiotest
-import tokiobin.archive_collectdes
+import tokio.cli.archive_collectdes
 
 #
 #  TESTING APPEND/UPDATE FUNCTIONALITY
@@ -55,7 +55,7 @@ def generate_tts(output_file,
             query_start,
             query_end]
     print("Running [%s]" % ' '.join(argv))
-    tokiobin.archive_collectdes.main(argv)
+    tokio.cli.archive_collectdes.main(argv)
     print("Created %s" % output_file)
 
 def update_tts(output_file,
@@ -72,7 +72,7 @@ def update_tts(output_file,
             query_end]
 
     print("Running [%s]" % ' '.join(argv))
-    tokiobin.archive_collectdes.main(argv)
+    tokio.cli.archive_collectdes.main(argv)
     print("Updated %s" % output_file)
 
 def summarize_hdf5(hdf5_file):
@@ -100,7 +100,7 @@ def summarize_hdf5(hdf5_file):
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_idempotency():
     """
-    bin/archive_collectdes.py cpuload idempotency
+    cli.archive_collectdes cpuload idempotency
     """
     tokiotest.TEMP_FILE.close()
 
@@ -141,7 +141,7 @@ def test_idempotency():
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_out_of_bounds():
     """
-    bin/archive_collectdes.py with out-of-bounds
+    cli.archive_collectdes with out-of-bounds
     """
     tokiotest.TEMP_FILE.close()
 
@@ -166,6 +166,6 @@ def test_out_of_bounds():
     print("Running [%s]" % ' '.join(argv))
     with warnings.catch_warnings(record=True) as warn:
         warnings.simplefilter("always")
-        tokiobin.archive_collectdes.main(argv)
+        tokio.cli.archive_collectdes.main(argv)
         print("Caught %d warnings" % len(warn))
         assert len(warn) > 0

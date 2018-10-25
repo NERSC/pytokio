@@ -11,8 +11,9 @@ import tokio.debug
 import tokio.connectors
 import tokio.tools
 import tokio.analysis
+# import tokio.cli # do not import by default
 
 # Exceptions
 from tokio.common import ConfigError
 
-__version__ = '0.11.0.dev0'
+__version__ = '0.11.0.dev1'

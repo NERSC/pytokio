@@ -24,6 +24,7 @@ been documented in the `pytokio architecture paper`_ presented at the
 
     user/install
     user/architecture
+    user/command-line
 
 .. toctree::
     :caption: API Documentation
@@ -31,9 +32,9 @@ been documented in the `pytokio architecture paper`_ presented at the
 
     api/tokio
     api/tokio.analysis
+    api/tokio.cli
     api/tokio.connectors
     api/tokio.tools
-
 
 .. toctree::
     :maxdepth: 1
