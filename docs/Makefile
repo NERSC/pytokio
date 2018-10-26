@@ -1,29 +1,24 @@
-.PHONY: clean
+# Minimal makefile for Sphinx documentation
+#
 
+# You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = pytokio
-SPHINXBUILDER = html
-SOURCEDIR     = source
-BUILDDIR      = build
-TARGETS       = $(BUILDDIR)/html/index.html \
-			    $(BUILDDIR)/html/modules.html \
-			    $(BUILDDIR)/html/tokio.connectors.html \
-			    $(BUILDDIR)/html/tokio.html \
-			    $(BUILDDIR)/html/tokio.tools.html \
-			    $(BUILDDIR)/html/tokiobin.html
+SOURCEDIR     = .
+BUILDDIR      = _build
 
-$(TARGETS):
+# Put it first so that "make" without argument is like "make help".
+help:
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-$(BUILDDIR)/html/index.html: source/modules.rst
-$(BUILDDIR)/html/%.html: source/%.rst
-	$(SPHINXBUILD) -M $(SPHINXBUILDER) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+.PHONY: help Makefile clean
 
-source/tokio.rst source/modules.rst:
-	sphinx-apidoc -o source/ ../tokio/
+# Catch-all target: route all unknown targets to Sphinx using the new
+# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
+%: Makefile
+	$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-#source/tokiobin.rst:
-#	sphinx-apidoc -o source/ ../tests/tokiobin/
-
-clean:
-	rm -rf $(BUILDDIR)
+clean: Makefile
+	$(SPHINXBUILD) -M clean "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	rm -rf api

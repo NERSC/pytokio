@@ -21,14 +21,14 @@ except ImportError:
     _HAVE_ELASTICSEARCH = False
 
 import tokiotest
-import tokiobin.cache_isdct
-import tokiobin.cache_collectdes
-import tokiobin.cache_darshan
-import tokiobin.cache_slurm
-import tokiobin.cache_topology
-import tokiobin.cache_lfsstatus
-import tokiobin.cache_nersc_jobsdb
-import tokiobin.cache_lmtdb
+import tokio.cli.cache_isdct
+import tokio.cli.cache_collectdes
+import tokio.cli.cache_darshan
+import tokio.cli.cache_slurm
+import tokio.cli.cache_topology
+import tokio.cli.cache_lfsstatus
+import tokio.cli.cache_nersc_jobsdb
+import tokio.cli.cache_lmtdb
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def verify_sqlite(output_str):
@@ -98,7 +98,7 @@ def run_connector(binary, argv):
     """Default cache_connector run function
 
     Args:
-        binary (module): tokiobin module that contains a main() function
+        binary (module): tokio.cli module that contains a main() function
         argv (list of str): list of CLI arguments to pass to connector
 
     Returns:
@@ -110,7 +110,7 @@ def run_elasticsearch(binary, argv):
     """Run function that traps connection errors from ElasticSearch
 
     Args:
-        binary (module): tokiobin module that contains a main() function
+        binary (module): tokio.cli module that contains a main() function
         argv (list of str): list of CLI arguments to pass to connector
 
     Returns:
@@ -126,99 +126,99 @@ def run_elasticsearch(binary, argv):
 
 CACHE_CONNECTOR_CONFIGS = [
     {
-        'name':       'bin/cache_isdct.py',
-        'binary':     tokiobin.cache_isdct,
+        'name':       'cli.cache_isdct',
+        'binary':     tokio.cli.cache_isdct,
         'args':       ['--json', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_isdct.py',
-        'binary':     tokiobin.cache_isdct,
+        'name':       'cli.cache_isdct',
+        'binary':     tokio.cli.cache_isdct,
         'args':       ['--csv', tokiotest.SAMPLE_NERSCISDCT_FILE],
         'validators': [verify_csv,],
     },
     {
-        'name':       'bin/cache_collectdes.py',
-        'description': 'bin/cache_collectdes.py, cached input',
-        'binary':     tokiobin.cache_collectdes,
+        'name':       'cli.cache_collectdes',
+        'description': 'cli.cache_collectdes, cached input',
+        'binary':     tokio.cli.cache_collectdes,
         'args':       ['--input', tokiotest.SAMPLE_COLLECTDES_FILE,
                        tokiotest.SAMPLE_COLLECTDES_START,
                        tokiotest.SAMPLE_COLLECTDES_END],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_collectdes.py',
-        'description': 'bin/cache_collectdes.py, remote connection',
-        'binary':     tokiobin.cache_collectdes,
+        'name':       'cli.cache_collectdes',
+        'description': 'cli.cache_collectdes, remote connection',
+        'binary':     tokio.cli.cache_collectdes,
         'args':       [tokiotest.SAMPLE_TIMESTAMP_START_NOW,
                        tokiotest.SAMPLE_TIMESTAMP_END_NOW],
         'runfunction': run_elasticsearch,
         'validators': [verify_json_zero_ok,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', '--perf', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_darshan.py',
-        'binary':     tokiobin.cache_darshan,
+        'name':       'cli.cache_darshan',
+        'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_slurm.py',
-        'binary':     tokiobin.cache_slurm,
+        'name':       'cli.cache_slurm',
+        'binary':     tokio.cli.cache_slurm,
         'args':       ['--json', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_json,],
     },
     {
-        'name':       'bin/cache_slurm.py',
-        'binary':     tokiobin.cache_slurm,
+        'name':       'cli.cache_slurm',
+        'binary':     tokio.cli.cache_slurm,
         'args':       ['--csv', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_csv,],
     },
     {
-        'name':       'bin/cache_slurm.py',
-        'binary':     tokiobin.cache_slurm,
+        'name':       'cli.cache_slurm',
+        'binary':     tokio.cli.cache_slurm,
         'args':       ['--native', tokiotest.SAMPLE_SLURM_CACHE_FILE],
         'validators': [verify_sacct,],
     },
     {
-        'name':       'bin/cache_topology.py',
-        'description': 'bin/cache_topology.py',
-        'binary':     tokiobin.cache_topology,
+        'name':       'cli.cache_topology',
+        'description': 'cli.cache_topology',
+        'binary':     tokio.cli.cache_topology,
         'args':       [
             '--nodemap-cache', tokiotest.SAMPLE_XTDB2PROC_FILE,
             '--jobinfo-cache', tokiotest.SAMPLE_SLURM_CACHE_FILE,
@@ -226,8 +226,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validators': [verify_json,],
     },
     {
-        'description': 'bin/cache_lfsstatus.py --fullness, no cache',
-        'binary':     tokiobin.cache_lfsstatus,
+        'description': 'cli.cache_lfsstatus --fullness, no cache',
+        'binary':     tokio.cli.cache_lfsstatus,
         'args':        [
             '--fullness',
             '--',
@@ -237,8 +237,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validators':  [verify_json,],
     },
     {
-        'description': 'bin/cache_lfsstatus.py --fullness, explicit cache',
-        'binary':     tokiobin.cache_lfsstatus,
+        'description': 'cli.cache_lfsstatus --fullness, explicit cache',
+        'binary':     tokio.cli.cache_lfsstatus,
         'args':        [
             '--fullness',
             tokiotest.SAMPLE_OSTFULLNESS_FILE,
@@ -248,8 +248,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validators':  [verify_json,],
     },
     {
-        'description': 'bin/cache_lfsstatus.py --failure, no cache',
-        'binary':     tokiobin.cache_lfsstatus,
+        'description': 'cli.cache_lfsstatus --failure, no cache',
+        'binary':     tokio.cli.cache_lfsstatus,
         'args':        [
             '--failure',
             '--',
@@ -259,8 +259,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validators':  [verify_json,],
     },
     {
-        'description': 'bin/cache_lfsstatus.py --failure, explicit cache',
-        'binary':     tokiobin.cache_lfsstatus,
+        'description': 'cli.cache_lfsstatus --failure, explicit cache',
+        'binary':     tokio.cli.cache_lfsstatus,
         'args':        [
             '--failure',
             tokiotest.SAMPLE_OSTMAP_FILE,
@@ -270,8 +270,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validators':  [verify_json,],
     },
     {
-        'description': 'bin/cache_nersc_jobsdb.py',
-        'binary':     tokiobin.cache_nersc_jobsdb,
+        'description': 'cli.cache_nersc_jobsdb',
+        'binary':     tokio.cli.cache_nersc_jobsdb,
         'args':        [
             '-i', tokiotest.SAMPLE_NERSCJOBSDB_FILE,
             datetime.datetime.fromtimestamp(
@@ -285,8 +285,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validate_contents': False,
     },
     {
-        'description': 'bin/cache_lmtdb.py',
-        'binary':     tokiobin.cache_lmtdb,
+        'description': 'cli.cache_lmtdb',
+        'binary':     tokio.cli.cache_lmtdb,
         'args':        [
             '-i', tokiotest.SAMPLE_LMTDB_FILE,
             datetime.datetime.fromtimestamp(
@@ -299,8 +299,8 @@ CACHE_CONNECTOR_CONFIGS = [
         'validate_contents': False,
     },
     {
-        'description': 'bin/cache_lmtdb.py --limit',
-        'binary':     tokiobin.cache_lmtdb,
+        'description': 'cli.cache_lmtdb --limit',
+        'binary':     tokio.cli.cache_lmtdb,
         'args':        [
             '--limit', '2',
             '-i', tokiotest.SAMPLE_LMTDB_FILE,
@@ -320,7 +320,7 @@ def run_cache_connector(config, to_file=False):
     """
     Test a connector cache (cache_*.py) CLI interface
     """
-    if config['binary'] == tokiobin.cache_darshan:
+    if config['binary'] == tokio.cli.cache_darshan:
         tokiotest.check_darshan()
 
     runfunction = config.get('runfunction', run_connector)

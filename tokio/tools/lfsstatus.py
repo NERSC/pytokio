@@ -94,7 +94,7 @@ def get_fullness_lfsstate(file_system, datetime_target, cache_file=None):
         cache_file (str): Basename of file to search for the requested data
 
     Returns:
-        Whatever is returned by get_lfsstate
+        Whatever is returned by :func:`tokio.tools.lfsstatus.get_lfsstate`
     """
     return get_lfsstate(file_system, datetime_target, 'fullness', cache_file)
 

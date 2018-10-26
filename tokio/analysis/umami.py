@@ -27,7 +27,7 @@ class Umami(collections.OrderedDict):
 
     def to_dict(self):
         """
-        Convert this object _and all of its constituent UmamiMetric objects_
+        Convert this object (and all of its constituent UmamiMetric objects)
         into a dictionary
         """
         return {k: v.__dict__ for k, v in self.items()}
@@ -64,7 +64,7 @@ class Umami(collections.OrderedDict):
 
         Returns:
             pandas.DataFrame: numerical representation of the values being
-                plotted
+            plotted
         """
         return pandas.DataFrame.from_dict(self._to_dict_for_pandas(), orient='index')
 
@@ -89,7 +89,8 @@ class Umami(collections.OrderedDict):
                 multiplied by len(self.keys()) to determine full diagram height
 
         Returns:
-            List of axes corresponding to each panel in the UMAMI diagram
+            list: List of matplotlib.axis.Axis objects corresponding to each
+            panel in the UMAMI diagram
         """
         # import here because of various things that can break matplotlib on import
         import matplotlib.pyplot
@@ -253,12 +254,12 @@ class Umami(collections.OrderedDict):
         return fig.axes
 
 class UmamiMetric(object):
-    """
-    A single row of an UMAMI diagram.  Logically contains timeseries data from
-    a single connector, where the 'timestamps' attribute is a list of timestamps
-    (seconds since epoch), and the 'values' attribute is a list of values
-    corresponding to each timestamp.  The number of timestamps and attributes
-    must always be the same.
+    """A single row of an UMAMI diagram.
+    
+    Logically contains timeseries data from a single connector, where the
+    `timestamps` attribute is a list of timestamps (seconds since epoch), and
+    the 'values' attribute is a list of values corresponding to each timestamp.
+    The number of timestamps and attributes must always be the same.
     """
     def __init__(self, timestamps, values, label, big_is_good=True):
         # If we are given pandas.Series, convert them to lists, then copy.

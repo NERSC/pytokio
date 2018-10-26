@@ -8,25 +8,44 @@ import os
 import json
 from tokio.common import isstr
 
-PYTOKIO_CONFIG = ""
-"""Path to configuration file to load
-"""
+#: Global variable containing the configuration
+CONFIG = {} 
 
-CONFIG = {}
-"""Global variable for the parsed configuration
-"""
+#: Path to configuration file to load
+PYTOKIO_CONFIG_FILE = "" 
+
+#: Path of default site configuration file
+DEFAULT_CONFIG_FILE = ""
 
 def init_config():
-    global PYTOKIO_CONFIG
+    """Loads the global configuration.
+
+    Loads the site-wide configuration file, then inspects relevant environment
+    variables for overrides.
+    """
     global CONFIG
+    global PYTOKIO_CONFIG_FILE
+    global DEFAULT_CONFIG_FILE
+
+    # Escape hatch for cases where we want to load the module without initalizing
+    if os.environ.get('PYTOKIO_SKIP_CONFIG') is not None:
+        return
+
+    # Set the default config path - set here rather than in the global namespace
+    # so site-specific paths don't get baked into the autodoc documentation
+    DEFAULT_CONFIG_FILE = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json')
 
     # Load a pytokio config from a special location
-    PYTOKIO_CONFIG = os.environ.get(
-        'PYTOKIO_CONFIG',
-        os.path.join(os.path.abspath(os.path.dirname(__file__)), 'site.json'))
+    PYTOKIO_CONFIG_FILE = os.environ.get('PYTOKIO_CONFIG', DEFAULT_CONFIG_FILE)
+
+    try:
+        with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
+            loaded_config = json.load(config_file)
+    except (OSError, IOError):
+        loaded_config = {}
 
     # Load pytokio config file and convert its keys into a set of constants
-    for _key, _value in json.load(open(PYTOKIO_CONFIG, 'r')).items():
+    for _key, _value in loaded_config.items():
         # config keys beginning with an underscore get skipped
         if _key.startswith('_'):
             pass
@@ -42,7 +61,7 @@ def init_config():
 
     # Check for magic environment variables to override the contents of the config
     # file at runtime
-    for _magic_variable in ['HDF5_FILES', 'ISDCT_FILES', 'LFSSTATUS_FULLNESS_FILES', 'LFSSTATUS_MAP_FILES']:
+    for _magic_variable in ['HDF5_FILES', 'ISDCT_FILES', 'LFSSTATUS_FULLNESS_FILES', 'LFSSTATUS_MAP_FILES', 'DARSHAN_LOG_DIRS']:
         _magic_value = os.environ.get("PYTOKIO_" + _magic_variable)
         if _magic_value is not None:
             try:

@@ -24,13 +24,15 @@ def get_job_diameter(jobid, nodemap_cache_file=None, jobinfo_cache_file=None):
 
     Returns:
         dict: Contains three keys representing three ways in which a job's
-            radius can be expressed.  Keys are:
+        radius can be expressed.  Keys are:
+
             * job_min_radius: The smallest distance between the job's center of
               mass and a job node
             * job_max_radius: The largest distance between the job's center of
               mass and a job node
             * job_avg_radius: The average distance between the job's center of
               mass and all job nodes
+
     """
     node_list = jobinfo.get_job_nodes(jobid=jobid, cache_file=jobinfo_cache_file)
     proc_table = craysdb.CraySdbProc(cache_file=nodemap_cache_file)

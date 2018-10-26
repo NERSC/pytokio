@@ -75,7 +75,7 @@ def _parse_section(lines, start_line=0):
     """Parse a single table of the HPSS daily report
 
     Converts a table from the HPSS daily report into a dictionary.  For example
-    an example table may appear as
+    an example table may appear as::
 
         Archive : IO Totals by HPSS Client Gateway (UI) Host
         Host             Users      IO_GB       Ops
@@ -85,7 +85,7 @@ def _parse_section(lines, start_line=0):
         Total               58   178279.2     29685
         HPSS ACCOUNTING:         224962.6
 
-    which will return a dict of form
+    which will return a dict of form::
 
         {
             "system": "archive",
@@ -118,14 +118,17 @@ def _parse_section(lines, start_line=0):
     Args:
         lines (list of str): Text of the HPSS report
         start_line (int): Index of ``lines`` defined such that
-          * lines[start_line] is the table title
-          * lines[start_line + 1] is the table heading row
-          * lines[start_line + 2] is the line separating the table heading and
+
+          * ``lines[start_line]`` is the table title
+          * ``lines[start_line + 1]`` is the table heading row
+          * ``lines[start_line + 2]`` is the line separating the table heading and
             the first row of data
-          * lines[start_line + 3:] are the rows of the table
+          * ``lines[start_line + 3:]`` are the rows of the table
 
     Returns:
-        tuple of (dict, int) where
+        tuple:
+          Tuple of (dict, int) where
+
           * dict contains the parsed contents of the table
           * int is the index of the last line of the table + 1
     """

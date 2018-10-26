@@ -16,10 +16,11 @@ class SubprocessOutputDict(dict):
 
     When deriving from this class, the child object will have to
 
-    1. Define subprocess_cmd after initializing this parent object
-    2. Define self.__repr__ (if necessary)
-    2. Define its own self.load_str
-    3. Define any introspective analysis methods
+        1. Define subprocess_cmd after initializing this parent object
+        2. Define self.__repr__ (if necessary)
+        3. Define its own self.load_str
+        4. Define any introspective analysis methods
+
     """
     def __init__(self, cache_file=None, from_string=None, silent_errors=False):
         super(SubprocessOutputDict, self).__init__(self)

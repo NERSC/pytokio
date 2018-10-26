@@ -651,10 +651,12 @@ class Hdf5(h5py.File):
             key (str): The standard name of a dataset to be accessed.
 
         Returns:
-            h5py.Dataset if key is a literal dataset name
-            h5py.Dataset if key maps directly to a literal dataset name
+            h5py.Dataset or numpy.ndarray: 
+
+              * h5py.Dataset if key is a literal dataset name
+              * h5py.Dataset if key maps directly to a literal dataset name
                 given the file schema version
-            numpy.ndarray if key maps to a provider function that can
+              * numpy.ndarray if key maps to a provider function that can
                 calculate the requested data
         """
         if not self.always_translate and super(Hdf5, self).__contains__(key):
@@ -759,7 +761,7 @@ class Hdf5(h5py.File):
             dataset_name (str): name of dataset whose columns will be retrieved
 
         Returns:
-            numpy.ndarray of column names, or empty if no columns defined
+            numpy.ndarray: Array of column names, or empty if no columns defined
         """
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
@@ -816,8 +818,8 @@ class Hdf5(h5py.File):
                 be retrieved
 
         Returns:
-            h5py.File: The dataset containing the timestamps corresponding to
-                dataset_name.
+            h5py.Dataset: The dataset containing the timestamps corresponding to
+            dataset_name.
         """
         return get_timestamps(self, dataset_name)
 
@@ -828,9 +830,9 @@ class Hdf5(h5py.File):
             dataset_name (str): name of dataset to access
             inverse (bool): return 0 for missing and 1 for present if True
 
-        Return:
-            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
-                absence of specific elements
+        Returns:
+            numpy.ndarray: Array of numpy.int8 of 1 and 0 to indicate the
+            presence or absence of specific elements
         """
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_missing_h5lmt(dataset_name, inverse=inverse)
@@ -846,9 +848,9 @@ class Hdf5(h5py.File):
             dataset_name (str): name of dataset to access
             inverse (bool): return 0 for missing and 1 for present if True
 
-        Return:
-            numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
-                absence of specific elements
+        Returns:
+            numpy.ndarray: Array of numpy.int8 of 1 and 0 to indicate the
+            presence or absence of specific elements
         """
         dataset = self.__getitem__(dataset_name)
         missing_dataset = self.get('/FSMissingGroup/FSMissingDataSet')
@@ -870,9 +872,9 @@ class Hdf5(h5py.File):
             dataset_name (str): dataset name to conver to DataFrame
 
         Returns:
-            Pandas DataFrame indexed by datetime objects corresponding to
-            timestamps, columns labeled appropriately, and values from the
-            dataset
+            pandas.DataFrame: DataFrame indexed by datetime objects
+            corresponding to timestamps, columns labeled appropriately, and
+            values from the dataset
         """
         if self.get_version(dataset_name=dataset_name) is None:
             return self._to_dataframe_h5lmt(dataset_name)
@@ -943,9 +945,9 @@ def missing_values(dataset, inverse=False):
         dataset: dataset to access
         inverse (bool): return 0 for missing and 1 for present if True
 
-    Return:
-        numpy.ndarray of numpy.int8 of 1 and 0 to indicate the presence or
-            absence of specific elements
+    Returns:
+        numpy.ndarray: Array of numpy.int8 of 1 and 0 to indicate the presence
+        or absence of specific elements
     """
     zero = numpy.int8(0)
     one = numpy.int8(1)

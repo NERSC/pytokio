@@ -12,7 +12,7 @@ import h5py
 import numpy
 import tokio
 import tokiotest
-import tokiobin.archive_lmtdb
+import tokio.cli.archive_lmtdb
 
 # expressed as fraction, not percent; used to account for differences in how
 # pylmt and pytokio handle missing data
@@ -44,7 +44,7 @@ def generate_tts(output_file,
             init_start,
             init_end]
     print("Running [%s]" % ' '.join(argv))
-    tokiobin.archive_lmtdb.main(argv)
+    tokio.cli.archive_lmtdb.main(argv)
     print("Created %s" % output_file)
 
 def update_tts(output_file, q_start, q_end):
@@ -59,7 +59,7 @@ def update_tts(output_file, q_start, q_end):
             q_end.strftime(tokiotest.SAMPLE_TIMESTAMP_DATE_FMT)]
 
     print("Running [%s]" % ' '.join(argv))
-    tokiobin.archive_lmtdb.main(argv)
+    tokio.cli.archive_lmtdb.main(argv)
     print("Updated %s" % output_file)
 
 def summarize_hdf5(hdf5_file):
@@ -127,7 +127,7 @@ def identical_datasets(summary0, summary1):
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_bin_archive_lmtdb_overlaps():
-    """bin/archive_lmtdb.py: write + overwrite correctness
+    """cli.archive_lmtdb: write + overwrite correctness
 
     1. initialize a new HDF5 and pull down a large window
     2. pull down a complete subset of that window to this newly minted HDF5
@@ -158,13 +158,13 @@ def test_bin_archive_lmtdb_overlaps():
         h5_file.close()
 
         func = identical_datasets
-        func.description = ("bin/archive_lmtdb.py overlap %s" % str(test_range))
+        func.description = ("cli.archive_lmtdb overlap %s" % str(test_range))
 # yield doesn't work because tokiotest.TEMP_FILE doesn't propagate
 #       yield func, summary0, summary1
         func(summary0, summary1)
 
 def test_bin_archive_lmtdb_nonmonotonic():
-    """bin/archive_lmtdb.py: counter reset to zero mid-day
+    """cli.archive_lmtdb: counter reset to zero mid-day
 
     Rebooting an OSS will cause its monotonic counters to become non-monotonic,
     which can result in negative rates being tabulated.  This test ensures that
@@ -219,7 +219,7 @@ class TestArchiveLmtdbCorrectness(object):
                ]
 
         print("Running [%s]" % ' '.join(argv))
-        tokiobin.archive_lmtdb.main(argv)
+        tokio.cli.archive_lmtdb.main(argv)
         print("Created %s" % cls.output_file)
 
         cls.generated = h5py.File(cls.output_file, 'r')
@@ -261,12 +261,12 @@ class TestArchiveLmtdbCorrectness(object):
 
             # check the dataset
             func = compare_h5lmt_dataset
-            func.description = "bin/archive_lmtdb.py: comparing %s dataset inside h5lmt" % dataset_name
+            func.description = "cli.archive_lmtdb: comparing %s dataset inside h5lmt" % dataset_name
             print(func.description)
             yield func, self.generated, self.ref_h5lmt, dataset_name, False
 
             # check the timestamp
-            func.description = "bin/archive_lmtdb.py: comparing %s's timestamps dataset inside h5lmt" % dataset_name
+            func.description = "cli.archive_lmtdb: comparing %s's timestamps dataset inside h5lmt" % dataset_name
             print(func.description)
             yield func, self.generated_tts, self.ref_h5lmt, dataset_name, True
             checked_ct += 1
@@ -285,7 +285,7 @@ class TestArchiveLmtdbCorrectness(object):
                 dataset_name = dataset.name
 
                 func = compare_tts_dataset
-                func.description = "bin/archive_lmtdb.py: comparing %s to hdf5 reference" % dataset_name
+                func.description = "cli.archive_lmtdb: comparing %s to hdf5 reference" % dataset_name
                 print(func.description)
                 yield func, self.generated, self.ref_hdf5, dataset_name
                 checked_ct += 1
