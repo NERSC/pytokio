@@ -63,7 +63,7 @@ def main(argv=None):
                                                        jobid=args.jobid,
                                                        which=args.load,
                                                        log_dir=args.logdir,
-                                                       log_dir_key=args.host)
+                                                       system=args.host)
         print(json.dumps(results, indent=4, sort_keys=True))
 
     else:
@@ -72,5 +72,5 @@ def main(argv=None):
                                                             username=args.username,
                                                             jobid=args.jobid,
                                                             log_dir=args.logdir,
-                                                            log_dir_key=args.host):
+                                                            system=args.host):
             print(logfile)
