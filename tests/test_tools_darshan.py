@@ -182,7 +182,7 @@ TEST_MATRIX = [
         'params': {
             'datetime_start': DATETIME_START,
             'datetime_end': None,
-            'log_dir_key': tokiotest.SAMPLE_DARSHAN_LOG_DIR_KEY,
+            'system': tokiotest.SAMPLE_DARSHAN_LOG_DIR_KEY,
             'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
         },
@@ -196,7 +196,7 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'log_dir_key': 'invalid key',
+            'system': 'invalid key',
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
