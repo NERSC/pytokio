@@ -22,7 +22,7 @@ DARSHAN_LOG_GLOB_FIELDS = {
 }
 
 def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
-                     jobid=None, log_dir=None, log_dir_key=None,
+                     jobid=None, log_dir=None, system=None,
                      which=None, **kwargs):
     """Return parsed Darshan logs matching a set of criteria
 
@@ -36,7 +36,7 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
         username (str): username of user who generated the log
         jobid (int): jobid corresponding to Darshan log
         log_dir (str): path to Darshan log directory base
-        log_dir_key (str): key to pass to enumerate_dated_files's lookup_key
+        system (str): key to pass to enumerate_dated_files's lookup_key
             when resolving darshan_log_dir
         which (str): 'base', 'total', and/or 'perf' as a comma-delimited string
         kwargs: arguments to pass to the connectors.darshan.Darshan object
@@ -62,6 +62,7 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
                                          datetime_end=datetime_end,
                                          username=username,
                                          jobid=jobid,
+                                         system=system,
                                          log_dir=log_dir)
 
     results = {}
@@ -78,7 +79,7 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
     return results
 
 def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobid=None,
-                     log_dir=None, log_dir_key=None):
+                     log_dir=None, system=None):
     """Return darshan log file paths matching a set of criteria
 
     Attempts to find Darshan logs that match the input criteria.
@@ -89,7 +90,7 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
         username (str): username of user who generated the log
         jobid (int): jobid corresponding to Darshan log
         log_dir (str): path to Darshan log directory base
-        log_dir_key (str): key to pass to enumerate_dated_files's lookup_key
+        system (str): key to pass to enumerate_dated_files's lookup_key
             when resolving darshan_log_dir
 
     Returns:
@@ -117,7 +118,7 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
     base_dirs = tokio.tools.common.enumerate_dated_files(start=datetime_start,
                                                          end=datetime_end,
                                                          template=log_dir,
-                                                         lookup_key=log_dir_key)
+                                                         lookup_key=system)
     debug_print("Darshan log base directories are:\n  " + "\n  ".join(base_dirs))
 
     # then run another pass of enumerate_dated_files to resolve the path within
@@ -128,7 +129,7 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
             start=datetime_start,
             end=datetime_end,
             template=os.path.join(base_dir, "%-Y", "%-m", "%-d"),
-            lookup_key=log_dir_key)
+            lookup_key=system)
 
     debug_print("Darshan log search directories are:\n  " + "\n  ".join(search_dirs))
 
