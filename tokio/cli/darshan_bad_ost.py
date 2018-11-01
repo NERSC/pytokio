@@ -168,6 +168,8 @@ def main(argv=None):
                         help="p-value above which correlations will not be displayed")
     parser.add_argument("-c", "--c-threshold", type=float, default=0.0,
                         help="coefficient below which abs(correlations) will not be displayed")
+    parser.add_argument("-C", "--c-warning", type=float, default=0.5,
+                        help="print a warning if abs(correlations) is above this threshold")
     parser.add_argument("darshanlogs", nargs="*", default=None, help="darshan logs to process")
     args = parser.parse_args(argv)
 
@@ -185,4 +187,11 @@ def main(argv=None):
         for result in sorted(results, key=lambda k: k['coefficient']):
             if result['p-value'] < args.p_threshold \
             and abs(result['coefficient']) > args.c_threshold:
-                print("%(ost_name)-10s %(coefficient)12.3f %(p-value)10.4g" % result)
+                if abs(result['coefficient']) > args.c_warning:
+                    if result['coefficient'] < 0:
+                        result['warning'] = " <-- this OST looks unhealthy"
+                    else:
+                        result['warning'] = " <-- this OST is running unusually quickly"
+                else:
+                    result['warning'] = ""
+                print("%(ost_name)-10s %(coefficient)12.3f %(p-value)10.4g%(warning)s" % result)
