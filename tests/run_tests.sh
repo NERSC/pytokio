@@ -13,6 +13,10 @@ fi
 TEST_DIR="$(dirname $($READLINK -f ${BASH_SOURCE[0]}))"
 cd "$TEST_DIR"
 
+# Set PYTHONPATH
+export PYTHONPATH="$(greadlink -f $(dirname $($READLINK -f ${BASH_SOURCE[0]}))/../)"
+echo "Using PYTHONPATH=$PYTHONPATH"
+
 # This is required to work around a known bug in pytokio
 export TZ=America/Los_Angeles
 

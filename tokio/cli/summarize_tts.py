@@ -11,23 +11,6 @@ import tokio.common
 import tokio.timeseries
 import tokio.connectors.hdf5
 
-def humanize_units(byte_count, divisor=1024.0):
-    """
-    Convert a raw byte count into human-readable base2 units
-    """
-    units = ["bytes", "KiB", "MiB", "GiB", "TiB"]
-    result = byte_count
-    index = 0
-    while index < len(units) - 1:
-        new_result = result / divisor
-        if new_result < 1.0:
-            break
-        else:
-            index += 1
-            result = new_result
-
-    return result, units[index]
-
 def summarize_tts_hdf5(hdf5_file):
     """
     Generate summary data based on the contents of TOKIO timeseries HDF5 file
@@ -65,8 +48,8 @@ def print_tts_hdf5_summary(results):
     """
     Format and print the summary data calculated by summarize_tts_hdf5()
     """
-    print(("Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])))
-    print(("Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])))
+    print(("Data Read:            %5.1f %s" % tokio.common.humanize_units(results['read_bytes'])))
+    print(("Data Written:         %5.1f %s" % tokio.common.humanize_units(results['write_bytes'])))
     print(("Missing data points:  %9d" % results['missing_pts']))
     print(("Expected data points: %9d" % results['total_pts']))
     print(("Percent data missing: %8.1f%%" % results['missing_pct']))
