@@ -25,4 +25,4 @@ export NERSC_HOST="edison"
 export PYTOKIO_CONFIG="${TEST_DIR}/inputs/site.json"
 echo "Test environment will load configuration from $PYTOKIO_CONFIG"
 
-nosetests --cover-package=tokio,tokiobin $@
+nosetests --cover-package=tokio $@
