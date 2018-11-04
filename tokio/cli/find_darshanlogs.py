@@ -30,28 +30,34 @@ def main(argv=None):
                          help='load each Darshan log; must be {base[,total][,perf]}')
     parser.add_argument('--logdir', type=str,
                         help='path to DARSHAN_LOG_DIR, exclusive of dated subdirectories (default: use site config value)')
-    parser.add_argument('--host', type=str,
+    parser.add_argument('--host', type=str, default=None,
                         help="hostname; only required if --logdir is not specified and site config contains multiple darshan_log_dirs")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Enable debug messages")
     args = parser.parse_args(argv)
 
+    start = None
+    end = None
     try:
         if args.start:
             start = datetime.datetime.strptime(args.start, DATE_FMT)
-        else:
-            raise TypeError("--start must be defined if --jobid is not given")
+    
         if args.end:
             end = datetime.datetime.strptime(args.end, DATE_FMT)
-        else:
-            end = start
+
     except ValueError:
         sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
         raise
 
     # Basic input bounds checking
-    if start > end:
-        raise Exception('query_start >= query_end')
+    if end and not start:
+        start = end
+    if start and not end:
+        end = start
+    if start and start > end:
+        raise ValueError('query_start >= query_end')
+    elif not start and not args.jobid:
+        raise ValueError("Either --start/--end or --jobid must be defined")
 
     if args.verbose:
         tokio.debug.DEBUG = True

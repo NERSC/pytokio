@@ -63,7 +63,8 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
                                          username=username,
                                          jobid=jobid,
                                          system=system,
-                                         log_dir=log_dir)
+                                         log_dir=log_dir,
+                                         match_first=(system is not None))
 
     results = {}
     for matching_logfile in matching_logfiles:
@@ -90,7 +91,7 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
         username (str): username of user who generated the log
         jobid (int): jobid corresponding to Darshan log
         log_dir (str): path to Darshan log directory base
-        system (str): key to pass to enumerate_dated_files's lookup_key
+        system (str or None): key to pass to enumerate_dated_files's lookup_key
             when resolving darshan_log_dir
 
     Returns:
@@ -118,8 +119,8 @@ def find_darshanlogs(datetime_start=None, datetime_end=None, username=None, jobi
     base_dirs = tokio.tools.common.enumerate_dated_files(start=datetime_start,
                                                          end=datetime_end,
                                                          template=log_dir,
-                                                         lookup_key=system)
-    debug_print("Darshan log base directories are:\n  " + "\n  ".join(base_dirs))
+                                                         lookup_key=system,
+                                                         match_first=(system is not None))
 
     # then run another pass of enumerate_dated_files to resolve the path within
     # the base darshan log directory
