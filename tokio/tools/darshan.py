@@ -63,8 +63,7 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
                                          username=username,
                                          jobid=jobid,
                                          system=system,
-                                         log_dir=log_dir,
-                                         match_first=(system is not None))
+                                         log_dir=log_dir)
 
     results = {}
     for matching_logfile in matching_logfiles:
