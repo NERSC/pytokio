@@ -654,8 +654,9 @@ class Hdf5(h5py.File):
 
         # Quirky way to access the missing data of a dataset through the
         # __getitem__ API via recursion
-        if key.endswith('/missing'):
-            return self.get_missing(key.rpartition('/')[0])
+        base_key, modifier = reduce_dataset_name(key)
+        if modifier and modifier == 'missing':
+            return self.get_missing(base_key)
 
         resolved_key, provider = self._resolve_schema_key(key)
 
@@ -714,7 +715,11 @@ class Hdf5(h5py.File):
         else:
             # resolve dataset name
             dataset = self.__getitem__(dataset_name)
-            version = dataset.attrs.get("version")
+            try:
+                # dataset can be either an HDF5 dataset or numpy.ndarray
+                version = dataset.attrs.get("version")
+            except AttributeError:
+                version = None
             if version is None:
                 version = self._version
             if isinstance(version, bytes):
@@ -858,7 +863,7 @@ class Hdf5(h5py.File):
         """Convert a dataset into a dataframe
 
         Args:
-            dataset_name (str): dataset name to conver to DataFrame
+            dataset_name (str): dataset name to convert to DataFrame
 
         Returns:
             pandas.DataFrame: DataFrame indexed by datetime objects
@@ -885,7 +890,12 @@ class Hdf5(h5py.File):
     def _to_dataframe_h5lmt(self, dataset_name):
         """Convert a dataset into a dataframe via H5LMT native schema
         """
-        normed_name = dataset_name.lstrip('/')
+        normed_name, modifier = reduce_dataset_name(dataset_name)
+        if not modifier:
+            normed_name = dataset_name.lstrip('/')
+        else:
+            normed_name = normed_name.lstrip('/')
+
         col_header_key = H5LMT_COLUMN_ATTRS.get(normed_name)
 
         # Hack around datasets that lack column headers to retrieve column names
@@ -899,7 +909,7 @@ class Hdf5(h5py.File):
             columns = None
 
         # Get timestamps through regular API
-        timestamps = self.get_timestamps(dataset_name)[...]
+        timestamps = self.get_timestamps(normed_name)[...]
 
         # Retrieve and transform data using H5LMT schema directly
         if normed_name == 'FSStepsGroup/FSStepsDataSet':
@@ -947,3 +957,17 @@ def missing_values(dataset, inverse=False):
         converter = numpy.vectorize(lambda x:
                                     one if (x == 0.0 and math.copysign(1, x) < 0.0) else zero)
     return converter(dataset)
+
+
+def reduce_dataset_name(key):
+    """Divide a dataset name into is base and modifier
+    Args:
+        dataset_name (str): Key to reference a dataset that may or may not have
+            a modifier suffix
+    Returns:
+        tuple of (str, str or None): First string is the base key, the second
+            string is the modifier.
+    """
+    if key.endswith('/missing'):
+        return tuple(key.rsplit('/', 1))
+    return key, None
