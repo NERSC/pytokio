@@ -2,7 +2,7 @@
 """
 import os
 import json
-import nose
+import tokio.config
 import tokiotest
 
 def test_site_config():
@@ -12,8 +12,6 @@ def test_site_config():
     basic sanity check to make sure that the example config that ships with
     pytokio looks like the test configuration which we validate.
     """
-
-    raise nose.SkipTest("test_site_config is not currently working")
 
     # Load the test environment's configuration
     with open(os.path.join(tokiotest.INPUT_DIR, 'site.json')) as config_file:
@@ -25,13 +23,13 @@ def test_site_config():
 
     # Ensure that all the keys present in the test configuration are also
     # present in the stock configuration
-    for key in test_config.keys():
+    for key in test_config:
         if key not in stock_config and not key.startswith('test'):
-            print "%s in test_config but not stock_config" % key
+            print("%s in test_config but not stock_config" % key)
             assert key in stock_config
 
     # and vice versa
-    for key in stock_config.keys():
+    for key in stock_config:
         if key not in test_config:
-            print "%s in stock_config but not test_config" % key
+            print("%s in stock_config but not test_config" % key)
             assert key in test_config

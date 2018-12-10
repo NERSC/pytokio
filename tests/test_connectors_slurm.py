@@ -22,7 +22,7 @@ def verify_slurm(slurm):
     Verify contents of a Slurm object
     """
     assert len(slurm) > 0
-    for counters in slurm.itervalues():
+    for counters in slurm.values():
         assert len(counters) > 0
 
 def verify_slurm_json(slurm_json):
@@ -30,10 +30,10 @@ def verify_slurm_json(slurm_json):
     Verify correctness of a json-serialized Slurm object
     """
     assert len(slurm_json) > 0
-    for counters in slurm_json.itervalues():
+    for counters in slurm_json.values():
         assert len(counters) > 0
         for key in tokiotest.SAMPLE_SLURM_CACHE_KEYS:
-            assert key in counters.keys()
+            assert key in counters
 
 def test_load_slurm_cache():
     """
@@ -116,8 +116,8 @@ def expand_nodelist(min_nid, max_nid):
         # scontrol is not available
         raise nose.SkipTest(error)
 
-    print "node range is", min_nid, max_nid
-    print "length of node list is", len(node_list)
+    print("node range is %s to %s" % (min_nid, max_nid))
+    print("length of node list is %s" % len(node_list))
     assert len(node_list) == num_nodes
 
 def test_expand_nodelist():
@@ -156,7 +156,7 @@ def test_slurm_serializer():
     # Read from a cache file
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     slurm_data.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
     slurm_cached = tokio.connectors.slurm.Slurm(cache_file=tokiotest.TEMP_FILE.name)

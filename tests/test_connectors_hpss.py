@@ -38,10 +38,10 @@ def test_find_columns():
     for test_str in TEST_STRINGS:
         cols = tokio.connectors.hpss._find_columns(test_str) #pylint: disable=protected-access
 
-        print "Test string: [%s]" % test_str
+        print("Test string: [%s]" % test_str)
         for istart, length in cols:
             sliced_str = test_str[istart:istart+length]
-            print "%2d, %2d, = [%s]" % (istart, length, sliced_str)
+            print("%2d, %2d, = [%s]" % (istart, length, sliced_str))
             assert sliced_str.strip().rstrip("=") == ""
 
 def test_find_columns_strict():
@@ -50,21 +50,21 @@ def test_find_columns_strict():
     for test_str in TEST_STRINGS:
         cols = tokio.connectors.hpss._find_columns(test_str, strict=True) #pylint: disable=protected-access
 
-        print "Test string: [%s]" % test_str
+        print("Test string: [%s]" % test_str)
         for istart, length in cols:
             sliced_str = test_str[istart:istart+length]
-            print "%2d, %2d, = [%s]" % (istart, length, sliced_str)
+            print("%2d, %2d, = [%s]" % (istart, length, sliced_str))
             assert sliced_str.rstrip("=") == ""
 
 def test_parse_section():
     """connectors.hpss._parse_section()
     """
     records = tokio.connectors.hpss._parse_section(TEST_TABLE.splitlines()) #pylint: disable=protected-access
-    print json.dumps(records[0], indent=4, sort_keys=True)
+    print(json.dumps(records[0], indent=4, sort_keys=True))
 
 def test_load():
     """connectors.hpss.HpssDailyReport.load()
     """
     results = tokio.connectors.hpss.HpssDailyReport(cache_file=tokiotest.SAMPLE_HPSS_REPORT)
-    print json.dumps(results, indent=4, sort_keys=True)
+    print(json.dumps(results, indent=4, sort_keys=True))
     assert results

@@ -42,10 +42,6 @@ if os.path.exists('MANIFEST'):
 def setup_package():
     import setuptools
 
-    include_scripts = [os.path.relpath(x, BASE_DIR) for x in glob.glob(os.path.join(BASE_DIR, 'bin', '*')) if '__init__' not in x]
-    print("Including scripts:")
-    print('\n  '.join(include_scripts))
-
     METADATA = dict(
         name='pytokio',
         version=find_version(),
@@ -57,16 +53,6 @@ def setup_package():
         download_url="https://www.github.com/nersc/pytokio",
         license='BSD',
         platforms=["Linux", "MacOS-X"],
-
-        packages=setuptools.find_packages(exclude=['bin']),
-        scripts=include_scripts, # TODO: convert to console_scripts
-
-        # If we want to keep site.json at the top-level and copy it in during
-        # install time.  This would force users to correctly install pytokio
-        # before it could be used though, which is not strictly necessary for
-        # any other purpose.
-        # data_files=[('etc', ['site.json'])],
-        include_package_data=True,
 
         # Dependencies
         install_requires=REQUIREMENTS,
@@ -89,6 +75,21 @@ def setup_package():
         keywords='I/O performance monitoring'
     )
 
+    # Include the tokio package
+    METADATA['packages'] = setuptools.find_packages()
+
+    # Create the CLI interface
+    METADATA['entry_points'] = {'console_scripts': generate_console_scripts()}
+
+    # If we want to keep site.json at the top-level and copy it in during
+    # install time.  This would force users to correctly install pytokio
+    # before it could be used though, which is not strictly necessary for
+    # any other purpose.
+    # METADATA['data_files'] = [('etc', ['site.json'])]
+
+    # Include all non-py files in MANIFEST['packages'] (including site.json)
+    METADATA['include_package_data'] = True
+
     setuptools.setup(**METADATA)
 
 def find_version():
@@ -110,11 +111,11 @@ def find_version():
                     with open(revision_cache, 'r') as revision_cache_f:
                         revision = revision_cache_f.read().strip()
                 if revision and revision != "unknown":
-                    version = "%s.dev0+%s" % (version, revision[:7])
+                    version = "%s+%s" % (version, revision[:7])
                     with open(revision_cache, 'w') as revision_cache_f:
                         revision_cache_f.write(revision)
                 else:
-                    version = "%s.dev0+unknown" % (version)
+                    version = "%s+unknown" % (version)
             return version
         else:
             raise RuntimeError("Unable to find version string")
@@ -145,6 +146,22 @@ def git_version():
         revision = "unknown"
 
     return revision
+
+def generate_console_scripts():
+    """Generates the console_scripts argument to setuptools.setup
+
+    Generates the console_scripts key:value to be passed into setuptools.setup(entry_points=...)
+    """
+    console_scripts = []
+    for x in glob.glob(os.path.join(BASE_DIR, 'tokio', 'cli', '*.py')):
+        if '__init__' not in x:
+            basename = os.path.basename(x).rsplit('.', 1)[0]
+            console_scripts.append("%s = tokio.cli.%s:main" % (basename, basename))
+
+    print("Including scripts:")
+    print('\n  '.join(console_scripts))
+
+    return console_scripts
 
 if __name__ == "__main__":
     setup_package()

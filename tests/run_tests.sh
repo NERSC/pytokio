@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 
-# For non-GNU systems
-READLINK=${READLINK-readlink}
+# Check for non-GNU readlink (e.g., MacOS)
+if [ -z "$READLINK" ]; then
+    if readlink -f $PWD > /dev/null 2>&1; then
+        READLINK="readlink"
+    else
+        READLINK="greadlink"
+    fi
+fi
 
 # Always run tests in the test directory since site.json contains relative paths
 TEST_DIR="$(dirname $($READLINK -f ${BASH_SOURCE[0]}))"
@@ -15,4 +21,4 @@ export NERSC_HOST="edison"
 export PYTOKIO_CONFIG="${TEST_DIR}/inputs/site.json"
 echo "Test environment will load configuration from $PYTOKIO_CONFIG"
 
-nosetests --cover-package=tokio,tokiobin $@
+nosetests --cover-package=tokio $@

@@ -8,7 +8,7 @@ import datetime
 def enumerate_dated_files(start, end, template,
                           lookup_key=None, match_first=True,
                           timedelta=datetime.timedelta(days=1)):
-    """Locate existing time-indexed files between a start and end time
+    """Locate existing time-indexed files between a start and end time.
 
     Given a start time, end time, and template data structure that describes a
     pattern by which the files of interest are indexed, locate all existing
@@ -18,13 +18,14 @@ def enumerate_dated_files(start, end, template,
     `datetime.strftime` and then checked for existence for every `timedelta`
     increment between `start` and `end`, inclusive.  `template` may be one
     of three data structures:
+
         - str: search for files matching this template
         - list of str: search for files matching each template.  If
-          `match_first` is True, only the first hit per list item per time
+          ``match_first`` is True, only the first hit per list item per time
           interval is returned; otherwise, every file matching every template
           in the entire list is returned.
-        - dict: use `lookup_key` to determine the element in the dictionary
-          to use as the template.  That value is treated as a new `template`
+        - dict: use ``lookup_key`` to determine the element in the dictionary
+          to use as the template.  That value is treated as a new ``template``
           object and can be of any of these three types.
 
     Args:
@@ -60,9 +61,10 @@ def enumerate_dated_files(start, end, template,
 
 
 def _expand_check_paths(template, lookup_key):
-    """Generate paths to examine from a variable-type template
+    """Generate paths to examine from a variable-type template.
 
     `template` may be one of three data structures:
+
         - str: search for files matching this exact template
         - list of str: search for files matching each template listed.
         - dict: use `lookup_key` to determine the element in the dictionary
@@ -71,16 +73,16 @@ def _expand_check_paths(template, lookup_key):
 
     Args:
         template (str, list, or dict): Template string(s) which should be passed
-            to datetime.strftime to be converted into specific time-delimited
-            files.
-        lookup_key (str or None): When `type(template)` is dict, use this key to
-            identify the key-value to use as template.  If None and `template` is
-            a dict, iterate through all values of `template`.
+            to datetime.datetime.strftime to be converted into specific
+            time-delimited files.
+        lookup_key (str or None): When `type(template)` is dict, use this key
+            to identify the key-value to use as template.  If None and
+            ``template`` is a dict, iterate through all values of `template`.
     """
     check_paths = []
     if isinstance(template, dict):
         if lookup_key is None:
-            check_paths += _expand_check_paths(template.values(), lookup_key)
+            check_paths += _expand_check_paths(list(template.values()), lookup_key)
         else:
             check_paths += _expand_check_paths(template.get(lookup_key, []), lookup_key)
     elif isinstance(template, list):

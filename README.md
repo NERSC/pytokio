@@ -1,8 +1,8 @@
 TOKIO - Total Knowledge of I/O
 ================================================================================
 
-This a reference implementation of the TOKIO framework composed as a Python
-package.  The full documentation is located on the [pytokio GitHub wiki][].
+pytokio is a Python implementation of the TOKIO framework.
+The full documentation can be found at https://pytokio.readthedocs.io/en/latest/
 
 Installation
 --------------------------------------------------------------------------------
@@ -26,7 +26,11 @@ or
 
 Alternatively, pytokio does not technically require a proper installation and it
 is sufficient to clone the git repo, add it to `PYTHONPATH`, and `import tokio`
-from there.
+from there.  If you wish to use the pytokio CLI tools without properly installing
+pytokio, also add the git repo's `bin/` subdirectory to `PATH`.
+
+pytokio supports both Python 2.7 and 3.6 and, at minimum, requires h5py, numpy,
+and pandas.  The full requirements are listed in `requirements.txt`.
 
 Quick Start
 --------------------------------------------------------------------------------
@@ -65,5 +69,4 @@ perform publicly and display publicly, and to permit other to do so.
 For license terms, please see `LICENSE.md` included in this repository.
 
 [![Build Status](https://travis-ci.org/NERSC/pytokio.svg?branch=master)](https://travis-ci.org/NERSC/pytokio)
-
-[pytokio GitHub wiki]: https://github.com/NERSC/pytokio/wiki
+[![Documentation Status](https://readthedocs.org/projects/pytokio-gkl/badge/?version=latest)](https://pytokio.readthedocs.io/en/latest/?badge=latest)

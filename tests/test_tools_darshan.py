@@ -1,5 +1,6 @@
 """Test tools.darshan interfaces
 """
+import sys
 import nose.tools
 import datetime
 import tokio.tools.darshan
@@ -10,8 +11,8 @@ DATETIME_START = datetime.datetime.strptime(tokiotest.SAMPLE_DARSHAN_START_TIME,
 def wrap_find_darshanlogs(test_input):
     """Allow named args to pass through nosetests
     """
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running: %s" % test_input['descr'])
+    print("Test args: %s" % test_input['params'])
     results = tokio.tools.darshan.find_darshanlogs(**(test_input['params']))
     assert (test_input['pass_criteria'])(results)
 
@@ -19,8 +20,8 @@ def wrap_load_darshanlogs(test_input):
     """Allow named args to pass through nosetests
     """
     tokiotest.check_darshan()
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running: %s" % test_input['descr'])
+    print("Test args: %s" % test_input['params'])
     expected_exception = test_input.get('expect_exception')
     if expected_exception:
         nose.tools.assert_raises(expected_exception,
@@ -34,8 +35,8 @@ def wrap_load_darshanlogs_assert_raises(test_input, exception):
     """Allow named args to pass through nosetests; expect an exception
     """
     tokiotest.check_darshan()
-    print "Running:", test_input['descr']
-    print "Test args:", test_input['params']
+    print("Running: %s" % test_input['descr'])
+    print("Test args: %s" % test_input['params'])
     nose.tools.assert_raises(exception, tokio.tools.darshan.load_darshanlogs, **(test_input['params']))
 
 TEST_MATRIX = [
@@ -47,7 +48,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -59,7 +59,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -71,7 +70,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': 'invaliduser',
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -83,7 +81,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -95,7 +92,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID_2,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -107,7 +103,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID_2,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) > 0,
     },
@@ -119,7 +114,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': 5,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) == 0,
     },
@@ -131,7 +125,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': None,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) >= tokiotest.SAMPLE_DARSHAN_LOGS_PER_DIR,
     },
@@ -143,7 +136,6 @@ TEST_MATRIX = [
             'datetime_end': DATETIME_START + datetime.timedelta(days=1),
             'username': None,
             'jobid': None,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
         },
         'pass_criteria': lambda x: len(x) >= (2 * tokiotest.SAMPLE_DARSHAN_LOGS_PER_DIR),
     },
@@ -155,7 +147,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'base'
         },
         'pass_criteria': lambda x: len(x) > 0,
@@ -168,7 +159,6 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'base,perf,total'
         },
         'pass_criteria': lambda x: len(x) > 0,
@@ -181,11 +171,34 @@ TEST_MATRIX = [
             'datetime_end': None,
             'username': None,
             'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
-            'darshan_log_dir': tokiotest.SAMPLE_DARSHAN_LOG_DIR,
             'which': 'asdflkj'
         },
         'pass_criteria': lambda x: len(x) > 0,
         'expect_exception': TypeError,
+    },
+    {
+        'descr': "valid jobid w/ valid user, valid log dir key",
+        'test_function': wrap_find_darshanlogs,
+        'params': {
+            'datetime_start': DATETIME_START,
+            'datetime_end': None,
+            'system': tokiotest.SAMPLE_DARSHAN_LOG_DIR_KEY,
+            'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
+            'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
+        },
+        'pass_criteria': lambda x: len(x) > 0,
+    },
+    {
+        'descr': "valid jobid w/ valid user, invalid log dir key",
+        'test_function': wrap_find_darshanlogs,
+        'params': {
+            'datetime_start': DATETIME_START,
+            'datetime_end': None,
+            'username': tokiotest.SAMPLE_DARSHAN_LOG_USER,
+            'jobid': tokiotest.SAMPLE_DARSHAN_JOBID,
+            'system': 'invalid key',
+        },
+        'pass_criteria': lambda x: len(x) == 0,
     },
 ]
 

@@ -9,16 +9,18 @@ import errno
 import warnings
 import mimetypes
 import subprocess
+from tokio.common import isstr
 
 class SubprocessOutputDict(dict):
     """Generic class to support connectors that parse the output of a subprocess
 
     When deriving from this class, the child object will have to
 
-    1. Define subprocess_cmd after initializing this parent object
-    2. Define self.__repr__ (if necessary)
-    2. Define its own self.load_str
-    3. Define any introspective analysis methods
+        1. Define subprocess_cmd after initializing this parent object
+        2. Define self.__repr__ (if necessary)
+        3. Define its own self.load_str
+        4. Define any introspective analysis methods
+
     """
     def __init__(self, cache_file=None, from_string=None, silent_errors=False):
         super(SubprocessOutputDict, self).__init__(self)
@@ -55,18 +57,23 @@ class SubprocessOutputDict(dict):
             warnings.warn("%s returned nonzero exit code (%d)" % (cmd, error.returncode))
             output_str = error.output
         except OSError as error:
-            if error[0] == errno.ENOENT:
-                raise type(error)(error[0], "%s command not found" % self.subprocess_cmd[0])
+            if error.errno == errno.ENOENT:
+                raise type(error)(error.errno, "%s command not found" % self.subprocess_cmd[0])
             raise
 
-        self.load_str(output_str)
+        if isstr(output_str):
+            # Python 2 - subprocess.check_output returns a string
+            self.load_str(output_str)
+        else:
+            # Python 3 - subprocess.check_output returns encoded bytes
+            self.load_str(output_str.decode())
 
     def load_cache(self):
         """Load subprocess output from a cached text file
         """
         _, encoding = mimetypes.guess_type(self.cache_file)
         if encoding == 'gzip':
-            input_fp = gzip.open(self.cache_file, 'r')
+            input_fp = gzip.open(self.cache_file, 'rt')
         else:
             input_fp = open(self.cache_file, 'r')
         self.load_str(input_fp.read())

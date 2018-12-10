@@ -23,16 +23,16 @@ QUERY_RANGE = SAMPLE_QUERY[1] - SAMPLE_QUERY[0]
 SAMPLE_QUERIES = [
     (
         SAMPLE_QUERY[0],
-        SAMPLE_QUERY[0] + long(QUERY_RANGE / 3),
+        SAMPLE_QUERY[0] + int(QUERY_RANGE / 3),
         SAMPLE_QUERY[2]
     ),
     (
-        SAMPLE_QUERY[0] + long(QUERY_RANGE / 3) + 1,
-        SAMPLE_QUERY[0] + long(QUERY_RANGE * 2 / 3),
+        SAMPLE_QUERY[0] + int(QUERY_RANGE / 3) + 1,
+        SAMPLE_QUERY[0] + int(QUERY_RANGE * 2 / 3),
         SAMPLE_QUERY[2]
     ),
     (
-        SAMPLE_QUERY[0] + long(QUERY_RANGE * 2 / 3) + 1,
+        SAMPLE_QUERY[0] + int(QUERY_RANGE * 2 / 3) + 1,
         SAMPLE_QUERY[1],
         SAMPLE_QUERY[2]
     ),
@@ -79,13 +79,13 @@ def test_memory_cache():
 
     ### First query will hit the cache database, then be cached in memory
     results1 = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
-    print "Got %d hits from source %d" % (len(results1), nerscjobsdb.last_hit)
+    print("Got %d hits from source %d" % (len(results1), nerscjobsdb.last_hit))
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
     verify_concurrent_jobs(results1, nerscjobsdb, 1)
 
     ### Second time query is run, it should be served out of cache
     results2 = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
-    print "Got %d hits from source %d" % (len(results2), nerscjobsdb.last_hit)
+    print("Got %d hits from source %d" % (len(results2), nerscjobsdb.last_hit))
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_MEMORY
     verify_concurrent_jobs(results2, nerscjobsdb, 1)
 
@@ -97,7 +97,7 @@ def test_memory_cache():
 
     ### Third time should go back to hitting the memory cache
     results = nerscjobsdb.get_concurrent_jobs(*(SAMPLE_QUERY))
-    print "Got %d hits from source %d" % (len(results), nerscjobsdb.last_hit)
+    print("Got %d hits from source %d" % (len(results), nerscjobsdb.last_hit))
     assert nerscjobsdb.last_hit == tokio.connectors.nersc_jobsdb.HIT_CACHE_DB
     verify_concurrent_jobs(results, nerscjobsdb, 1)
 
@@ -120,9 +120,9 @@ def test_save_cache():
     piecewise_rows = []
     for sample_query in SAMPLE_QUERIES:
         ### Perform part of the original query
-        print "Querying %s to %s on %s" % sample_query
+        print("Querying %s to %s on %s" % sample_query)
         piecewise_result = nerscjobsdb.get_concurrent_jobs(*(sample_query))
-        print "Got %d hits from source %d" % (len(nerscjobsdb.last_results), nerscjobsdb.last_hit)
+        print("Got %d hits from source %d" % (len(nerscjobsdb.last_results), nerscjobsdb.last_hit))
         assert len(piecewise_result) > 0
 
         ### Keep a running list of all rows these piecewise queries return
@@ -148,10 +148,10 @@ def test_save_cache():
     ### same query against this newly created database return the same reduced
     ### result (total nodehrs, total jobs, and total nodes)
     assert len(test_result) > 0
-    for key, value in test_result.iteritems():
-        print "Comparing truth(%s=%d) to piecewise(%s=%d)" % (
+    for key, value in test_result.items():
+        print("Comparing truth(%s=%d) to piecewise(%s=%d)" % (
             key, truth_result[key],
-            key, value)
+            key, value))
         assert value != 0
         assert value == truth_result[key]
 
@@ -165,5 +165,5 @@ def test_save_cache():
     for row in truth_rows:
         truth_jobs.add(row[0])
 
-    print "Piecewise gave %d rows; ground truth gave %d" % (len(piecewise_jobs), len(truth_jobs))
+    print("Piecewise gave %d rows; ground truth gave %d" % (len(piecewise_jobs), len(truth_jobs)))
     assert len(piecewise_jobs - truth_jobs) == 0

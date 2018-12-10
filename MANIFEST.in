@@ -1,4 +1,12 @@
-include .revision
-include tokio/site.json
-include LICENSE README.md
-include requirements.txt
+include .revision           # contains git revision used to build this sdist
+include tokio/site.json     # must explicitly include site.json since it's a datafile
+include requirements.txt    # required by readthedocs and setup.py
+
+# includes hand-made CLI wrappers to enable the sdist to be used without proper
+# setuptools installation; setuptools will generate the proper CLI interfaces
+# as part of the `setup.py install` process
+include bin/*.py
+
+# include example notebooks in sdist for advanced users
+include examples/*.ipynb
+include examples/sample_summary.csv.gz

@@ -103,12 +103,12 @@ def test_flush_function_correctness():
     flush_function_hits = set([])
     for page in FLUSH_STATE['pages']:
         flush_function_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print "flush_function populated %d documents" % len(flush_function_hits)
+    print("flush_function populated %d documents" % len(flush_function_hits))
 
     no_flush_hits = set([])
     for page in es_obj.scroll_pages:
         no_flush_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print "no flush function populated %d documents" % len(no_flush_hits)
+    print("no flush function populated %d documents" % len(no_flush_hits))
 
     # Ensure that our ground-truth query actually returned something
     assert len(no_flush_hits) > 0

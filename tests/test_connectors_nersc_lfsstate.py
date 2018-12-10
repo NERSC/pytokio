@@ -15,28 +15,28 @@ def verify_ost(ost, input_type):
     Verify the basic structure of lfsstate objects
     """
     assert ost
-    print "Found %d time stamps" % len(ost)
+    print("Found %d time stamps" % len(ost))
 
     if input_type == 'ostmap':
         tmp_os = 'osc'
     elif input_type == 'ostfullness':
         tmp_os = 'ost'
 
-    for _, fs_data in ost.iteritems():
+    for _, fs_data in ost.items():
         assert fs_data
-        print "Found %d file systems" % len(fs_data)
-        for target_name, obd_data in fs_data.iteritems():
+        print("Found %d file systems" % len(fs_data))
+        for target_name, obd_data in fs_data.items():
             assert obd_data
-            print "Found %d OBD IDs" % len(obd_data)
+            print("Found %d OBD IDs" % len(obd_data))
             obd_data = fs_data[target_name]
             found_roles = set()
-            for obd_name, keyvalues in obd_data.iteritems():
+            for obd_name, keyvalues in obd_data.items():
                 if input_type == 'ostmap':
                     verify_ostmap(obd_name, keyvalues, target_name)
                 elif input_type == 'ostfullness':
                     verify_ostfullness(keyvalues)
 
-                found_roles.add(unicode(keyvalues['role']))
+                found_roles.add(str(keyvalues['role']))
         # Every Lustre file system should have at least one OSC
         assert tmp_os in found_roles
 
@@ -58,32 +58,38 @@ def verify_ostfullness(keyvalues):
     assert keyvalues['total_kib'] > 0
     assert keyvalues['total_kib'] >= (keyvalues['remaining_kib'] + keyvalues['used_kib'])
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostmap_from_cache():
     """
     Read OST map from a cache file
     """
-    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_OSTMAP_FILE, tokiotest.TEMP_FILE.name)
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.TEMP_FILE.name)
     verify_ost(ostmap, input_type='ostmap')
 
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_ostfullness_from_cache():
     """
     Read OST fullness from a cache file
     """
-    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE)
+    tokiotest.TEMP_FILE.close()
+    tokiotest.gunzip(tokiotest.SAMPLE_OSTFULLNESS_FILE, tokiotest.TEMP_FILE.name)
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.TEMP_FILE.name)
     verify_ost(ostfullness, input_type='ostfullness')
 
 def test_ostmap_from_cache_gz():
     """
     Read OST map from a compressed cache file
     """
-    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE_GZ)
+    ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE)
     verify_ost(ostmap, input_type='ostmap')
 
 def test_ostfullness_from_cache_gz():
     """
     Read OST fullness from a compressed cache file
     """
-    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE_GZ)
+    ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE)
     verify_ost(ostfullness, input_type='ostfullness')
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
@@ -94,7 +100,7 @@ def test_ostmap_serializer():
     # Read from a cache file
     ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.SAMPLE_OSTMAP_FILE)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     ostmap.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
     ostmap = nersc_lfsstate.NerscLfsOstMap(tokiotest.TEMP_FILE.name)
@@ -109,7 +115,7 @@ def test_ostfullness_serializer():
     # Read from a cache file
     ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.SAMPLE_OSTFULLNESS_FILE)
     # Serialize the object, then re-read it and verify it
-    print "Caching to %s" % tokiotest.TEMP_FILE.name
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
     ostfullness.save_cache(tokiotest.TEMP_FILE.name)
     # Open a second file handle to this cached file to load it
     ostfullness = nersc_lfsstate.NerscLfsOstFullness(tokiotest.TEMP_FILE.name)

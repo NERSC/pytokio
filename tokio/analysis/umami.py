@@ -9,8 +9,6 @@ import collections
 import textwrap
 import numpy
 import pandas
-import matplotlib
-import matplotlib.pyplot
 
 DEFAULT_LINEWIDTH = 1
 DEFAULT_LINECOLOR = "#853692"
@@ -29,10 +27,10 @@ class Umami(collections.OrderedDict):
 
     def to_dict(self):
         """
-        Convert this object _and all of its constituent UmamiMetric objects_
+        Convert this object (and all of its constituent UmamiMetric objects)
         into a dictionary
         """
-        return {k: v.__dict__ for k, v in self.iteritems()}
+        return {k: v.__dict__ for k, v in self.items()}
 
     def _to_dict_for_pandas(self, stringify_key=False):
         """
@@ -41,7 +39,7 @@ class Umami(collections.OrderedDict):
         expressed.
         """
         to_df = {}
-        for metric, measurement in self.iteritems():
+        for metric, measurement in self.items():
             for index, timestamp in enumerate(measurement.timestamps):
                 if stringify_key:
                     key = str(timestamp)
@@ -66,7 +64,7 @@ class Umami(collections.OrderedDict):
 
         Returns:
             pandas.DataFrame: numerical representation of the values being
-                plotted
+            plotted
         """
         return pandas.DataFrame.from_dict(self._to_dict_for_pandas(), orient='index')
 
@@ -91,9 +89,13 @@ class Umami(collections.OrderedDict):
                 multiplied by len(self.keys()) to determine full diagram height
 
         Returns:
-            List of axes corresponding to each panel in the UMAMI diagram
+            list: List of matplotlib.axis.Axis objects corresponding to each
+            panel in the UMAMI diagram
         """
-        rows_to_plot = self.keys()
+        # import here because of various things that can break matplotlib on import
+        import matplotlib.pyplot
+
+        rows_to_plot = list(self.keys())
         fig = matplotlib.pyplot.figure()
         fig.set_size_inches(figsize[0], len(rows_to_plot) * figsize[1])
 
@@ -107,7 +109,7 @@ class Umami(collections.OrderedDict):
         # x range in the presence of trailing/leading NaNs
         x_min = None
         x_max = None
-        for measurement in self.itervalues():
+        for measurement in self.values():
             this_min = min(measurement.timestamps)
             this_max = max(measurement.timestamps)
             if x_min is None or this_min < x_min:
@@ -118,7 +120,7 @@ class Umami(collections.OrderedDict):
         # Draw UMAMI rows
         last_ax_ts = None
         row_num = None
-        for measurement in self.itervalues():
+        for measurement in self.values():
             if row_num is None:
                 row_num = 0
             else:
@@ -179,7 +181,7 @@ class Umami(collections.OrderedDict):
 
             # scale the extents of the y ranges a little for clarity
             orig_ylim = ax_ts.get_ylim()
-            new_ylim = map(lambda a, b: a*(1 + b), orig_ylim, (-0.1, 0.1))
+            new_ylim = list(map(lambda a, b: a*(1 + b), orig_ylim, (-0.1, 0.1)))
             ax_ts.set_ylim(new_ylim)
 
             yticks = ax_ts.get_yticks().tolist()
@@ -195,7 +197,7 @@ class Umami(collections.OrderedDict):
                 # we (hopefully) would get integral ticks otherwise, force
                 # them to ints.  This will mess things up if the yrange is
                 # very narrow and must be expressed as floats.
-                yticks = map(int, yticks)
+                yticks = list(map(int, yticks))
                 yticks[-1] = " "
                 ax_ts.set_yticklabels(yticks)
 
@@ -204,7 +206,7 @@ class Umami(collections.OrderedDict):
 
             # determine the color of our highlights based on quartile
             percentiles = [numpy.nanpercentile(y_val[0:-1], percentile)
-                           for percentile in 25, 50, 75, 100]
+                           for percentile in (25, 50, 75, 100)]
 
             color_index = 0
             for color_index, percentile in enumerate(percentiles):
@@ -252,12 +254,12 @@ class Umami(collections.OrderedDict):
         return fig.axes
 
 class UmamiMetric(object):
-    """
-    A single row of an UMAMI diagram.  Logically contains timeseries data from
-    a single connector, where the 'timestamps' attribute is a list of timestamps
-    (seconds since epoch), and the 'values' attribute is a list of values
-    corresponding to each timestamp.  The number of timestamps and attributes
-    must always be the same.
+    """A single row of an UMAMI diagram.
+    
+    Logically contains timeseries data from a single connector, where the
+    `timestamps` attribute is a list of timestamps (seconds since epoch), and
+    the 'values' attribute is a list of values corresponding to each timestamp.
+    The number of timestamps and attributes must always be the same.
     """
     def __init__(self, timestamps, values, label, big_is_good=True):
         # If we are given pandas.Series, convert them to lists, then copy.
