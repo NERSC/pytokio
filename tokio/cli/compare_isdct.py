@@ -118,10 +118,12 @@ def summarize_reduced_diffs(reduced_diffs):
         read_gibs = reduced_diffs.get('sum_data_units_read_gibs', 0)
         write_gibs = reduced_diffs.get('sum_data_units_written_gibs', 0)
 
-    buf += "Read:    %10.2f TiB\n" % read_gibs
-    buf += "Read:    %10.2f MOps\n" % (reduced_diffs.get('sum_host_read_commands', 0) / 1000000.0)
-    buf += "Written: %10.2f TiB\n" % write_gibs
-    buf += "Written: %10.2f MOps\n" % (reduced_diffs.get('sum_host_write_commands', 0) / 1000000.0)
+    buf += "Read:    %10.2f TiB, %10.2f MOps\n" % (
+        read_gibs,
+        reduced_diffs.get('sum_host_read_commands', 0) / 1000000.0)
+    buf += "Written: %10.2f TiB, %10.2f MOps\n" % (
+        write_gibs,
+        reduced_diffs.get('sum_host_write_commands', 0) / 1000000.0)
     buf += "WAF:     %+10.4f\n" % reduced_diffs.get('max_write_amplification_factor', 0)
     return buf
 
