@@ -8,6 +8,7 @@ derived datasets dynamically.
 
 import math
 import datetime
+import warnings
 import h5py
 import numpy
 import pandas
@@ -918,6 +919,7 @@ class Hdf5(h5py.File):
             num_dims = len(self[dataset_name].shape)
             if num_dims == 1:
                 values = self[dataset_name][:]
+                num_indices_expected = self[dataset_name].shape[0]
             elif num_dims == 2:
                 # only transpose if dataset_name refers to a native type
                 if normed_name in SCHEMA_DATASET_PROVIDERS[None]:
@@ -925,11 +927,45 @@ class Hdf5(h5py.File):
                     columns = self.get_columns(normed_name)
                 else:
                     values = self[dataset_name][:].T
+                num_indices_expected = values.shape[0]
             elif num_dims > 2:
                 raise Exception("Can only convert 1d or 2d datasets to dataframe")
 
+        indices = [datetime.datetime.fromtimestamp(t) for t in timestamps]
+        num_indices = len(indices)
+
+        # if an HDF5 file was initialized but not fully populated, the number of
+        # timestamps (indices) might be less than the size of the matrix being
+        # stored.  this is OK as long as there are no valid values in the part
+        # of the matrix that don't have corresponding indices.
+        if num_indices_expected != num_indices:
+            warning_msg = "dataset size and timestamps are inconsistent (%d vs %d values; missing sum is %f)" \
+                % (num_indices_expected, num_indices, values[num_indices:, :].sum())
+            missings = self.get_missing(normed_name)
+#           print("shape of defined range: (%d, %d)" % missings[:num_indices, :].shape)
+#           print("shape of undefined range: (%d, %d)" % missings[num_indices:, :].shape)
+#           print("missing elements in defined range:", missings[:num_indices, :].sum())
+#           print("missing elements in undefined range:", missings[num_indices:, :].sum())
+
+            # if we have more indices than values, this is unrecoverable because
+            # we don't know where in `values` data was written twice
+            if (num_indices > num_indices_expected):
+                raise IndexError(warning_msg)
+
+            # h5lmt format doesn't support distinguishing uninitialized elements
+            # from initialized-but-zero, so we assume that a zero indicates
+            # missing here
+            if (self.get_version() is None and values[num_indices:, :].sum() != 0.0) \
+            or (self.get_version() is not None and ~(missings[num_indices:, :].astype(bool)).sum() != 0):
+                raise IndexError(warning_msg)
+            if num_dims == 1:
+                values = values[:num_indices]
+            else:
+                values = values[:num_indices, :]
+            warnings.warn(warning_msg)
+
         return pandas.DataFrame(data=values,
-                                index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
+                                index=indices,
                                 columns=columns)
 
 def missing_values(dataset, inverse=False):
