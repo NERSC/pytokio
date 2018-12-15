@@ -5,18 +5,22 @@ Documentation for the REST API is here:
     http://es.net/network-r-and-d/data-for-researchers/snmp-api/
 """
 
-class EsnetSnmp(dict):
+import time
+import json
+import datetime
+import warnings
+
+import requests
+import pandas
+
+from .. import config
+from . import common
+
+
+class EsnetSnmp(common.CacheableDict):
     """Container for ESnet SNMP counters
     """
-
-    def __init__(*args, **kwargs):
-        """
-        """
-        super(EsnetSnmp, self).__init__(*args, **kwargs)
-        # do some other stuff
-        pass
-
-    def get_interface_counters(self, start, end, interface, direction, agg_func=None, interval=None):
+    def get_interface_counters(self, start, end, endpoint, interface, direction, agg_func=None, interval=None):
         """Retrieves data rate data for an ESnet endpoint
 
         Args:
@@ -30,4 +34,37 @@ class EsnetSnmp(dict):
             interval (int or None): Resolution, in seconds, of the data to be
                 returned.  If None, uses the ESnet default.
         """
-        pass
+        # TODO: check begin/end parameter validity
+
+        # TODO: check in/out parameter validity
+
+        uri = config.CONFIG.get('esnet_snmp_uri')
+        if uri is None:
+            warnings.warn("no esnet_snmp_uri configured")
+            return {}
+        uri += '/%s/interface/%s/%s' % (endpoint, interface, direction)
+
+        params = {
+            'begin': int(time.mktime(start.timetuple())),
+            'end': int(time.mktime(end.timetuple())),
+        }
+        if agg_func is not None:
+            params['calc_func'] = agg_func
+        if interval is not None:
+            params['calc'] = interval
+
+        request = requests.get(uri, params=params)
+        response_data = json.loads(request.text)
+        self.update(response_data)
+        return response_data
+
+    def to_dataframe(self):
+        """Return data as a Pandas DataFrame
+        """
+        if 'data' not in self:
+            return None
+
+        indices = [datetime.datetime.fromtimestamp(x[0]) for x in self.get('data', [])]
+        values = [datetime.datetime.fromtimestamp(x[1]) for x in self.get('data', [])]
+
+        return pandas.DataFrame(values, index=indices)

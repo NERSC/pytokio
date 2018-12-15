@@ -48,3 +48,8 @@ try:
     import tokio.connectors.slurm
 except ImportError:
     pass
+
+try:
+    import tokio.connectors.esnet_snmp
+except ImportError:
+    pass
