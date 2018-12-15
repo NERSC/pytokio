@@ -21,6 +21,11 @@ class CacheableDict(dict):
     """
     def __init__(self, input_file=None):
         """Either initialize as empty or load from cache
+
+        Args:
+            input_file (str): Path to either a JSON file representing the dict
+                or a native file that will be parsed into a JSON-compatible
+                format
         """
         super(CacheableDict, self).__init__()
         self.input_file = input_file

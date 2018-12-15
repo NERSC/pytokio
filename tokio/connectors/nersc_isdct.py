@@ -35,7 +35,7 @@ class NerscIsdct(common.CacheableDict):
                 directory containing the output of NERSC's ISDCT collection
                 script.
         """
-        super(NerscIsdct, self).__init__(self, input_file=input_file)
+        super(NerscIsdct, self).__init__(input_file=input_file)
 
         # synthesize metrics independent of the input format
         self._synthesize_metrics()
