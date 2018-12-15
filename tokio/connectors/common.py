@@ -19,10 +19,10 @@ class CacheableDict(dict):
     ``load_native()`` method to be invoked when ``input_file`` is not JSON.
 
     """
-    def __init__(self, *args, input_file=None, **kwargs):
+    def __init__(self, input_file=None):
         """Either initialize as empty or load from cache
         """
-        super(CacheableDict, self).__init__(*args, **kwargs)
+        super(CacheableDict, self).__init__()
         self.input_file = input_file
         self.load()
 
