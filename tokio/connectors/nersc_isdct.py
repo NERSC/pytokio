@@ -20,11 +20,11 @@ import warnings
 import numpy
 import pandas
 from tokio.common import isstr
-import tokio.connectors.common
+from . import common
 
 REX_SERIAL_NO = r'(Intel SSD|SMART Attributes|SMART and Health Information).*(CVF[^ ]+-\d+)'
 
-class NerscIsdct(tokio.connectors.common.CacheableDict):
+class NerscIsdct(common.CacheableDict):
     """Dictionary subclass that self-populates with ISDCT output data
     """
     def __init__(self, input_file):
