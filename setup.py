@@ -56,7 +56,10 @@ def setup_package():
 
         # Dependencies
         install_requires=REQUIREMENTS,
-        extras_require={'collectdes': ['elasticsearch>=5.4']},
+        extras_require={
+            'collectdes': ['elasticsearch>=5.4'],
+            'esnet_snmp': ['requests'],
+        },
         python_requires=">=2.7",
 
         classifiers=[
