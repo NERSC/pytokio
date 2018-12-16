@@ -9,7 +9,15 @@ import nose
 
 import tokio.connectors.esnet_snmp
 
-def validate_interface_counters(esnetsnmp):
+ESNETSNMP_ENDPOINTS = {
+    'sunn-cr5': ['5_2_1'],
+    'sacr-cr5': ['4_2_1'],
+    'nersc-mr2': ['xe-0_1_0', 'xe-7_1_0'],
+}
+ESNETSNMP_END = datetime.datetime.now()
+ESNETSNMP_START = ESNETSNMP_END - datetime.timedelta(hours=1)
+
+def validate_last_response(esnetsnmp):
     """Ensure that the REST API returns a known structure
 
     Ensures that all return fields are present based on what we input.  Note
@@ -26,8 +34,8 @@ def validate_interface_counters(esnetsnmp):
         interval (int or None): the interval passed to the API endpoint, if any
 
     """
-    print(json.dumps(esnetsnmp.last_response, indent=4, sort_keys=True))
-#   assert esnetsnmp
+    assert esnetsnmp
+    print(json.dumps(esnetsnmp.last_response))
     assert 'end_time' in esnetsnmp.last_response
     assert 'begin_time' in esnetsnmp.last_response
     assert 'data' in esnetsnmp.last_response
@@ -59,18 +67,16 @@ def validate_interface_counters(esnetsnmp):
 def test_esnetsnmp_get_interface_counters():
     """EsnetSnmp.get_interface_counters() basic functionality
     """
-    endpoints = {
-        'sunn-cr5': ['5_2_1'],
-        'sacr-cr5': ['4_2_1'],
-        'nersc-mr2': ['xe-0_1_0', 'xe-7_1_0'],
-    }
-    end = datetime.datetime.now()
-    start = end - datetime.timedelta(hours=1)
-    endpoint = list(endpoints)[0]
-    interface = endpoints[endpoint][0]
 
-    # test bare minimum functionality, direction=='in'
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
+    endpoint = list(ESNETSNMP_ENDPOINTS)[0]
+    interface = ESNETSNMP_ENDPOINTS[endpoint][0]
+
+    # tests:
+    #  - minimum required inputs
+    #  - direction=='in'
+    #  - two-step initialize and populate
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+        start=ESNETSNMP_START, end=ESNETSNMP_END)
     try:
         esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
@@ -78,34 +84,44 @@ def test_esnetsnmp_get_interface_counters():
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp)
+    validate_last_response(esnetsnmp)
 
-    # test bare minimum functionality, direction=='out'
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
+    # tests:
+    #  - minimum required inputs
+    #  - direction=='out'
+    #  - single-step initialize and populate
     try:
-        esnetsnmp.get_interface_counters(endpoint=endpoint,
-                                         interface=interface,
-                                         direction='out')
+        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+            start=ESNETSNMP_START,
+            end=ESNETSNMP_END,
+            endpoint=endpoint,
+            interface=interface,
+            direction='out')
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp)
+    validate_last_response(esnetsnmp)
 
-    # test specifying all parameters
+    # tests:
+    #  - specifying all parameters
     agg_func = 'max'
     interval = 60
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
     try:
-        esnetsnmp.get_interface_counters(endpoint=endpoint,
-                                         interface=interface,
-                                         direction='out',
-                                         agg_func=agg_func,
-                                         interval=interval)
+        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+            start=ESNETSNMP_START,
+            end=ESNETSNMP_END,
+            endpoint=endpoint,
+            interface=interface,
+            direction='out',
+            agg_func=agg_func,
+            interval=interval)
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp)
+    validate_last_response(esnetsnmp)
 
+    # ensure that response is valid (though this is more a test of the REST API
+    # returning correct results)
     print("calc: %s == %s? %s" % (
         int(esnetsnmp.last_response['calc']),
         interval,
@@ -117,3 +133,44 @@ def test_esnetsnmp_get_interface_counters():
         agg_func.lower(),
         esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()))
     assert esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()
+
+def test_to_dataframe():
+    """EsnetSnmp.to_dataframe()
+    """
+    endpoint = list(ESNETSNMP_ENDPOINTS)[0]
+    interface = ESNETSNMP_ENDPOINTS[endpoint][0]
+
+    try:
+        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+            start=ESNETSNMP_START,
+            end=ESNETSNMP_END,
+            endpoint=endpoint,
+            interface=interface,
+            direction='out')
+    except requests.exceptions.ConnectionError as error:
+        raise nose.SkipTest(error)
+
+    assert esnetsnmp
+    dataframe = esnetsnmp.to_dataframe()
+    assert len(dataframe)
+    print("dataframe has %d rows; raw result had %d rows" % (
+        len(dataframe),
+        len(esnetsnmp.last_response['data'])))
+    assert len(dataframe) == len(esnetsnmp.last_response['data'])
+
+    esnetsnmp.get_interface_counters(
+        endpoint=endpoint,
+        interface=interface,
+        direction='in')
+
+    dataframe = esnetsnmp.to_dataframe(multiindex=False)
+    print(dataframe)
+    print("dataframe has %d rows; last raw result had %d rows" % (
+        len(dataframe),
+        len(esnetsnmp.last_response['data'])))
+    assert len(dataframe) > len(esnetsnmp.last_response['data'])
+
+    print(json.dumps(esnetsnmp))
+
+    dataframe = esnetsnmp.to_dataframe(multiindex=True)
+    assert len(dataframe)

@@ -3,6 +3,10 @@
 Documentation for the REST API is here:
 
     http://es.net/network-r-and-d/data-for-researchers/snmp-api/
+
+Relies either on the 'esnet_snmp_uri' configuration value being set in the
+pytokio configuration or the PYTOKIO_ESNET_SNMP_URI being defined in the
+environment.
 """
 
 import time
@@ -153,11 +157,6 @@ class EsnetSnmp(common.CacheableDict):
         for timestamp, value in data:
             self[self.requested_endpoint][self.requested_interface][self.requested_direction][timestamp] = value
 
-        # once result is processed, clear it
-        self.requested_endpoint = None
-        self.requested_interface = None
-        self.requested_direction = None
-
         return True
 
     def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None):
@@ -185,13 +184,15 @@ class EsnetSnmp(common.CacheableDict):
         self.requested_agg_func = agg_func
         self.requested_timestep = interval
 
-        if self.requested_timestep is not None and self.timestep is not None and self.requested_timestep != self.timestep:
-            warnings.warn("received timestep %d from an object with timestep %d" % (self.requested_timestep, self.timestep))
+        if self.requested_timestep is not None \
+        and self.timestep is not None \
+        and self.requested_timestep != self.timestep:
+            warnings.warn("received timestep %d from an object with timestep %d" 
+                % (self.requested_timestep, self.timestep))
 
         uri = config.CONFIG.get('esnet_snmp_uri')
         if uri is None:
-            warnings.warn("no esnet_snmp_uri configured")
-            return {}
+            requests.exception.ConnectionError("no esnet_snmp_uri configured")
         uri += '/%s/interface/%s/%s' % (endpoint, interface, direction)
 
         params = {
@@ -206,18 +207,24 @@ class EsnetSnmp(common.CacheableDict):
         request = requests.get(uri, params=params)
         self.last_response = json.loads(request.text)
 
+        self._insert_result()
+
         return self.last_response
 
-    def to_dataframe(self):
+    def to_dataframe(self, multiindex=False):
         """Return data as a Pandas DataFrame
+
+        Args:
+            multiindex (bool): If True, return a DataFrame indexed by timestamp,
+                endpoint, interface, and direction
         """
 
         to_df = []
 
-        for endpoint, interfaces in self:
-            for interface, directions in interfaces:
-                for direction, data in directions:
-                    for timestamp, value in data:
+        for endpoint, interfaces in self.items():
+            for interface, directions in interfaces.items():
+                for direction, data in directions.items():
+                    for timestamp, value in data.items():
                         to_df.append({
                             'endpoint': endpoint,
                             'interface': interface,
@@ -226,7 +233,11 @@ class EsnetSnmp(common.CacheableDict):
                             'data_rate': value,
                         })
 
-        return pandas.DataFrame.from_dict(to_df, orient='index')
+        dataframe = pandas.DataFrame.from_records(to_df)
+        if multiindex:
+            return dataframe.set_index(['timestamp', 'endpoint', 'interface', 'direction'])
+
+        return dataframe
 
 def _get_interval_result(result):
     """Parse the raw output of the REST API output and return the timestep
