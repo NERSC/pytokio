@@ -10,7 +10,6 @@ import time
 import datetime
 import warnings
 import numpy
-import tokio.connectors.hdf5
 from tokio.common import isstr
 
 class TimeSeries(object):
@@ -22,7 +21,7 @@ class TimeSeries(object):
     def __init__(self, dataset_name=None,
                  start=None, end=None, timestep=None, num_columns=None,
                  column_names=None, timestamp_key=None,
-                 hdf5_file=None, sort_hex=False):
+                 sort_hex=False):
 
         # numpy.ndarray of timestamp measurements
         self.timestamps = None
@@ -50,15 +49,10 @@ class TimeSeries(object):
         # string describing schema version
         self.global_version = None
 
-        # attempt to attach the object if requested.
-        if dataset_name is not None:
-            attached = False
-            if hdf5_file is not None:
-                attached = self.attach(hdf5_file, dataset_name)
-            # if attach fails due to dataset being uninitialized, initialize it instead
-            if not attached and start and end and timestep and num_columns:
-                self.init(start, end, timestep, num_columns, dataset_name,
-                          column_names, timestamp_key)
+        # attempt to initialize the object if fields are supplied
+        if dataset_name is not None and start and end and timestep and num_columns:
+            self.init(start, end, timestep, num_columns, dataset_name,
+                column_names, timestamp_key)
 
     def init(self, start, end, timestep, num_columns, dataset_name,
              column_names=None, timestamp_key=None):
@@ -106,168 +100,12 @@ class TimeSeries(object):
         """Set the timestamp key
 
         Args:
-            timestamp_key (str or None): The key for the timestamp dataset.  If
-                None, use the default
+            timestamp_key (str): The key for the timestamp dataset.
             safe (bool): If true, do not overwrite an existing timestamp key
         """
         # Root the timestamp_key at the same parent as the dataset
         if not safe or self.timestamp_key is None:
-            if timestamp_key is None:
-                self.timestamp_key = '/'.join(self.dataset_name.split('/')[0:-1] \
-                                     + [tokio.connectors.hdf5.DEFAULT_TIMESTAMP_DATASET])
-            else:
-                self.timestamp_key = timestamp_key
-
-    def attach(self, hdf5_file, dataset_name, light=False):
-        """
-        Populate a TimeSeries dataset object with the data from an existing HDF5
-        dataset.  If light is True, don't actually load datasets into memory;
-        reference them directly into the HDF5 file
-
-        Responsible for setting self.dataset_name, self.columns, self.dataset,
-        self.dataset_metadata, self.group_metadata, self.timestamp_key
-        """
-        self.dataset_name = dataset_name
-
-        try:
-            dataset = hdf5_file[dataset_name]
-        except KeyError:
-            # can't attach because dataset doesn't exist; pass this back to caller so it can init
-            return False
-
-        self.dataset = dataset if light else dataset[:, :]
-
-        # load and decode version of dataset and file schema
-        self.global_version = hdf5_file['/'].attrs.get('version')
-        self.version = hdf5_file.get_version(dataset_name)
-        if isinstance(self.version, bytes):
-            self.version = self.version.decode()
-
-        # copy columns into memory
-        columns = hdf5_file.get_columns(dataset_name)
-        self.set_columns(columns)
-
-        # copy metadata into memory
-        for key, value in dataset.attrs.items():
-            if isinstance(value, bytes):
-                self.dataset_metadata[key] = value.decode()
-            else:
-                self.dataset_metadata[key] = value
-        for key, value in dataset.parent.attrs.items():
-            if isinstance(value, bytes):
-                self.group_metadata[key] = value.decode()
-            else:
-                self.group_metadata[key] = value
-
-        self.timestamp_key = tokio.connectors.hdf5.get_timestamps_key(hdf5_file, dataset_name)
-        self.timestamps = hdf5_file[self.timestamp_key]
-        self.timestamps = self.timestamps if light else self.timestamps[:]
-
-        self.timestep = self.timestamps[1] - self.timestamps[0]
-        return True
-
-    def commit_dataset(self, hdf5_file, **kwargs):
-        """
-        Write contents of this object into an HDF5 file group
-        """
-        extra_dataset_args = {
-            'dtype': 'f8',
-            'chunks': True,
-            'compression': 'gzip',
-        }
-        extra_dataset_args.update(kwargs)
-
-        # Create the dataset in the HDF5 file (if necessary)
-        if self.dataset_name in hdf5_file:
-            dataset_hdf5 = hdf5_file[self.dataset_name]
-        else:
-            dataset_hdf5 = hdf5_file.create_dataset(name=self.dataset_name,
-                                                    shape=self.dataset.shape,
-                                                    **extra_dataset_args)
-
-        # Create the timestamps in the HDF5 file (if necessary) and calculate
-        # where to insert our data into the HDF5's dataset
-        if self.timestamp_key not in hdf5_file:
-            timestamps_hdf5 = hdf5_file.create_dataset(name=self.timestamp_key,
-                                                       shape=self.timestamps.shape,
-                                                       dtype='i8')
-            # Copy the in-memory timestamp dataset into the HDF5 file
-            timestamps_hdf5[:] = self.timestamps[:]
-            t_start = 0
-            t_end = self.timestamps.shape[0]
-            start_timestamp = self.timestamps[0]
-            end_timestamp = self.timestamps[-1] + self.timestep
-        else:
-            existing_timestamps = tokio.connectors.hdf5.get_timestamps(hdf5_file, self.dataset_name)
-            t_start, t_end = get_insert_indices(self.timestamps, existing_timestamps)
-
-            if t_start < 0 \
-            or t_start > (len(existing_timestamps) - 2) \
-            or t_end < 1 \
-            or t_end > len(existing_timestamps):
-                raise IndexError("cannot commit dataset that is not a subset of existing data")
-
-            start_timestamp = existing_timestamps[0]
-            end_timestamp = existing_timestamps[-1] + self.timestep
-
-        # Make sure that the start/end timestamps are consistent with the HDF5
-        # file's global time range
-        if 'start' not in hdf5_file.attrs:
-            hdf5_file.attrs['start'] = start_timestamp
-            hdf5_file.attrs['end'] = end_timestamp
-        else:
-            if hdf5_file.attrs['start'] != start_timestamp \
-            or hdf5_file.attrs['end'] != end_timestamp:
-#               warnings.warn(
-                raise IndexError("Mismatched start or end values:  %d != %d or %d != %d" % (
-                    start_timestamp, hdf5_file.attrs['start'],
-                    end_timestamp, hdf5_file.attrs['end']))
-
-        # If we're updating an existing HDF5, use its column names and ordering.
-        # Otherwise sort the columns before committing them.
-        if tokio.connectors.hdf5.COLUMN_NAME_KEY in dataset_hdf5.attrs:
-            self.rearrange_columns(self.columns)
-        else:
-            self.sort_columns()
-
-        # Copy the in-memory dataset into the HDF5 file
-        dataset_hdf5[t_start:t_end, :] = self.dataset[:, :]
-
-        # Copy column names into metadata before committing metadata
-        self.dataset_metadata[tokio.connectors.hdf5.COLUMN_NAME_KEY] = self.columns
-        self.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
-
-        # If self.version was never set, don't set a dataset-level version in the HDF5
-        if self.version is not None:
-            hdf5_file.set_version(self.version, dataset_name=self.dataset_name)
-
-        # Set the file's global version to indicate its schema
-        if self.global_version is not None:
-            hdf5_file['/'].attrs['version'] = self.global_version
-
-        # Insert/update dataset metadata
-        for key, value in self.dataset_metadata.items():
-            # special hack for column names
-            if (key == tokio.connectors.hdf5.COLUMN_NAME_KEY):
-                # note: the behavior of numpy.string_(x) where
-                # type(x) == numpy.array is _different_ in python2 vs. python3.
-                # Python3 happily converts each element to a numpy.string_,
-                # while Python2 first calls a.__repr__ to turn it into a single
-                # string, then converts that to numpy.string_.
-                dataset_hdf5.attrs[key] = numpy.array([numpy.string_(x) for x in value])
-            elif isstr(value):
-                dataset_hdf5.attrs[key] = numpy.string_(value)
-            elif value is None:
-                warnings.warn("Skipping attribute %s (null value) for %s" % (key, self.dataset_name))
-            else:
-                dataset_hdf5.attrs[key] = value
-
-        # Insert/update group metadata
-        for key, value in self.group_metadata.items():
-            if isstr(value):
-                dataset_hdf5.parent.attrs[key] = numpy.string_(value)
-            else:
-                dataset_hdf5.parent.attrs[key] = value
+            self.timestamp_key = timestamp_key
 
     def update_column_map(self):
         """
@@ -401,15 +239,6 @@ class TimeSeries(object):
             self.dataset[t_index, c_index] = value
         return True
 
-    def missing_matrix(self, inverse=False):
-        """
-        Because we initialize datasets with -0.0, we can scan the sign bit of every
-        element of an array to determine how many data were never populated.  This
-        converts negative zeros to ones and all other data into zeros then count up
-        the number of missing elements in the array.
-        """
-        return tokio.connectors.hdf5.missing_values(self.dataset, inverse)
-
     def convert_to_deltas(self):
         """
         Convert a matrix of monotonically increasing rows into deltas.  Replaces
@@ -531,22 +360,3 @@ def timeseries_deltas(dataset):
                     prev_nonzero[icol] = this_element
 
     return diff_matrix
-
-def get_insert_indices(my_timestamps, existing_timestamps):
-    """
-    Given new timestamps and an existing series of timestamps, find the indices
-    overlap so that new data can be inserted into the middle of an existing
-    dataset
-    """
-    existing_timestep = existing_timestamps[1] - existing_timestamps[0]
-    my_timestep = my_timestamps[1] - my_timestamps[0]
-
-    # make sure the time delta is ok
-    if existing_timestep != my_timestep:
-        raise Exception("Existing dataset has different timestep (mine=%d, existing=%d)"
-                        % (my_timestep, existing_timestep))
-
-    my_offset = (my_timestamps[0] - existing_timestamps[0]) // existing_timestep
-    my_end = my_offset + len(my_timestamps)
-
-    return my_offset, my_end
