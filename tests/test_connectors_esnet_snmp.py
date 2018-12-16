@@ -2,7 +2,6 @@
 """
 
 import datetime
-import time
 import json
 
 import requests
@@ -10,7 +9,7 @@ import nose
 
 import tokio.connectors.esnet_snmp
 
-def validate_interface_counters(esnetsnmp, start=None, end=None, agg_func=None, interval=None):
+def validate_interface_counters(esnetsnmp):
     """Ensure that the REST API returns a known structure
 
     Ensures that all return fields are present based on what we input.  Note
@@ -27,33 +26,35 @@ def validate_interface_counters(esnetsnmp, start=None, end=None, agg_func=None, 
         interval (int or None): the interval passed to the API endpoint, if any
 
     """
-    assert esnetsnmp
-    print(json.dumps(esnetsnmp, indent=4, sort_keys=True))
-    assert 'end_time' in esnetsnmp
-    assert 'begin_time' in esnetsnmp
-    assert 'data' in esnetsnmp
-    if agg_func is None:
-        assert 'agg' in esnetsnmp
-    else:
-        assert 'calc' in esnetsnmp
-    if interval is None:
-        assert 'cf' in esnetsnmp
-    else:
-        assert 'calc_func' in esnetsnmp
+    print(json.dumps(esnetsnmp.last_response, indent=4, sort_keys=True))
+#   assert esnetsnmp
+    assert 'end_time' in esnetsnmp.last_response
+    assert 'begin_time' in esnetsnmp.last_response
+    assert 'data' in esnetsnmp.last_response
 
-    if start is not None:
+    if esnetsnmp.requested_agg_func is None:
+        assert 'agg' in esnetsnmp.last_response
+    else:
+        assert 'calc' in esnetsnmp.last_response
+
+    if esnetsnmp.requested_timestep is None:
+        assert 'cf' in esnetsnmp.last_response
+    else:
+        assert 'calc_func' in esnetsnmp.last_response
+
+    if esnetsnmp.start is not None:
         print("begin_time: %s <= %s? %s" % (
-            esnetsnmp['begin_time'],
-            int(time.mktime(start.timetuple())),
-            (esnetsnmp['begin_time'] <= int(time.mktime(start.timetuple())))))
-        assert esnetsnmp['begin_time'] <= int(time.mktime(start.timetuple()))
+            esnetsnmp.last_response['begin_time'],
+            esnetsnmp.start_epoch,
+            (esnetsnmp.last_response['begin_time'] <= esnetsnmp.start_epoch)))
+        assert esnetsnmp.last_response['begin_time'] <= esnetsnmp.start_epoch
 
-    if end is not None:
+    if esnetsnmp.end is not None:
         print("end_time: %s >= %s? %s" % (
-            esnetsnmp['end_time'],
-            int(time.mktime(end.timetuple())),
-            (esnetsnmp['end_time'] >= int(time.mktime(end.timetuple())))))
-        assert esnetsnmp['end_time'] >= int(time.mktime(end.timetuple()))
+            esnetsnmp.last_response['end_time'],
+            esnetsnmp.end_epoch,
+            (esnetsnmp.last_response['end_time'] >= esnetsnmp.end_epoch)))
+        assert esnetsnmp.last_response['end_time'] >= esnetsnmp.end_epoch
 
 def test_esnetsnmp_get_interface_counters():
     """EsnetSnmp.get_interface_counters() basic functionality
@@ -69,39 +70,33 @@ def test_esnetsnmp_get_interface_counters():
     interface = endpoints[endpoint][0]
 
     # test bare minimum functionality, direction=='in'
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp()
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
     try:
-        esnetsnmp.get_interface_counters(start=start,
-                                         end=end,
-                                         endpoint=endpoint,
+        esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
                                          direction='in')
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp, start=start, end=end)
+    validate_interface_counters(esnetsnmp)
 
     # test bare minimum functionality, direction=='out'
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp()
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
     try:
-        esnetsnmp.get_interface_counters(start=start,
-                                         end=end,
-                                         endpoint=endpoint,
+        esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
                                          direction='out')
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp, start=start, end=end)
+    validate_interface_counters(esnetsnmp)
 
     # test specifying all parameters
     agg_func = 'max'
     interval = 60
-    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp()
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end)
     try:
-        esnetsnmp.get_interface_counters(start=start,
-                                         end=end,
-                                         endpoint=endpoint,
+        esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
                                          direction='out',
                                          agg_func=agg_func,
@@ -109,20 +104,16 @@ def test_esnetsnmp_get_interface_counters():
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
-    validate_interface_counters(esnetsnmp,
-                                start=start,
-                                end=end,
-                                agg_func=agg_func,
-                                interval=interval)
+    validate_interface_counters(esnetsnmp)
 
     print("calc: %s == %s? %s" % (
-        int(esnetsnmp['calc']),
+        int(esnetsnmp.last_response['calc']),
         interval,
-        (int(esnetsnmp['calc']) == interval)))
-    assert int(esnetsnmp['calc']) == interval
+        (int(esnetsnmp.last_response['calc']) == interval)))
+    assert int(esnetsnmp.last_response['calc']) == interval
 
     print("calc_func: %s == %s? %s" % (
-        esnetsnmp['calc_func'].lower(),
+        esnetsnmp.last_response['calc_func'].lower(),
         agg_func.lower(),
-        esnetsnmp['calc_func'].lower() == agg_func.lower()))
-    assert esnetsnmp['calc_func'].lower() == agg_func.lower()
+        esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()))
+    assert esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()
