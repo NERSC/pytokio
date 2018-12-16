@@ -10,6 +10,7 @@ import errno
 import tempfile
 import subprocess
 import datetime
+import numpy # for compare_timeseries
 
 try:
     import StringIO as io
@@ -332,3 +333,32 @@ def try_unlink(output_filename):
     if os.path.exists(output_filename):
         print("Destroying %s" % output_filename)
         os.unlink(output_filename)
+
+# TimeSeries and HDF5 tests have some mutual dependency, so factor out those
+# test components here
+
+def compare_timeseries(timeseries1, timeseries2, verbose=False):
+    """
+    Compare two TimeSeries objects' datasets column by column
+    """
+    for timeseries1_index, column in enumerate(list(timeseries1.columns)):
+        timeseries2_index = timeseries2.column_map[column]
+        if verbose:
+            col_sum1 = timeseries1.dataset[:, timeseries1_index].sum()
+            col_sum2 = timeseries2.dataset[:, timeseries2_index].sum()
+            print("%-14s: %.16e vs. %.16e" % (column, col_sum1, col_sum2))
+        assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index],
+                                 timeseries2.dataset[:, timeseries2_index])
+
+def generate_timeseries(file_name=SAMPLE_COLLECTDES_HDF5,
+                        dataset_name=SAMPLE_COLLECTDES_DSET):
+    """
+    Return a TimeSeries object that's initialized against the sample input
+    """
+    output_hdf5 = tokio.connectors.hdf5.Hdf5(file_name, 'r')
+    print("Creating timeseries from %s" % file_name)
+    timeseries = output_hdf5.to_timeseries(dataset_name=dataset_name)
+
+    return timeseries
+
+

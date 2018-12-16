@@ -7,12 +7,13 @@ derived datasets dynamically.
 """
 
 import math
+import time
 import datetime
 import warnings
 import h5py
 import numpy
 import pandas
-from tokio.common import isstr
+import tokio.common
 from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unused-import
                                     map_dataset,
                                     demux_column,
@@ -641,7 +642,7 @@ class Hdf5(h5py.File):
             key (str): The standard name of a dataset to be accessed.
 
         Returns:
-            h5py.Dataset or numpy.ndarray: 
+            h5py.Dataset or numpy.ndarray:
 
               * h5py.Dataset if key is a literal dataset name
               * h5py.Dataset if key maps directly to a literal dataset name
@@ -689,7 +690,7 @@ class Hdf5(h5py.File):
             return key, None
 
         # Straight mapping between the key and a dataset
-        key = key.lstrip('/') if isstr(key) else key
+        key = key.lstrip('/') if tokio.common.isstr(key) else key
         if key in self.schema:
             hdf5_key = self.schema.get(key)
             if super(Hdf5, self).__contains__(hdf5_key):
@@ -725,8 +726,7 @@ class Hdf5(h5py.File):
                 version = self._version
             if isinstance(version, bytes):
                 return version.decode() # for python3
-            else:
-                return version
+            return version
 
     def set_version(self, version, dataset_name=None):
         """Set the version attribute from an HDF5 file dataset
@@ -742,12 +742,13 @@ class Hdf5(h5py.File):
         if dataset_name is None:
             self._version = version
             return self._version
-        else:
-            # resolve dataset name
-            dataset = self.__getitem__(dataset_name)
-            if dataset is None:
-                raise KeyError("Dataset %s does not exist" % dataset_name)
-            dataset.attrs["version"] = version
+
+        # resolve dataset name
+        dataset = self.__getitem__(dataset_name)
+        if dataset is None:
+            raise KeyError("Dataset %s does not exist" % dataset_name)
+        dataset.attrs["version"] = version
+        return version
 
     def get_columns(self, dataset_name):
         """Get the column names of a dataset
@@ -760,7 +761,7 @@ class Hdf5(h5py.File):
         """
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
-        
+
         return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
 
     def _get_columns_h5lmt(self, dataset_name):
@@ -949,7 +950,7 @@ class Hdf5(h5py.File):
 
             # if we have more indices than values, this is unrecoverable because
             # we don't know where in `values` data was written twice
-            if (num_indices > num_indices_expected):
+            if num_indices > num_indices_expected:
                 raise IndexError(warning_msg)
 
             # h5lmt format doesn't support distinguishing uninitialized elements
@@ -967,6 +968,178 @@ class Hdf5(h5py.File):
         return pandas.DataFrame(data=values,
                                 index=indices,
                                 columns=columns)
+
+    def to_timeseries(self, dataset_name, light=False):
+        """Creates a TimeSeries representation of a dataset
+
+        Create a TimeSeries dataset object with the data from an existing HDF5
+        dataset.
+
+        Responsible for setting timeseries.dataset_name, timeseries.columns, timeseries.dataset,
+        timeseries.dataset_metadata, timeseries.group_metadata, timeseries.timestamp_key
+
+        Args:
+            dataset_name (str): Name of existing dataset in self to convert into
+                a TimeSeries object
+            light (bool): If True, don't actually load datasets into memory;
+                reference them directly into the HDF5 file
+
+        Returns:
+            tokio.timeseries.TimeSeries: The in-memory representation of the
+            given dataset.
+        """
+        timeseries = tokio.timeseries.TimeSeries()
+        timeseries.dataset_name = dataset_name
+
+        try:
+            dataset = self[dataset_name]
+        except KeyError:
+            # can't attach because dataset doesn't exist; pass this back to caller so it can init
+            return None
+
+        timeseries.dataset = dataset if light else dataset[:, :]
+
+        # load and decode version of dataset and file schema
+        timeseries.global_version = self['/'].attrs.get('version')
+        timeseries.version = self.get_version(dataset_name)
+        if isinstance(timeseries.version, bytes):
+            timeseries.version = timeseries.version.decode()
+
+        # copy columns into memory
+        columns = self.get_columns(dataset_name)
+        timeseries.set_columns(columns)
+
+        # copy metadata into memory
+        for key, value in dataset.attrs.items():
+            if isinstance(value, bytes):
+                timeseries.dataset_metadata[key] = value.decode()
+            else:
+                timeseries.dataset_metadata[key] = value
+        for key, value in dataset.parent.attrs.items():
+            if isinstance(value, bytes):
+                timeseries.group_metadata[key] = value.decode()
+            else:
+                timeseries.group_metadata[key] = value
+
+        timeseries.timestamp_key = get_timestamps_key(self, dataset_name)
+        timeseries.timestamps = self[timeseries.timestamp_key]
+        timeseries.timestamps = timeseries.timestamps if light else timeseries.timestamps[:]
+
+        timeseries.timestep = timeseries.timestamps[1] - timeseries.timestamps[0]
+        return timeseries
+
+    def commit_timeseries(self, timeseries, **kwargs):
+        """Writes contents of a TimeSeries object into a group
+
+        Args:
+            timeseries (tokio.timeseries.TimeSeries): the time series to save
+                as a dataset within self
+            kwargs (dict): Extra arguments to pass to self.create_dataset()
+        """
+        extra_dataset_args = {
+            'dtype': 'f8',
+            'chunks': True,
+            'compression': 'gzip',
+        }
+        extra_dataset_args.update(kwargs)
+
+        # Create the dataset in the HDF5 file (if necessary)
+        if timeseries.dataset_name in self:
+            dataset_hdf5 = self[timeseries.dataset_name]
+        else:
+            dataset_hdf5 = self.create_dataset(name=timeseries.dataset_name,
+                                               shape=timeseries.dataset.shape,
+                                               **extra_dataset_args)
+
+        # when timestamp_key has been left empty, use the default
+        timestamp_key = timeseries.timestamp_key
+        if timestamp_key is None:
+            timestamp_key = '/'.join(timeseries.dataset_name.split('/')[0:-1] \
+                                 + [DEFAULT_TIMESTAMP_DATASET])
+
+        # Create the timestamps in the HDF5 file (if necessary) and calculate
+        # where to insert our data into the HDF5's dataset
+        if timestamp_key not in self:
+            timestamps_hdf5 = self.create_dataset(name=timestamp_key,
+                                                  shape=timeseries.timestamps.shape,
+                                                  dtype='i8')
+            # Copy the in-memory timestamp dataset into the HDF5 file
+            timestamps_hdf5[:] = timeseries.timestamps[:]
+            t_start = 0
+            t_end = timeseries.timestamps.shape[0]
+            start_timestamp = timeseries.timestamps[0]
+            end_timestamp = timeseries.timestamps[-1] + timeseries.timestep
+        else:
+            existing_timestamps = self.get_timestamps(timeseries.dataset_name)
+            t_start, t_end = get_insert_indices(timeseries.timestamps, existing_timestamps)
+
+            if t_start < 0 \
+            or t_start > (len(existing_timestamps) - 2) \
+            or t_end < 1 \
+            or t_end > len(existing_timestamps):
+                raise IndexError("cannot commit dataset that is not a subset of existing data")
+
+            start_timestamp = existing_timestamps[0]
+            end_timestamp = existing_timestamps[-1] + timeseries.timestep
+
+        # Make sure that the start/end timestamps are consistent with the HDF5
+        # file's global time range
+        if 'start' not in self.attrs:
+            self.attrs['start'] = start_timestamp
+            self.attrs['end'] = end_timestamp
+        else:
+            if self.attrs['start'] != start_timestamp \
+            or self.attrs['end'] != end_timestamp:
+#               warnings.warn(
+                raise IndexError("Mismatched start or end values:  %d != %d or %d != %d" % (
+                    start_timestamp, self.attrs['start'],
+                    end_timestamp, self.attrs['end']))
+
+        # If we're updating an existing dataset, use its column names and ordering.
+        # Otherwise sort the columns before committing them.
+        if COLUMN_NAME_KEY in dataset_hdf5.attrs:
+            timeseries.rearrange_columns(timeseries.columns)
+        else:
+            timeseries.sort_columns()
+
+        # Copy the in-memory dataset into the HDF5 file
+        dataset_hdf5[t_start:t_end, :] = timeseries.dataset[:, :]
+
+        # Copy column names into metadata before committing metadata
+        timeseries.dataset_metadata[COLUMN_NAME_KEY] = timeseries.columns
+        timeseries.dataset_metadata['updated'] = int(time.mktime(datetime.datetime.now().timetuple()))
+
+        # If timeseries.version was never set, don't set a dataset-level version in the HDF5
+        if timeseries.version is not None:
+            self.set_version(timeseries.version, dataset_name=timeseries.dataset_name)
+
+        # Set the file's global version to indicate its schema
+        if timeseries.global_version is not None:
+            self['/'].attrs['version'] = timeseries.global_version
+
+        # Insert/update dataset metadata
+        for key, value in timeseries.dataset_metadata.items():
+            # special hack for column names
+            if key == COLUMN_NAME_KEY:
+                # note: the behavior of numpy.string_(x) where
+                # type(x) == numpy.array is _different_ in python2 vs. python3.
+                # Python3 happily converts each element to a numpy.string_,
+                # while Python2 first calls a.__repr__ to turn it into a single
+                # string, then converts that to numpy.string_.
+                dataset_hdf5.attrs[key] = numpy.array([numpy.string_(x) for x in value])
+            elif tokio.common.isstr(value):
+                dataset_hdf5.attrs[key] = numpy.string_(value)
+            elif value is None:
+                warnings.warn("Skipping attribute %s (null value) for %s" % (key, timeseries.dataset_name))
+            else:
+                dataset_hdf5.attrs[key] = value
+
+        # Insert/update group metadata
+        for key, value in timeseries.group_metadata.items():
+            if tokio.common.isstr(value):
+                dataset_hdf5.parent.attrs[key] = numpy.string_(value)
+            else:
+                dataset_hdf5.parent.attrs[key] = value
 
 def missing_values(dataset, inverse=False):
     """Identify matrix values that are missing
@@ -1007,3 +1180,22 @@ def reduce_dataset_name(key):
     if key.endswith('/missing'):
         return tuple(key.rsplit('/', 1))
     return key, None
+
+def get_insert_indices(my_timestamps, existing_timestamps):
+    """
+    Given new timestamps and an existing series of timestamps, find the indices
+    overlap so that new data can be inserted into the middle of an existing
+    dataset
+    """
+    existing_timestep = existing_timestamps[1] - existing_timestamps[0]
+    my_timestep = my_timestamps[1] - my_timestamps[0]
+
+    # make sure the time delta is ok
+    if existing_timestep != my_timestep:
+        raise Exception("Existing dataset has different timestep (mine=%d, existing=%d)"
+                        % (my_timestep, existing_timestep))
+
+    my_offset = (my_timestamps[0] - existing_timestamps[0]) // existing_timestep
+    my_end = my_offset + len(my_timestamps)
+
+    return my_offset, my_end
