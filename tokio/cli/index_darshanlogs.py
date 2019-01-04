@@ -54,10 +54,12 @@ Schemata::
         filename CHAR UNIQUE,
         end_time INTEGER,
         exe CHAR,
+        exename CHAR,
         jobid CHAR,
         nprocs INTEGER,
         start_time INTEGER,
         uid INTEGER,
+        username CHAR,
         log_version CHAR,
         walltime INTEGER
     );
@@ -114,6 +116,8 @@ HEADER_COUNTERS = [
 MOUNT_TABLE = "mounts"
 HEADERS_TABLE = "headers"
 SUMMARIES_TABLE = "summaries"
+
+VERBOSITY = 0
 
 def summarize_by_fs(darshan_log, max_mb=0):
     """Generates summary scalar values for a Darshan log
@@ -193,6 +197,10 @@ def summarize_by_fs(darshan_log, max_mb=0):
 
     result['headers']['exe'] = counters.get('exe')[0]
 
+    # username is resolved here so that it can be indexed without having to mess around
+    result['headers']['username'] = darshan_data.filename_metadata.get('username')
+    result['headers']['exename'] = os.path.basename(result['headers']['exe'])
+
     return result
 
 def create_mount_table(conn):
@@ -205,7 +213,7 @@ def create_mount_table(conn):
         mountpt CHAR UNIQUE
     )
     """ % MOUNT_TABLE
-    print(query)
+    vprint(query, 2)
     cursor.execute(query)
 
     cursor.close()
@@ -217,8 +225,8 @@ def update_mount_table(conn, mount_points):
     cursor = conn.cursor()
 
     for mount_point in mount_points:
-        print("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE)
-        print("Parameters: ", (mount_point,))
+        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, 2)
+        vprint("Parameters: %s" % str(mount_point,), 2)
 
     cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, [(x,) for x in mount_points])
 
@@ -234,15 +242,17 @@ def create_headers_table(conn):
         filename CHAR UNIQUE,
         end_time INTEGER,
         exe CHAR,
+        exename CHAR,
         jobid CHAR,
         nprocs INTEGER,
         start_time INTEGER,
         uid INTEGER,
+        username CHAR,
         version CHAR,
         walltime INTEGER
     )
     """ % HEADERS_TABLE
-    print(query)
+    vprint(query, 2)
     cursor.execute(query)
     cursor.close()
     conn.commit()
@@ -252,17 +262,19 @@ def update_headers_table(conn, header_data):
     """
     cursor = conn.cursor()
 
-    header_counters = ["filename", "exe"] + HEADER_COUNTERS
+    header_counters = ["filename", "exe", "username", "exename"] + HEADER_COUNTERS
 
+#   query = "INSERT OR IGNORE INTO %s (" % HEADERS_TABLE
     query = "INSERT INTO %s (" % HEADERS_TABLE
     query += ", ".join(header_counters)
     query += ") VALUES (" + ",".join(["?"] * len(header_counters))
     query += ")"
 
     for header_datum in header_data:
-        print(query)
-        print("Parameters: ", tuple([header_datum[x] for x in header_counters]))
-    cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
+        vprint(query, 2)
+        vprint("Parameters: %s" % str(tuple([header_datum[x] for x in header_counters])), 2)
+        cursor.execute(query, tuple([header_datum[x] for x in header_counters]))
+#   cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
 
     cursor.close()
     conn.commit()
@@ -285,7 +297,7 @@ def create_summaries_table(conn):
         UNIQUE(log_id, fs_id)
     )
     """
-    print(query)
+    vprint(query, 2)
     cursor.execute(query)
     cursor.close()
     conn.commit()
@@ -300,12 +312,12 @@ def update_summaries_table(conn, summary_data):
     for per_fs_counters in summary_data:
         for mountpt, summary_datum in per_fs_counters.items():
             query = base_query + "  (SELECT log_id from headers where filename = '%s'),\n" % summary_datum['filename']
-            query += "  (SELECT fs_id from mounts where mountpt = '%s'),\n  " % mountpt 
+            query += "  (SELECT fs_id from mounts where mountpt = '%s'),\n  " % mountpt
             query += ", ".join(["?"] * len(INTEGER_COUNTERS + REAL_COUNTERS))
             query += ")"
-            print(query)
-            print("Parameters: ", tuple([summary_datum[x] for x in (INTEGER_COUNTERS + REAL_COUNTERS)]))
-            cursor.execute(query, tuple([summary_datum[x] for x in (INTEGER_COUNTERS + REAL_COUNTERS)]))
+            vprint(query, 2)
+            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in INTEGER_COUNTERS + REAL_COUNTERS])), 2)
+            cursor.execute(query, tuple([summary_datum[x] for x in INTEGER_COUNTERS + REAL_COUNTERS]))
 
     cursor.close()
     conn.commit()
@@ -323,7 +335,7 @@ def get_existing_logs(conn):
 
     Args:
         conn (sqlite3.Connection): Connection to database containing existing
-            logs 
+            logs
 
     Returns:
         list of str: Basenames of Darshan log files represnted in the database
@@ -331,7 +343,7 @@ def get_existing_logs(conn):
     cursor = conn.cursor()
     # test table existence first
     cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND (name = ? OR name = ?)",
-        (SUMMARIES_TABLE, HEADERS_TABLE))
+                   (SUMMARIES_TABLE, HEADERS_TABLE))
     if len(cursor.fetchall()) < 2:
         return []
 
@@ -352,7 +364,7 @@ def process_log_list(conn, log_list):
        logs] into a list of log files
     2. Returns the subset of Darshan logs which do not already appear in the
        given database.
-    
+
     Relies on the logic of get_existing_logs() to determine whether a log
     appears in a database or not.
 
@@ -368,7 +380,7 @@ def process_log_list(conn, log_list):
     # Filter out logs that were already processed.  NOTE: get_existing_logs()
     # returns basename; exclude_list is path/basename
     exclude_list = get_existing_logs(conn)
-    print("%d log files already found in database" % len(exclude_list))
+    vprint("%d log files already found in database" % len(exclude_list), 1)
 
     # If only one argument is passed in but it's a directory, enumerate all the
     # files in that directory.  This is a compromise for cases where the CLI
@@ -391,20 +403,26 @@ def process_log_list(conn, log_list):
             else:
                 num_excluded += 1
 
-    print("Adding %d new logs" % len(new_log_list))
-    print("Excluding %d existing logs" % num_excluded)
+    vprint("Adding %d new logs" % len(new_log_list), 1)
+    vprint("Excluding %d existing logs" % num_excluded, 1)
 
     return new_log_list
 
-def index_darshanlogs(log_list, threads=1, max_mb=0):
+def index_darshanlogs(log_list, output_file, threads=1, max_mb=0):
     """Calculate the sum bytes read/written
 
     Given a list of input files, parse each as a Darshan log in parallel to
     create a list of scalar summary values correspond to each log and insert
     these into an SQLite database.
 
+    Current implementation parses all logs and stores their index values in
+    memory before beginning the database insert process.  This can be
+    memory-intensive if processing many millions of logs at once but avoids
+    thread contention on the SQLite database.
+
     Args:
         log_list (list of str): Paths to Darshan logs to be processed
+        output_file (str): Path to a SQLite database file to populate
         threads (int): Number of subprocesses to spawn for Darshan log parsing
         max_mb (int): Skip logs of size larger than this value
 
@@ -412,7 +430,7 @@ def index_darshanlogs(log_list, threads=1, max_mb=0):
         dict: Reduced data along different reduction dimensions
     """
 
-    conn = sqlite3.connect('blah.db')
+    conn = sqlite3.connect(output_file)
 
     new_log_list = process_log_list(conn, log_list)
 
@@ -435,20 +453,38 @@ def index_darshanlogs(log_list, threads=1, max_mb=0):
     update_summaries_table(conn, [x['summaries'] for x in log_records])
 
     conn.close()
+    vprint("Updated %s" % output_file, 1)
 
     return
+
+def vprint(string, level):
+    """Print a message if verbosity is enabled
+
+    Args:
+        string (str): Message to print
+        level (int): Minimum verbosity level required to print
+    """
+
+    if VERBOSITY >= level:
+        print(string)
 
 def main(argv=None):
     """Entry point for the CLI interface
     """
+    global VERBOSITY
+
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")
     parser.add_argument('-t', '--threads', default=1, type=int,
-                        help="Number of concurrent processes")
-    parser.add_argument('-o', '--output', type=str, default=None, help="Name of output file")
-    parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider")
+                        help="Number of concurrent processes (default: 1)")
+    parser.add_argument('-o', '--output', type=str, default='darshalogs.db', help="Name of output file (default: darshanlogs.db)")
+    parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider (default: 0 (disabled))")
+    parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity level (default: none)")
     args = parser.parse_args(argv)
+
+    VERBOSITY = args.verbose
 
     index_darshanlogs(log_list=args.darshanlogs,
                       threads=args.threads,
-                      max_mb=args.max_mb)
+                      max_mb=args.max_mb,
+                      output_file=args.output)
