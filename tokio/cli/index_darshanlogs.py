@@ -1,5 +1,63 @@
 """
 TODO
+
+Schemata:
+
+CREATE TABLE logsummaries (
+    log_id INTEGER,
+    fs_id INTEGER,
+
+    bytes_read INTEGER,
+    bytes_written INTEGER,
+    reads INTEGER,
+    writes INTEGER,
+    file_not_aligned INTEGER,
+    consec_reads INTEGER
+    consec_writes INTEGER,
+
+    mmaps INTEGER,
+    opens INTEGER,
+    seeks INTEGER,
+    stats INTEGER,
+    fdsyncs INTEGER,
+    fsyncs INTEGER,
+
+    seq_reads INTEGER,
+    seq_writes INTEGER,
+    rw_switches INTEGER,
+
+    f_close_start_timestamp REAL,
+    f_close_end_timestamp REAL,
+    f_open_start_timestamp REAL,
+    f_open_end_timestamp REAL,
+
+    f_read_start_timestamp REAL,
+    f_read_end_timestamp REAL,
+
+    f_write_start_timestamp REAL,
+    f_write_end_timestamp REAL,
+
+    FOREIGN KEY (fs_id) REFERENCES filesystems (fs_id),
+    FOREIGN KEY (log_id) REFERENCES headers (log_id)
+);
+
+CREATE TABLE filesystems (
+    fs_id INTEGER PRIMARY KEY,
+    mountpt CHAR
+);
+
+CREATE TABLE headers (
+    logid INTEGER PRIMARY KEY,
+    filename CHAR UNIQUE,
+    end_time INTEGER,
+    exe CHAR,
+    jobid CHAR,
+    nprocs INTEGER,
+    start_time INTEGER,
+    uid INTEGER,
+    log_version CHAR,
+    walltime INTEGER
+);
 """
 
 import os
