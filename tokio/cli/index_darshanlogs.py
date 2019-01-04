@@ -3,7 +3,7 @@ TODO
 
 Schemata:
 
-CREATE TABLE logsummaries (
+CREATE TABLE summaries (
     log_id INTEGER,
     fs_id INTEGER,
 
@@ -37,17 +37,17 @@ CREATE TABLE logsummaries (
     f_write_start_timestamp REAL,
     f_write_end_timestamp REAL,
 
-    FOREIGN KEY (fs_id) REFERENCES filesystems (fs_id),
+    FOREIGN KEY (fs_id) REFERENCES mounts (fs_id),
     FOREIGN KEY (log_id) REFERENCES headers (log_id)
 );
 
-CREATE TABLE filesystems (
+CREATE TABLE mounts (
     fs_id INTEGER PRIMARY KEY,
     mountpt CHAR
 );
 
 CREATE TABLE headers (
-    logid INTEGER PRIMARY KEY,
+    log_id INTEGER PRIMARY KEY,
     filename CHAR UNIQUE,
     end_time INTEGER,
     exe CHAR,
@@ -109,14 +109,18 @@ HEADER_COUNTERS = [
     'walltime',
 ]
 
-def process_log(darshan_log, max_mb=0):
+MOUNT_TABLE = "mounts"
+HEADERS_TABLE = "headers"
+SUMMARIES_TABLE = "summaries"
+
+def summarize_by_fs(darshan_log, max_mb=0):
     """
     Parse a Darshan log and add up the bytes read and written to each entry in
     the mount table.
     """
     result = {
-        'logsummaries': {},
-        'filesystems': set([]),
+        'summaries': {},
+        'mounts': set([]),
         'headers': {},
     }
     if max_mb and (os.path.getsize(darshan_log) / 1024 / 1024) > max_mb:
@@ -146,16 +150,17 @@ def process_log(darshan_log, max_mb=0):
         return result
 
     #
-    # Populate the logsummaries data
+    # Populate the summaries data
     #
 
     # Initialize sums
     for mount in mount_list:
-        result['logsummaries'][mount] = {}
+        result['summaries'][mount] = {}
         for counter in INTEGER_COUNTERS:
-            result['logsummaries'][mount][counter] = 0
+            result['summaries'][mount][counter] = 0
         for counter in REAL_COUNTERS:
-            result['logsummaries'][mount][counter] = 0.0
+            result['summaries'][mount][counter] = 0.0
+        result['summaries'][mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # For each file instrumented, find its mount point and increment that
     # mount's counters
@@ -164,26 +169,26 @@ def process_log(darshan_log, max_mb=0):
             if posix_file.startswith(mount):
                 for counters in posix_counters[posix_file].values():
                     for counter in INTEGER_COUNTERS + REAL_COUNTERS:
-                        result['logsummaries'][mount][counter] += counters.get(counter.upper(), 0)
+                        result['summaries'][mount][counter] += counters.get(counter.upper(), 0)
                 break # don't apply these bytes to more than one mount
 
     #
-    # Populate the filesystems data and remove all mount points that were not used
+    # Populate the mounts data and remove all mount points that were not used
     #
-    for key in list(result['logsummaries'].keys()):
+    for key in list(result['summaries'].keys()):
         # check_val works only when all the keys are positive counters
-        check_val = sum([result['logsummaries'][key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens')])
+        check_val = sum([result['summaries'][key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens')])
         if check_val == 0:
-            result['logsummaries'].pop(key, None)
+            result['summaries'].pop(key, None)
         else:
-            result['filesystems'].add(key)
+            result['mounts'].add(key)
 
     #
     # Populate the headers data
     #
     counters = darshan_data.get('header')
     print(darshan_data.keys())
-    result['headers']['filename'] = darshan_data.log_file
+    result['headers']['filename'] = os.path.basename(darshan_data.log_file)
     for counter in HEADER_COUNTERS:
         result['headers'][counter] = counters.get(counter)
 
@@ -191,14 +196,128 @@ def process_log(darshan_log, max_mb=0):
 
     return result
 
-def _process_log_parallel(darshan_log, max_mb):
+def create_mount_table(conn):
+    """Creates the mount table
+    """
+    cursor = conn.cursor()
+
+    query = """CREATE TABLE IF NOT EXISTS %s (
+        fs_id INTEGER PRIMARY KEY,
+        mountpt CHAR UNIQUE
+    )
+    """ % MOUNT_TABLE
+    print(query)
+    cursor.execute(query)
+
+    cursor.close()
+    conn.commit()
+
+def update_mount_table(conn, mount_points):
+    """Adds new mount points to the mount table
+    """
+    cursor = conn.cursor()
+
+    for mount_point in mount_points:
+        print("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE)
+        print((mount_point,))
+
+    cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, [(x,) for x in mount_points])
+
+    cursor.close()
+    conn.commit()
+
+def create_headers_table(conn):
+    """Creates the headers table
+    """
+    cursor = conn.cursor()
+    query = """CREATE TABLE IF NOT EXISTS %s (
+        log_id INTEGER PRIMARY KEY,
+        filename CHAR UNIQUE,
+        end_time INTEGER,
+        exe CHAR,
+        jobid CHAR,
+        nprocs INTEGER,
+        start_time INTEGER,
+        uid INTEGER,
+        version CHAR,
+        walltime INTEGER
+    )
+    """ % HEADERS_TABLE
+    print(query)
+    cursor.execute(query)
+    cursor.close()
+    conn.commit()
+
+def update_headers_table(conn, header_data):
+    """Adds new header data to the headers table
+    """
+    cursor = conn.cursor()
+
+    header_counters = ["filename", "exe"] + HEADER_COUNTERS
+
+    query = "INSERT INTO %s (" % HEADERS_TABLE
+    query += ", ".join(header_counters)
+    query += ") VALUES (" + ",".join(["?"] * len(header_counters))
+    query += ")"
+
+    for header_datum in header_data:
+        print(query)
+        print(tuple([header_datum[x] for x in header_counters]))
+    cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
+
+    cursor.close()
+    conn.commit()
+
+def create_summaries_table(conn):
+    """Creates the summaries table
+    """
+    cursor = conn.cursor()
+    query = """CREATE TABLE IF NOT EXISTS %s (
+        log_id INTEGER,
+        fs_id INTEGER,
+    """ % SUMMARIES_TABLE
+
+    query += " INTEGER,\n    ".join(INTEGER_COUNTERS) + " INTEGER, \n    "
+    query += " REAL,\n    ".join(REAL_COUNTERS) + " REAL,\n    "
+
+    query += """
+        FOREIGN KEY (fs_id) REFERENCES mounts (fs_id),
+        FOREIGN KEY (log_id) REFERENCES headers (log_id)
+    )
+    """
+    print(query)
+    cursor.execute(query)
+    cursor.close()
+    conn.commit()
+
+def update_summaries_table(conn, summary_data):
+    """Adds new summary counters to the summaries table
+    """
+    cursor = conn.cursor()
+
+    base_query = "INSERT INTO %s (" % SUMMARIES_TABLE
+    base_query += "log_id, fs_id, " + ", ".join(INTEGER_COUNTERS + REAL_COUNTERS) + ")\nVALUES\n("
+    for per_fs_counters in summary_data:
+        for mountpt, summary_datum in per_fs_counters.items():
+            query = base_query + "(SELECT log_id from headers where filename = '%s'),\n" % summary_datum['filename']
+            query += "(SELECT fs_id from mounts where mountpt = '%s'),\n" % mountpt 
+            query += ",\n".join(["?"] * len(INTEGER_COUNTERS + REAL_COUNTERS))
+            query += "\n)"
+            print(query)
+            print(tuple([summary_datum[x] for x in (INTEGER_COUNTERS + REAL_COUNTERS)]))
+            cursor.execute(query, tuple([summary_datum[x] for x in (INTEGER_COUNTERS + REAL_COUNTERS)]))
+
+    cursor.close()
+    conn.commit()
+
+def _summarize_by_fs_parallel(darshan_log, max_mb):
     """
     Return a tuple containing the Darshan log name and the results of
-    process_log() to the parallel orchestrator.
+    summarize_by_fs() to the parallel orchestrator.
     """
-    return (darshan_log, process_log(darshan_log, max_mb))
+    return (darshan_log, summarize_by_fs(darshan_log, max_mb))
 
-def sum_bytes_per_fs(log_list, threads=1, max_mb=0):
+def index_darshanlogs(log_list, threads=1, max_mb=0):
     """Calculate the sum bytes read/written
 
     Given a list of input files, process each as a Darshan log and return a
@@ -240,9 +359,19 @@ def sum_bytes_per_fs(log_list, threads=1, max_mb=0):
         new_log_list.remove(log_name)
 
     # Analyze the remaining logs in parallel
-    for log_name, result in multiprocessing.Pool(threads).imap_unordered(functools.partial(_process_log_parallel, max_mb=max_mb), new_log_list):
+    mount_points = set([])
+    for log_name, result in multiprocessing.Pool(threads).imap_unordered(functools.partial(_summarize_by_fs_parallel, max_mb=max_mb), new_log_list):
         if result:
             global_results.append(result)
+            mount_points |= result['mounts']
+
+    conn = sqlite3.connect('blah.db')
+    create_mount_table(conn)
+    create_headers_table(conn)
+    create_summaries_table(conn)
+    update_mount_table(conn, mount_points)
+    update_headers_table(conn, [x['headers'] for x in global_results])
+    update_summaries_table(conn, [x['summaries'] for x in global_results])
 
     return global_results
 
@@ -257,9 +386,9 @@ def main(argv=None):
     parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider")
     args = parser.parse_args(argv)
 
-    global_results = sum_bytes_per_fs(log_list=args.darshanlogs,
-                                      threads=args.threads,
-                                      max_mb=args.max_mb)
+    global_results = index_darshanlogs(log_list=args.darshanlogs,
+                                       threads=args.threads,
+                                       max_mb=args.max_mb)
 
-    pprinter = pprint.PrettyPrinter(indent=4)
-    pprinter.pprint(global_results)
+#   pprinter = pprint.PrettyPrinter(indent=4)
+#   pprinter.pprint(global_results)
