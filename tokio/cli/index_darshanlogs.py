@@ -66,6 +66,7 @@ Schemata::
 """
 
 import os
+import time
 import sqlite3
 import operator
 import functools
@@ -234,7 +235,7 @@ def create_mount_table(conn):
         mountpt CHAR UNIQUE
     )
     """ % MOUNT_TABLE
-    vprint(query, 2)
+    vprint(query, 3)
     cursor.execute(query)
 
     cursor.close()
@@ -246,8 +247,8 @@ def update_mount_table(conn, mount_points):
     cursor = conn.cursor()
 
     for mount_point in mount_points:
-        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, 2)
-        vprint("Parameters: %s" % str(mount_point,), 2)
+        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, 4)
+        vprint("Parameters: %s" % str(mount_point,), 4)
 
     cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, [(x,) for x in mount_points])
 
@@ -273,7 +274,7 @@ def create_headers_table(conn):
         walltime INTEGER
     )
     """ % HEADERS_TABLE
-    vprint(query, 2)
+    vprint(query, 3)
     cursor.execute(query)
     cursor.close()
     conn.commit()
@@ -285,17 +286,17 @@ def update_headers_table(conn, header_data):
 
     header_counters = ["filename", "exe", "username", "exename"] + HEADER_COUNTERS
 
-#   query = "INSERT OR IGNORE INTO %s (" % HEADERS_TABLE
+#   query = "INSERT OR IGNORE INTO %s (" % HEADERS_TABLE # silently ignore inconsistent data
     query = "INSERT INTO %s (" % HEADERS_TABLE
     query += ", ".join(header_counters)
     query += ") VALUES (" + ",".join(["?"] * len(header_counters))
     query += ")"
 
     for header_datum in header_data:
-        vprint(query, 2)
-        vprint("Parameters: %s" % str(tuple([header_datum[x] for x in header_counters])), 2)
-        cursor.execute(query, tuple([header_datum[x] for x in header_counters]))
-#   cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
+        vprint(query, 4)
+        vprint("Parameters: %s" % str(tuple([header_datum[x] for x in header_counters])), 4)
+#       cursor.execute(query, tuple([header_datum[x] for x in header_counters])) # easier debugging
+    cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
 
     cursor.close()
     conn.commit()
@@ -318,7 +319,7 @@ def create_summaries_table(conn):
         UNIQUE(log_id, fs_id)
     )
     """
-    vprint(query, 2)
+    vprint(query, 3)
     cursor.execute(query)
     cursor.close()
     conn.commit()
@@ -336,8 +337,8 @@ def update_summaries_table(conn, summary_data):
             query += "  (SELECT fs_id from mounts where mountpt = '%s'),\n  " % mountpt
             query += ", ".join(["?"] * len(SUMMARY_COUNTERS))
             query += ")"
-            vprint(query, 2)
-            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in SUMMARY_COUNTERS])), 2)
+            vprint(query, 4)
+            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in SUMMARY_COUNTERS])), 4)
             cursor.execute(query, tuple([summary_datum[x] for x in SUMMARY_COUNTERS]))
 
     cursor.close()
@@ -453,25 +454,37 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0):
 
     conn = sqlite3.connect(output_file)
 
+    t_start = time.time()
     new_log_list = process_log_list(conn, log_list)
+    vprint("Built log list in %.1f seconds" % (time.time() - t_start), 2)
 
     # Analyze the remaining logs in parallel
+    t_start = time.time()
     log_records = []
     mount_points = set([])
     for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
         if result:
             log_records.append(result)
             mount_points |= result['mounts']
+    vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
     # Create tables and indices
+    t_start = time.time()
     create_mount_table(conn)
     create_headers_table(conn)
     create_summaries_table(conn)
+    vprint("Initialized tables in %.1f seconds" % (time.time() - t_start), 2)
 
     # Insert new data that was collected in parallel
+    t_start = time.time()
     update_mount_table(conn, mount_points)
+    vprint("Updated mounts table in %.1f seconds" % (time.time() - t_start), 2)
+    t_start = time.time()
     update_headers_table(conn, [x['headers'] for x in log_records])
+    vprint("Updated headers table in %.1f seconds" % (time.time() - t_start), 2)
+    t_start = time.time()
     update_summaries_table(conn, [x['summaries'] for x in log_records])
+    vprint("Updated summaries table in %.1f seconds" % (time.time() - t_start), 2)
 
     conn.close()
     vprint("Updated %s" % output_file, 1)
