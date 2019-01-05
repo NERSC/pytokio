@@ -150,8 +150,9 @@ def summarize_by_fs(darshan_log, max_mb=0):
         warnings.warn(errmsg)
         return result
 
-    posix_counters = darshan_data.get('counters', {}).get('posix')
-    if not posix_counters:
+    posix_counters = darshan_data.get('counters', {}).get('posix', {})
+    stdio_counters = darshan_data.get('counters', {}).get('stdio', {})
+    if not posix_counters and not stdio_counters:
         errmsg = "No counters found in %s" % darshan_log
         warnings.warn(errmsg)
         return result
@@ -174,15 +175,29 @@ def summarize_by_fs(darshan_log, max_mb=0):
         result['summaries'][mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
-    for posix_file in posix_counters:
-        for mount in mount_list:
-            if posix_file.startswith(mount):
-                for counters in posix_counters[posix_file].values():
-                    for counter, reduction in INTEGER_COUNTERS.items():
-                        result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], counters.get(counter.upper(), 0))
-                    for counter, reduction in REAL_COUNTERS.items():
-                        result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], counters.get(counter.upper(), 0))
-                break # don't apply these bytes to more than one mount
+    for counter_dict in posix_counters, stdio_counters:
+        # record_file is the full path to a file that the application manipulated
+        for record_file in counter_dict:
+            # only consider files that map to known mount points (this drops I/O
+            # performed to stdout from the stdio module)
+            for mount in mount_list:
+                if record_file.startswith(mount):
+                    # counter_dict contains counters from the Darshan log
+                    for counters in counter_dict[record_file].values():
+                        # loop over the counters we're interested in and update
+                        # them if they exist in the Darshan log's compendium.
+                        # if they are NOT present in the Darshan log, do
+                        # nothing--don't attempt to reduce with an implicit zero
+                        # value, as this can screw up reductions that use min/max!
+                        for counter, reduction in INTEGER_COUNTERS.items():
+                            logged_val = counters.get(counter.upper())
+                            if logged_val is not None:
+                                result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], logged_val)
+                        for counter, reduction in REAL_COUNTERS.items():
+                            logged_val = counters.get(counter.upper())
+                            if logged_val is not None:
+                                result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], logged_val)
+                    break # don't apply this record's counters to more than one mountpt
 
     # Populate the mounts data and remove all mount points that were not used
     result['mounts'] = set([])
