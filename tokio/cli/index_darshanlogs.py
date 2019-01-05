@@ -126,12 +126,22 @@ SUMMARIES_TABLE = "summaries"
 
 VERBOSITY = 0
 
-def record_in_mount(filename, mount):
-    if filename.startswith(mount):
-        return True
-    elif (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
-        return True
-    return False;
+def get_file_mount(filename, mount_list):
+    """Return the mount point in which a file is located
+
+    Args:
+        filename (str): Fully equalified path to a file or directory
+        mount_list (list of str): List of mount points
+    Returns:
+        str or None: The member of mount_list in which filename lives, or None
+            if filename does not match any mounts
+    """
+    for mount in mount_list:
+        if filename.startswith(mount):
+            return mount
+        if (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
+            return mount
+    return None;
 
 def summarize_by_fs(darshan_log, max_mb=0):
     """Generates summary scalar values for a Darshan log
@@ -146,11 +156,10 @@ def summarize_by_fs(darshan_log, max_mb=0):
             from the POSIX module which are reduced over all files sharing a
             common mount point.
     """
-    result = {}
     if max_mb and (os.path.getsize(darshan_log) / 1024 / 1024) > max_mb:
         errmsg = "Skipping %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
         warnings.warn(errmsg)
-        return result
+        return {}
 
     try:
         darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
@@ -158,7 +167,7 @@ def summarize_by_fs(darshan_log, max_mb=0):
     except:
         errmsg = "Unable to open or parse %s" % darshan_log
         warnings.warn(errmsg)
-        return result
+        return {}
 
     module_records = {
         'posix': darshan_data.get('counters', {}).get('posix', {}),
@@ -167,82 +176,87 @@ def summarize_by_fs(darshan_log, max_mb=0):
     if not module_records['posix'] and not module_records['stdio']:
         errmsg = "No counters found in %s" % darshan_log
         warnings.warn(errmsg)
-        return result
+        return {}
 
     # reverse the mount to match the deepest path first and root path last
     mount_list = list(reversed(sorted(darshan_data.get('mounts', {}).keys())))
     if not mount_list:
         errmsg = "No mount table found in %s" % darshan_log
         warnings.warn(errmsg)
-        return result
+        return {}
 
     # hack in UNKNOWN for the stdio module since it does not appear in the mount table
     mount_list += ["UNKNOWN"]
 
     # Populate the summaries data
-    result['summaries'] = {}
+    reduced_counters = {}
     for mount in mount_list:
-        result['summaries'][mount] = {}
+        reduced_counters[mount] = {}
         for counter in INTEGER_COUNTERS:
-            result['summaries'][mount][counter] = 0
+            reduced_counters[mount][counter] = 0
         for counter in REAL_COUNTERS:
-            result['summaries'][mount][counter] = 0.0
-        result['summaries'][mount]['filename'] = os.path.basename(darshan_data.log_file)
+            reduced_counters[mount][counter] = 0.0
+        reduced_counters[mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
-    for module, counter_dict in module_records.items():
+    for module, log_counters in module_records.items():
         # record_file is the full path to a file that the application manipulated
-        for record_file in counter_dict:
-            # only consider files that map to known mount points (or UNKNOWN for
-            # stdout/stderr)
-            for mount in mount_list:
-                if record_in_mount(record_file, mount):
-                    # counter_dict contains counters from the Darshan log
-                    for counters in counter_dict[record_file].values():
-                        # loop over the counters we're interested in and update
-                        # them if they exist in the Darshan log's compendium.
-                        # if they are NOT present in the Darshan log, do
-                        # nothing--don't attempt to reduce with an implicit zero
-                        # value, as this can screw up reductions that use min/max!
-                        for counter, reduction in INTEGER_COUNTERS.items():
-                            logged_val = counters.get(counter.upper())
-                            if logged_val is not None:
-                                result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], logged_val)
-                            elif (counter == 'posix_files' and module == 'posix') \
-                            or (counter == 'stdio_files' and module == 'stdio'):
-                                result['summaries'][mount][counter] += 1
-                            # if counter doesn't exist in Darshan log and isn't
-                            # one of our special counters, skip it
-                        for counter, reduction in REAL_COUNTERS.items():
-                            logged_val = counters.get(counter.upper())
-                            if logged_val is not None:
-                                result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], logged_val)
-                    break # don't apply this record's counters to more than one mountpt
+        for record_file in log_counters:
+            # skip file records resident on unknown file systems
+            mount = get_file_mount(record_file, mount_list)
+            if mount is None:
+                continue
+
+            # only iterate over values; keys are MPI ranks that we don't use
+            for counters in log_counters[record_file].values():
+                # Now loop over the counters in our schema and add them if
+                # they exist in the Darshan log's compendium.
+                for counter, reduction in INTEGER_COUNTERS.items():
+                    logged_val = counters.get(counter.upper())
+                    if logged_val is not None:
+                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val)
+                    elif (counter == 'posix_files' and module == 'posix') \
+                    or (counter == 'stdio_files' and module == 'stdio'):
+                        reduced_counters[mount][counter] += 1
+                    # else:
+                        # if counter doesn't exist in Darshan log and isn't one
+                        # of our special counters, skip it do nothing--don't
+                        # attempt to reduce with an implicit zero value, as this
+                        # can screw up reductions that use min/max!
+
+                for counter, reduction in REAL_COUNTERS.items():
+                    logged_val = counters.get(counter.upper())
+                    if logged_val is not None:
+                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val)
 
     # Populate the mounts data and remove all mount points that were not used
-    result['mounts'] = set([])
-    for key in list(result['summaries'].keys()):
+    mountpts = set([])
+    for key in list(reduced_counters.keys()):
         # check_val works only when all the keys are positive counters
-        check_val = sum([result['summaries'][key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
+        check_val = sum([reduced_counters[key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
         if check_val == 0:
-            result['summaries'].pop(key, None)
+            reduced_counters.pop(key, None)
         else:
-            result['mounts'].add(key)
+            mountpts.add(key)
 
     # Populate the headers data
-    result['headers'] = {}
+    header = {}
     counters = darshan_data.get('header')
-    result['headers']['filename'] = os.path.basename(darshan_data.log_file)
+    header['filename'] = os.path.basename(darshan_data.log_file)
     for counter in HEADER_COUNTERS:
-        result['headers'][counter] = counters.get(counter)
+        header[counter] = counters.get(counter)
 
-    result['headers']['exe'] = counters.get('exe')[0]
+    header['exe'] = counters.get('exe')[0]
 
     # username is resolved here so that it can be indexed without having to mess around
-    result['headers']['username'] = darshan_data.filename_metadata.get('username')
-    result['headers']['exename'] = os.path.basename(result['headers']['exe'])
+    header['username'] = darshan_data.filename_metadata.get('username')
+    header['exename'] = os.path.basename(header['exe'])
 
-    return result
+    return {
+        'summaries': reduced_counters,
+        'headers': header,
+        'mounts': mountpts
+    }
 
 def create_mount_table(conn):
     """Creates the mount table
