@@ -16,8 +16,8 @@ import argparse
 import tokio.config
 
 def process_darshan_perfs(summary_jsons,
-                          limit_fs=[], limit_user=[], limit_exe=[],
-                          exclude_fs=[], exclude_user=[], exclude_exe=[],
+                          limit_fs=None, limit_user=None, limit_exe=None,
+                          exclude_fs=None, exclude_user=None, exclude_exe=None,
                           tuples=False):
     """
     Ingest the per-log file system summary contained in the summary_json file(s)
@@ -106,7 +106,12 @@ def process_darshan_perfs(summary_jsons,
                 results['per_user_exe_fs'][key]['write_bytes'] += counters[mount].get('write_bytes', 0)
                 results['per_user_exe_fs'][key]['num_jobs'] += 1
 
-    return results
+    # convert dict of dicts into a list of tuples
+    results_lists = {}
+    for category, rankings in results.items():
+        results_lists[category] = [(key, val.get('read_bytes', 0), val.get('write_bytes', 0), val.get('num_jobs', 0)) for key, val in rankings.items()]
+
+    return results_lists
 
 def print_top(categorized_data, max_show=10):
     """
@@ -128,19 +133,19 @@ def print_top(categorized_data, max_show=10):
         print_buffer += "%2s  %40s %10s %10s %8s\n" % ('#', name, 'Read(GiB)', 'Write(GiB)', '# Jobs')
         print_buffer += '=' * 75 + "\n"
         displayed = 0
-        for winner in sorted(rankings, key=lambda x, r=rankings: r[x]['read_bytes'] + r[x]['write_bytes'], reverse=True):
-            if len(winner) > 40:
-                winner_str = "..." + winner[-37:]
+        for winner in sorted(rankings, key=lambda x: x[1] + x[2], reverse=True):
+            if len(winner[0]) > 40:
+                winner_str = "..." + winner[0][-37:]
             else:
-                winner_str = winner
+                winner_str = winner[0]
             displayed += 1
             if displayed > max_show:
                 break
             print_buffer += "%2d. %40.40s %10.1f %10.1f %8d\n" % (displayed,
-                                                      winner_str,
-                                                      rankings[winner]['read_bytes'] / 2.0**30,
-                                                      rankings[winner]['write_bytes'] / 2.0**30,
-                                                      rankings[winner]['num_jobs'])
+                                                                  winner_str,
+                                                                  winner[1] / 2.0**30,
+                                                                  winner[2] / 2.0**30,
+                                                                  winner[3])
         if displayed > 0:
             sys.stdout.write(print_buffer)
 
