@@ -16,63 +16,36 @@ import argparse
 
 import tokio.config
 
-TOP_USERS_QUERY = """
+BASE_QUERY = """
 SELECT
-    h.username,
     SUM(s.bytes_read) AS readbytes,
     SUM(s.bytes_written) AS writebytes,
-    COUNT(h.filename)
-FROM
-    summaries AS s
-INNER JOIN
-    headers AS h ON h.log_id = s.log_id
-GROUP BY h.username
-ORDER BY (readbytes+writebytes) DESC
-"""
-
-TOP_FS_QUERY = """
-SELECT
-    m.mountpt,
-    SUM(s.bytes_read) AS readbytes,
-    SUM(s.bytes_written) AS writebytes,
-    COUNT(h.filename)
+    COUNT(DISTINCT h.filename) AS jobcount
 FROM
     summaries AS s
 INNER JOIN
     headers AS h ON h.log_id = s.log_id,
     mounts AS m ON m.fs_id = s.fs_id
-GROUP BY m.mountpt
 ORDER BY (readbytes+writebytes) DESC
 """
 
-TOP_EXE_QUERY = """
-SELECT
-    h.exename,
-    SUM(s.bytes_read) AS readbytes,
-    SUM(s.bytes_written) AS writebytes,
-    COUNT(s.bytes_written)
-FROM
-    summaries AS s
-INNER JOIN
-    headers AS h ON h.log_id = s.log_id
-GROUP BY h.exename
-ORDER BY (readbytes+writebytes) DESC
-"""
+QUERY_PARAMS = {
+    'per_user': {
+        'col': 'h.username',
+    },
+    'per_fs': {
+        'col': 'm.mountpt',
+    },
+    'per_exe': {
+        'col': 'h.exename',
+    },
+    'per_user_exe_fs': {
+        'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple' ,
+        'group': 'tuple',
+    },
+}
 
-TOP_TUPLE_QUERY = """
-SELECT
-    h.username, h.exename, m.mountpt,
-    SUM(s.bytes_read) AS readbytes,
-    SUM(s.bytes_written) AS writebytes,
-    COUNT(s.bytes_written)
-FROM
-    summaries AS s
-INNER JOIN
-    headers AS h ON h.log_id = s.log_id,
-    mounts AS m ON m.fs_id = s.fs_id
-GROUP BY h.username, h.exename, m.mountpt
-ORDER BY (readbytes+writebytes) DESC
-"""
+VERBOSITY = 0
 
 def query_index_db(db_filenames,
                    limit_fs=None, limit_user=None, limit_exe=None,
@@ -81,34 +54,28 @@ def query_index_db(db_filenames,
                    max_results=None):
     """Reduce Darshan log index by fs, user, and/or exe
     """
-    fs_limits = []
 
-    fsname_to_mount = {}
-    for mount, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
-        fsname_to_mount[fsname] = mount
-
+    where = []
     if limit_fs:
         for limit in limit_fs:
-            fs_limits.append("m.mountpt = '%s'" % fsname_to_mount.get(limit, limit))
+            where.append("m.mountpt LIKE '%s'" % limit)
     if exclude_fs:
         for limit in exclude_fs:
-            fs_limits.append("m.mountpt != '%s'" % fsname_to_mount.get(limit, limit))
+            where.append("m.mountpt NOT LIKE '%s'" % limit)
 
-    user_limits = []
     if limit_user:
         for limit in limit_user:
-            user_limits.append("h.username = '%s'" % limit)
+            where.append("h.username LIKE '%s'" % limit)
     if exclude_user:
         for limit in exclude_user:
-            user_limits.append("h.username != '%s'" % limit)
+            where.append("h.username NOT LIKE '%s'" % limit)
 
-    exe_limits = []
     if limit_exe:
         for limit in limit_exe:
-            exe_limits.append("h.exename = '%s'" % limit)
+            where.append("h.exename LIKE '%s'" % limit)
     if exclude_exe:
         for limit in exclude_exe:
-            exe_limits.append("h.exename != '%s'" % limit)
+            where.append("h.exename NOT LIKE '%s'" % limit)
 
     results = {}
 
@@ -116,58 +83,29 @@ def query_index_db(db_filenames,
         conn = sqlite3.connect(db_filename)
         cursor = conn.cursor()
 
-        # 'per_user': TOP_USERS_QUERY,
-        query = TOP_USERS_QUERY
-        if exe_limits or user_limits:
-            query = query.replace("GROUP",
-                                  "WHERE\n    " + "\n    AND ".join(exe_limits + user_limits) + "\nGROUP")
-        if max_results:
-            query += "\nLIMIT %d" % max_results
-        print(query)
-        cursor.execute(query)
-        if 'per_user' not in results:
-            results['per_user'] = []
-        results['per_user'] += cursor.fetchall()
+        for category, config in QUERY_PARAMS.items():
 
-        # 'per_fs': TOP_FS_QUERY,
-        query = TOP_FS_QUERY
-        if fs_limits:
-            query = query.replace("GROUP",
-                                  "WHERE\n    " + "\n    AND ".join(fs_limits) + "\nGROUP")
-        if max_results:
-            query += "\nLIMIT %d" % max_results
-        print(query)
-        cursor.execute(query)
-        if 'per_fs' not in results:
-            results['per_fs'] = []
-        results['per_fs'] += cursor.fetchall()
+            query = BASE_QUERY
 
-        # 'per_exe': TOP_EXE_QUERY,
-        query = TOP_EXE_QUERY
-        if exe_limits or user_limits:
-            query = query.replace("GROUP",
-                                  "WHERE\n    " + "\n    AND ".join(exe_limits + user_limits) + "\nGROUP")
-        if max_results:
-            query += "\nLIMIT %d" % max_results
-        print(query)
-        cursor.execute(query)
-        if 'per_exe' not in results:
-            results['per_exe'] = []
-        results['per_exe'] += cursor.fetchall()
+            # insert the column to group by
+            query = query.replace("SELECT", "SELECT\n    %s," % config['col'])
+            query = query.replace("ORDER", "GROUP BY %s\nORDER" % config.get('group', config['col']))
 
-        if tuples:
-            # 'per_user_exe_fs': TOP_TUPLE_QUERY,
-            query = TOP_TUPLE_QUERY
-            if exe_limits or user_limits or fs_limits:
+            # insert filter qualifiers
+            if where:
                 query = query.replace("GROUP",
-                                      "WHERE\n    " + "\n    AND ".join(exe_limits + user_limits + fs_limits) + "\nGROUP")
+                                      "WHERE\n    " + "\n    AND ".join(where) + "\nGROUP")
+
+            # insert max number of return items
             if max_results:
                 query += "\nLIMIT %d" % max_results
-            print(query)
+
+            vprint(query, 1)
+
             cursor.execute(query)
-            if 'per_user_exe_fs' not in results:
-                results['per_user_exe_fs'] = []
-            results['per_user_exe_fs'] += cursor.fetchall()
+            if category not in results:
+                results[category] = []
+            results[category] += cursor.fetchall()
 
         cursor.close()
         conn.close()
@@ -253,15 +191,15 @@ def reduce_summary_jsons(summary_jsons,
             results['per_user'][username]['read_bytes'] += counters[mount].get('read_bytes', 0)
             results['per_user'][username]['write_bytes'] += counters[mount].get('write_bytes', 0)
             results['per_user'][username]['num_jobs'] += 1
-            results['per_fs'][fs_key]['read_bytes'] += counters[mount].get('read_bytes', 0)
-            results['per_fs'][fs_key]['write_bytes'] += counters[mount].get('write_bytes', 0)
-            results['per_fs'][fs_key]['num_jobs'] += 1
+            results['per_fs'][mount]['read_bytes'] += counters[mount].get('read_bytes', 0)
+            results['per_fs'][mount]['write_bytes'] += counters[mount].get('write_bytes', 0)
+            results['per_fs'][mount]['num_jobs'] += 1
             results['per_exe'][exename]['read_bytes'] += counters[mount].get('read_bytes', 0)
             results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
             results['per_exe'][exename]['num_jobs'] += 1
 
             if tuples:
-                key = "%.12s/%.12s/%.12s" % (username, exename, fs_key)
+                key = "%s|%s|%s" % (username, exename, mount)
                 results['per_user_exe_fs'][key]['read_bytes'] += counters[mount].get('read_bytes', 0)
                 results['per_user_exe_fs'][key]['write_bytes'] += counters[mount].get('write_bytes', 0)
                 results['per_user_exe_fs'][key]['num_jobs'] += 1
@@ -284,6 +222,11 @@ def print_top(categorized_data, max_show=10):
         'per_user_exe_fs': "User/App/FS",
     }
 
+    # precompile regular expressions
+    mount_to_fsname = {}
+    for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
+        mount_to_fsname[re.compile(rex_str)] = fsname
+
     categories = 0
     for category, rankings in categorized_data.items():
         print_buffer = ""
@@ -294,10 +237,26 @@ def print_top(categorized_data, max_show=10):
         print_buffer += '=' * 75 + "\n"
         displayed = 0
         for winner in sorted(rankings, key=lambda x: x[1] + x[2], reverse=True):
-            if len(winner[0]) > 40:
-                winner_str = "..." + winner[0][-37:]
-            else:
-                winner_str = winner[0]
+            winner_str = winner[0]
+
+            # map mount points to logical file system names
+            for mount_rex, fsname in mount_to_fsname.items():
+                match = mount_rex.match(winner_str)
+                if match:
+                    winner_str = fsname
+                if '|' in winner_str:
+                    base, mount = winner_str.rsplit('|', 1)
+                    match = mount_rex.match(mount)
+                    if match:
+                        winner_str = base + '|' + fsname
+
+            if '|' in winner_str:
+                winner_str = winner_str.replace('|', ', ')
+
+            if len(winner_str) > 40:
+#               winner_str = "..." + winner_str[-37:]
+                winner_str = winner_str[:19] + "..." + winner_str[-18:]
+
             displayed += 1
             if displayed > max_show:
                 break
@@ -311,9 +270,22 @@ def print_top(categorized_data, max_show=10):
 
         categories += 1
 
+def vprint(string, level):
+    """Print a message if verbosity is enabled
+
+    Args:
+        string (str): Message to print
+        level (int): Minimum verbosity level required to print
+    """
+
+    if VERBOSITY >= level:
+        print(string)
+
 def main(argv=None):
     """Entry point for the CLI interface
     """
+    global VERBOSITY
+
     parser = argparse.ArgumentParser()
     parser.add_argument("indexfile", type=str, nargs='+',
                         help="json output of darshan_per_fs_bytes.py")
@@ -327,9 +299,9 @@ def main(argv=None):
                         help="show top N users, apps, file systems")
     group_fs = parser.add_mutually_exclusive_group()
     group_fs.add_argument("--limit-fs", type=str, default=None,
-                          help="only process data targeting this file system")
+                          help="only process data targeting this file system.  MUST be a fully qualified path to the mount point or injected SQL")
     group_fs.add_argument("--exclude-fs", type=str, default=None,
-                          help="exclude data targeting this file system")
+                          help="exclude data targeting this file system.  MUST be a fully qualified path to the mount point or injected SQL")
     group_user = parser.add_mutually_exclusive_group()
     group_user.add_argument("--limit-user", type=str, default=None,
                             help="only process logs generated by this user")
@@ -340,8 +312,10 @@ def main(argv=None):
                            help="only process logs generated by this binary")
     group_exe.add_argument("--exclude-exe", type=str, default=None,
                            help="exclude logs generated by this binary")
+    parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity level (default: none)")
 
     args = parser.parse_args(argv)
+    VERBOSITY = args.verbose
 
     kwargs = {
         'limit_user': args.limit_user.split(',') if args.limit_user else [],
