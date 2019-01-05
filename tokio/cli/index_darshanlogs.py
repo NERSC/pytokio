@@ -118,11 +118,18 @@ HEADER_COUNTERS = [
     'walltime',
 ]
 
-MOUNT_TABLE = "mounts"
+MOUNTS_TABLE = "mounts"
 HEADERS_TABLE = "headers"
 SUMMARIES_TABLE = "summaries"
 
 VERBOSITY = 0
+
+def record_in_mount(filename, mount):
+    if filename.startswith(mount):
+        return True
+    elif (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
+        return True
+    return False;
 
 def summarize_by_fs(darshan_log, max_mb=0):
     """Generates summary scalar values for a Darshan log
@@ -153,6 +160,7 @@ def summarize_by_fs(darshan_log, max_mb=0):
 
     posix_counters = darshan_data.get('counters', {}).get('posix', {})
     stdio_counters = darshan_data.get('counters', {}).get('stdio', {})
+    vprint("Got %d posix records and %d stdio records" % (len(posix_counters), len(stdio_counters)), 3)
     if not posix_counters and not stdio_counters:
         errmsg = "No counters found in %s" % darshan_log
         warnings.warn(errmsg)
@@ -164,6 +172,9 @@ def summarize_by_fs(darshan_log, max_mb=0):
         errmsg = "No mount table found in %s" % darshan_log
         warnings.warn(errmsg)
         return result
+
+    # hack in UNKNOWN for the stdio module since it does not appear in the mount table
+    mount_list += ["UNKNOWN"]
 
     # Populate the summaries data
     result['summaries'] = {}
@@ -179,10 +190,10 @@ def summarize_by_fs(darshan_log, max_mb=0):
     for counter_dict in posix_counters, stdio_counters:
         # record_file is the full path to a file that the application manipulated
         for record_file in counter_dict:
-            # only consider files that map to known mount points (this drops I/O
-            # performed to stdout from the stdio module)
+            # only consider files that map to known mount points (or UNKNOWN for
+            # stdout/stderr)
             for mount in mount_list:
-                if record_file.startswith(mount):
+                if record_in_mount(record_file, mount):
                     # counter_dict contains counters from the Darshan log
                     for counters in counter_dict[record_file].values():
                         # loop over the counters we're interested in and update
@@ -234,7 +245,7 @@ def create_mount_table(conn):
         fs_id INTEGER PRIMARY KEY,
         mountpt CHAR UNIQUE
     )
-    """ % MOUNT_TABLE
+    """ % MOUNTS_TABLE
     vprint(query, 3)
     cursor.execute(query)
 
@@ -246,11 +257,13 @@ def update_mount_table(conn, mount_points):
     """
     cursor = conn.cursor()
 
+    # We force the addition of UNKNOWN so stdio's stdout/stderr counters are
+    # still included
     for mount_point in mount_points:
-        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, 4)
+        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNTS_TABLE, 4)
         vprint("Parameters: %s" % str(mount_point,), 4)
 
-    cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNT_TABLE, [(x,) for x in mount_points])
+    cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNTS_TABLE, [(x,) for x in mount_points])
 
     cursor.close()
     conn.commit()
@@ -295,8 +308,8 @@ def update_headers_table(conn, header_data):
     for header_datum in header_data:
         vprint(query, 4)
         vprint("Parameters: %s" % str(tuple([header_datum[x] for x in header_counters])), 4)
-#       cursor.execute(query, tuple([header_datum[x] for x in header_counters])) # easier debugging
-    cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
+        cursor.execute(query, tuple([header_datum[x] for x in header_counters])) # easier debugging
+#   cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
 
     cursor.close()
     conn.commit()
@@ -410,8 +423,8 @@ def process_log_list(conn, log_list):
     # prevents every CLI arg from having to be checked to determine if it's a
     # darshan log or directory
     num_excluded = 0
+    new_log_list = []
     if len(log_list) == 1 and os.path.isdir(log_list[0]):
-        new_log_list = []
         for filename in os.listdir(log_list[0]):
             filename = os.path.join(log_list[0], filename)
             if os.path.isfile(filename) and os.path.basename(filename) not in exclude_list:
