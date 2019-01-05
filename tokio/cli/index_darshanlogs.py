@@ -93,6 +93,8 @@ INTEGER_COUNTERS = {
     'seq_reads': operator.add,
     'seq_writes': operator.add,
     'rw_switches': operator.add,
+    'posix_files': operator.add,
+    'stdio_files': operator.add,
 }
 
 REAL_COUNTERS = {
@@ -158,10 +160,11 @@ def summarize_by_fs(darshan_log, max_mb=0):
         warnings.warn(errmsg)
         return result
 
-    posix_counters = darshan_data.get('counters', {}).get('posix', {})
-    stdio_counters = darshan_data.get('counters', {}).get('stdio', {})
-    vprint("Got %d posix records and %d stdio records" % (len(posix_counters), len(stdio_counters)), 3)
-    if not posix_counters and not stdio_counters:
+    module_records = {
+        'posix': darshan_data.get('counters', {}).get('posix', {}),
+        'stdio': darshan_data.get('counters', {}).get('stdio', {}),
+    }
+    if not module_records['posix'] and not module_records['stdio']:
         errmsg = "No counters found in %s" % darshan_log
         warnings.warn(errmsg)
         return result
@@ -187,7 +190,7 @@ def summarize_by_fs(darshan_log, max_mb=0):
         result['summaries'][mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
-    for counter_dict in posix_counters, stdio_counters:
+    for module, counter_dict in module_records.items():
         # record_file is the full path to a file that the application manipulated
         for record_file in counter_dict:
             # only consider files that map to known mount points (or UNKNOWN for
@@ -205,6 +208,11 @@ def summarize_by_fs(darshan_log, max_mb=0):
                             logged_val = counters.get(counter.upper())
                             if logged_val is not None:
                                 result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], logged_val)
+                            elif (counter == 'posix_files' and module == 'posix') \
+                            or (counter == 'stdio_files' and module == 'stdio'):
+                                result['summaries'][mount][counter] += 1
+                            # if counter doesn't exist in Darshan log and isn't
+                            # one of our special counters, skip it
                         for counter, reduction in REAL_COUNTERS.items():
                             logged_val = counters.get(counter.upper())
                             if logged_val is not None:
