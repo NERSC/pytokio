@@ -67,41 +67,45 @@ Schemata::
 
 import os
 import sqlite3
+import operator
 import functools
 import argparse
 import warnings
 import multiprocessing
 import tokio.connectors.darshan
 
-INTEGER_COUNTERS = [
-    'bytes_read',
-    'bytes_written',
-    'reads',
-    'writes',
-    'file_not_aligned',
-    'consec_reads',
-    'consec_writes',
-    'mmaps',
-    'opens',
-    'seeks',
-    'stats',
-    'fdsyncs',
-    'fsyncs',
-    'seq_reads',
-    'seq_writes',
-    'rw_switches',
-]
+INTEGER_COUNTERS = {
+    'bytes_read': operator.add,
+    'bytes_written': operator.add,
+    'reads': operator.add,
+    'writes': operator.add,
+    'file_not_aligned': operator.add,
+    'consec_reads': operator.add,
+    'consec_writes': operator.add,
+    'mmaps': operator.add,
+    'opens': operator.add,
+    'seeks': operator.add,
+    'stats': operator.add,
+    'fdsyncs': operator.add,
+    'fsyncs': operator.add,
+    'flushes': operator.add,
+    'seq_reads': operator.add,
+    'seq_writes': operator.add,
+    'rw_switches': operator.add,
+}
 
-REAL_COUNTERS = [
-    'f_close_start_timestamp',
-    'f_close_end_timestamp',
-    'f_open_start_timestamp',
-    'f_open_end_timestamp',
-    'f_read_start_timestamp',
-    'f_read_end_timestamp',
-    'f_write_start_timestamp',
-    'f_write_end_timestamp',
-]
+REAL_COUNTERS = {
+    'f_close_start_timestamp': min,
+    'f_close_end_timestamp': max,
+    'f_open_start_timestamp': min,
+    'f_open_end_timestamp': max,
+    'f_read_start_timestamp': min,
+    'f_read_end_timestamp': max,
+    'f_write_start_timestamp': min,
+    'f_write_end_timestamp': max,
+}
+
+SUMMARY_COUNTERS = list(INTEGER_COUNTERS.keys()) + list(REAL_COUNTERS.keys())
 
 HEADER_COUNTERS = [
     'end_time',
@@ -169,13 +173,15 @@ def summarize_by_fs(darshan_log, max_mb=0):
             result['summaries'][mount][counter] = 0.0
         result['summaries'][mount]['filename'] = os.path.basename(darshan_data.log_file)
 
-    # Reduce each counter (with a sum operator) according to its mount point
+    # Reduce each counter according to its mount point
     for posix_file in posix_counters:
         for mount in mount_list:
             if posix_file.startswith(mount):
                 for counters in posix_counters[posix_file].values():
-                    for counter in INTEGER_COUNTERS + REAL_COUNTERS:
-                        result['summaries'][mount][counter] += counters.get(counter.upper(), 0)
+                    for counter, reduction in INTEGER_COUNTERS.items():
+                        result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], counters.get(counter.upper(), 0))
+                    for counter, reduction in REAL_COUNTERS.items():
+                        result['summaries'][mount][counter] = reduction(result['summaries'][mount][counter], counters.get(counter.upper(), 0))
                 break # don't apply these bytes to more than one mount
 
     # Populate the mounts data and remove all mount points that were not used
@@ -288,8 +294,8 @@ def create_summaries_table(conn):
         fs_id INTEGER,
     """ % SUMMARIES_TABLE
 
-    query += " INTEGER,\n    ".join(INTEGER_COUNTERS) + " INTEGER, \n    "
-    query += " REAL,\n    ".join(REAL_COUNTERS) + " REAL,\n    "
+    query += " INTEGER,\n    ".join(INTEGER_COUNTERS.keys()) + " INTEGER, \n    "
+    query += " REAL,\n    ".join(REAL_COUNTERS.keys()) + " REAL,\n    "
 
     query += """
         FOREIGN KEY (fs_id) REFERENCES mounts (fs_id),
@@ -308,16 +314,16 @@ def update_summaries_table(conn, summary_data):
     cursor = conn.cursor()
 
     base_query = "INSERT INTO %s (" % SUMMARIES_TABLE
-    base_query += "\n  log_id,\n  fs_id,\n  " + ",\n  ".join(INTEGER_COUNTERS + REAL_COUNTERS) + ") VALUES (\n"
+    base_query += "\n  log_id,\n  fs_id,\n  " + ",\n  ".join(SUMMARY_COUNTERS) + ") VALUES (\n"
     for per_fs_counters in summary_data:
         for mountpt, summary_datum in per_fs_counters.items():
             query = base_query + "  (SELECT log_id from headers where filename = '%s'),\n" % summary_datum['filename']
             query += "  (SELECT fs_id from mounts where mountpt = '%s'),\n  " % mountpt
-            query += ", ".join(["?"] * len(INTEGER_COUNTERS + REAL_COUNTERS))
+            query += ", ".join(["?"] * len(SUMMARY_COUNTERS))
             query += ")"
             vprint(query, 2)
-            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in INTEGER_COUNTERS + REAL_COUNTERS])), 2)
-            cursor.execute(query, tuple([summary_datum[x] for x in INTEGER_COUNTERS + REAL_COUNTERS]))
+            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in SUMMARY_COUNTERS])), 2)
+            cursor.execute(query, tuple([summary_datum[x] for x in SUMMARY_COUNTERS]))
 
     cursor.close()
     conn.commit()
