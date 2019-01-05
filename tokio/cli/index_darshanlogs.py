@@ -188,7 +188,7 @@ def summarize_by_fs(darshan_log, max_mb=0):
     result['mounts'] = set([])
     for key in list(result['summaries'].keys()):
         # check_val works only when all the keys are positive counters
-        check_val = sum([result['summaries'][key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens')])
+        check_val = sum([result['summaries'][key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
         if check_val == 0:
             result['summaries'].pop(key, None)
         else:
