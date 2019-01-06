@@ -13,8 +13,11 @@ import tokio#.connectors.darshan - TODO: fix the import problems
 import tokio.cli.index_darshanlogs
 
 SAMPLE_DARSHAN_LOGS = glob.glob(os.path.join(os.getcwd(), 'inputs', '*.darshan'))
-LOGS_FROM_DIR = glob.glob(os.path.join(tokiotest.SAMPLE_DARSHAN_LOG_DIR, '*', '*', '*', '*.darshan'))
-FILTER_FOR_EXE = ['vpicio_uni', 'dbscan_read']
+TABLES = [
+    tokio.cli.index_darshanlogs.MOUNTS_TABLE,
+    tokio.cli.index_darshanlogs.HEADERS_TABLE,
+    tokio.cli.index_darshanlogs.SUMMARIES_TABLE
+]
 
 def verify_index_db(output_file):
     conn = sqlite3.connect(output_file)
@@ -25,14 +28,24 @@ def verify_index_db(output_file):
 
     print("%s contains %d tables" % (output_file, len(tables)))
     assert len(tables) == 3
-    assert tokio.cli.index_darshanlogs.MOUNTS_TABLE in tables
-    assert tokio.cli.index_darshanlogs.HEADERS_TABLE in tables
-    assert tokio.cli.index_darshanlogs.SUMMARIES_TABLE in tables
+    for table in TABLES:
+        print("Verifying existence of table %s" % table)
+        assert table in tables
 
+    table_len = {}
     for table in tables:
         print("Checking length of table %s" % table)
-        table_len = get_table_len(table, conn=conn, cursor=cursor)
-        assert table_len > 0
+        table_len[table] = get_table_len(table, conn=conn, cursor=cursor)
+        assert table_len[table] > 0
+
+    print("Checking full consistency of %s" % tokio.cli.index_darshanlogs.SUMMARIES_TABLE)
+    cursor.execute("SELECT * from %s AS s INNER JOIN %s AS h ON h.log_id = s.log_id, %s AS m ON m.fs_id = s.fs_id" % (
+        tokio.cli.index_darshanlogs.SUMMARIES_TABLE,
+        tokio.cli.index_darshanlogs.HEADERS_TABLE,
+        tokio.cli.index_darshanlogs.MOUNTS_TABLE))
+    rows = cursor.fetchall()
+    print("  fully joined summaries has %d rows" % len(rows))
+    assert len(rows) == table_len[tokio.cli.index_darshanlogs.SUMMARIES_TABLE]
 
     conn.close()
 
@@ -241,7 +254,6 @@ def test_get_existing_logs():
     print("Test malformed database (all summaries, missing headers)")
     conn = make_index_db(dest_db=tokiotest.TEMP_FILE.name,
                          mod_queries="DELETE FROM headers WHERE log_id % 2 = 0")
-    cursor = conn.cursor()
     existing_logs = tokio.cli.index_darshanlogs.get_existing_logs(conn)
     assert existing_logs
 
@@ -302,7 +314,58 @@ def test_process_log_list():
 
     conn.close()
 
+@tokiotest.needs_darshan
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_update():
     """cli.index_darshanlogs with an existing database
     """
-    raise nose.SkipTest("test not implemented")
+    tokiotest.check_darshan()
+
+    # create a database with a couple of entries
+    argv = ['--quiet', '--output', tokiotest.TEMP_FILE.name] + [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
+    print("Executing: %s" % " ".join(argv))
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+
+    # hack on database
+    conn = sqlite3.connect(tokiotest.TEMP_FILE.name)
+    cursor = conn.cursor()
+
+    print("Initial database:")
+    orig_num_rows = {}
+    for table in TABLES:
+        orig_num_rows[table] = get_table_len(table=table, conn=conn, cursor=cursor)
+
+    print("Test database with all headers, all summaries")
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    for table in TABLES:
+        num_rows = get_table_len(table=table, conn=conn, cursor=cursor)
+        assert num_rows == orig_num_rows[table]
+
+    @nose.tools.raises(sqlite3.IntegrityError)
+    def all_headers_half_summaries():
+        print("Test database with all headers, only half summaries")
+        cursor.execute("DELETE FROM summaries WHERE log_id % 2 = 0")
+        conn.commit()
+        # sqlite3.IntegrityError
+        tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+        for table in TABLES:
+            num_rows = get_table_len(table=table, conn=conn, cursor=cursor)
+            assert num_rows == orig_num_rows[table]
+    all_headers_half_summaries()
+
+    print("Test consistent and half-populated database")
+    cursor.execute("DELETE FROM headers WHERE log_id % 2 = 0")
+    conn.commit()
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    for table in TABLES:
+        num_rows = get_table_len(table=table, conn=conn, cursor=cursor)
+        assert num_rows == orig_num_rows[table]
+
+    print("Test unpopulated database")
+    cursor.execute("DELETE FROM headers")
+    cursor.execute("DELETE FROM summaries")
+    conn.commit()
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    for table in TABLES:
+        num_rows = get_table_len(table=table, conn=conn, cursor=cursor)
+        assert num_rows == orig_num_rows[table]

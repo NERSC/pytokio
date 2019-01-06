@@ -333,7 +333,16 @@ def update_headers_table(conn, header_data):
 
     header_counters = ["filename", "exe", "username", "exename"] + HEADER_COUNTERS
 
-#   query = "INSERT OR IGNORE INTO %s (" % HEADERS_TABLE # silently ignore inconsistent data
+    # "INSERT OR IGNORE INTO" below allows duplicate summaries rows to be added.
+    # This is generally harmless as long as you always INNER JOIN summaries to
+    # headers when calculating reduced metrics over the whole summaries table,
+    # but not all users may know to do this.
+    #
+    # In practice the following will only trigger a sqlite3.IntegrityError if
+    # the database was corrupted in such a way that the headers table lost some
+    # values but the summaries table did not.  The way the database is populated
+    # here makes that impossible, but someone may hack the database on their own
+    # and cause problems.
     query = "INSERT INTO %s (" % HEADERS_TABLE
     query += ", ".join(header_counters)
     query += ") VALUES (" + ",".join(["?"] * len(header_counters))
@@ -342,8 +351,8 @@ def update_headers_table(conn, header_data):
     for header_datum in header_data:
         vprint(query, 4)
         vprint("Parameters: %s" % str(tuple([header_datum[x] for x in header_counters])), 4)
-        cursor.execute(query, tuple([header_datum[x] for x in header_counters])) # easier debugging
-#   cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
+#       cursor.execute(query, tuple([header_datum[x] for x in header_counters])) # easier debugging
+    cursor.executemany(query, [tuple([header_datum[x] for x in header_counters]) for header_datum in header_data])
 
     cursor.close()
     conn.commit()
