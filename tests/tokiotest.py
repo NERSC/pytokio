@@ -49,6 +49,7 @@ SAMPLE_DARSHAN_LOG_USER = 'glock'
 SAMPLE_DARSHAN_LOG_DIR_KEY = 'testsystem'
 SAMPLE_DARSHAN_JOBID_2 = 4487503
 SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
+
 SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
 SAMPLE_DARSHAN_FQLOG_META = {
     "username": "glock",
@@ -58,6 +59,11 @@ SAMPLE_DARSHAN_FQLOG_META = {
     "start_day": 20,
     # don't test the rest for now
 }
+
+# Darshan logs that test weird edge cases.  Just throwing these into the
+# INPUT_DIR is good enough since some tests will glob against inputs/*.darshan
+SAMPLE_DARSHAN_LOG_NOPOSIX = os.path.join(INPUT_DIR, 'noposix.darshan') # lacks a POSIX module
+SAMPLE_DARSHAN_LOG_NOPOSIXOPENS = os.path.join(INPUT_DIR, 'noposix.darshan') # only posix op was a stat
 
 ### For lfsstatus connector/tool.  These values must reflect the contents of
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
