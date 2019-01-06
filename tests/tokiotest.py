@@ -49,6 +49,7 @@ SAMPLE_DARSHAN_LOG_USER = 'glock'
 SAMPLE_DARSHAN_LOG_DIR_KEY = 'testsystem'
 SAMPLE_DARSHAN_JOBID_2 = 4487503
 SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
+SAMPLE_DARSHAN_INDEX_DB = os.path.join(INPUT_DIR, 'darshanlogs.db')
 
 SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
 SAMPLE_DARSHAN_FQLOG_META = {
