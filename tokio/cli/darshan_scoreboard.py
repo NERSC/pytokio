@@ -289,7 +289,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("indexfile", type=str, nargs='+',
                         help="json output of darshan_per_fs_bytes.py")
-    parser.add_argument("--parser-json", action='store_true',
+    parser.add_argument("--json-index", action='store_true',
                         help="indexfile is JSON instead of SQLite")
     parser.add_argument("--json", action='store_true',
                         help="output in json format")
@@ -327,7 +327,7 @@ def main(argv=None):
         'tuples': args.tuples,
     }
 
-    if args.parser_json:
+    if args.json_index:
         results = reduce_summary_jsons(args.indexfile, **kwargs)
     else:
         results = query_index_db(args.indexfile, **kwargs)
