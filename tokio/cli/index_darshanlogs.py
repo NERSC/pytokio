@@ -125,6 +125,7 @@ HEADERS_TABLE = "headers"
 SUMMARIES_TABLE = "summaries"
 
 VERBOSITY = 0
+QUIET = False
 
 def get_file_mount(filename, mount_list):
     """Return the mount point in which a file is located
@@ -136,7 +137,10 @@ def get_file_mount(filename, mount_list):
         str or None: The member of mount_list in which filename lives, or None
             if filename does not match any mounts
     """
-    for mount in mount_list:
+    # always want the most specific mount path to match first
+    sorted_mount_list = sorted(mount_list, key=len, reverse=True)
+
+    for mount in sorted_mount_list:
         if filename.startswith(mount):
             return mount
         if (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
@@ -165,8 +169,15 @@ def summarize_by_fs(darshan_log, max_mb=0):
         darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
         darshan_data.darshan_parser_base()
     except:
-        errmsg = "Unable to open or parse %s" % darshan_log
-        warnings.warn(errmsg)
+        if not QUIET:
+            errmsg = "Unable to open or parse %s" % darshan_log
+            warnings.warn(errmsg)
+        return {}
+
+    if not darshan_data:
+        if not QUIET:
+            errmsg = "Unable to open or parse %s" % darshan_log
+            warnings.warn(errmsg)
         return {}
 
     module_records = {
@@ -174,15 +185,16 @@ def summarize_by_fs(darshan_log, max_mb=0):
         'stdio': darshan_data.get('counters', {}).get('stdio', {}),
     }
     if not module_records['posix'] and not module_records['stdio']:
-        errmsg = "No counters found in %s" % darshan_log
-        warnings.warn(errmsg)
+        if not QUIET:
+            errmsg = "No counters found in %s" % darshan_log
+            warnings.warn(errmsg)
         return {}
 
-    # reverse the mount to match the deepest path first and root path last
-    mount_list = list(reversed(sorted(darshan_data.get('mounts', {}).keys())))
+    mount_list = list(darshan_data.get('mounts', {}).keys())
     if not mount_list:
-        errmsg = "No mount table found in %s" % darshan_log
-        warnings.warn(errmsg)
+        if not QUIET:
+            errmsg = "No mount table found in %s" % darshan_log
+            warnings.warn(errmsg)
         return {}
 
     # hack in UNKNOWN for the stdio module since it does not appear in the mount table
@@ -423,7 +435,11 @@ def process_log_list(conn, log_list):
        given database.
 
     Relies on the logic of get_existing_logs() to determine whether a log
-    appears in a database or not.
+    appears in a database or not.  If a database is somehow created where the
+    summaries table is fully populated but the headers table is not, this will
+    still return log files corresponding to the missing headers and
+    potentially result in duplicate summaries entries that have no matching
+    header.
 
     Args:
         conn (sqlite3.Connection): Database containing log data
@@ -541,17 +557,20 @@ def main(argv=None):
     """Entry point for the CLI interface
     """
     global VERBOSITY
+    global QUIET
 
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")
     parser.add_argument('-t', '--threads', default=1, type=int,
                         help="Number of concurrent processes (default: 1)")
-    parser.add_argument('-o', '--output', type=str, default='darshalogs.db', help="Name of output file (default: darshanlogs.db)")
+    parser.add_argument('-o', '--output', type=str, default='darshanlogs.db', help="Name of output file (default: darshanlogs.db)")
     parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider (default: 0 (disabled))")
     parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity level (default: none)")
+    parser.add_argument('-q', '--quiet', action='store_true', help="Suppress warnings for invalid Darshan logs")
     args = parser.parse_args(argv)
 
     VERBOSITY = args.verbose
+    QUIET = args.quiet
 
     index_darshanlogs(log_list=args.darshanlogs,
                       threads=args.threads,
