@@ -56,26 +56,27 @@ def query_index_db(db_filenames,
     """
 
     where = []
+    where0 = []
     if limit_fs:
-        for limit in limit_fs:
-            where.append("m.mountpt LIKE '%s'" % limit)
+        where0 = ["m.mountpt LIKE '%s'" % limit for limit in limit_fs]
+        where.append("(" + " OR ".join(where0) + ")")
     if exclude_fs:
-        for limit in exclude_fs:
-            where.append("m.mountpt NOT LIKE '%s'" % limit)
+        where0 = ["m.mountpt NOT LIKE '%s'" % limit for limit in exclude_fs]
+        where.append("(" + " AND ".join(where0) + ")")
 
     if limit_user:
-        for limit in limit_user:
-            where.append("h.username LIKE '%s'" % limit)
+        where0 = ["h.username LIKE '%s'" % limit for limit in limit_user]
+        where.append("(" + " OR ".join(where0) + ")")
     if exclude_user:
-        for limit in exclude_user:
-            where.append("h.username NOT LIKE '%s'" % limit)
+        where0 = ["h.username NOT LIKE '%s'" % limit for limit in exclude_user]
+        where.append("(" + " AND ".join(where0) + ")")
 
     if limit_exe:
-        for limit in limit_exe:
-            where.append("h.exename LIKE '%s'" % limit)
+        where0 = ["h.exename LIKE '%s'" % limit for limit in limit_exe]
+        where.append("(" + " OR ".join(where0) + ")")
     if exclude_exe:
-        for limit in exclude_exe:
-            where.append("h.exename NOT LIKE '%s'" % limit)
+        where0 = ["h.exename NOT LIKE '%s'" % limit for limit in exclude_exe]
+        where.append("(" + " AND ".join(where0) + ")")
 
     results = {}
 

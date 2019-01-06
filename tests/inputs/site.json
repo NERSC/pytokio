@@ -9,7 +9,9 @@
         "^/var/opt/cray/dws/mounts/.*/ss": "bb-shared",
         "^/var/opt/cray/dws/mounts/.*/ps": "bb-private",
         "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch": "bb-shared",
-        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch": "bb-private"
+        "^/var/opt/cray/dws/mounts/batch/.*_private_scratch": "bb-private",
+        "^/global/u1": "homes-u1",
+        "^/global/u2": "homes-u2"
     },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",

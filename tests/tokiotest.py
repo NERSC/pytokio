@@ -41,8 +41,7 @@ SAMPLE_DARSHAN_JOBHOST = 'edison'
 SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47'
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43'
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS = '/scratch1,/scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL = 'scratch1,scratch2'
+
 SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 SAMPLE_DARSHAN_LOG_DIR = os.path.join(INPUT_DIR, 'darshanlogs')
 SAMPLE_DARSHAN_LOG_USER = 'glock'
@@ -50,6 +49,22 @@ SAMPLE_DARSHAN_LOG_DIR_KEY = 'testsystem'
 SAMPLE_DARSHAN_JOBID_2 = 4487503
 SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
 SAMPLE_DARSHAN_INDEX_DB = os.path.join(INPUT_DIR, 'darshanlogs.db')
+# SAMPLE_DARSHAN_INDEX_DB_EXES contains a subset of SELECT exename FROM headers;
+# they're expressed as numbers and not sensible exe names (like ph.x) because
+# the Darshan logs used to generate darshanlogs.db were obfuscated
+SAMPLE_DARSHAN_INDEX_DB_EXES = [
+    '1221559022',
+    '2054166464',
+    '1700134137'
+]
+# SAMPLE_DARSHAN_INDEX_DB_USER is one of the values returned by 
+# SELECT username FROM HEADERS
+SAMPLE_DARSHAN_INDEX_DB_USER = 'aa4hm0jcwfg'
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS = [
+    '/global/cscratch1',
+    '/global/u2',
+]
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL = 'cscratch,homes-u2'
 
 SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
 SAMPLE_DARSHAN_FQLOG_META = {
