@@ -4,14 +4,10 @@ or index_darshanlogs tools and generate a scoreboard of top sources of I/O based
 on user, file system, and/or application.
 """
 
-import os
 import re
 import sys
 import json
-import gzip
 import sqlite3
-import mimetypes
-import collections
 import argparse
 
 import tokio.config
@@ -40,7 +36,7 @@ QUERY_PARAMS = {
         'col': 'h.exename',
     },
     'per_user_exe_fs': {
-        'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple' ,
+        'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple',
         'group': 'tuple',
     },
 }
@@ -50,7 +46,6 @@ VERBOSITY = 0
 def query_index_db(db_filenames,
                    limit_fs=None, limit_user=None, limit_exe=None,
                    exclude_fs=None, exclude_user=None, exclude_exe=None,
-                   tuples=False,
                    max_results=None):
     """Reduce Darshan log index by fs, user, and/or exe
     """
@@ -112,105 +107,6 @@ def query_index_db(db_filenames,
         conn.close()
 
     return results
-
-def reduce_summary_jsons(summary_jsons,
-                         limit_fs=None, limit_user=None, limit_exe=None,
-                         exclude_fs=None, exclude_user=None, exclude_exe=None,
-                         tuples=False):
-    """Reduces summary JSON by fs, user, and/or exe
-
-    Ingests the per-log file system summary contained in the summary_json
-    file(s) and produce a dictionary with bytes read/written reduced on
-    application binary name, user name, and file system.
-    """
-
-    summary = {}
-    for summary_json in summary_jsons:
-        _, encoding = mimetypes.guess_type(summary_json)
-        if encoding == 'gzip':
-            summary.update(json.load(gzip.open(summary_json, 'r')))
-        else:
-            summary.update(json.load(open(summary_json, 'r')))
-
-    regex_filename = re.compile(r'^([^_]+)_(.*?)_id(\d+)_.*.darshan')
-
-    results = collections.OrderedDict()
-    results['per_user'] = collections.defaultdict(lambda: collections.defaultdict(int))
-    results['per_fs'] = collections.defaultdict(lambda: collections.defaultdict(int))
-    results['per_exe'] = collections.defaultdict(lambda: collections.defaultdict(int))
-    results['per_user_exe_fs'] = collections.defaultdict(lambda: collections.defaultdict(int))
-
-    for darshan_log, counters in summary.items():
-        darshan_log_bn = os.path.basename(darshan_log)
-        regex_match = regex_filename.search(darshan_log_bn)
-        if regex_match:
-            username = regex_match.group(1)
-            exename = regex_match.group(2)
-        elif '_' in darshan_log_bn:
-            username = darshan_log_bn.split('_', 1)[0]
-            exename = "<unknown>"
-        else:
-            username = "<unknown>"
-            exename = "<unknown>"
-
-        # apply limits, if applicable
-        if (limit_user and username not in limit_user) \
-        or (limit_exe and exename not in limit_exe) \
-        or (exclude_user and username in exclude_user) \
-        or (exclude_exe and exename in exclude_exe):
-            continue
-
-        # precompile regular expressions
-        mount_to_fsname = {}
-        for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
-            mount_to_fsname[re.compile(rex_str)] = fsname
-
-        for mount in counters:
-#           if mount == '/':
-#               continue
-
-            # try to map mount to a logical file system name
-            fs_key = None
-            for mount_rex, fsname in mount_to_fsname.items():
-                match = mount_rex.match(mount)
-                if match:
-                    fs_key = fsname
-
-            # if limit_fs/exclude_fs in play, filter at the per-record basis
-            if limit_fs:
-                if mount not in limit_fs \
-                and (fs_key and fs_key not in limit_fs):
-                    continue
-            if exclude_fs:
-                if mount in exclude_fs \
-                or (fs_key and fs_key in exclude_fs):
-                    continue
-
-            if fs_key is None:
-                fs_key = mount
-
-            results['per_user'][username]['read_bytes'] += counters[mount].get('read_bytes', 0)
-            results['per_user'][username]['write_bytes'] += counters[mount].get('write_bytes', 0)
-            results['per_user'][username]['num_jobs'] += 1
-            results['per_fs'][mount]['read_bytes'] += counters[mount].get('read_bytes', 0)
-            results['per_fs'][mount]['write_bytes'] += counters[mount].get('write_bytes', 0)
-            results['per_fs'][mount]['num_jobs'] += 1
-            results['per_exe'][exename]['read_bytes'] += counters[mount].get('read_bytes', 0)
-            results['per_exe'][exename]['write_bytes'] += counters[mount].get('write_bytes', 0)
-            results['per_exe'][exename]['num_jobs'] += 1
-
-            if tuples:
-                key = "%s|%s|%s" % (username, exename, mount)
-                results['per_user_exe_fs'][key]['read_bytes'] += counters[mount].get('read_bytes', 0)
-                results['per_user_exe_fs'][key]['write_bytes'] += counters[mount].get('write_bytes', 0)
-                results['per_user_exe_fs'][key]['num_jobs'] += 1
-
-    # convert dict of dicts into a list of tuples
-    results_lists = {}
-    for category, rankings in results.items():
-        results_lists[category] = [(key, val.get('read_bytes', 0), val.get('write_bytes', 0), val.get('num_jobs', 0)) for key, val in rankings.items()]
-
-    return results_lists
 
 def print_top(categorized_data, max_show=10):
     """
@@ -290,12 +186,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("indexfile", type=str, nargs='+',
                         help="json output of darshan_per_fs_bytes.py")
-    parser.add_argument("--json-index", action='store_true',
-                        help="indexfile is JSON instead of SQLite")
     parser.add_argument("--json", action='store_true',
                         help="output in json format")
-    parser.add_argument("--tuples", action='store_true',
-                        help="generate top user-fs-exe tuples")
     parser.add_argument("--max-show", type=int, default=10,
                         help="show top N users, apps, file systems")
     group_fs = parser.add_mutually_exclusive_group()
@@ -325,13 +217,9 @@ def main(argv=None):
         'exclude_user': args.exclude_user.split(',') if args.exclude_user else [],
         'exclude_fs': args.exclude_fs.split(',') if args.exclude_fs else [],
         'exclude_exe': args.exclude_exe.split(',') if args.exclude_exe else [],
-        'tuples': args.tuples,
     }
 
-    if args.json_index:
-        results = reduce_summary_jsons(args.indexfile, **kwargs)
-    else:
-        results = query_index_db(args.indexfile, **kwargs)
+    results = query_index_db(args.indexfile, **kwargs)
 
     if args.json:
         print(json.dumps(results, indent=4, sort_keys=True))
