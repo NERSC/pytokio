@@ -167,7 +167,12 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
 
     try:
         darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
-        darshan_data.darshan_parser_base()
+        if QUIET:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                darshan_data.darshan_parser_base()
+        else:
+            darshan_data.darshan_parser_base()
     except:
         if not QUIET:
             errmsg = "Unable to open or parse %s" % darshan_log
