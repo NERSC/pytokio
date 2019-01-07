@@ -20,6 +20,8 @@ TABLES = [
 ]
 
 def verify_index_db(output_file):
+    """Verifies schemata and correctness of an index database
+    """
     conn = sqlite3.connect(output_file)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -39,10 +41,17 @@ def verify_index_db(output_file):
         assert table_len[table] > 0
 
     print("Checking full consistency of %s" % tokio.cli.index_darshanlogs.SUMMARIES_TABLE)
-    cursor.execute("SELECT * from %s AS s INNER JOIN %s AS h ON h.log_id = s.log_id, %s AS m ON m.fs_id = s.fs_id" % (
-        tokio.cli.index_darshanlogs.SUMMARIES_TABLE,
-        tokio.cli.index_darshanlogs.HEADERS_TABLE,
-        tokio.cli.index_darshanlogs.MOUNTS_TABLE))
+    cursor.execute("""
+        SELECT 
+            *
+        FROM
+            %s AS s
+        INNER JOIN
+            %s AS h ON h.log_id = s.log_id,
+            %s AS m ON m.fs_id = s.fs_id""" % (
+                tokio.cli.index_darshanlogs.SUMMARIES_TABLE,
+                tokio.cli.index_darshanlogs.HEADERS_TABLE,
+                tokio.cli.index_darshanlogs.MOUNTS_TABLE))
     rows = cursor.fetchall()
     print("  fully joined summaries has %d rows" % len(rows))
     assert len(rows) == table_len[tokio.cli.index_darshanlogs.SUMMARIES_TABLE]
@@ -50,6 +59,8 @@ def verify_index_db(output_file):
     conn.close()
 
 def get_table_len(table, output_file=None, conn=None, cursor=None):
+    """Retrieve the row count for a table in the index db
+    """
     if not conn:
         conn = sqlite3.connect(output_file)
     if not cursor:
@@ -65,9 +76,11 @@ def test_input_dir():
     """cli.index_darshanlogs with input dir
     """
     tokiotest.check_darshan()
-    argv = ['--quiet', '--output', tokiotest.TEMP_FILE.name] + [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
+    argv = ['--quiet',
+            '--output',
+            tokiotest.TEMP_FILE.name] + [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
     print("Executing: %s" % " ".join(argv))
-    output_str = tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
     assert get_table_len(tokio.cli.index_darshanlogs.HEADERS_TABLE,
                          output_file=tokiotest.TEMP_FILE.name) > 1
@@ -80,7 +93,7 @@ def test_input_file():
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + [SAMPLE_DARSHAN_LOGS[0]]
     print("Executing: %s" % " ".join(argv))
-    output_str = tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
     assert get_table_len(tokio.cli.index_darshanlogs.HEADERS_TABLE,
                          output_file=tokiotest.TEMP_FILE.name) == 1
@@ -93,7 +106,7 @@ def test_input_files():
     tokiotest.check_darshan()
     argv = ['--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
     print("Executing: %s" % " ".join(argv))
-    output_str = tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
     assert get_table_len(tokio.cli.index_darshanlogs.HEADERS_TABLE,
                          output_file=tokiotest.TEMP_FILE.name) > 1
@@ -106,7 +119,7 @@ def test_multithreaded():
     tokiotest.check_darshan()
     argv = ['--threads', '4', '--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
     print("Executing: %s" % " ".join(argv))
-    output_str = tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
 
 def test_get_file_mount():
@@ -180,7 +193,8 @@ def test_summarize_by_fs():
 
     print("Verify max_mb functionality")
     warnings.filterwarnings('ignore')
-    result = tokio.cli.index_darshanlogs.summarize_by_fs(tokiotest.SAMPLE_DARSHAN_LOG, max_mb=1.0/1024.0)
+    result = tokio.cli.index_darshanlogs.summarize_by_fs(tokiotest.SAMPLE_DARSHAN_LOG,
+                                                         max_mb=1.0/1024.0)
     assert not result
 
 def make_index_db(dest_db, mod_queries=None, src_db=tokiotest.SAMPLE_DARSHAN_INDEX_DB):
@@ -264,7 +278,7 @@ def test_process_log_list():
     """
     print('Test database with some summaries table data missing')
     conn = make_index_db(dest_db=tokiotest.TEMP_FILE.name)
-    
+
     # Get full list of logs in database.  We assume sample database is fully
     # consistent so we don't unnecessarily couple this test to get_existing_logs()
     cursor = conn.cursor()
@@ -322,7 +336,9 @@ def test_update():
     tokiotest.check_darshan()
 
     # create a database with a couple of entries
-    argv = ['--quiet', '--output', tokiotest.TEMP_FILE.name] + [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
+    argv = ['--quiet',
+            '--output',
+            tokiotest.TEMP_FILE.name] + [os.path.dirname(SAMPLE_DARSHAN_LOGS[0])]
     print("Executing: %s" % " ".join(argv))
     tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
 
@@ -343,6 +359,8 @@ def test_update():
 
     @nose.tools.raises(sqlite3.IntegrityError)
     def all_headers_half_summaries():
+        """Test database with half of the summaries rows missing
+        """
         print("Test database with all headers, only half summaries")
         cursor.execute("DELETE FROM summaries WHERE log_id % 2 = 0")
         conn.commit()
