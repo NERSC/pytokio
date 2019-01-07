@@ -9,6 +9,7 @@ import sys
 import json
 import sqlite3
 import argparse
+import collections
 
 import tokio.config
 
@@ -25,20 +26,13 @@ INNER JOIN
 ORDER BY (readbytes+writebytes) DESC
 """
 
-QUERY_PARAMS = {
-    'per_user': {
-        'col': 'h.username',
-    },
-    'per_fs': {
-        'col': 'm.mountpt',
-    },
-    'per_exe': {
-        'col': 'h.exename',
-    },
-    'per_user_exe_fs': {
-        'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple',
-        'group': 'tuple',
-    },
+QUERY_PARAMS = collections.OrderedDict()
+QUERY_PARAMS['per_user'] = {'col': 'h.username'}
+QUERY_PARAMS['per_fs'] = {'col': 'm.mountpt'}
+QUERY_PARAMS['per_exe'] = {'col': 'h.exename'}
+QUERY_PARAMS['per_user_exe_fs'] = {
+    'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple',
+    'group': 'tuple',
 }
 
 VERBOSITY = 0
@@ -73,7 +67,7 @@ def query_index_db(db_filenames,
         where0 = ["h.exename NOT LIKE '%s'" % limit for limit in exclude_exe]
         where.append("(" + " AND ".join(where0) + ")")
 
-    results = {}
+    results = collections.OrderedDict()
 
     for db_filename in db_filenames:
         conn = sqlite3.connect(db_filename)
