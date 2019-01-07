@@ -147,12 +147,12 @@ def get_file_mount(filename, mount_list):
             return mount
     return None;
 
-def summarize_by_fs(darshan_log, max_mb=0):
+def summarize_by_fs(darshan_log, max_mb=0.0):
     """Generates summary scalar values for a Darshan log
 
     Args:
         darshan_log (str): Path to a Darshan log file
-        max_mb (int): Skip logs of size larger than this value
+        max_mb (float): Skip logs of size larger than this value
 
     Returns:
         dict: Contains three keys (summaries, mounts, and headers) whose values
@@ -160,7 +160,7 @@ def summarize_by_fs(darshan_log, max_mb=0):
             from the POSIX module which are reduced over all files sharing a
             common mount point.
     """
-    if max_mb and (os.path.getsize(darshan_log) / 1024 / 1024) > max_mb:
+    if max_mb > 0.0 and (os.path.getsize(darshan_log) / 1024.0 / 1024.0) > max_mb:
         errmsg = "Skipping %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
         warnings.warn(errmsg)
         return {}
@@ -490,7 +490,7 @@ def process_log_list(conn, log_list):
 
     return new_log_list
 
-def index_darshanlogs(log_list, output_file, threads=1, max_mb=0):
+def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     """Calculate the sum bytes read/written
 
     Given a list of input files, parse each as a Darshan log in parallel to
@@ -506,7 +506,7 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0):
         log_list (list of str): Paths to Darshan logs to be processed
         output_file (str): Path to a SQLite database file to populate
         threads (int): Number of subprocesses to spawn for Darshan log parsing
-        max_mb (int): Skip logs of size larger than this value
+        max_mb (float): Skip logs of size larger than this value
 
     Returns:
         dict: Reduced data along different reduction dimensions
