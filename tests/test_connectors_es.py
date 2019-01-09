@@ -4,6 +4,7 @@ Test the ElasticSearch collectd connector.  Some of these tests will essentially
 pass only at NERSC because of the assumptions built into the indices.
 """
 
+import datetime
 import tokio.connectors.es
 
 # Disable dependence on external Elasticsearch cluster to run tests
@@ -12,6 +13,30 @@ tokio.connectors.es.LOCAL_MODE = True
 FLUSH_STATE = {'pages': []}
 PAGE_SIZE = 100
 NUM_PAGES = 10
+
+FAKE_TIMESERIES_QUERIES = [
+    {
+        '@timestamp': {},
+    },
+    {
+        "blah": {
+            'hello': 'blah',
+            'world': 'blah',
+            '@timestamp': {},
+        },
+    },
+    {
+        "blah": [
+            {
+                'hello': 'world',
+                '1': 2,
+            },
+            {
+                '@timestamp': {},
+            },
+        ],
+    },
+]
 
 def make_fake_pages(num_pages=NUM_PAGES, page_size=PAGE_SIZE):
     """Create a set of fake pages
@@ -101,3 +126,11 @@ def test_flush_function_correctness():
 
     # Catch cases where mismatching results are returned
     assert flush_function_hits == no_flush_hits
+
+def test_build_timeseries_query():
+    """connectors.es.build_timeseries_query"""
+
+    for query in FAKE_TIMESERIES_QUERIES:
+        # doesn't matter _what_ the datetime is
+        ret = tokio.connectors.es.build_timeseries_query(query, datetime.datetime.now(), datetime.datetime.now())
+        assert ret

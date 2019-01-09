@@ -319,9 +319,16 @@ def build_timeseries_query(orig_query, start, end):
         time_range_obj['gte'] = int(time.mktime(start.timetuple()))
         time_range_obj['lt'] = int(time.mktime(end.timetuple()))
         time_range_obj['format'] = time_format
+        remaps[0] += 1
+
+    # note we use a single-element list so that remaps becomes mutable
+    remaps = [0]
 
     query = copy.deepcopy(orig_query)
 
     map_item(query, '@timestamp', set_time_range)
+
+    if not remaps:
+        raise RuntimeError("unable to locate timestamp in query")
 
     return query
