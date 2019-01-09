@@ -1,120 +1,78 @@
 #!/usr/bin/env python
 """
-Test the ElasticSearch collectd connector.  Some of these tests will essentially
-pass only at NERSC because of the assumptions built into the indices.
+Test the ElasticSearch collectd connector.  Not much that can be done since most
+functionality is dictated by the behavior of Elasticsearch.
 """
 
 import datetime
 import nose
+import tokio.connectors.es
+import tokio.connectors.collectd_es
+import tokiotest
 try:
     import elasticsearch.exceptions
-    import tokio.connectors.collectd_es
     _HAVE_ELASTICSEARCH = True
 except ImportError:
     _HAVE_ELASTICSEARCH = False
-import tokiotest
-# import logging
+
+FAKE_PAGES = [
+    {
+        '_scroll_id': 1,
+        'hits': {
+            'hits': [{'payload': 'results'}],
+        },
+    },
+    {
+        '_scroll_id': 1,
+        'hits': {
+            'hits': [],
+        },
+    },
+]
 
 ### the ElasticSearch python library can be VERY noisy on failures
+# import logging
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
-### PAGE_SIZE is number of documents to return per page
-PAGE_SIZE = 200
-
-### QUERY_WINDOW is how long of a time period to search over
-QUERY_WINDOW = datetime.timedelta(seconds=10)
-
-FLUSH_STATE = {
-    'pages': []
-}
-
-def flush_function(es_obj):
+def test_query_interfaces():
+    """test_connectors_collectd_es.query_*
     """
-    save our bundled pages into json
-    """
-    global FLUSH_STATE
+    global _HAVE_ELASTICSEARCH
 
-    ### assert es_obj.page_size == flush_every as passed to es_obj.query_and_scroll
-    assert len(es_obj.scroll_pages) == 1
+    end = datetime.datetime.now() - datetime.timedelta(hours=1)
+    start = end - datetime.timedelta(seconds=10)
 
-    ### "flush" to the global state
-    FLUSH_STATE['pages'].append(es_obj.scroll_pages[0])
+    esdb = None
+    if _HAVE_ELASTICSEARCH:
+        esdb = tokio.connectors.collectd_es.CollectdEs(
+            host=tokiotest.SAMPLE_COLLECTDES_HOST,
+            port=tokiotest.SAMPLE_COLLECTDES_PORT,
+            index=tokiotest.SAMPLE_COLLECTDES_INDEX)
+        try:
+            esdb.query({"query": {"match": {"message": {"query": "test connection", "operator": "and"}}}})
+        except elasticsearch.exceptions.ConnectionError:
+            esdb = None
 
-    ### empty the page buffer
-    es_obj.scroll_pages = []
+    if not esdb:
+        tokio.connectors.es.LOCAL_MODE = True
+        assert tokio.connectors.es.LOCAL_MODE
+        esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
+        esdb.local_mode = True
 
-def test_flush_function_correctness():
-    """
-    CollectdEs flush function correctness
-    """
-    if not _HAVE_ELASTICSEARCH:
-        raise nose.SkipTest("elasticsearch module not available")
+    if tokio.connectors.es.LOCAL_MODE:
+        esdb.fake_pages = FAKE_PAGES
+    esdb.query_disk(start, end)
+    assert esdb.scroll_pages
+    esdb.scroll_pages = []
 
-    # Define start/end time.  Because we don't know what's in the remote server,
-    # we can't really make this deterministic; just use a five second window
-    # ending now.
-    t_stop = datetime.datetime.now() - datetime.timedelta(hours=1)
-    t_start = t_stop - QUERY_WINDOW
+    if tokio.connectors.es.LOCAL_MODE:
+        esdb.fake_pages = FAKE_PAGES
+    esdb.query_memory(start, end)
+    assert esdb.scroll_pages
+    esdb.scroll_pages = []
 
-    # note that strftime("%s") is not standard POSIX; this may not work
-    query = tokio.connectors.collectd_es.build_timeseries_query(
-        tokiotest.SAMPLE_COLLECTDES_QUERY,
-        t_start,
-        t_stop)
-
-    # Connect
-    try:
-        es_obj = tokio.connectors.collectd_es.CollectdEs(
-            host='localhost',
-            port=9200,
-            index=tokiotest.SAMPLE_COLLECTDES_INDEX,
-            page_size=PAGE_SIZE)
-        ############################################################################
-        # Accumulate results using a flush_function
-        ############################################################################
-        es_obj.query_and_scroll(
-            query=query,
-            flush_every=PAGE_SIZE,
-            flush_function=flush_function
-        )
-    except elasticsearch.exceptions.ConnectionError as error:
-        raise nose.SkipTest(error)
-
-
-    # Run flush function on the last page
-    if len(es_obj.scroll_pages) > 0:
-        flush_function(es_obj)
-
-    # If no pages were found, there is a problem
-    assert len(FLUSH_STATE['pages']) > 0
-
-    if not len(FLUSH_STATE['pages']) > 2:
-        raise nose.SkipTest("time range only got %d pages; cannot test flush function"
-                            % len(FLUSH_STATE['pages']))
-
-    ############################################################################
-    # Accumulate results on the object without a flush function
-    ############################################################################
-    es_obj.query_and_scroll(query)
-
-    ############################################################################
-    # Ensure that both return identical hits
-    ############################################################################
-    flush_function_hits = set([])
-    for page in FLUSH_STATE['pages']:
-        flush_function_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print("flush_function populated %d documents" % len(flush_function_hits))
-
-    no_flush_hits = set([])
-    for page in es_obj.scroll_pages:
-        no_flush_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print("no flush function populated %d documents" % len(no_flush_hits))
-
-    # Ensure that our ground-truth query actually returned something
-    assert len(no_flush_hits) > 0
-
-    # Catch obviously wrong number of returned results
-    assert len(no_flush_hits) == len(flush_function_hits)
-
-    # Catch cases where mismatching results are returned
-    assert flush_function_hits == no_flush_hits
+    if tokio.connectors.es.LOCAL_MODE:
+        esdb.fake_pages = FAKE_PAGES
+    esdb.query_cpu(start, end)
+    assert esdb.scroll_pages
+    esdb.scroll_pages = []

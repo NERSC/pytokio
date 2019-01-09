@@ -53,6 +53,9 @@ class EsConnection(object):
             fake_pages (list): A list of ``page`` structures that should be
                 returned by self.scroll() when the elasticsearch module is not
                 actually available.  Used only for debugging.
+            local_mode (bool): If True, retrieve query results from
+                self.fake_pages instead of attempting to contact an
+                Elasticsearch server
         """
         # retain state of Elasticsearch client
         self.client = None
@@ -78,13 +81,15 @@ class EsConnection(object):
         self.sort_by = ''
         # for debugging
         self.fake_pages = []
+        self.local_mode = LOCAL_MODE
 
-        self.connect()
+        if host and port and not self.local_mode:
+            self.connect()
 
     def connect(self):
         """Instantiate a connection and retain the connection context.
         """
-        if LOCAL_MODE:
+        if self.local_mode:
             warnings.warn("operating in local mode; elasticsearch queries will not be issued")
         else:
             self.client = elasticsearch.Elasticsearch(host=self.connect_host,
@@ -109,7 +114,7 @@ class EsConnection(object):
         Returns:
             dict: The page resulting from the issued query.
         """
-        if LOCAL_MODE:
+        if self.local_mode:
             self.page = self.fake_pages.pop(0)
         else:
             self.page = self.client.search(body=query, index=self.index, sort=self.sort_by)
@@ -131,7 +136,7 @@ class EsConnection(object):
         if self.scroll_id is None:
             raise Exception('no scroll id')
 
-        if LOCAL_MODE:
+        if self.local_mode:
             self.page = self.fake_pages.pop(0)
         else:
             self.page = self.client.scroll(scroll_id=self.scroll_id, scroll=self.scroll_size)
@@ -174,7 +179,7 @@ class EsConnection(object):
         self._hits_since_flush = 0
 
         # Get first set of results and a scroll id
-        if LOCAL_MODE:
+        if self.local_mode:
             self.page = self.fake_pages.pop(0)
         else:
             self.page = self.client.search(
