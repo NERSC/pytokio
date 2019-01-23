@@ -64,7 +64,10 @@ SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS = [
     '/global/cscratch1',
     '/global/u2',
 ]
-SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL = 'cscratch,homes-u2'
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL = [
+    'cscratch',
+    'homes-u2',
+]
 
 SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
 SAMPLE_DARSHAN_FQLOG_META = {

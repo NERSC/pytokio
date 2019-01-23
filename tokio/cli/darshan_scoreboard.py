@@ -17,7 +17,7 @@ BASE_QUERY = """
 SELECT
     SUM(s.bytes_read) AS readbytes,
     SUM(s.bytes_written) AS writebytes,
-    COUNT(DISTINCT h.filename) AS jobcount
+    COUNT(DISTINCT h.filename) AS jobcount,
 FROM
     summaries AS s
 INNER JOIN
@@ -28,7 +28,7 @@ ORDER BY (readbytes+writebytes) DESC
 
 QUERY_PARAMS = collections.OrderedDict()
 QUERY_PARAMS['per_user'] = {'col': 'h.username'}
-QUERY_PARAMS['per_fs'] = {'col': 'm.fsname'}
+QUERY_PARAMS['per_fs'] = {'col': 'm.fsname, m.mountpt'}
 QUERY_PARAMS['per_exe'] = {'col': 'h.exename'}
 QUERY_PARAMS['per_user_exe_fs'] = {
     'col': 'h.username || "|" || h.exename || "|" || m.fsname AS tuple',
@@ -78,7 +78,7 @@ def query_index_db(db_filenames,
             query = BASE_QUERY
 
             # insert the column to group by
-            query = query.replace("SELECT", "SELECT\n    %s," % config['col'])
+            query = query.replace("FROM", "    %s\nFROM" % config['col'])
             query = query.replace("ORDER", "GROUP BY %s\nORDER" % config.get('group', config['col']))
 
             # insert filter qualifiers
@@ -122,8 +122,8 @@ def print_top(categorized_data, max_show=10):
         print_buffer += "%2s  %40s %10s %10s %8s\n" % ('#', name, 'Read(GiB)', 'Write(GiB)', '# Jobs')
         print_buffer += '=' * 75 + "\n"
         displayed = 0
-        for winner in sorted(rankings, key=lambda x: x[1] + x[2], reverse=True):
-            winner_str = winner[0]
+        for winner in sorted(rankings, key=lambda x: x[0] + x[1], reverse=True):
+            winner_str = winner[3]
             if not winner_str:
                 # Darshan logs without POSIX/STDIO counters and without
                 # filename-encoded metadata can result in null strings for
@@ -142,9 +142,9 @@ def print_top(categorized_data, max_show=10):
                 break
             print_buffer += "%2d. %40.40s %10.1f %10.1f %8d\n" % (displayed,
                                                                   winner_str,
+                                                                  winner[0] / 2.0**30,
                                                                   winner[1] / 2.0**30,
-                                                                  winner[2] / 2.0**30,
-                                                                  winner[3])
+                                                                  winner[2])
         if displayed > 0:
             sys.stdout.write(print_buffer)
 
@@ -168,7 +168,7 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser()
     parser.add_argument("indexfile", type=str, nargs='+',
-                        help="json output of darshan_per_fs_bytes.py")
+                        help="path to index database created by index_darshanlogs")
     parser.add_argument("--json", action='store_true',
                         help="output in json format")
     parser.add_argument("--max-show", type=int, default=10,
