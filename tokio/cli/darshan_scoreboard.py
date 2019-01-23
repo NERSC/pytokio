@@ -28,10 +28,10 @@ ORDER BY (readbytes+writebytes) DESC
 
 QUERY_PARAMS = collections.OrderedDict()
 QUERY_PARAMS['per_user'] = {'col': 'h.username'}
-QUERY_PARAMS['per_fs'] = {'col': 'm.mountpt'}
+QUERY_PARAMS['per_fs'] = {'col': 'm.fsname'}
 QUERY_PARAMS['per_exe'] = {'col': 'h.exename'}
 QUERY_PARAMS['per_user_exe_fs'] = {
-    'col': 'h.username || "|" || h.exename || "|" || m.mountpt AS tuple',
+    'col': 'h.username || "|" || h.exename || "|" || m.fsname AS tuple',
     'group': 'tuple',
 }
 
@@ -47,10 +47,10 @@ def query_index_db(db_filenames,
     where = []
     where0 = []
     if limit_fs:
-        where0 = ["m.mountpt LIKE '%s'" % limit for limit in limit_fs]
+        where0 = ["(m.mountpt LIKE '%s' OR m.fsname LIKE '%s')" % (limit, limit) for limit in limit_fs]
         where.append("(" + " OR ".join(where0) + ")")
     if exclude_fs:
-        where0 = ["m.mountpt NOT LIKE '%s'" % limit for limit in exclude_fs]
+        where0 = ["(m.mountpt NOT LIKE '%s' AND m.fsname NOT LIKE '%s')" % (limit, limit) for limit in exclude_fs]
         where.append("(" + " AND ".join(where0) + ")")
 
     if limit_user:
@@ -113,11 +113,6 @@ def print_top(categorized_data, max_show=10):
         'per_user_exe_fs': "User/App/FS",
     }
 
-    # precompile regular expressions
-    mount_to_fsname = {}
-    for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
-        mount_to_fsname[re.compile(rex_str)] = fsname
-
     categories = 0
     for category, rankings in categorized_data.items():
         print_buffer = ""
@@ -129,17 +124,11 @@ def print_top(categorized_data, max_show=10):
         displayed = 0
         for winner in sorted(rankings, key=lambda x: x[1] + x[2], reverse=True):
             winner_str = winner[0]
-
-            # map mount points to logical file system names
-            for mount_rex, fsname in mount_to_fsname.items():
-                match = mount_rex.match(winner_str)
-                if match:
-                    winner_str = fsname
-                if '|' in winner_str:
-                    base, mount = winner_str.rsplit('|', 1)
-                    match = mount_rex.match(mount)
-                    if match:
-                        winner_str = base + '|' + fsname
+            if not winner_str:
+                # Darshan logs without POSIX/STDIO counters and without
+                # filename-encoded metadata can result in null strings for
+                # winner[0]
+                winner_str = "UNKNOWN|UNKNOWN|UNKNOWN"
 
             if '|' in winner_str:
                 winner_str = winner_str.replace('|', ', ')
