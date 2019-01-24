@@ -46,7 +46,8 @@ Schemata::
 
     CREATE TABLE mounts (
         fs_id INTEGER PRIMARY KEY,
-        mountpt CHAR
+        mountpt CHAR,
+        fsname CHAR
     );
 
     CREATE TABLE headers (
@@ -66,6 +67,7 @@ Schemata::
 """
 
 import os
+import re
 import time
 import sqlite3
 import operator
@@ -127,24 +129,42 @@ SUMMARIES_TABLE = "summaries"
 VERBOSITY = 0
 QUIET = False
 
+# precompile regular expressions
+MOUNT_TO_FSNAME = {}
+
+def init_mount_to_fsname():
+    """Initialize regexes to map mount points to file system names
+    """
+    global MOUNT_TO_FSNAME
+    for rex_str, fsname in tokio.config.CONFIG.get('mount_to_fsname', {}).items():
+        MOUNT_TO_FSNAME[re.compile(rex_str)] = fsname
+
 def get_file_mount(filename, mount_list):
     """Return the mount point in which a file is located
 
     Args:
         filename (str): Fully equalified path to a file or directory
         mount_list (list of str): List of mount points
+
     Returns:
-        str or None: The member of mount_list in which filename lives, or None
-            if filename does not match any mounts
+        tuple of (str, str) or None: The member of mount_list in which filename
+            lives; first string is the mount point, and the second is the
+            logical file system name.  Returns None if filename does not match
+            any mounts
     """
     # always want the most specific mount path to match first
     sorted_mount_list = sorted(mount_list, key=len, reverse=True)
 
     for mount in sorted_mount_list:
         if filename.startswith(mount):
-            return mount
+            logical = mount
+            for mount_rex, fsname in MOUNT_TO_FSNAME.items():
+                match = mount_rex.match(mount)
+                if match:
+                    logical = fsname
+            return (mount, logical)
         if (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
-            return mount
+            return mount, mount
     return None;
 
 def summarize_by_fs(darshan_log, max_mb=0.0):
@@ -216,6 +236,7 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
         reduced_counters[mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
+    logical_mount_names = {}
     for module, log_counters in module_records.items():
         # record_file is the full path to a file that the application manipulated
         for record_file in log_counters:
@@ -223,6 +244,8 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
             mount = get_file_mount(record_file, mount_list)
             if mount is None:
                 continue
+            mount, logical = mount
+            logical_mount_names[mount] = logical
 
             # only iterate over values; keys are MPI ranks that we don't use
             for counters in log_counters[record_file].values():
@@ -247,14 +270,14 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
                         reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val)
 
     # Populate the mounts data and remove all mount points that were not used
-    mountpts = set([])
+    mountpts = {}
     for key in list(reduced_counters.keys()):
         # check_val works only when all the keys are positive counters
         check_val = sum([reduced_counters[key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
         if check_val == 0:
             reduced_counters.pop(key, None)
         else:
-            mountpts.add(key)
+            mountpts[key] = logical_mount_names.get(key, key)
 
     # Populate the headers data
     header = {}
@@ -282,7 +305,8 @@ def create_mount_table(conn):
 
     query = """CREATE TABLE IF NOT EXISTS %s (
         fs_id INTEGER PRIMARY KEY,
-        mountpt CHAR UNIQUE
+        mountpt CHAR UNIQUE,
+        fsname CHAR
     )
     """ % MOUNTS_TABLE
     vprint(query, 3)
@@ -298,11 +322,11 @@ def update_mount_table(conn, mount_points):
 
     # We force the addition of UNKNOWN so stdio's stdout/stderr counters are
     # still included
-    for mount_point in mount_points:
-        vprint("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNTS_TABLE, 4)
-        vprint("Parameters: %s" % str(mount_point,), 4)
+    for mount_point in mount_points.items():
+        vprint("INSERT OR IGNORE INTO %s (mountpt, fsname) VALUES (?, ?)" % MOUNTS_TABLE, 4)
+        vprint("Parameters: %s" % str(mount_point), 4)
 
-    cursor.executemany("INSERT OR IGNORE INTO %s (mountpt) VALUES (?)" % MOUNTS_TABLE, [(x,) for x in mount_points])
+    cursor.executemany("INSERT OR IGNORE INTO %s (mountpt, fsname) VALUES (?, ?)" % MOUNTS_TABLE, [(x, mount_points[x]) for x in mount_points])
 
     cursor.close()
     conn.commit()
@@ -519,6 +543,8 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
 
     conn = sqlite3.connect(output_file)
 
+    init_mount_to_fsname()
+
     t_start = time.time()
     new_log_list = process_log_list(conn, log_list)
     vprint("Built log list in %.1f seconds" % (time.time() - t_start), 2)
@@ -526,11 +552,11 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     # Analyze the remaining logs in parallel
     t_start = time.time()
     log_records = []
-    mount_points = set([])
+    mount_points = {}
     for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
         if result:
             log_records.append(result)
-            mount_points |= result['mounts']
+            mount_points.update(result['mounts'])
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
     # Create tables and indices
@@ -572,6 +598,7 @@ def main(argv=None):
     """
     global VERBOSITY
     global QUIET
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")

@@ -10,7 +10,7 @@ import tokio.cli.darshan_scoreboard
 
 INDEXDB = tokiotest.SAMPLE_DARSHAN_INDEX_DB
 INDEXDB_USER = tokiotest.SAMPLE_DARSHAN_INDEX_DB_USER
-INDEXDB_ALL_MOUNTS = tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS
+INDEXDB_ALL_MOUNTS = tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL
 INDEXDB_EXES = tokiotest.SAMPLE_DARSHAN_INDEX_DB_EXES
 
 def test_scoreboard():
@@ -39,7 +39,7 @@ def test_scoreboard_limit_user():
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
     print("Result: %s" % decoded_result)
-    assert INDEXDB_USER in [x[0] for x in decoded_result['per_user']]
+    assert INDEXDB_USER in [x[3] for x in decoded_result['per_user']]
 
 def test_scoreboard_exclude_user():
     """cli.darshan_scoreboard --exclude-user
@@ -49,13 +49,13 @@ def test_scoreboard_exclude_user():
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
     print("Result: %s" % decoded_result)
-    assert INDEXDB_USER not in [x[0] for x in decoded_result['per_user']]
+    assert INDEXDB_USER not in [x[3] for x in decoded_result['per_user']]
 
-def test_scoreboard_limit_fs():
+def limit_fs(indexdb_mounts):
     """cli.darshan_scoreboard --limit-fs
     """
     # include ALL file systems - expect everything to return
-    argv = ['--json', '--limit-fs', ",".join(INDEXDB_ALL_MOUNTS), INDEXDB]
+    argv = ['--json', '--limit-fs', ",".join(indexdb_mounts), INDEXDB]
     print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
@@ -65,7 +65,7 @@ def test_scoreboard_limit_fs():
     assert decoded_result['per_exe']
 
     # include only one file system - expect a subset of above results
-    wanted_fs = INDEXDB_ALL_MOUNTS[0]
+    wanted_fs = indexdb_mounts[0]
     argv = ['--json', '--limit-fs', wanted_fs, INDEXDB]
     print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
@@ -79,12 +79,13 @@ def test_scoreboard_limit_fs():
     assert len(decoded_result2['per_fs']) == 1
 
     # make sure that each app we wanted is defined in the results
-    assert wanted_fs in [x[0] for x in decoded_result['per_fs']]
+    all_fs = [x[3] for x in decoded_result2['per_fs']] + [x[4] for x in decoded_result2['per_fs']]
+    assert wanted_fs in all_fs
 
-def test_scoreboard_exclude_fs():
+def exclude_fs(indexdb_mounts):
     """cli.darshan_scoreboard --exclude-fs
     """
-    argv = ['--json', '--exclude-fs', ",".join(INDEXDB_ALL_MOUNTS), INDEXDB]
+    argv = ['--json', '--exclude-fs', ",".join(indexdb_mounts), INDEXDB]
     print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
     decoded_result = json.loads(output_str)
@@ -94,7 +95,7 @@ def test_scoreboard_exclude_fs():
     assert not decoded_result['per_fs']
 
     # now test excluding just one file system
-    excluded_fs = INDEXDB_ALL_MOUNTS[0]
+    excluded_fs = indexdb_mounts[0]
     argv = ['--json', '--exclude-fs', "%s" % excluded_fs, INDEXDB]
     print("Executing: %s" % " ".join(argv))
     output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
@@ -105,33 +106,36 @@ def test_scoreboard_exclude_fs():
     assert len(decoded_result2['per_fs'])
 
     # make sure that results don't include the thing we excluded
-    assert excluded_fs not in [x[0] for x in decoded_result2['per_fs']]
+    all_fs = [x[3] for x in decoded_result2['per_fs']] + [x[4] for x in decoded_result2['per_fs']]
+    assert excluded_fs not in all_fs 
 
-def test_scoreboard_limit_fs_logical():
-    """cli.darshan_scoreboard --limit-fs, logical fs names
-    """
-    raise nose.SkipTest("Not implemented")
-#   argv = ['--json', '--limit-fs', INDEXDB_ALL_MOUNTS_LOGICAL, INDEXDB]
-#   print("Executing: %s" % " ".join(argv))
-#   output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
-#   decoded_result = json.loads(output_str)
-#   print("Result: %s" % decoded_result)
-#   assert decoded_result['per_user']
-#   assert decoded_result['per_fs']
-#   assert decoded_result['per_exe']
-
-def test_scoreboard_exclude_fs_logical():
-    """cli.darshan_scoreboard --exclude-fs, logical fs names
-    """
-    raise nose.SkipTest("Not implemented")
-#   argv = ['--json', '--exclude-fs', "%s" % INDEXDB_ALL_MOUNTS_LOGICAL, INDEXDB]
-#   print("Executing: %s" % " ".join(argv))
-#   output_str = tokiotest.run_bin(tokio.cli.darshan_scoreboard, argv)
-#   decoded_result = json.loads(output_str)
-#   print(decoded_result)
-#   assert not decoded_result['per_user']
-#   assert not decoded_result['per_exe']
-#   assert not decoded_result['per_fs']
+def test_scoreboard_fs_filters():
+    tests = [
+        (
+            exclude_fs,
+            tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS,
+            "cli.darshan_scoreboard --exclude-fs"
+        ),
+        (
+            exclude_fs,
+            tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL,
+            "cli.darshan_scoreboard --exclude-fs, logical fs name"
+        ),
+        (
+            limit_fs,
+            tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS,
+            "cli.darshan_scoreboard --limit-fs"
+        ),
+        (
+            limit_fs,
+            tokiotest.SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL,
+            "cli.darshan_scoreboard --limit-fs, logical fs name"
+        ),
+    ]
+    for test in tests:
+        test_func = test[0]
+        test_func.description = test[2]
+        yield test_func, test[1]
 
 def test_scoreboard_limit_exe():
     """cli.darshan_scoreboard --limit-exe
@@ -153,7 +157,7 @@ def test_scoreboard_limit_exe():
 
         # make sure that each app we wanted is defined in the results
         for wanted_app in wanted_apps:
-            assert wanted_app in [x[0] for x in decoded_result['per_exe']]
+            assert wanted_app in [x[3] for x in decoded_result['per_exe']]
 
 def test_scoreboard_exclude_exe():
     """cli.darshan_scoreboard --exclude-exe
@@ -176,7 +180,7 @@ def test_scoreboard_exclude_exe():
         assert len(decoded_result['per_exe'])
 
         # make sure the app is not included in the results
-        assert appname not in [x[0] for x in decoded_result['per_exe']]
+        assert appname not in [x[3] for x in decoded_result['per_exe']]
 
         # make sure that we successfully removed something that was present in
         # the unfiltered reference
@@ -195,7 +199,7 @@ def test_scoreboard_combo():
     print("Result: %s" % json.dumps(decoded_result))
 
     for user_exe_fs in decoded_result['per_user_exe_fs']:
-        username, exename, mountpt = user_exe_fs[0].split('|')
+        username, exename, mountpt = user_exe_fs[3].split('|')
         # jobcount = user_exe_fs[-1]
         argv = ['--json', INDEXDB]
         argv += ['--limit-user', username]

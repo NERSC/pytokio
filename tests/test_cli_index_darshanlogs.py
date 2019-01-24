@@ -154,9 +154,11 @@ def test_get_file_mount():
     for label, mount_list in mount_lists.items():
         print("Testing %s mount list" % label)
         for test_case, truth in test_cases.items():
-            mnt = tokio.cli.index_darshanlogs.get_file_mount(test_case, mount_list)
+            mnt, logical = tokio.cli.index_darshanlogs.get_file_mount(test_case, mount_list)
             print("  File %s is under mount %s" % (test_case, mnt))
             assert mnt == truth
+            print("  File %s exists in fs %s" % (test_case, logical))
+            assert not logical.startswith('/') or logical == '/'
 
 @tokiotest.needs_darshan
 def test_summarize_by_fs():
