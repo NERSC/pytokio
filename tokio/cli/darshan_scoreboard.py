@@ -28,7 +28,10 @@ ORDER BY (readbytes+writebytes) DESC
 
 QUERY_PARAMS = collections.OrderedDict()
 QUERY_PARAMS['per_user'] = {'col': 'h.username'}
-QUERY_PARAMS['per_fs'] = {'col': 'm.fsname, m.mountpt'}
+QUERY_PARAMS['per_fs'] = {
+    'col': 'm.fsname, m.mountpt',
+    'group': 'm.fsname',
+}
 QUERY_PARAMS['per_exe'] = {'col': 'h.exename'}
 QUERY_PARAMS['per_user_exe_fs'] = {
     'col': 'h.username || "|" || h.exename || "|" || m.fsname AS tuple',
