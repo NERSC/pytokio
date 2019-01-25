@@ -21,14 +21,24 @@ The typical output of ``mmperfmon query usage`` may look something like::
 """
 
 import re
+import datetime
+
 import pandas
-from tokio.connectors.common import SubprocessOutputDict
+
+from .common import SubprocessOutputDict
+from ..common import to_epoch
 
 _REX_LEGEND = re.compile(r'^\s*(\d+):\s+([^|]+)\|([^|]+)\|(\S+)\s*$')
 _REX_ROWHEAD = re.compile(r'^\s*Row\s+Timestamp')
 _REX_ROW = re.compile(r'^\s*\d+\s+(\d{4}-\d\d-\d\d-\d\d:\d\d:\d\d)\s+')
 
 MMPERFMON = 'mmperfmon'
+MMPERFMON_DATE_FMT = "%Y-%m-%d-%H:%M:%S"
+MMPERFMON_UNITS_TO_BYTES = {
+    "MB": 1048576,
+    "kB": 1024,
+}
+
 
 class Mmperfmon(SubprocessOutputDict):
     """
@@ -134,7 +144,12 @@ class Mmperfmon(SubprocessOutputDict):
         for timestamp, hosts in self.items():
             metrics = hosts.get(host)
             if metrics is not None:
-                to_df[timestamp] = metrics
+                timestamp_o = datetime.datetime.strptime(timestamp, MMPERFMON_DATE_FMT)
+                to_df[timestamp_o] = {}
+                for key, value in metrics.items():
+                    new_value = value_unit_to_bytes(value)
+                    new_key = key + "_bytes" if new_value != value else key
+                    to_df[timestamp_o][new_key] = new_value
 
         return pandas.DataFrame.from_dict(to_df, orient='index')
                 
@@ -154,11 +169,14 @@ class Mmperfmon(SubprocessOutputDict):
             for hostname, counters in hosts.items():
                 value = counters.get(metric)
                 if value is not None:
-                    if timestamp not in to_df:
-                        to_df[timestamp] = {}
-                    to_df[timestamp][hostname] = value
+                    timestamp_o = datetime.datetime.strptime(timestamp, MMPERFMON_DATE_FMT)
+                    if timestamp_o not in to_df:
+                        to_df[timestamp_o] = {}
+                    new_value = value_unit_to_bytes(value)
+                    to_df[timestamp_o][hostname] = new_value
 
         return pandas.DataFrame.from_dict(to_df, orient='index')
+
 
     def to_dataframe(self, by_host=None, by_metric=None):
         """Convert to a pandas.DataFrame
@@ -222,3 +240,28 @@ def get_col_pos(line, align=None):
                 col_pos.append((old_col_pos[index][1]+1, stop))
 
     return col_pos
+
+def value_unit_to_bytes(value_unit):
+    """Converts a value+unit string into bytes
+
+    Converts a string containing both a numerical value and a unit of that value
+    into a normalized value.  For example, "1 MB" will convert to 1048576.
+
+    Args:
+        value_unit (str): Of the format "float str" where float is the value and
+            str is the unit by which value is expressed.
+
+    Returns:
+        int: Number of bytes represented by value_unit
+    """
+    try:
+        val, unit = value_unit.split()
+    except ValueError:
+        return value_unit
+
+    val = float(val)
+    multiple = MMPERFMON_UNITS_TO_BYTES.get(unit)
+    if multiple is not None:
+        return val * multiple
+    return value_unit
+
