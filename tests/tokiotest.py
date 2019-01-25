@@ -202,6 +202,10 @@ SAMPLE_COLLECTDES_QUERY = {
     },
 }
 
+SAMPLE_MMPERFMON_OUTPUT = os.path.join(INPUT_DIR, 'sample_mmperfmon.txt.gz')
+SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
+
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
     """

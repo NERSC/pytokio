@@ -30,7 +30,7 @@ _REX_ROW = re.compile(r'^\s*\d+\s+(\d{4}-\d\d-\d\d-\d\d:\d\d:\d\d)\s+')
 
 MMPERFMON = 'mmperfmon'
 
-class MmperfmonOutput(SubprocessOutputDict):
+class Mmperfmon(SubprocessOutputDict):
     """
     Representation for the mmperfmon query command.  Generates a dict of form
 
@@ -54,28 +54,34 @@ class MmperfmonOutput(SubprocessOutputDict):
 
     """
     def __init__(self, *args, **kwargs):
-        super(MmperfmonOutput, self).__init__(*args, **kwargs)
+        super(Mmperfmon, self).__init__(*args, **kwargs)
         self.subprocess_cmd = MMPERFMON
         self.legend = {}
         self.col_offsets = []
         self.load()
 
-    def __repr__(self):
-        """Serialize object into an ASCII string
-
-        Returns a string that resembles the input used to initialize this object
-        """
-        repr_result = ""
-
-        # TODO
-
-        return repr_result
+#   def __repr__(self):
+#       """Serialize object into an ASCII string
+#
+#       Returns a string that resembles the input used to initialize this object
+#       """
+#       repr_result = ""
+#
+#       # TODO
+#
+#       return repr_result
 
     @classmethod
     def from_str(cls, input_str):
         """Instantiate from a string
         """
         return cls(from_string=input_str)
+
+    @classmethod
+    def from_file(cls, cache_file):
+        """Instantiate from a cache file
+        """
+        return cls(cache_file=cache_file)
 
     def load_str(self, input_str):
         """Parse the output of the subprocess output to initialize self
@@ -114,11 +120,57 @@ class MmperfmonOutput(SubprocessOutputDict):
                     if hostname not in self[timestamp]:
                         self[timestamp][hostname] = to_update
 
-    def to_dataframe(self):
+    def to_dataframe_by_host(self, host):
+        """Returns data from a specific host as a DataFrame
+
+        Args:
+            host (str): Hostname from which a DataFrame should be constructed
+
+        Returns:
+            pandas.DataFrame: All measurements from the given host.  Columns
+                correspond to different metrics; indexed in time.
+        """
+        to_df = {}
+        for timestamp, hosts in self.items():
+            metrics = hosts.get(host)
+            if metrics is not None:
+                to_df[timestamp] = metrics
+
+        return pandas.DataFrame.from_dict(to_df, orient='index')
+                
+
+    def to_dataframe_by_metric(self, metric):
+        """Returns data for a specific metric as a DataFrame
+
+        Args:
+            metric (str): Metric from which a DataFrame should be constructed
+
+        Returns:
+            pandas.DataFrame: All measurements of the given metric for all
+                hosts.  Columns represent hosts; indexed in time.
+        """
+        to_df = {}
+        for timestamp, hosts in self.items():
+            for hostname, counters in hosts.items():
+                value = counters.get(metric)
+                if value is not None:
+                    if timestamp not in to_df:
+                        to_df[timestamp] = {}
+                    to_df[timestamp][hostname] = value
+
+        return pandas.DataFrame.from_dict(to_df, orient='index')
+
+    def to_dataframe(self, by_host=None, by_metric=None):
         """Convert to a pandas.DataFrame
         """
-        pass
-        # TODO
+        if (by_host is None and by_metric is None) \
+        or (by_host is not None and by_metric is not None):
+            raise RuntimeError("must specify either by_host or by_metric")
+        elif by_host is not None:
+            return self.to_dataframe_by_host(host=by_host)
+
+        return self.to_dataframe_by_metric(metric=by_metric)
+            
 
 def get_col_pos(line, align=None):
     """Return column offsets of a left-aligned text table
@@ -170,29 +222,3 @@ def get_col_pos(line, align=None):
                 col_pos.append((old_col_pos[index][1]+1, stop))
 
     return col_pos
-
-def test_get_col_pos():
-    """connectors.mmperfmon.get_col_pos()
-    """
-    input_strs = [
-        "Row           Timestamp cpu_user cpu_sys   mem_total",
-        "Row   Timestamp cpu_user cpu_sys mem_total",
-        "   Row   Timestamp     cpu_user cpu_sys mem_total",
-        "Row   Timestamp     cpu_user cpu_sys mem_total     ",
-        "  Row   Timestamp     cpu_user    cpu_sys      mem_total     ",
-    ]
-    for input_str in input_strs:
-        print("Evaluating [%s]" % input_str)
-        tokens = input_str.strip().split()
-        offsets = get_col_pos(input_str)
-        print("Offsets are: " + str(offsets))
-        assert offsets
-        istart = 0
-        num_tokens = 0
-        for index, (istart, istop) in enumerate(offsets):
-            token = input_str[istart:istop]
-            print("    [%s] vs [%s]" % (token, tokens[index]))
-            assert token == tokens[index]
-            istart = istop
-            num_tokens += 1
-        assert num_tokens == len(tokens)
