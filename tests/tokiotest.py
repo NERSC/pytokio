@@ -7,6 +7,8 @@ import os
 import sys
 import gzip
 import errno
+import shutil
+import tarfile
 import tempfile
 import subprocess
 import datetime
@@ -202,10 +204,6 @@ SAMPLE_COLLECTDES_QUERY = {
     },
 }
 
-SAMPLE_MMPERFMON_OUTPUT = os.path.join(INPUT_DIR, 'sample_mmperfmon.txt.gz')
-SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
-SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
-
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
     """
@@ -396,4 +394,23 @@ def generate_timeseries(file_name=SAMPLE_COLLECTDES_HDF5,
 
     return timeseries
 
+def untar(input_filename):
+    """Unpack a tarball to test support for that input type
+    """
+    cleanup_untar(input_filename)
+    tar = tarfile.open(input_filename)
+    tar.extractall(path=INPUT_DIR)
+    tar.close()
 
+def cleanup_untar(input_filename):
+    """Clean up the artifacts created by this test's untar() function
+    """
+    tar = tarfile.open(input_filename)
+    for member in tar.getmembers():
+        fq_name = os.path.join(INPUT_DIR, member.name)
+        if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
+            print("Removing %s" % fq_name)
+            if member.isdir():
+                shutil.rmtree(fq_name)
+            else:
+                os.unlink(fq_name)

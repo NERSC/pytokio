@@ -20,25 +20,26 @@ The typical output of ``mmperfmon query usage`` may look something like::
 
 """
 
+import os
 import re
+import tarfile
 import datetime
+import warnings
 
 import pandas
 
-from .common import SubprocessOutputDict
+from .common import SubprocessOutputDict, walk_file_collection
 from ..common import to_epoch
 
 _REX_LEGEND = re.compile(r'^\s*(\d+):\s+([^|]+)\|([^|]+)\|(\S+)\s*$')
 _REX_ROWHEAD = re.compile(r'^\s*Row\s+Timestamp')
 _REX_ROW = re.compile(r'^\s*\d+\s+(\d{4}-\d\d-\d\d-\d\d:\d\d:\d\d)\s+')
 
-MMPERFMON = 'mmperfmon'
 MMPERFMON_DATE_FMT = "%Y-%m-%d-%H:%M:%S"
 MMPERFMON_UNITS_TO_BYTES = {
     "MB": 1048576,
     "kB": 1024,
 }
-
 
 class Mmperfmon(SubprocessOutputDict):
     """
@@ -65,21 +66,10 @@ class Mmperfmon(SubprocessOutputDict):
     """
     def __init__(self, *args, **kwargs):
         super(Mmperfmon, self).__init__(*args, **kwargs)
-        self.subprocess_cmd = MMPERFMON
+        self.subprocess_cmd = None
         self.legend = {}
         self.col_offsets = []
         self.load()
-
-#   def __repr__(self):
-#       """Serialize object into an ASCII string
-#
-#       Returns a string that resembles the input used to initialize this object
-#       """
-#       repr_result = ""
-#
-#       # TODO
-#
-#       return repr_result
 
     @classmethod
     def from_str(cls, input_str):
@@ -93,12 +83,41 @@ class Mmperfmon(SubprocessOutputDict):
         """
         return cls(cache_file=cache_file)
 
+    def load(self):
+        """Load either a tarfile, directory, or single mmperfmon output file
+
+        Tries to load self.cache_file; if it is a directory or tarfile, it is
+        handled by self.load_multiple; otherwise falls through to the load_str
+        code path.
+        """
+        try:
+            self.load_multiple(input_file=self.cache_file)
+        except tarfile.ReadError:
+            super(Mmperfmon, self).load()
+
+    def load_multiple(self, input_file):
+        """Load one or more input files from a directory or tarball
+
+        Args:
+            input_file (str): Path to either a directory or a tarfile containing
+                multiple text files, each of which contains the output of a
+                single mmperfmon invocation.
+        """
+        for (member_name, _, member_handle) in walk_file_collection(input_file):
+            try:
+                self.load_str(input_str=member_handle.read())
+            except:
+                warnings.warn("Parsing error in %s" % member_name)
+                raise
+
+
     def load_str(self, input_str):
         """Parse the output of the subprocess output to initialize self
         """
-
         for line in input_str.splitlines():
             # decode the legend
+            if not isinstance(line, str):
+                line = line.decode()
             match = _REX_LEGEND.search(line)
             if match is not None:
                 # extract values
