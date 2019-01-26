@@ -7,7 +7,8 @@ import json
 import tokio.connectors.mmperfmon
 import tokiotest
 
-SAMPLE_SINGLE_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon.txt.gz')
+SAMPLE_USAGE_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon-usage.txt.gz')
+SAMPLE_NUMOPS_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
 SAMPLE_TGZ_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon.tgz')
 SAMPLE_TAR_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon.tar')
 SAMPLE_UNPACKED_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon_dir')
@@ -50,7 +51,7 @@ def test_get_col_pos():
 def test_to_df():
     """connectors.mmperfmon.Mmperfmon.to_dataframe()
     """
-    mmpout = tokio.connectors.mmperfmon.Mmperfmon.from_file(SAMPLE_SINGLE_INPUT)
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon.from_file(SAMPLE_USAGE_INPUT)
     validate_object(mmpout)
 
     for sample_host in SAMPLE_HOSTS:
@@ -65,8 +66,22 @@ def test_to_df():
         print(dataframe)
         validate_object(dataframe)
 
-def test_load_multiple():
-    """connectors.mmperfmon.Mmperfmon, multiple load idempotency
+def test_load_single_single():
+    """connectors.mmperfmon.Mmperfmon, load single, load diff single
+    """
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_NUMOPS_INPUT)
+    mmpout.load_str(gzip.open(SAMPLE_USAGE_INPUT).read())
+    print(json.dumps(mmpout, indent=4, sort_keys=True))
+    validate_object(mmpout)
+
+    for sample_host in SAMPLE_HOSTS:
+        print("\nRetrieving dataframe for host [%s]" % sample_host)
+        dataframe = mmpout.to_dataframe(by_host=sample_host)
+        print(dataframe)
+        validate_object(dataframe)
+
+def test_load_multi_single_idempotent():
+    """connectors.mmperfmon.Mmperfmon, load multiple, load single
     """
     print("Loading from %s" % SAMPLE_TGZ_INPUT)
     mmpout = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_TGZ_INPUT)
@@ -75,8 +90,8 @@ def test_load_multiple():
     mmpout_orig = json.dumps(mmpout, sort_keys=True)
 
     # load a subset of the original load
-    print("Reloading from %s" % SAMPLE_SINGLE_INPUT)
-    input_str = gzip.open(SAMPLE_SINGLE_INPUT, 'r').read()
+    print("Reloading from %s" % SAMPLE_USAGE_INPUT)
+    input_str = gzip.open(SAMPLE_USAGE_INPUT, 'r').read()
     mmpout.load_str(input_str)
     validate_object(mmpout)
 
