@@ -5,6 +5,7 @@ functionality is dictated by the behavior of Elasticsearch.
 """
 
 import datetime
+import copy
 import nose
 import tokio.connectors.es
 import tokio.connectors.collectd_es
@@ -60,19 +61,19 @@ def test_query_interfaces():
         esdb.local_mode = True
 
     if tokio.connectors.es.LOCAL_MODE:
-        esdb.fake_pages = FAKE_PAGES
+        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
     esdb.query_disk(start, end)
     assert esdb.scroll_pages
     esdb.scroll_pages = []
 
     if tokio.connectors.es.LOCAL_MODE:
-        esdb.fake_pages = FAKE_PAGES
+        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
     esdb.query_memory(start, end)
     assert esdb.scroll_pages
     esdb.scroll_pages = []
 
     if tokio.connectors.es.LOCAL_MODE:
-        esdb.fake_pages = FAKE_PAGES
+        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
     esdb.query_cpu(start, end)
     assert esdb.scroll_pages
     esdb.scroll_pages = []
