@@ -40,6 +40,10 @@ def main(argv=None):
                         help="port of ElasticSearch endpoint (default: 9200)")
     parser.add_argument('-i', '--index', type=str, default='dtn-dtn-log*',
                         help='ElasticSearch index to query (default:dtn-dtn-log*)')
+    parser.add_argument('--user', type=str, default=None,
+                        help='limit results to transfers owned by this user')
+    parser.add_argument('--type', type=str, default=None,
+                        help='limit results to either STOR, RETR, or NLST')
     args = parser.parse_args(argv)
 
     if args.debug:
@@ -67,8 +71,14 @@ def main(argv=None):
             index=args.index,
             timeout=args.timeout)
 
+        must = []
+        if args.user:
+            must.append({"term": {"USER": args.user}})
+        if args.type:
+            must.append({"term": {"TYPE": args.type.upper()}})
+
         pages = None
-        esdb.query(query_start, query_end)
+        esdb.query(query_start, query_end, must=must)
         if pages is None:
             pages = esdb.scroll_pages
         else:
