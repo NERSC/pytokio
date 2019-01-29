@@ -59,6 +59,9 @@ def test_query_interfaces():
         assert tokio.connectors.es.LOCAL_MODE
         esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
         esdb.local_mode = True
+        print("Testing in local mode")
+    else:
+        print("Testing in remote mode")
 
     if tokio.connectors.es.LOCAL_MODE:
         esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
