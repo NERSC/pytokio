@@ -1,0 +1,10 @@
+Ran the following:
+
+./bin/cache_nersc_globuslogs.py 2019-01-29T00:00:00 2019-01-29T00:10:00 > globuslogs.json
+
+Then downselected results to include
+
+1. more than one unique user
+2. more than one record from the same user
+
+Then edited IP addresses and references to user names to anonymize.
