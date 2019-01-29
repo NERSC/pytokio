@@ -75,8 +75,7 @@ def flush_function(es_obj):
     es_obj.scroll_pages = []
 
 def test_flush_function_correctness():
-    """
-    CollectdEs flush function correctness
+    """connectors.es flush function correctness
     """
     es_obj = tokio.connectors.es.EsConnection(host=None, port=None)
     es_obj.fake_pages = make_fake_pages()
@@ -128,7 +127,8 @@ def test_flush_function_correctness():
     assert flush_function_hits == no_flush_hits
 
 def test_build_timeseries_query():
-    """connectors.es.build_timeseries_query"""
+    """connectors.es.build_timeseries_query()
+    """
 
     for query in FAKE_TIMESERIES_QUERIES:
         # doesn't matter _what_ the datetime is
