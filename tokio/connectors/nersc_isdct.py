@@ -13,7 +13,6 @@ metrics.
 import os
 import re
 import tarfile
-import mimetypes
 import time
 import datetime
 import warnings
@@ -71,7 +70,7 @@ class NerscIsdct(common.CacheableDict):
         timestamp_str = None
         min_mtime = None
         parsed_counters_list = []
-        for (member_name, mtime, member_handle) in walk_file_collection(self.input_file):
+        for (member_name, mtime, member_handle) in common.walk_file_collection(self.input_file):
             # is this a magic timestamp file?
             if 'timestamp_' in member_name:
                 timestamp_str = member_name.split('_')[-1]
@@ -496,42 +495,3 @@ def parse_counters_fileobj(fileobj, nodename=None):
         return {}
 
     return {device_sn : data}
-
-def walk_file_collection(input_source):
-    """Walk all member files of an input source.
-
-    Iterator that visits every member of an input source (either directory or
-    tarfile) and yields its file name, last modify time, and a file handle to
-    its contents.
-
-    Args:
-        input_source (str): A path to either a directory containing files or a
-            tarfile containing files.
-
-    Yields:
-        tuple: Attributes for a member of `input_source` with the following
-        data:
-
-        * str: fully qualified path corresponding to its name
-        * float: last modification time expressed as seconds since epoch
-        * file: handle to access the member's contents
-    """
-
-    if os.path.isdir(input_source):
-        for root, _, files in os.walk(input_source):
-            for file_name in files:
-                fq_file_name = os.path.join(root, file_name)
-                yield (fq_file_name,
-                       os.path.getmtime(fq_file_name),
-                       open(fq_file_name, 'r'))
-    else:
-        _, encoding = mimetypes.guess_type(input_source)
-        if encoding == 'gzip':
-            file_obj = tarfile.open(input_source, 'r:gz')
-        else:
-            file_obj = tarfile.open(input_source, 'r')
-        for member in file_obj.getmembers():
-            if member.isfile():
-                yield (member.name,
-                       member.mtime,
-                       file_obj.extractfile(member))

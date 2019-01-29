@@ -81,3 +81,18 @@ def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
             return fmt % (bytect / unit[0], unit[1])
 
     return fmt % (bytect, "bytes" if bytect != 1 else "byte")
+
+def to_epoch(datetime_obj):
+    """Convert datetime.datetime into epoch seconds
+
+    Currently assumes input datetime is expressed in localtime.  Does not handle
+    timezones very well.
+
+    Args:
+        datetime_obj (datetime.datetime): Datetime to convert to seconds-since-epoch
+
+    Returns:
+        int: Seconds since epoch
+    """
+
+    return int(time.mktime(datetime_obj.timetuple()))

@@ -92,9 +92,9 @@ def test_unpacked_input():
     """
     Load NerscIsdct from unpacked .tgz directories
     """
-    untar(SAMPLE_TGZ_INPUT)
+    tokiotest.untar(SAMPLE_TGZ_INPUT)
     isdct_data = tokio.connectors.nersc_isdct.NerscIsdct(SAMPLE_UNPACKED_INPUT)
-    cleanup_untar(SAMPLE_TGZ_INPUT)
+    tokiotest.cleanup_untar(SAMPLE_TGZ_INPUT)
     validate_object(isdct_data)
 
 def test_json_gz_input():
@@ -152,29 +152,3 @@ def test_diff_report_zeros():
     isdct_data_old = tokio.connectors.nersc_isdct.NerscIsdct(tokiotest.SAMPLE_NERSCISDCT_PREV_FILE)
     result = isdct_data.diff(isdct_data_old, report_zeros=False)
     validate_diff(result, report_zeros=False)
-
-################################################################################
-#  Helper functions
-################################################################################
-def untar(input_filename):
-    """
-    Unpack a tarball to test support for that input type
-    """
-    cleanup_untar(input_filename)
-    tar = tarfile.open(input_filename)
-    tar.extractall(path=tokiotest.INPUT_DIR)
-    tar.close()
-
-def cleanup_untar(input_filename):
-    """
-    Clean up the artifacts created by this test's untar() function
-    """
-    tar = tarfile.open(input_filename)
-    for member in tar.getmembers():
-        fq_name = os.path.join(tokiotest.INPUT_DIR, member.name)
-        if os.path.exists(fq_name) and fq_name.startswith(tokiotest.INPUT_DIR): # one final backstop
-            print("Removing %s" % fq_name)
-            if member.isdir():
-                shutil.rmtree(fq_name)
-            else:
-                os.unlink(fq_name)
