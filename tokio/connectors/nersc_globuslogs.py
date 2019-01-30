@@ -139,7 +139,7 @@ class NerscGlobusLogs(es.EsConnection):
                                      flush_every=self.flush_every,
                                      flush_function=self.flush_function)
 
-    def to_csv(self, fields):
+    def to_csv(self):
         """Converts self.scroll_pages to CSV
 
         Returns:

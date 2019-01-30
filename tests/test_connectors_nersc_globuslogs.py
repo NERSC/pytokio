@@ -138,3 +138,16 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
         print("Validated %d records" % valid_records)
 
     esdb.scroll_pages = []
+
+def test_to_csv():
+    """tokio.connectors.nersc_globuslogs.NerscGlobusLogs.to_csv()
+    """
+    esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(host=None, port=None, index=None)
+    esdb.local_mode = True
+    esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
+    esdb.query(datetime.datetime.now(), datetime.datetime.now())
+    csv = esdb.to_csv()
+    print(csv)
+    csv_lines = csv.splitlines()
+    assert len(csv_lines) > 1
+    assert csv_lines[-1].strip(',')
