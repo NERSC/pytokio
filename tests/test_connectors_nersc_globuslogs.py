@@ -11,14 +11,7 @@ import json
 import copy
 import datetime
 
-try:
-    from imp import reload
-except ImportError:
-    # Python 2
-    pass
-
 import tokio.connectors.es
-reload(tokio.connectors.es) # required because es maintains local-mode state
 import tokio.connectors.nersc_globuslogs
 
 import tokiotest
@@ -54,7 +47,7 @@ def test_query_interfaces():
     start = end - datetime.timedelta(hours=1)
 
     esdb = None
-    remote_results = [[{}]]
+    remote_results = [[{'_source':{}}]]
     if _HAVE_ELASTICSEARCH:
         esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(
             host=tokiotest.SAMPLE_COLLECTDES_HOST,
@@ -73,8 +66,6 @@ def test_query_interfaces():
             remote_results = esdb.scroll_pages
 
     if not esdb or not remote_results:
-        tokio.connectors.es.LOCAL_MODE = True
-        assert tokio.connectors.es.LOCAL_MODE
         esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(host=None, port=None, index=None)
         esdb.local_mode = True
         print("Testing in local mode")

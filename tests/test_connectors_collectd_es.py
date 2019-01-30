@@ -9,15 +9,7 @@ non-NERSC sites.
 import datetime
 import copy
 
-try:
-    from imp import reload
-except ImportError:
-    # Python 2
-    pass
-
-
 import tokio.connectors.es
-reload(tokio.connectors.es) # required because es maintains local-mode state
 import tokio.connectors.collectd_es
 import tokiotest
 try:
@@ -67,8 +59,6 @@ def test_query_interfaces():
             esdb = None
 
     if not esdb:
-        tokio.connectors.es.LOCAL_MODE = True
-        assert tokio.connectors.es.LOCAL_MODE
         esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
         esdb.local_mode = True
         print("Testing in local mode")
@@ -94,7 +84,7 @@ def test_query_interfaces():
 #                            target_val='cpu')
     test_func = validate_es_query_method
     test_func.description = "connectors.collectd_es.CollectdEs.query_cpu()"
-    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'cpu'
+    yield test_func, esdb, esdb.query_cpu, 'plugin', start, end, 'cpu'
 
 #   validate_es_query_method(esdb=esdb,
 #                            method=esdb.query_memory,
@@ -104,7 +94,7 @@ def test_query_interfaces():
 #                            target_val='memory')
     test_func = validate_es_query_method
     test_func.description = "connectors.collectd_es.CollectdEs.query_memory()"
-    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'memory'
+    yield test_func, esdb, esdb.query_memory, 'plugin', start, end, 'memory'
 
 def validate_es_query_method(esdb, method, field, start, end, target_val):
     """Tests a connector-specific query method
@@ -127,7 +117,7 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
             when issued to a remote Elasticsearch service.  If operating in
             local mode, this can be any value.
     """
-    if tokio.connectors.es.LOCAL_MODE:
+    if esdb.local_mode:
         esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
 #       method(start, end, target_val)
         method(start, end)

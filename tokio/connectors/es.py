@@ -75,8 +75,6 @@ class EsConnection(object):
                 self.fake_pages instead of attempting to contact an
                 Elasticsearch server
         """
-        global LOCAL_MODE
-
         # retain state of Elasticsearch client
         self.client = None
         self.page = None
@@ -103,10 +101,7 @@ class EsConnection(object):
         self.fake_pages = []
         self.local_mode = LOCAL_MODE
 
-        if self.local_mode:
-            print("Initialized into local mode")
-
-        if host and port and not self.local_mode:
+        if host and port:
             self.connect()
 
     def _process_page(self):
@@ -186,6 +181,10 @@ class EsConnection(object):
         Returns:
             dict: The page resulting from the issued query.
         """
+        if not self.client:
+            # allow lazy connect
+            self.connect()
+
         if self.local_mode:
             self._pop_fake_page()
         else:
@@ -207,6 +206,10 @@ class EsConnection(object):
         """
         if self.scroll_id is None:
             raise Exception('no scroll id')
+
+        if not self.client:
+            # allow lazy connect
+            self.connect()
 
         if self.local_mode:
             self._pop_fake_page()
@@ -241,6 +244,9 @@ class EsConnection(object):
             flush_function (function, optional): function to call when
                 `flush_every` docs are retrieved.
         """
+        if not self.client:
+            # allow lazy connect
+            self.connect()
 
         # initialize the scroll state
         self.scroll_pages = []

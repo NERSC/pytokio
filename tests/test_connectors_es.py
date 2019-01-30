@@ -7,9 +7,6 @@ pass only at NERSC because of the assumptions built into the indices.
 import datetime
 import tokio.connectors.es
 
-# Disable dependence on external Elasticsearch cluster to run tests
-tokio.connectors.es.LOCAL_MODE = True
-
 FLUSH_STATE = {'pages': []}
 PAGE_SIZE = 100
 NUM_PAGES = 10
@@ -81,6 +78,7 @@ def test_flush_function_correctness():
     """connectors.es flush function correctness
     """
     es_obj = tokio.connectors.es.EsConnection(host=None, port=None)
+    es_obj.local_mode = True
     es_obj.fake_pages = make_fake_pages()
 
     ############################################################################
