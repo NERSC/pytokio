@@ -1,13 +1,23 @@
 #!/usr/bin/env python
-"""
-Test the ElasticSearch collectd connector.  Not much that can be done since most
-functionality is dictated by the behavior of Elasticsearch.
+"""Test the Elasticsearch collectd connector
+
+Ensures that the connector-specific queries are working when Elasticsearch is
+available.  Will require modifying tokiotest.SAMPLE_COLLECTDES_* to work at
+non-NERSC sites.
 """
 
 import datetime
 import copy
-import nose
+
+try:
+    from imp import reload
+except ImportError:
+    # Python 2
+    pass
+
+
 import tokio.connectors.es
+reload(tokio.connectors.es) # required because es maintains local-mode state
 import tokio.connectors.collectd_es
 import tokiotest
 try:
@@ -15,6 +25,10 @@ try:
     _HAVE_ELASTICSEARCH = True
 except ImportError:
     _HAVE_ELASTICSEARCH = False
+
+# elasticsearch can be VERY noisy on failures
+# import logging
+# logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
 FAKE_PAGES = [
     {
@@ -26,21 +40,18 @@ FAKE_PAGES = [
     {
         '_scroll_id': 1,
         'hits': {
-            'hits': [],
-        },
-    },
+            'hits': []
+        }
+    }
 ]
 
-### the ElasticSearch python library can be VERY noisy on failures
-# import logging
-# logging.getLogger('elasticsearch').setLevel(logging.WARNING)
-
 def test_query_interfaces():
-    """test_connectors_collectd_es.query_*
+    """connectors.collectd_es.CollectdEs.query_*
     """
     global _HAVE_ELASTICSEARCH
 
     end = datetime.datetime.now() - datetime.timedelta(hours=1)
+    # adjust the timedelta to match the data source's data generate rates
     start = end - datetime.timedelta(seconds=10)
 
     esdb = None
@@ -50,7 +61,8 @@ def test_query_interfaces():
             port=tokiotest.SAMPLE_COLLECTDES_PORT,
             index=tokiotest.SAMPLE_COLLECTDES_INDEX)
         try:
-            esdb.query({"query": {"match": {"message": {"query": "test connection", "operator": "and"}}}})
+            esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
+            esdb.query(tokio.connectors.collectd_es.BASE_QUERY)
         except elasticsearch.exceptions.ConnectionError:
             esdb = None
 
@@ -63,20 +75,79 @@ def test_query_interfaces():
     else:
         print("Testing in remote mode")
 
-    if tokio.connectors.es.LOCAL_MODE:
-        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-    esdb.query_disk(start, end)
-    assert esdb.scroll_pages
-    esdb.scroll_pages = []
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_disk,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='disk')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_disk()"
+    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'disk'
 
-    if tokio.connectors.es.LOCAL_MODE:
-        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-    esdb.query_memory(start, end)
-    assert esdb.scroll_pages
-    esdb.scroll_pages = []
 
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_cpu,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='cpu')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_cpu()"
+    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'cpu'
+
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_memory,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='memory')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_memory()"
+    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'memory'
+
+def validate_es_query_method(esdb, method, field, start, end, target_val):
+    """Tests a connector-specific query method
+
+    Exercises a connector-specific query method in a way that fully validates
+    functionality against a remote Elasticsearch service that contains arbitrary
+    data (but in the correct format) if available.  If a remote Elasticsearch
+    service is not available, still validates that the API works.
+
+    Args:
+        esdb: Instance of an object derived from connectors.es.EsConnection
+            to test
+        method: query method of ``esdb`` that should be called
+        field (str): key corresponding to the _source field that ``method`` is
+            querying.  Required to verify that ``method`` returns only those
+            records that match this field.
+        start (datetime.datetime): Passed as ``method``'s ``start`` argument
+        end (datetime.datetime): Passed as ``method``'s ``end`` argument
+        target_val: a value of ``field`` that will return more than zero results
+            when issued to a remote Elasticsearch service.  If operating in
+            local mode, this can be any value.
+    """
     if tokio.connectors.es.LOCAL_MODE:
         esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-    esdb.query_cpu(start, end)
-    assert esdb.scroll_pages
+#       method(start, end, target_val)
+        method(start, end)
+        assert esdb.scroll_pages
+    else:
+        print("Searching for %s" % target_val)
+#       method(start, end, target_val)
+        method(start, end)
+        assert esdb.scroll_pages
+        print("Got %d pages" % len(esdb.scroll_pages))
+        num_recs = sum([len(page) for page in esdb.scroll_pages])
+        print("Got %d records" % num_recs)
+
+        valid_records = 0
+        for page in esdb.scroll_pages:
+            for rec in page:
+                if rec['_source'][field] != target_val:
+                    print("%s != %s" % (rec['_source'][field], target_val))
+                    assert rec['_source'][field] == target_val
+                valid_records += 1
+        print("Validated %d records" % valid_records)
+
     esdb.scroll_pages = []

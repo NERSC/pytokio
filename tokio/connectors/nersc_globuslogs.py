@@ -51,26 +51,6 @@ SOURCE_FILTER = [
     'host',
 ]
 
-def insert_condition(mutable_query, field, value, term="term"):
-    """Inserts a new condition into a query object
-
-    See https://www.elastic.co/guide/en/elasticsearch/reference/current/term-level-queries.html
-    for complete documentation.
-
-    Args:
-        mutable_query (dict): a query object to be modified
-        field (str): the field to which a term query will be applied
-        value: the value to match for the term query
-        term (str): one of the following: term, terms, terms_set, range, exists,
-            prefix, wildcard, regexp, fuzzy, type, ids.  
-
-    Returns:
-        Nothing.  ``mutable_query`` is updated in place.
-    """
-    mutable_query['query']['constant_score']['filter']['bool']['must'].append({
-        term: {field: value}
-    })
-
 class NerscGlobusLogs(es.EsConnection):
     """Connection handler for NERSC Globus transfer logs
     """
@@ -158,3 +138,11 @@ class NerscGlobusLogs(es.EsConnection):
                                      filter_function=self.filter_function,
                                      flush_every=self.flush_every,
                                      flush_function=self.flush_function)
+
+    def to_csv(self, fields):
+        """Converts self.scroll_pages to CSV
+
+        Returns:
+            str: Contents of the last query's pages in CSV format
+        """
+        return super(NerscGlobusLogs, self).to_csv(fields=SOURCE_FILTER)

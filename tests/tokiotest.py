@@ -188,7 +188,7 @@ SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/datatargets/readrates'
 SAMPLE_COLLECTDES_DSET2 = '/datatargets/writerates'
 
-SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_INDEX = 'gerty-collectd-*' # this test will ONLY work at NERSC
 SAMPLE_GLOBUSLOGS_INDEX = 'dtn-dtn-log*' # this test will ONLY work at NERSC
 SAMPLE_COLLECTDES_HOST = 'localhost'
 SAMPLE_COLLECTDES_PORT = 9200

@@ -42,6 +42,7 @@ def make_fake_pages(num_pages=NUM_PAGES, page_size=PAGE_SIZE):
     """Create a set of fake pages
     """
     fake_pages = []
+    scroll_id = 0
     for scroll_id in range(num_pages):
         fake_page = {
             '_scroll_id': str(scroll_id),
@@ -56,7 +57,9 @@ def make_fake_pages(num_pages=NUM_PAGES, page_size=PAGE_SIZE):
             })
         fake_pages.append(fake_page)
 
-    fake_pages.append({'_scroll_id': str(scroll_id), 'hits': { 'hits': [] } })
+    # append a terminal empty page (this is what elasticsearch does to signal
+    # the end of a scrolling query)
+    fake_pages.append({'_scroll_id': str(scroll_id), 'hits': {'hits': []}})
     return fake_pages
 
 def flush_function(es_obj):

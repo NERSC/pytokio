@@ -16,6 +16,24 @@ try:
 except ImportError:
     LOCAL_MODE = True
 
+BASE_QUERY = {
+    "query": {
+        "constant_score": {
+            "filter": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "@timestamp": {}
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
+
 class EsConnection(object):
     """Elasticsearch connection handler.
 
@@ -57,6 +75,8 @@ class EsConnection(object):
                 self.fake_pages instead of attempting to contact an
                 Elasticsearch server
         """
+        global LOCAL_MODE
+
         # retain state of Elasticsearch client
         self.client = None
         self.page = None
@@ -83,8 +103,60 @@ class EsConnection(object):
         self.fake_pages = []
         self.local_mode = LOCAL_MODE
 
+        if self.local_mode:
+            print("Initialized into local mode")
+
         if host and port and not self.local_mode:
             self.connect()
+
+    def _process_page(self):
+        """Remove a page from the incoming queue and append it
+
+        Takes the last received page (self.page), updates the internal state of
+        the scroll operation, updates some internal counters, calls the flush
+        function if applicable, and applies the filter function.  Then appends
+        the results to self.scroll_pages.
+
+        Returns:
+            bool: True if hits were appended or not
+        """
+        if not self.page['hits']['hits']:
+            return False
+
+        self.scroll_id = self.page.get('_scroll_id')
+        num_hits = len(self.page['hits']['hits'])
+        self._total_hits += num_hits
+
+        # if this page will push us over flush_every, flush it first
+        if self._flush_function is not None \
+        and self._flush_every \
+        and (self._hits_since_flush + num_hits) > self._flush_every:
+            self._flush_function(self)
+            self._hits_since_flush = 0
+            self._num_flushes += 1
+
+        # increment hits since flush only after we've (possibly) flushed
+        self._hits_since_flush += num_hits
+
+        # if a filter function exists, use its output as the page to append
+        if self._filter_function is None:
+            filtered_page = self.page
+        else:
+            filtered_page = self._filter_function(self.page)
+
+        # finally append the page
+        self.scroll_pages.append(filtered_page)
+        return True
+
+
+    def _pop_fake_page(self):
+        if not self.fake_pages:
+            warn_str = "fake_pages is empty on a query/scroll; this means either"
+            warn_str += "\n\n"
+            warn_str += "1. You forgot to set self.fake_pages before issuing the query, or\n"
+            warn_str += "2. You forgot to terminate self.fake_pages with an empty page"
+            warnings.warn(warn_str)
+        self.page = self.fake_pages.pop(0)
 
     def connect(self):
         """Instantiate a connection and retain the connection context.
@@ -115,7 +187,7 @@ class EsConnection(object):
             dict: The page resulting from the issued query.
         """
         if self.local_mode:
-            self.page = self.fake_pages.pop(0)
+            self._pop_fake_page()
         else:
             self.page = self.client.search(body=query, index=self.index, sort=self.sort_by)
 
@@ -137,7 +209,7 @@ class EsConnection(object):
             raise Exception('no scroll id')
 
         if self.local_mode:
-            self.page = self.fake_pages.pop(0)
+            self._pop_fake_page()
         else:
             self.page = self.client.scroll(scroll_id=self.scroll_id, scroll=self.scroll_size)
 
@@ -180,7 +252,7 @@ class EsConnection(object):
 
         # Get first set of results and a scroll id
         if self.local_mode:
-            self.page = self.fake_pages.pop(0)
+            self._pop_fake_page()
         else:
             self.page = self.client.search(
                 index=self.index,
@@ -196,45 +268,6 @@ class EsConnection(object):
         while more:
             self.page = self.scroll()
             more = self._process_page()
-
-    def _process_page(self):
-        """Remove a page from the incoming queue and append it
-
-        Takes the last received page (self.page), updates the internal state of
-        the scroll operation, updates some internal counters, calls the flush
-        function if applicable, and applies the filter function.  Then appends
-        the results to self.scroll_pages.
-
-        Returns:
-            bool: True if hits were appended or not
-        """
-        if not self.page['hits']['hits']:
-            return False
-
-        self.scroll_id = self.page.get('_scroll_id')
-        num_hits = len(self.page['hits']['hits'])
-        self._total_hits += num_hits
-
-        # if this page will push us over flush_every, flush it first
-        if self._flush_function is not None \
-        and self._flush_every \
-        and (self._hits_since_flush + num_hits) > self._flush_every:
-            self._flush_function(self)
-            self._hits_since_flush = 0
-            self._num_flushes += 1
-
-        # increment hits since flush only after we've (possibly) flushed
-        self._hits_since_flush += num_hits
-
-        # if a filter function exists, use its output as the page to append
-        if self._filter_function is None:
-            filtered_page = self.page
-        else:
-            filtered_page = self._filter_function(self.page)
-
-        # finally append the page
-        self.scroll_pages.append(filtered_page)
-        return True
 
     def query_timeseries(self, query_template, start, end, source_filter=True,
                          filter_function=None, flush_every=None,
@@ -272,6 +305,18 @@ class EsConnection(object):
             flush_every=flush_every,
             flush_function=flush_function)
         tokio.debug.debug_print("Elasticsearch query took %s seconds" % (time.time() - time0))
+
+    def to_csv(self, fields):
+        """Converts self.scroll_pages to CSV
+
+        Returns:
+            str: Contents of the last query's pages in CSV format
+        """
+        ret_str = ",".join(fields) + "\n"
+        for page in self.scroll_pages:
+            for record in page:
+                ret_str += ",".join([record.get(field, "") for field in fields])
+        return ret_str
 
 def build_timeseries_query(orig_query, start, end):
     """Create a query object with time ranges bounded.
@@ -337,3 +382,23 @@ def build_timeseries_query(orig_query, start, end):
         raise RuntimeError("unable to locate timestamp in query")
 
     return query
+
+def mutate_query(mutable_query, field, value, term="term"):
+    """Inserts a new condition into a query object
+
+    See https://www.elastic.co/guide/en/elasticsearch/reference/current/term-level-queries.html
+    for complete documentation.
+
+    Args:
+        mutable_query (dict): a query object to be modified
+        field (str): the field to which a term query will be applied
+        value: the value to match for the term query
+        term (str): one of the following: term, terms, terms_set, range, exists,
+            prefix, wildcard, regexp, fuzzy, type, ids.  
+
+    Returns:
+        Nothing.  ``mutable_query`` is updated in place.
+    """
+    mutable_query['query']['constant_score']['filter']['bool']['must'].append({
+        term: {field: value}
+    })
