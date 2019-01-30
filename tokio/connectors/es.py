@@ -181,13 +181,12 @@ class EsConnection(object):
         Returns:
             dict: The page resulting from the issued query.
         """
-        if not self.client:
-            # allow lazy connect
-            self.connect()
-
         if self.local_mode:
             self._pop_fake_page()
         else:
+            if not self.client:
+                # allow lazy connect
+                self.connect()
             self.page = self.client.search(body=query, index=self.index, sort=self.sort_by)
 
         self.scroll_id = self.page.get('_scroll_id')
@@ -207,13 +206,12 @@ class EsConnection(object):
         if self.scroll_id is None:
             raise Exception('no scroll id')
 
-        if not self.client:
-            # allow lazy connect
-            self.connect()
-
         if self.local_mode:
             self._pop_fake_page()
         else:
+            if not self.client:
+                # allow lazy connect
+                self.connect()
             self.page = self.client.scroll(scroll_id=self.scroll_id, scroll=self.scroll_size)
 
         return self.page
@@ -244,10 +242,6 @@ class EsConnection(object):
             flush_function (function, optional): function to call when
                 `flush_every` docs are retrieved.
         """
-        if not self.client:
-            # allow lazy connect
-            self.connect()
-
         # initialize the scroll state
         self.scroll_pages = []
         self._filter_function = filter_function
@@ -260,6 +254,9 @@ class EsConnection(object):
         if self.local_mode:
             self._pop_fake_page()
         else:
+            if not self.client:
+                # allow lazy connect
+                self.connect()
             self.page = self.client.search(
                 index=self.index,
                 body=query,
