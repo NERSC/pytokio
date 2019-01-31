@@ -410,7 +410,7 @@ def build_timeseries_query(orig_query, start, end, start_key='@timestamp', end_k
         map_item(query, start_key, set_time_range, start_time=start, end_time=end)
     else:
         map_item(query, start_key, set_time, operator='lt', time_val=end)
-        map_item(query, start_key, set_time, operator='gte', time_val=start)
+        map_item(query, end_key, set_time, operator='gte', time_val=start)
 
     if not remaps[0]:
         raise RuntimeError("unable to locate timestamp in query")
