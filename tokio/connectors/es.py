@@ -347,7 +347,7 @@ def build_timeseries_query(orig_query, start, end):
         dict: A query object with all instances of ``@timestamp`` bounded by
         `start` and `end`.
     """
-    def map_item(obj, target_key, map_function):
+    def map_item(obj, target_key, map_function, **kwargs):
         """
         Recursively walk a hierarchy of dicts and lists, searching for a
         matching key.  For each match found, apply map_function to that key's
@@ -356,29 +356,30 @@ def build_timeseries_query(orig_query, start, end):
         if isinstance(obj, list):
             iterator = enumerate
             if target_key in obj:
-                return obj[target_key]
+                map_function(obj[target_key], **kwargs)
+                return
         elif isinstance(obj, dict):
             iterator = dict.items
             if target_key in obj:
-                return obj[target_key]
+                map_function(obj[target_key], **kwargs)
+                return
         else:
             # hit a dead end without a match
-            return None
+            return
+
         # if this isn't a dead end, search down each iterable element
         for _, value in iterator(obj):
             if isinstance(value, (list, dict)):
                 # dive down any discovered rabbit holes
-                item = map_item(value, target_key, map_function)
-                if item is not None:
-                    map_function(item)
-        return None
+                map_item(value, target_key, map_function, **kwargs)
+        return
 
-    def set_time_range(time_range_obj, time_format="epoch_second"):
+    def set_time_range(time_range_obj, start_time, end_time, time_format="epoch_second"):
         """
         Set the upper and lower bounds of a time range
         """
-        time_range_obj['gte'] = int(time.mktime(start.timetuple()))
-        time_range_obj['lt'] = int(time.mktime(end.timetuple()))
+        time_range_obj['gte'] = int(time.mktime(start_time.timetuple()))
+        time_range_obj['lt'] = int(time.mktime(end_time.timetuple()))
         time_range_obj['format'] = time_format
         remaps[0] += 1
 
@@ -387,9 +388,13 @@ def build_timeseries_query(orig_query, start, end):
 
     query = copy.deepcopy(orig_query)
 
-    map_item(query, '@timestamp', set_time_range)
+    map_item(query,
+             target_key='@timestamp',
+             map_function=set_time_range,
+             start_time=start,
+             end_time=end)
 
-    if not remaps:
+    if not remaps[0]:
         raise RuntimeError("unable to locate timestamp in query")
 
     return query
