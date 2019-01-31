@@ -329,7 +329,7 @@ class EsConnection(object):
                 to_df.append(record_dict)
         return pandas.DataFrame(to_df)
 
-def build_timeseries_query(orig_query, start, end):
+def build_timeseries_query(orig_query, start, end, start_key='@timestamp', end_key=None):
     """Create a query object with time ranges bounded.
 
     Given a query dict and a start/end datetime object, return a new query
@@ -337,11 +337,23 @@ def build_timeseries_query(orig_query, start, end):
     containing at least one ``@timestamp`` field to indicate where the time
     ranges should be inserted.
 
+    If orig_query is querying records that contain both a "start" and "end"
+    time (e.g., a job) rather than a discrete point in time (e.g., a sampled
+    metric), ``start_key`` and ``end_key`` can be used to modify the query to
+    return all records that overlapped with the interval specified by
+    ``start_time`` and ``end_time``.
+
     Args:
         orig_query (dict): A query object containing at least one ``@timestamp``
             field.
         start (datetime.datetime): lower bound for query (inclusive)
         end (datetime.datetime): upper bound for query (exclusive)
+        start_key (str): The key containing a timestamp against which a time
+            range query should be applied.
+        end_key (str): The key containing a timestamp against which the upper
+            bound of the time range should be applied.  If None, treat
+            ``start_key`` as a single point in time rather than the start of
+            a recorded process.
 
     Returns:
         dict: A query object with all instances of ``@timestamp`` bounded by
@@ -375,11 +387,17 @@ def build_timeseries_query(orig_query, start, end):
         return
 
     def set_time_range(time_range_obj, start_time, end_time, time_format="epoch_second"):
-        """
-        Set the upper and lower bounds of a time range
+        """Set the upper and lower bounds of a time range
         """
         time_range_obj['gte'] = int(time.mktime(start_time.timetuple()))
         time_range_obj['lt'] = int(time.mktime(end_time.timetuple()))
+        time_range_obj['format'] = time_format
+        remaps[0] += 1
+
+    def set_time(time_range_obj, operator, time_val, time_format="epoch_second"):
+        """Set a single time filter
+        """
+        time_range_obj[operator] = int(time.mktime(time_val.timetuple()))
         time_range_obj['format'] = time_format
         remaps[0] += 1
 
@@ -388,11 +406,11 @@ def build_timeseries_query(orig_query, start, end):
 
     query = copy.deepcopy(orig_query)
 
-    map_item(query,
-             target_key='@timestamp',
-             map_function=set_time_range,
-             start_time=start,
-             end_time=end)
+    if end_key is None:
+        map_item(query, start_key, set_time_range, start_time=start, end_time=end)
+    else:
+        map_item(query, start_key, set_time, operator='lt', time_val=end)
+        map_item(query, start_key, set_time, operator='gte', time_val=start)
 
     if not remaps[0]:
         raise RuntimeError("unable to locate timestamp in query")

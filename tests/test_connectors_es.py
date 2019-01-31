@@ -133,5 +133,9 @@ def test_build_timeseries_query():
 
     for query in FAKE_TIMESERIES_QUERIES:
         # doesn't matter _what_ the datetime is
-        ret = tokio.connectors.es.build_timeseries_query(query, datetime.datetime.now(), datetime.datetime.now())
+        ret = tokio.connectors.es.build_timeseries_query(
+            query,
+            datetime.datetime.now() - datetime.timedelta(hours=1),
+            datetime.datetime.now())
+        print(ret)
         assert ret
