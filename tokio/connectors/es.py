@@ -247,6 +247,12 @@ class EsConnection(object):
             flush_function (function, optional): function to call when
                 `flush_every` docs are retrieved.
         """
+        ### Print query
+        debug.debug_print(json.dumps(query, indent=4))
+
+        ### Run query
+        time0 = time.time()
+
         # initialize the scroll state
         self.scroll_pages = []
         self._filter_function = filter_function
@@ -276,11 +282,12 @@ class EsConnection(object):
         while more:
             self.page = self.scroll()
             more = self._process_page()
+        debug.debug_print("Elasticsearch query took %s seconds" % (time.time() - time0))
 
     def query_timeseries(self, query_template, start, end, source_filter=True,
                          filter_function=None, flush_every=None,
                          flush_function=None):
-        """Query Elasticsearch for collectd plugin data.
+        """Craft and issue query bounded by time
 
         Args:
             query_template (dict): a query object containing at least one
@@ -301,18 +308,12 @@ class EsConnection(object):
         """
         query = build_timeseries_query(query_template, start, end)
 
-        ### Print query
-        debug.debug_print(json.dumps(query, indent=4))
-
-        ### Run query
-        time0 = time.time()
         self.query_and_scroll(
             query=query,
             source_filter=source_filter,
             filter_function=filter_function,
             flush_every=flush_every,
             flush_function=flush_function)
-        debug.debug_print("Elasticsearch query took %s seconds" % (time.time() - time0))
 
     def to_dataframe(self, fields):
         """Converts self.scroll_pages to CSV
