@@ -9,7 +9,8 @@ import copy
 import time
 import json
 import warnings
-import tokio
+import pandas
+from .. import debug
 try:
     import elasticsearch
     LOCAL_MODE = False
@@ -297,7 +298,7 @@ class EsConnection(object):
         query = build_timeseries_query(query_template, start, end)
 
         ### Print query
-        tokio.debug.debug_print(json.dumps(query, indent=4))
+        debug.debug_print(json.dumps(query, indent=4))
 
         ### Run query
         time0 = time.time()
@@ -307,19 +308,22 @@ class EsConnection(object):
             filter_function=filter_function,
             flush_every=flush_every,
             flush_function=flush_function)
-        tokio.debug.debug_print("Elasticsearch query took %s seconds" % (time.time() - time0))
+        debug.debug_print("Elasticsearch query took %s seconds" % (time.time() - time0))
 
-    def to_csv(self, fields):
+    def to_dataframe(self, fields):
         """Converts self.scroll_pages to CSV
 
         Returns:
             str: Contents of the last query's pages in CSV format
         """
-        ret_str = ",".join(fields) + "\n"
+        to_df = []
         for page in self.scroll_pages:
             for record in page:
-                ret_str += ",".join([record.get(field, "") for field in fields])
-        return ret_str
+                record_dict = {}
+                for field in fields:
+                    record_dict[field] = record['_source'].get(field)
+                to_df.append(record_dict)
+        return pandas.DataFrame(to_df)
 
 def build_timeseries_query(orig_query, start, end):
     """Create a query object with time ranges bounded.

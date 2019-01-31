@@ -139,10 +139,10 @@ class NerscGlobusLogs(es.EsConnection):
                                      flush_every=self.flush_every,
                                      flush_function=self.flush_function)
 
-    def to_csv(self):
+    def to_dataframe(self):
         """Converts self.scroll_pages to CSV
 
         Returns:
             str: Contents of the last query's pages in CSV format
         """
-        return super(NerscGlobusLogs, self).to_csv(fields=SOURCE_FILTER)
+        return super(NerscGlobusLogs, self).to_dataframe(fields=SOURCE_FILTER)

@@ -142,15 +142,13 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
 
     esdb.scroll_pages = []
 
-def test_to_csv():
-    """connectors.collectd_es.CollectdEs.to_csv()
+def test_to_dataframe():
+    """connectors.collectd_es.CollectdEs.to_dataframe()
     """
     esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
     esdb.local_mode = True
     esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
     esdb.query_disk(datetime.datetime.now(), datetime.datetime.now())
-    csv = esdb.to_csv()
-    print(csv)
-    csv_lines = csv.splitlines()
-    assert len(csv_lines) > 1
-    assert csv_lines[-1].strip(',')
+    dataframe = esdb.to_dataframe()
+    print(dataframe)
+    assert len(dataframe) > 0
