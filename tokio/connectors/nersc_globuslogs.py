@@ -15,7 +15,12 @@ QUERY = {
                     "must": [
                         {
                             "range": {
-                                "@timestamp": {}
+                                "start_date": {}
+                            }
+                        },
+                        {
+                            "range": {
+                                "end_date": {}
                             }
                         }
                     ]
@@ -95,7 +100,7 @@ class NerscGlobusLogs(es.EsConnection):
             # no need to deepcopy since query_timeseries() will do that
             query = QUERY
 
-        self._query_timeseries(query, start, end)
+        self.query_timeseries(query, start, end)
 
     def query_user(self, start, end, user):
         """Wraps query() with a user restriction
@@ -122,22 +127,39 @@ class NerscGlobusLogs(es.EsConnection):
         """
         self.query(start=start, end=end, must=[{"term": {"TYPE": xfer_type}}])
 
-    def _query_timeseries(self, query_template, start, end):
-        """Map connection-wide attributes to self.query_timeseries arguments
+    def query_timeseries(self, query_template, start, end):
+        """Craft and issue query that returns all overlapping records
 
         Args:
             query_template (dict): a query object containing at least one
                 ``@timestamp`` field
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
+            source_filter (bool or list): Return all fields contained in each
+                document's _source field if True; otherwise, only return source
+                fields contained in the provided list of str.
+            filter_function (function, optional): Function to call before each
+                set of results is appended to the ``scroll_pages`` attribute; if
+                specified, return value of this function is what is appended.
+            flush_every (int or None): trigger the flush function once the
+                number of docs contained across all ``scroll_pages`` reaches
+                this value.  If None, do not apply `flush_function`.
+            flush_function (function, optional): function to call when
+                `flush_every` docs are retrieved.
         """
-        return self.query_timeseries(query_template=query_template,
-                                     start=start,
-                                     end=end,
-                                     source_filter=SOURCE_FILTER,
-                                     filter_function=self.filter_function,
-                                     flush_every=self.flush_every,
-                                     flush_function=self.flush_function)
+        query = es.build_timeseries_query(
+            query_template,
+            start,
+            end,
+            start_key='start_date',
+            end_key='end_date')
+
+        self.query_and_scroll(
+            query=query,
+            source_filter=SOURCE_FILTER,
+            filter_function=self.filter_function,
+            flush_every=self.flush_every,
+            flush_function=self.flush_function)
 
     def to_dataframe(self):
         """Converts self.scroll_pages to a DataFrame
