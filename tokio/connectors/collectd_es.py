@@ -21,7 +21,7 @@ QUERY_MEMORY_DATA = copy.deepcopy(BASE_QUERY)
 es.mutate_query(QUERY_MEMORY_DATA, term='term', field='plugin', value='memory')
 
 ### Only return the following _source fields
-COLLECTD_SOURCE_FILTER = [
+SOURCE_FILTER = [
     '@timestamp',
     'hostname',
     'plugin',
@@ -93,7 +93,15 @@ class CollectdEs(es.EsConnection):
         return self.query_timeseries(query_template=query_template,
                                      start=start,
                                      end=end,
-                                     source_filter=COLLECTD_SOURCE_FILTER,
+                                     source_filter=SOURCE_FILTER,
                                      filter_function=self.filter_function,
                                      flush_every=self.flush_every,
                                      flush_function=self.flush_function)
+
+    def to_dataframe(self):
+        """Converts self.scroll_pages to a DataFrame
+
+        Returns:
+            pandas.DataFrame: Contents of the last query's pages
+        """
+        return super(CollectdEs, self).to_dataframe(fields=SOURCE_FILTER)

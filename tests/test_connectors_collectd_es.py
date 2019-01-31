@@ -6,8 +6,10 @@ available.  Will require modifying tokiotest.SAMPLE_COLLECTDES_* to work at
 non-NERSC sites.
 """
 
-import datetime
 import copy
+import gzip
+import json
+import datetime
 
 import tokio.connectors.es
 import tokio.connectors.collectd_es
@@ -22,20 +24,15 @@ except ImportError:
 # import logging
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
-FAKE_PAGES = [
-    {
+FAKE_PAGES = []
+for fake_page in json.load(gzip.open(tokiotest.SAMPLE_COLLECTDES_FILE)):
+    FAKE_PAGES.append({
         '_scroll_id': 1,
         'hits': {
-            'hits': [{'payload': 'results'}],
-        },
-    },
-    {
-        '_scroll_id': 1,
-        'hits': {
-            'hits': []
+            'hits': fake_page
         }
-    }
-]
+    })
+FAKE_PAGES.append({'_scroll_id': 1, 'hits': {'hits': []}})
 
 def test_query_interfaces():
     """connectors.collectd_es.CollectdEs.query_*
