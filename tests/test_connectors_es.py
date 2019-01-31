@@ -4,6 +4,7 @@ Test the ElasticSearch collectd connector.  Some of these tests will essentially
 pass only at NERSC because of the assumptions built into the indices.
 """
 
+import copy
 import datetime
 import tokio.connectors.es
 
@@ -130,12 +131,31 @@ def test_flush_function_correctness():
 def test_build_timeseries_query():
     """connectors.es.build_timeseries_query()
     """
+    end_time = datetime.datetime.now()
+    start_time = end_time - datetime.timedelta(hours=1)
 
     for query in FAKE_TIMESERIES_QUERIES:
         # doesn't matter _what_ the datetime is
-        ret = tokio.connectors.es.build_timeseries_query(
-            query,
-            datetime.datetime.now() - datetime.timedelta(hours=1),
-            datetime.datetime.now())
+        ret = tokio.connectors.es.build_timeseries_query(query, start_time, end_time)
         print(ret)
         assert ret
+
+        # now use the time range version of the call
+        ret_ref = copy.deepcopy(ret)
+        ret = tokio.connectors.es.build_timeseries_query(
+            query,
+            start_time,
+            end_time,
+            start_key='@timestamp',
+            end_key='@timestamp')
+        print(ret)
+        assert ret == ret_ref
+
+        # and make sure that the test inputs weren't throwing false positives
+        ret = tokio.connectors.es.build_timeseries_query(
+            query,
+            start_time,
+            end_time,
+            start_key='@timestamp',
+            end_key='INVALID KEY')
+        assert ret != ret_ref
