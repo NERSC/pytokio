@@ -13,9 +13,9 @@ import pandas
 from .. import debug
 try:
     import elasticsearch
-    LOCAL_MODE = False
+    HAVE_ES_PKG = False
 except ImportError:
-    LOCAL_MODE = True
+    HAVE_ES_PKG = True
 
 BASE_QUERY = {
     "query": {
@@ -100,7 +100,11 @@ class EsConnection(object):
         self.sort_by = ''
         # for debugging
         self.fake_pages = []
-        self.local_mode = LOCAL_MODE
+        # if elasticsearch package is not available, we MUST run in local mode.
+        # But this can also be changed at runtime if, e.g., elasticsearch _is_
+        # available, but a connection cannot be made to the Elasticsearch
+        # service.
+        self.local_mode = HAVE_ES_PKG
 
         if host and port:
             self.connect()

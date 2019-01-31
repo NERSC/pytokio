@@ -114,7 +114,7 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
             when issued to a remote Elasticsearch service.  If operating in
             local mode, this can be any value.
     """
-    if tokio.connectors.es.LOCAL_MODE:
+    if esdb.local_mode:
         esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
         method(start, end, target_val)
 #       method(start, end)
