@@ -188,7 +188,10 @@ SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/datatargets/readrates'
 SAMPLE_COLLECTDES_DSET2 = '/datatargets/writerates'
 
-SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_INDEX = 'gerty-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_GLOBUSLOGS_INDEX = 'dtn-dtn-log*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_HOST = 'localhost'
+SAMPLE_COLLECTDES_PORT = 9200
 SAMPLE_COLLECTDES_QUERY = {
     "query": {
         "bool": {
@@ -206,6 +209,10 @@ SAMPLE_COLLECTDES_QUERY = {
         },
     },
 }
+
+SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
+SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
+SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
