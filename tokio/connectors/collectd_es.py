@@ -54,6 +54,14 @@ class CollectdEs(es.EsConnection):
         self.flush_every = 50000
         self.flush_function = lambda x: x
 
+    @classmethod
+    def from_cache(cls, *args, **kwargs):
+        instance = super(CollectdEs, cls).from_cache(*args, **kwargs)
+        instance.filter_function = lambda x: x['hits']['hits']
+        instance.flush_every = 50000
+        instance.flush_function = lambda x: x
+        return instance
+
     def query_disk(self, start, end):
         """Query Elasticsearch for collectd disk plugin data.
 

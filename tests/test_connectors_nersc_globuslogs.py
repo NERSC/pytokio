@@ -140,7 +140,7 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
     esdb.scroll_pages = []
 
 def test_to_dataframe():
-    """tokio.connectors.nersc_globuslogs.NerscGlobusLogs.to_dataframe()
+    """connectors.nersc_globuslogs.NerscGlobusLogs.to_dataframe()
     """
     esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(host=None, port=None, index=None)
     esdb.local_mode = True
