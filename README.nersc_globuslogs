@@ -1,0 +1,31 @@
+A reasonable SQLite schema for the data contained in the NERSC Globus logs would be
+
+CREATE TABLE files (
+    rowid INT PRIMARY KEY,
+    timestamp CHAR,
+    block INT,
+    buffer INT,
+    code INT,
+    date CHAR,
+    dest CHAR,
+    destip CHAR,
+    file CHAR,
+    host CHAR,
+    nbytes INT, 
+    tart CHAR,
+    streams INT, 
+    tripes INT, 
+    askid CHAR,
+    type CHAR,
+    user CHAR,
+    volume CHAR,
+    bandwidth_mbps REAL,
+    duration REAL,
+    end_date CHAR,
+    host2 CHAR,
+    start_date CHAR
+);
+
+However take care to note that many of these fields may contain commas, so
+storing records as intermediate CSV files will likely cause data corruption
+problems.
