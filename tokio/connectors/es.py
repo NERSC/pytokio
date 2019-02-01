@@ -8,6 +8,8 @@ methods to query, scroll, and process pages of scrolling data.
 import copy
 import time
 import json
+import mimetypes
+import gzip
 import warnings
 import pandas
 from .. import debug
@@ -108,6 +110,63 @@ class EsConnection(object):
 
         if host and port:
             self.connect()
+
+    @classmethod
+    def from_cache(cls, cache_file):
+        """Initializes an EsConnection object from a cache file.
+
+        This path is designed to be used for testing.
+
+        Args:
+            cache_file (str): Path to the JSON formatted list of pages
+        """
+        _, encoding = mimetypes.guess_type(cache_file)
+        if encoding == 'gzip':
+            input_fp = gzip.open(cache_file, 'rt')
+        else:
+            input_fp = open(cache_file, 'r')
+
+        # convert cached hits into something resembling a real Elasticsearch response
+        pages = []
+        for hits in json.load(input_fp):
+            pages.append({
+                '_scroll_id': '0',
+                'hits': {
+                    'hits': hits
+                }
+            })
+
+        # never forget to terminate fake pages with an empty page
+        pages.append({'_scroll_id': 0, 'hits': {'hits': []}})
+        input_fp.close()
+
+        instance = cls(host=None, port=None, index=None)
+        instance.local_mode = True
+        instance.fake_pages = pages
+        return instance
+
+    def save_cache(self, output_file=None):
+        """Persist the response of the last query to a file
+
+        This is a little different from other connectors' save_cache() methods
+        in that it only saves down the state of the last query's results.  It
+        does not save any connection information and does not restore the state
+        of a previous EsConnection object.
+
+        Its principal intention is to be used with testing.
+
+        Args:
+            output_file (str or None): Path to file to which json should be
+                written.  If None, write to stdout.  Default is None.
+        """
+        # write out pages to a file
+        if output_file is None:
+            print(json.dumps(self.scroll_pages, indent=4))
+        else:
+            _, encoding = mimetypes.guess_type(output_file)
+            output_file = gzip.open(output_file, 'w') if encoding == 'gzip' else open(output_file, 'w')
+            json.dump(self.scroll_pages, output_file)
+            output_file.close()
 
     def _process_page(self):
         """Remove a page from the incoming queue and append it
@@ -429,7 +488,7 @@ def mutate_query(mutable_query, field, value, term="term"):
         field (str): the field to which a term query will be applied
         value: the value to match for the term query
         term (str): one of the following: term, terms, terms_set, range, exists,
-            prefix, wildcard, regexp, fuzzy, type, ids.  
+            prefix, wildcard, regexp, fuzzy, type, ids.
 
     Returns:
         Nothing.  ``mutable_query`` is updated in place.

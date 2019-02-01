@@ -40,6 +40,7 @@ def main(argv=None):
                         help="port of ElasticSearch endpoint (default: 9200)")
     parser.add_argument('-i', '--index', type=str, default='dtn-dtn-log*',
                         help='ElasticSearch index to query (default:dtn-dtn-log*)')
+    parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")
     parser.add_argument('--user', type=str, default=None,
                         help='limit results to transfers owned by this user')
     parser.add_argument('--type', type=str, default=None,
@@ -61,8 +62,9 @@ def main(argv=None):
     if query_start >= query_end:
         raise Exception('query_start >= query_end')
 
-    # Read input from a cached json file (generated previously via the --json
-    # option) or by querying ElasticSearch?
+    # Read input from a cached json file (generated previously) or by querying
+    # Elasticsearch directly
+    must = []
     if args.input is None:
         ### Try to connect
         esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(
@@ -71,36 +73,27 @@ def main(argv=None):
             index=args.index,
             timeout=args.timeout)
 
-        must = []
         if args.user:
             must.append({"term": {"USER": args.user}})
         if args.type:
             must.append({"term": {"TYPE": args.type.upper()}})
 
-        pages = None
-        esdb.query(query_start, query_end, must=must)
-        if pages is None:
-            pages = esdb.scroll_pages
-        else:
-            pages += esdb.scroll_pages
-
         tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
     else:
-        _, encoding = mimetypes.guess_type(args.input)
-        if encoding == 'gzip':
-            input_file = gzip.open(args.input, 'r')
-        else:
-            input_file = open(args.input, 'r')
-        pages = json.load(input_file)
-        input_file.close()
+        esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs.from_cache(args.input)
         tokio.debug.debug_print("Loaded results from %s" % args.input)
 
+    esdb.query(query_start, query_end, must=must)
+
     # Write output
-    if args.output:
-        _, encoding = mimetypes.guess_type(args.output)
-        output_file = gzip.open(args.output, 'w') if encoding == 'gzip' else open(args.output, 'w')
-        json.dump(pages, output_file)
-        output_file.close()
-        print("Wrote output to %s" % args.output)
+    cache_file = args.output
+    if cache_file is not None:
+        print("Caching to %s" % cache_file)
+
+    if args.csv:
+        if cache_file is None:
+            print(esdb.to_dataframe().to_csv())
+        else:
+            esdb.to_dataframe().to_csv(cache_file)
     else:
-        print(json.dumps(pages, indent=4, sort_keys=True))
+        esdb.save_cache(cache_file)

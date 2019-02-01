@@ -65,6 +65,14 @@ class NerscGlobusLogs(es.EsConnection):
         self.flush_every = 50000
         self.flush_function = lambda x: x
 
+    @classmethod
+    def from_cache(cls, *args, **kwargs):
+        instance = super(NerscGlobusLogs, cls).from_cache(*args, **kwargs)
+        instance.filter_function = lambda x: x['hits']['hits']
+        instance.flush_every = 50000
+        instance.flush_function = lambda x: x
+        return instance
+
     def query(self, start, end, must=None):
         """Queries Elasticsearch for Globus logs
 
