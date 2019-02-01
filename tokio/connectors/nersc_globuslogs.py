@@ -77,7 +77,7 @@ class NerscGlobusLogs(es.EsConnection):
         """Queries Elasticsearch for Globus logs
 
         Accepts a start time, end time, and an optional "must" field which can
-        be used to apply additional term queries.  For example, ``must`` may be
+        be used to apply additional term queries.  For example, ``must`` may be::
 
             [
                 {
