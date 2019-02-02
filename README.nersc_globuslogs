@@ -1,31 +1,21 @@
-A reasonable SQLite schema for the data contained in the NERSC Globus logs would be
+INSERT INTO transfers (timestamp, block, buffer, code, date, dest, destip, file, host, nbytes, start, streams, stripes, taskid, type, user, volume, bandwidth_mbps, duration, start_date, end_date, loghost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ('2019-02-01T18:00:57.635Z', 4194304, 332800, ['226', '226'], '20190201180057.343719', ['128.55.205.29', '128.55.205.29'], ['128.55.205.29', '128.55.205.29'], '/global/projecta/projectdirs/lsst/production/DC2_ImSim/Run2.0i/instance_catalog/00190288/Dynamic/specFileSN_MS_10066_3929_59835.2529_y.dat', 'dtn10.nersc.gov', 35295, '20190201180057.310850', 4, '1', ['b947a070-26RIPES=1', 'b947a070-2637-11e9-934f-0e3d676669f4'], ['STOR', 'RETR'], 'heatherk', '/', 8.56, 0.033, '2019-02-01T18:00:57.310Z', '2019-02-01T18:00:57.343Z', None)
+Traceback (most recent call last):
+  File "./bin/archive_nersc_globuslogs.py", line 6, in <module>
+    main()
+  File "/global/homes/g/glock/src/git/pytokio-dev/tokio/cli/archive_nersc_globuslogs.py", line 158, in main
+    query_to_sqlite(esdb, query_start, query_end, conn, args.table)
+  File "/global/homes/g/glock/src/git/pytokio-dev/tokio/cli/archive_nersc_globuslogs.py", line 90, in query_to_sqlite
+    cursor.execute(query, insert)
+sqlite3.InterfaceError: Error binding parameter 3 - probably unsupported type.
 
-CREATE TABLE files (
-    rowid INT PRIMARY KEY,
-    timestamp CHAR,
-    block INT,
-    buffer INT,
-    code INT,
-    date CHAR,
-    dest CHAR,
-    destip CHAR,
-    file CHAR,
-    host CHAR,
-    nbytes INT, 
-    tart CHAR,
-    streams INT, 
-    tripes INT, 
-    askid CHAR,
-    type CHAR,
-    user CHAR,
-    volume CHAR,
-    bandwidth_mbps REAL,
-    duration REAL,
-    end_date CHAR,
-    host2 CHAR,
-    start_date CHAR
-);
+The actual bad record from Elasticsearch is
 
-However take care to note that many of these fields may contain commas, so
-storing records as intermediate CSV files will likely cause data corruption
-problems.
+DATE=20190201180057.343719 HOST=dtn10.nersc.gov PROG=globus-gridftp-server NL.EVNT=FTP_INFO START=20190201180057.310850 USER=heatherk FILE=/global/projecta/projectdirs/lsst/production/DC2_ImSim/Run2.0i/instance_catalog/00190288/Dynamic/specFileSN_MS_10066_3929_59835.2529_y.dat BUFFER=332800 BLOCK=4194304 NBYTES=35295 VOLUME=/ STREAMS=4 STRIPES=1 DEST=[128.55.205.29] TYPE=STOR CODE=226 TASKID=b947a070-26RIPES=1 DEST=[128.55.205.29] TYPE=RETR CODE=226 TASKID=b947a070-2637-11e9-934f-0e3d676669f4 retrans=0,0,0,0
+
+And as a result, Kibana throws back a few of these fields as JSON lists instead
+of scalars.  Should we just discard malformed records and pretend like they
+didn't happen?  It's otherwise impossible to discern the true contents of the
+record since bits are missing.  We may also have to validate all fields (incl.
+TASKID) before inserting to ensure we don't pollute the SQLite database.
+
+Bummer.
