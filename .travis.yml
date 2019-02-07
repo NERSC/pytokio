@@ -1,10 +1,16 @@
 language: python
+python:
+  - "2.7"
+  - "3.6"
 sudo: required
+before_script:
+    - pip install coverage elasticsearch requests setuptools python-coveralls
+    - git clone -b darshan-3.1.5 https://xgitlab.cels.anl.gov/darshan/darshan.git || git clone -b darshan-3.1.5 https://github.com/glennklockwood/darshan.git
+    - export "PATH=${PWD}/darshan/darshan-util:$PATH"
+    - (cd darshan/darshan-util && ./configure && make darshan-parser)
 install:
-    - pip install coverage elasticsearch requests setuptools
     - python setup.py sdist
     - pip install dist/*
-    - git clone -b darshan-3.1.5 https://xgitlab.cels.anl.gov/darshan/darshan.git || git clone -b darshan-3.1.5 https://github.com/glennklockwood/darshan.git
-    - (cd darshan/darshan-util && ./configure && make darshan-parser)
-    - export "PATH=${PWD}/darshan/darshan-util:$PATH"
 script: (./tests/run_tests.sh --with-coverage)
+after_success:
+  - coveralls
