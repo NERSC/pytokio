@@ -13,4 +13,4 @@ install:
     - pip install dist/*
 script: (./tests/run_tests.sh --with-coverage)
 after_success:
-  - coveralls
+  - (cd tests && coveralls)
