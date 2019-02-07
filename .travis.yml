@@ -11,6 +11,6 @@ before_script:
 install:
     - python setup.py sdist
     - pip install dist/*
-script: (./tests/run_tests.sh --with-coverage)
+script: (mv tokio _tokio && ./tests/run_tests.sh --with-coverage)
 after_success:
   - (cd tests && coveralls)
