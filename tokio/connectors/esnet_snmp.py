@@ -172,7 +172,8 @@ class EsnetSnmp(common.CacheableDict):
         """Retrieves data rate data for an ESnet endpoint
 
         Args:
-            interface (str, optional): Name of the ESnet endpoint interface
+            endpoint (str): Name of ESnet endpoint (usually a router identifier)
+            interface (str): Name of the ESnet endpoint interface
             direction (str): "in" or "out" to signify data input into ESnet or
                 data output from ESnet
             agg_func (str or None): Specifies the reduction operator to be
