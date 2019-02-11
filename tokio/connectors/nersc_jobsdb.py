@@ -3,7 +3,7 @@
 Extract job info from the NERSC jobs database.  Accessing the MySQL database is
 not required (i.e., if you have everything stored in a cache, you never have to
 touch MySQL).  However if you do have to connect to MySQL, you must set the
-following environment variables:
+following environment variables::
 
     NERSC_JOBSDB_HOST
     NERSC_JOBSDB_USER
@@ -165,7 +165,7 @@ class NerscJobsDb(cachingdb.CachingDb):
 
         Returns:
             tuple of datetime.datetime: Two-item tuple of (start time,
-                end time)
+            end time)
         """
         query_str = NERSC_JOBSDB_QUERY + """
         WHERE

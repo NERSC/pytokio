@@ -7,6 +7,8 @@ import os
 import sys
 import gzip
 import errno
+import shutil
+import tarfile
 import tempfile
 import subprocess
 import datetime
@@ -41,14 +43,48 @@ SAMPLE_DARSHAN_JOBHOST = 'edison'
 SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47'
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43'
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS = '/scratch1,/scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL = 'scratch1,scratch2'
+
 SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 SAMPLE_DARSHAN_LOG_DIR = os.path.join(INPUT_DIR, 'darshanlogs')
 SAMPLE_DARSHAN_LOG_USER = 'glock'
 SAMPLE_DARSHAN_LOG_DIR_KEY = 'testsystem'
 SAMPLE_DARSHAN_JOBID_2 = 4487503
 SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
+SAMPLE_DARSHAN_INDEX_DB = os.path.join(INPUT_DIR, 'darshanlogs.db')
+# SAMPLE_DARSHAN_INDEX_DB_EXES contains a subset of SELECT exename FROM headers;
+# they're expressed as numbers and not sensible exe names (like ph.x) because
+# the Darshan logs used to generate darshanlogs.db were obfuscated
+SAMPLE_DARSHAN_INDEX_DB_EXES = [
+    '1221559022',
+    '2054166464',
+    '1700134137'
+]
+# SAMPLE_DARSHAN_INDEX_DB_USER is one of the values returned by 
+# SELECT username FROM HEADERS
+SAMPLE_DARSHAN_INDEX_DB_USER = 'aa4hm0jcwfg'
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS = [
+    '/global/cscratch1',
+    '/global/u2',
+]
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL = [
+    'cscratch',
+    'homes-u2',
+]
+
+SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
+SAMPLE_DARSHAN_FQLOG_META = {
+    "username": "glock",
+    "exename": "vpicio_uni",
+    "jobid": "4478544",
+    "start_month": 3,
+    "start_day": 20,
+    # don't test the rest for now
+}
+
+# Darshan logs that test weird edge cases.  Just throwing these into the
+# INPUT_DIR is good enough since some tests will glob against inputs/*.darshan
+SAMPLE_DARSHAN_LOG_NOPOSIX = os.path.join(INPUT_DIR, 'noposix.darshan') # lacks a POSIX module
+SAMPLE_DARSHAN_LOG_NOPOSIXOPENS = os.path.join(INPUT_DIR, 'noposix.darshan') # only posix op was a stat
 
 ### For lfsstatus connector/tool.  These values must reflect the contents of
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
@@ -152,7 +188,10 @@ SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/datatargets/readrates'
 SAMPLE_COLLECTDES_DSET2 = '/datatargets/writerates'
 
-SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_INDEX = 'gerty-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_GLOBUSLOGS_INDEX = 'dtn-dtn-log*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_HOST = 'localhost'
+SAMPLE_COLLECTDES_PORT = 9200
 SAMPLE_COLLECTDES_QUERY = {
     "query": {
         "bool": {
@@ -170,6 +209,10 @@ SAMPLE_COLLECTDES_QUERY = {
         },
     },
 }
+
+SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
+SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
+SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
@@ -361,4 +404,23 @@ def generate_timeseries(file_name=SAMPLE_COLLECTDES_HDF5,
 
     return timeseries
 
+def untar(input_filename):
+    """Unpack a tarball to test support for that input type
+    """
+    cleanup_untar(input_filename)
+    tar = tarfile.open(input_filename)
+    tar.extractall(path=INPUT_DIR)
+    tar.close()
 
+def cleanup_untar(input_filename):
+    """Clean up the artifacts created by this test's untar() function
+    """
+    tar = tarfile.open(input_filename)
+    for member in tar.getmembers():
+        fq_name = os.path.join(INPUT_DIR, member.name)
+        if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
+            print("Removing %s" % fq_name)
+            if member.isdir():
+                shutil.rmtree(fq_name)
+            else:
+                os.unlink(fq_name)

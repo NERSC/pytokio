@@ -1,10 +1,4 @@
-"""
-Dump a lot of data out of ElasticSearch using the Python API and native
-scrolling support.
-
-Instantiates a :class:`tokio.connectors.collectd_es.CollectdEs` object and
-relies on the :meth:`tokio.connectors.collectd_es.CollectdEs.query_timeseries`
-method to populate a data structure that is then serialized to JSON.
+"""Command-line interface into the nersc_globuslogs connector
 """
 
 import sys
@@ -17,7 +11,7 @@ import warnings
 import mimetypes
 
 import tokio.debug
-import tokio.connectors.collectd_es
+import tokio.connectors.nersc_globuslogs
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
 
@@ -44,9 +38,13 @@ def main(argv=None):
                         help="hostname of ElasticSearch endpoint (default: localhost)")
     parser.add_argument('-p', '--port', type=int, default=9200,
                         help="port of ElasticSearch endpoint (default: 9200)")
-    parser.add_argument('-i', '--index', type=str, default='cori-collectd-*',
-                        help='ElasticSearch index to query (default:cori-collectd-*)')
+    parser.add_argument('-i', '--index', type=str, default='dtn-dtn-log*',
+                        help='ElasticSearch index to query (default:dtn-dtn-log*)')
     parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")
+    parser.add_argument('--user', type=str, default=None,
+                        help='limit results to transfers owned by this user')
+    parser.add_argument('--type', type=str, default=None,
+                        help='limit results to either STOR, RETR, or NLST')
     args = parser.parse_args(argv)
 
     if args.debug:
@@ -69,30 +67,23 @@ def main(argv=None):
     must = []
     if args.input is None:
         ### Try to connect
-        esdb = tokio.connectors.collectd_es.CollectdEs(
+        esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(
             host=args.host,
             port=args.port,
             index=args.index,
             timeout=args.timeout)
 
-        pages = None
-        for plugin_query in [tokio.connectors.collectd_es.QUERY_CPU_DATA,
-                             tokio.connectors.collectd_es.QUERY_DISK_DATA,
-                             tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
-            esdb.query_timeseries(plugin_query,
-                            query_start,
-                            query_end)
-            if pages is None:
-                pages = esdb.scroll_pages
-            else:
-                pages += esdb.scroll_pages
+        if args.user:
+            must.append({"term": {"USER": args.user}})
+        if args.type:
+            must.append({"term": {"TYPE": args.type.upper()}})
 
         tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
     else:
-        esdb = tokio.connectors.collectd_es.CollectdEs.from_cache(args.input)
-        # the following query is arbitrary but is required to parse the cached output
-        esdb.query_disk(query_start, query_end)
+        esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs.from_cache(args.input)
         tokio.debug.debug_print("Loaded results from %s" % args.input)
+
+    esdb.query(query_start, query_end, must=must)
 
     # Write output
     cache_file = args.output

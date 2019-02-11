@@ -21,6 +21,7 @@ except ImportError:
     _HAVE_ELASTICSEARCH = False
 
 import tokiotest
+import tokio.cli.cache_nersc_globuslogs
 import tokio.cli.cache_isdct
 import tokio.cli.cache_collectdes
 import tokio.cli.cache_darshan
@@ -125,6 +126,35 @@ def run_elasticsearch(binary, argv):
         raise nose.SkipTest(error)
 
 CACHE_CONNECTOR_CONFIGS = [
+    {
+        'name':       'cli.cache_nersc_globuslogs',
+        'description': 'cli.cache_nersc_globuslogs, cached input',
+        'binary':     tokio.cli.cache_nersc_globuslogs,
+        'args':       ['--input', tokiotest.SAMPLE_GLOBUSLOGS,
+                       tokiotest.SAMPLE_TIMESTAMP_START_NOW,
+                       tokiotest.SAMPLE_TIMESTAMP_END_NOW],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'cli.cache_nersc_globuslogs',
+        'description': 'cli.cache_nersc_globuslogs, remote connection',
+        'binary':     tokio.cli.cache_nersc_globuslogs,
+        'args':       ['--input', tokiotest.SAMPLE_GLOBUSLOGS,
+                       tokiotest.SAMPLE_TIMESTAMP_START_NOW,
+                       tokiotest.SAMPLE_TIMESTAMP_END_NOW],
+        'runfunction': run_elasticsearch,
+        'validators': [verify_json_zero_ok,],
+    },
+    {
+        'name':       'cli.cache_nersc_globuslogs',
+        'description': 'cli.cache_nersc_globuslogs --csv',
+        'binary':     tokio.cli.cache_nersc_globuslogs,
+        'args':       ['--input', tokiotest.SAMPLE_GLOBUSLOGS,
+                       '--csv',
+                       tokiotest.SAMPLE_TIMESTAMP_START_NOW,
+                       tokiotest.SAMPLE_TIMESTAMP_END_NOW],
+        'validators': [verify_csv,],
+    },
     {
         'name':       'cli.cache_isdct',
         'binary':     tokio.cli.cache_isdct,

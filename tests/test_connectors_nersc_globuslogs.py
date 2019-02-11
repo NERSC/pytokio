@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-"""Test the Elasticsearch collectd connector
+"""Tests the Elasticsearch Globus log connector
 
 Ensures that the connector-specific queries are working when Elasticsearch is
-available.  Will require modifying tokiotest.SAMPLE_COLLECTDES_* to work at
-non-NERSC sites.
+available.  Will require modifying tokiotest.SAMPLE_GLOBUSLOGS and
+tokiotest.SAMPLE_COLLECTDES_* (For connection info) to work at non-NERSC sites.
 """
 
-import copy
 import gzip
 import json
+import copy
 import datetime
 
 import tokio.connectors.es
-import tokio.connectors.collectd_es
+import tokio.connectors.nersc_globuslogs
+
 import tokiotest
 try:
     import elasticsearch.exceptions
@@ -24,74 +25,73 @@ except ImportError:
 # import logging
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
+# Create fake pages and add decorations that real queries return
 FAKE_PAGES = []
-for fake_page in json.load(gzip.open(tokiotest.SAMPLE_COLLECTDES_FILE)):
+for fake_page in json.load(gzip.open(tokiotest.SAMPLE_GLOBUSLOGS)):
     FAKE_PAGES.append({
         '_scroll_id': 1,
         'hits': {
             'hits': fake_page
         }
     })
+# never forget to terminate fake pages with an empty page
 FAKE_PAGES.append({'_scroll_id': 1, 'hits': {'hits': []}})
 
 def test_query_interfaces():
-    """connectors.collectd_es.CollectdEs.query_*
+    """connectors.nersc_globuslogs.NerscGlobusLogs.query_*
     """
     global _HAVE_ELASTICSEARCH
 
     end = datetime.datetime.now() - datetime.timedelta(hours=1)
     # adjust the timedelta to match the data source's data generate rates
-    start = end - datetime.timedelta(seconds=10)
+    start = end - datetime.timedelta(hours=1)
 
     esdb = None
+    remote_results = [[{'_source':{}}]]
     if _HAVE_ELASTICSEARCH:
-        esdb = tokio.connectors.collectd_es.CollectdEs(
+        esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(
             host=tokiotest.SAMPLE_COLLECTDES_HOST,
             port=tokiotest.SAMPLE_COLLECTDES_PORT,
-            index=tokiotest.SAMPLE_COLLECTDES_INDEX)
+            index=tokiotest.SAMPLE_GLOBUSLOGS_INDEX)
         try:
             esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-            esdb.query(tokio.connectors.collectd_es.BASE_QUERY)
+            esdb.query(start, end)
         except elasticsearch.exceptions.ConnectionError:
             esdb = None
 
-    if not esdb:
-        esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
+        # we need to save remote_results to discover valid values to query
+        # from which we can assert that our connector's specific queries are
+        # producing valid response data
+        if esdb and esdb.scroll_pages:
+            remote_results = esdb.scroll_pages
+
+    if not esdb or not remote_results:
+        esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(host=None, port=None, index=None)
         esdb.local_mode = True
         print("Testing in local mode")
     else:
         print("Testing in remote mode")
 
 #   validate_es_query_method(esdb=esdb,
-#                            method=esdb.query_disk,
-#                            field='plugin',
+#                            method=esdb.query_user,
+#                            field='USER',
 #                            start=start,
 #                            end=end,
-#                            target_val='disk')
+#                            target_val=remote_results[0][0]['_source'].get('USER', ""))
     test_func = validate_es_query_method
-    test_func.description = "connectors.collectd_es.CollectdEs.query_disk()"
-    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'disk'
+    test_func.description = "connectors.nersc_globuslogs.NerscGlobusLogs.query_user()"
+    yield test_func, esdb, esdb.query_user, 'USER', start, end, \
+          remote_results[0][0]['_source'].get('USER', "")
 
-
-#   validate_es_query_method(esdb=esdb,
-#                            method=esdb.query_cpu,
-#                            field='plugin',
-#                            start=start,
-#                            end=end,
-#                            target_val='cpu')
-    test_func = validate_es_query_method
-    test_func.description = "connectors.collectd_es.CollectdEs.query_cpu()"
-    yield test_func, esdb, esdb.query_cpu, 'plugin', start, end, 'cpu'
-
-#   validate_es_query_method(esdb=esdb,
-#                            method=esdb.query_memory,
-#                            field='plugin',
-#                            start=start,
-#                            end=end,
-#                            target_val='memory')
-    test_func = validate_es_query_method
-    test_func.description = "connectors.collectd_es.CollectdEs.query_memory()"
-    yield test_func, esdb, esdb.query_memory, 'plugin', start, end, 'memory'
+#    validate_es_query_method(esdb=esdb,
+#                             method=esdb.query_type,
+#                             field='TYPE',
+#                             start=start,
+#                             end=end,
+#                             target_val=remote_results[0][0]['_source'].get('TYPE', ""))
+    test_func.description = "connectors.nersc_globuslogs.NerscGlobusLogs.query_type()"
+    yield test_func, esdb, esdb.query_type, 'TYPE', start, end, \
+          remote_results[0][0]['_source'].get('TYPE', "")
 
 def validate_es_query_method(esdb, method, field, start, end, target_val):
     """Tests a connector-specific query method
@@ -116,13 +116,13 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
     """
     if esdb.local_mode:
         esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-#       method(start, end, target_val)
-        method(start, end)
+        method(start, end, target_val)
+#       method(start, end)
         assert esdb.scroll_pages
     else:
         print("Searching for %s" % target_val)
-#       method(start, end, target_val)
-        method(start, end)
+        method(start, end, target_val)
+#       method(start, end)
         assert esdb.scroll_pages
         print("Got %d pages" % len(esdb.scroll_pages))
         num_recs = sum([len(page) for page in esdb.scroll_pages])
@@ -140,12 +140,12 @@ def validate_es_query_method(esdb, method, field, start, end, target_val):
     esdb.scroll_pages = []
 
 def test_to_dataframe():
-    """connectors.collectd_es.CollectdEs.to_dataframe()
+    """connectors.nersc_globuslogs.NerscGlobusLogs.to_dataframe()
     """
-    esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
+    esdb = tokio.connectors.nersc_globuslogs.NerscGlobusLogs(host=None, port=None, index=None)
     esdb.local_mode = True
     esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
-    esdb.query_disk(datetime.datetime.now(), datetime.datetime.now())
+    esdb.query(datetime.datetime.now(), datetime.datetime.now())
     dataframe = esdb.to_dataframe()
     print(dataframe)
     assert len(dataframe) > 0

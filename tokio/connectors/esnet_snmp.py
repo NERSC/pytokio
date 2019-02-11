@@ -44,7 +44,14 @@ class EsnetSnmp(common.CacheableDict):
 
     Various methods are provided to access the data of interest.
     """
-    def __init__(self, start, end, endpoint=None, interface=None, direction=None, agg_func=None, interval=None):
+    def __init__(self,
+                 start,
+                 end,
+                 endpoint=None,
+                 interface=None,
+                 direction=None,
+                 agg_func=None,
+                 interval=None):
         """Retrieves data rate data for an ESnet endpoint
 
         Initializes the object with a start and end time.  Optionally runs a
@@ -62,7 +69,8 @@ class EsnetSnmp(common.CacheableDict):
             direction (str, optional): "in" or "out" to signify data input into
                 ESnet or data output from ESnet
             agg_func (str, optional ): Specifies the reduction operator to be
-                applied over each interval; must be one of "average," "min," or "max."  If None, uses the ESnet default.
+                applied over each interval; must be one of "average," "min," or
+                "max."  If None, uses the ESnet default.
             interval (int, optional ): Resolution, in seconds, of the data to be
                 returned.  If None, uses the ESnet default.
 
@@ -141,7 +149,8 @@ class EsnetSnmp(common.CacheableDict):
             if not self.timestep:
                 self.timestep = interval
             elif self.timestep != interval:
-                warnings.warn("received timestep %d from an object with timestep %d" % (interval, self.timestep))
+                warnings.warn("received timestep %d from an object with timestep %d"
+                              % (interval, self.timestep))
 
         if self.requested_endpoint not in self:
             self[self.requested_endpoint] = {}
@@ -187,12 +196,12 @@ class EsnetSnmp(common.CacheableDict):
         if self.requested_timestep is not None \
         and self.timestep is not None \
         and self.requested_timestep != self.timestep:
-            warnings.warn("received timestep %d from an object with timestep %d" 
-                % (self.requested_timestep, self.timestep))
+            warnings.warn("received timestep %d from an object with timestep %d"
+                          % (self.requested_timestep, self.timestep))
 
         uri = config.CONFIG.get('esnet_snmp_uri')
         if uri is None:
-            requests.exception.ConnectionError("no esnet_snmp_uri configured")
+            raise requests.exceptions.ConnectionError("no esnet_snmp_uri configured")
         uri += '/%s/interface/%s/%s' % (endpoint, interface, direction)
 
         params = {
