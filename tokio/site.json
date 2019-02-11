@@ -69,5 +69,19 @@
     "lfsstatus_fullness_providers": [
         "hdf5",
         "nersc_lfsstate"
-    ]
+    ],
+    "esnet_snmp_interfaces": {
+        "nersc": [
+            "sunn-cr5/interface/to_nersc_ip-d_v4",
+            "sunn-cr5/interface/to_nersc_ip-d_v6",
+            "sunn-cr5/interface/to_nersc_ip-b",
+            "sunn-cr5/interface/to_nersc_ip-b_v6",
+            "sacr-cr5/interface/to_nersc_ip-e"
+        ],
+        "alcf": [
+            "star-cr5/interface/to_anl_hpc_ip-a_v4v6",
+            "star-cr5/interface/to_anl_hpc_ip-b_v4v6",
+            "star-cr5/interface/to_anl_ip-g-hpc"
+        ]
+    }
 }
