@@ -51,7 +51,8 @@ class EsnetSnmp(common.CacheableDict):
                  interface=None,
                  direction=None,
                  agg_func=None,
-                 interval=None):
+                 interval=None,
+                 **kwargs):
         """Retrieves data rate data for an ESnet endpoint
 
         Initializes the object with a start and end time.  Optionally runs a
@@ -73,6 +74,7 @@ class EsnetSnmp(common.CacheableDict):
                 "max."  If None, uses the ESnet default.
             interval (int, optional ): Resolution, in seconds, of the data to be
                 returned.  If None, uses the ESnet default.
+            kwargs (dict): arguments to pass to super.__init__()
 
         Attributes:
             start (datetime.datetime): Start of interval represented by this object, inclusive
@@ -81,7 +83,7 @@ class EsnetSnmp(common.CacheableDict):
             end_epoch (int): Seconds since epoch for self.end
         """
 
-        super(EsnetSnmp, self).__init__()
+        super(EsnetSnmp, self).__init__(**kwargs)
 
         if start >= end:
             raise RuntimeError("Start must be greater than or equal to end")
@@ -107,6 +109,25 @@ class EsnetSnmp(common.CacheableDict):
                                         direction=direction,
                                         agg_func=agg_func,
                                         interval=interval)
+
+    def load_json(self, **kwargs):
+        """Loads input from serialized JSON
+
+        Need to coerce timestamp keys back into ints from strings
+        """
+        super(EsnetSnmp, self).load_json(**kwargs)
+
+        for endpoint, interfaces in self.items():
+            for interface, directions in interfaces.items():
+                for direction, data in directions.items():
+                    if isinstance(data, dict):
+                        keys = list(data.keys())
+                        # make a copy of the key as an int
+                        for key in keys:
+                            data[int(key)] = data[key]
+                        # delete the old non-int key
+                        for key in keys:
+                            del data[key]
 
     def _insert_result(self):
         """Parse the raw output of the REST API and update self
@@ -236,14 +257,15 @@ class EsnetSnmp(common.CacheableDict):
         for endpoint, interfaces in self.items():
             for interface, directions in interfaces.items():
                 for direction, data in directions.items():
-                    for timestamp, value in data.items():
-                        to_df.append({
-                            'endpoint': endpoint,
-                            'interface': interface,
-                            'direction': direction,
-                            'timestamp': datetime.datetime.fromtimestamp(timestamp),
-                            'data_rate': value,
-                        })
+                    if isinstance(data, dict):
+                        for timestamp, value in data.items():
+                            to_df.append({
+                                'endpoint': endpoint,
+                                'interface': interface,
+                                'direction': direction,
+                                'timestamp': datetime.datetime.fromtimestamp(timestamp),
+                                'data_rate': value,
+                            })
 
         dataframe = pandas.DataFrame.from_records(to_df)
         if multiindex:
