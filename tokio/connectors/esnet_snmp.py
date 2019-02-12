@@ -166,6 +166,8 @@ class EsnetSnmp(common.CacheableDict):
         for timestamp, value in data:
             self[self.requested_endpoint][self.requested_interface][self.requested_direction][timestamp] = value
 
+        self[self.requested_endpoint][self.requested_interface]['units'] = 'bytes/sec'
+
         return True
 
     def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None):
