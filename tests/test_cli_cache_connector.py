@@ -20,16 +20,23 @@ try:
 except ImportError:
     _HAVE_ELASTICSEARCH = False
 
+try:
+    import requests.exceptions
+    _HAVE_REQUESTS = True
+except ImportError:
+    _HAVE_REQUESTS = False
+
 import tokiotest
-import tokio.cli.cache_nersc_globuslogs
-import tokio.cli.cache_isdct
 import tokio.cli.cache_collectdes
 import tokio.cli.cache_darshan
+import tokio.cli.cache_esnet_snmp
+import tokio.cli.cache_isdct
+import tokio.cli.cache_lfsstatus
+import tokio.cli.cache_lmtdb
+import tokio.cli.cache_nersc_globuslogs
+import tokio.cli.cache_nersc_jobsdb
 import tokio.cli.cache_slurm
 import tokio.cli.cache_topology
-import tokio.cli.cache_lfsstatus
-import tokio.cli.cache_nersc_jobsdb
-import tokio.cli.cache_lmtdb
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def verify_sqlite(output_str):
@@ -124,6 +131,26 @@ def run_elasticsearch(binary, argv):
         return tokiotest.run_bin(binary, argv)
     except elasticsearch.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
+
+def run_requests(binary, argv):
+    """Run function that traps connection errors from REST
+
+    Args:
+        binary (module): tokio.cli module that contains a main() function
+        argv (list of str): list of CLI arguments to pass to connector
+
+    Returns:
+        Stdout of cache connector script as a string
+    """
+
+    if not _HAVE_REQUESTS:
+        raise nose.SkipTest("requests module not available")
+
+    try:
+        return tokiotest.run_bin(binary, argv)
+    except requests.exceptions.ConnectionError as error:
+        raise nose.SkipTest(error)
+
 
 CACHE_CONNECTOR_CONFIGS = [
     {
@@ -226,6 +253,36 @@ CACHE_CONNECTOR_CONFIGS = [
         'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --json, remote connection',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--json", "nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --csv, remote connection',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--csv", "nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_csv,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --json, cached input',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--json", "nersc"],
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --csv, cached input',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--csv", "nersc"],
+        'validators':  [verify_csv,],
     },
     {
         'name':       'cli.cache_slurm',
