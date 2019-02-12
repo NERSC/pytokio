@@ -106,6 +106,6 @@ def main(argv=None):
             esnetdata.save_cache(cache_file)
         else:
             esnetdata.save_cache(cache_file, indent=4, sort_keys=True)
-            print()
+            sys.stdout.write("\n")
     else:
         raise Exception("No output format specified")
