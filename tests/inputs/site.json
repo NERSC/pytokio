@@ -10,6 +10,9 @@
         "^/var/opt/cray/dws/mounts/.*/ps": "bb-private",
         "^/var/opt/cray/dws/mounts/batch/.*_striped_scratch": "bb-shared",
         "^/var/opt/cray/dws/mounts/batch/.*_private_scratch": "bb-private",
+        "^/global/project": "project2",
+        "^/global/projectb": "projectb",
+        "^/global/projecta": "projecta",
         "^/global/u1": "homes-u1",
         "^/global/u2": "homes-u2",
         "^/hello": "hellofs",
@@ -73,5 +76,26 @@
     "lfsstatus_fullness_providers": [
         "hdf5",
         "nersc_lfsstate"
-    ]
+    ],
+    "esnet_snmp_uri": "https://graphite.es.net/snmp/west",
+    "esnet_snmp_interfaces": {
+        "nersc": {
+            "sunn-cr5": [
+                "to_nersc_ip-d_v4",
+                "to_nersc_ip-d_v6",
+                "to_nersc_ip-b",
+                "to_nersc_ip-b_v6"
+            ],
+            "sacr-cr5": [
+                "to_nersc_ip-e"
+            ]
+        },
+        "alcf": {
+            "star-cr5": [
+                "to_anl_hpc_ip-a_v4v6",
+                "to_anl_hpc_ip-b_v4v6",
+                "to_anl_ip-g-hpc"
+            ]
+        }
+    }
 }
