@@ -70,6 +70,7 @@
         "hdf5",
         "nersc_lfsstate"
     ],
+    "esnet_snmp_uri": "https://graphite.es.net/snmp/west",
     "esnet_snmp_interfaces": {
         "nersc": {
             "sunn-cr5": [
