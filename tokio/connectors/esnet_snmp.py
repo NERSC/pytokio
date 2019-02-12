@@ -4,9 +4,59 @@ Documentation for the REST API is here:
 
     http://es.net/network-r-and-d/data-for-researchers/snmp-api/
 
-Relies either on the 'esnet_snmp_uri' configuration value being set in the
-pytokio configuration or the PYTOKIO_ESNET_SNMP_URI being defined in the
-environment.
+Notes:
+    This connector relies either on the ``esnet_snmp_uri`` configuration value
+    being set in the pytokio configuration or the ``PYTOKIO_ESNET_SNMP_URI``
+    being defined in the runtime environment.
+
+Examples:
+    Retrieving the data of multiple endpoints (ESnet routers) and interfaces
+    is a common pattern.  To do this, the ``EsnetSnmp`` object should be
+    initialized with only the intended start/end times, and the object should
+    be asynchronously populated using calls to
+    ``EsnetSnmp.get_interface_counters``::
+
+        import datetime
+        import tokio.connectors.esnet_snmp
+
+        ROUTER = 'sunn-cr5'
+        INTERFACE = 'to_nersc_ip-d_v4'
+        TARGET_DATE = datetime.datetime.today() - datetime.timedelta(days=1)
+
+        # Because the ESnet API treats the end date as inclusive, we subtract
+        # one second to avoid counting the first measurement of the following
+        # day.
+        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+            start=TARGET_DATE,
+            end=TARGET_DATE + datetime.timedelta(days=1, seconds=-1))
+        for direction in 'in', 'out':
+            esnetsnmp.get_interface_counters(
+                endpoint=ROUTER,
+                interface=INTERFACE,
+                direction=direction,
+                agg_func='average')
+
+        for direction in 'in', 'out':
+            bytes_per_sec = list(esnetsnmp[ROUTER][INTERFACE][direction].values())
+            total_bytes = sum(bytes_per_sec) * esnetsnmp.timestep
+            print("%s:%s saw %.2f TiB %s" % (
+                ROUTER,
+                INTERFACE,
+                total_bytes / 2**40,
+                direction))
+
+    For simple queries, it is sufficient to specify the endpoint, interface,
+    and direction directly in the initialization::
+
+        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+            start=TARGET_DATE,
+            end=TARGET_DATE + datetime.timedelta(days=1, seconds=-1)
+            endpoint=ROUTER,
+            interface=INTERFACE,
+            direction="in")
+        print("Total bytes in: %.2f" % (
+            sum(list(esnetsnmp[ROUTER][INTERFACE]["in"].values())) / 2**40))
+
 """
 
 import time
@@ -19,7 +69,6 @@ import pandas
 
 from .. import config
 from . import common
-
 
 class EsnetSnmp(common.CacheableDict):
     """Container for ESnet SNMP counters
