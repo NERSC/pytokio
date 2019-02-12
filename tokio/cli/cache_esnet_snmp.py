@@ -10,15 +10,16 @@ import tokio.connectors.esnet_snmp
 import tokio.config
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
+DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
 
 def main(argv=None):
     """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--start", type=str,
-                        help="start time of query in %s format" % DATE_FMT)
+                        help="start time of query in %s format" % DATE_FMT_PRINT)
     parser.add_argument("-e", "--end", type=str,
-                        help="end time of query in %s format" % DATE_FMT)
+                        help="end time of query in %s format" % DATE_FMT_PRINT)
     parser.add_argument("-j", "--json", action="store_true", default=True,
                         help="return output in JSON format")
     parser.add_argument("-c", "--csv", action="store_true",
@@ -45,7 +46,9 @@ def main(argv=None):
         query_args = {}
         for kvpair in args.endpoints.split(","):
             key, value = kvpair.split(":", 1)
-            query_args[key] = value
+            if key not in query_args:
+                query_args[key] = []
+            query_args[key].append(value)
 
     if not query_args:
         errstr = "Invalid endpoint specification.\n\n"
@@ -62,7 +65,7 @@ def main(argv=None):
         if args.end:
             end = datetime.datetime.strptime(args.end, DATE_FMT)
     except ValueError:
-        raise ValueError("Start and end times must be in format %s\n" % DATE_FMT)
+        raise ValueError("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
 
     if not args.start:
         start = datetime.datetime.now() - datetime.timedelta(hours=1)
