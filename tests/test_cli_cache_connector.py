@@ -151,6 +151,14 @@ def run_requests(binary, argv):
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
+@nose.tools.raises(ValueError)
+def run_raises_valueerror(binary, argv):
+    return tokiotest.run_bin(binary, argv)
+
+@nose.tools.raises(SystemExit)
+def run_raises_systemexit(binary, argv):
+    return tokiotest.run_bin(binary, argv)
+
 
 CACHE_CONNECTOR_CONFIGS = [
     {
@@ -256,6 +264,14 @@ CACHE_CONNECTOR_CONFIGS = [
     },
     {
         'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp default args',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
         'description': 'cli.cache_esnet_snmp --json, remote connection',
         'binary':      tokio.cli.cache_esnet_snmp,
         'args':        ["--json", "nersc"],
@@ -283,6 +299,41 @@ CACHE_CONNECTOR_CONFIGS = [
         'binary':      tokio.cli.cache_esnet_snmp,
         'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--csv", "nersc"],
         'validators':  [verify_csv,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, explicit endpoint:interface',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "blah0:interf0"],
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, invalid endpoint:interface',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "blah"],
+        'runfunction': run_raises_valueerror,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, invalid --start format',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--start", "invalid", "nersc"],
+        'runfunction': run_raises_valueerror,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, --end without --start',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--end", "2019-01-01T00:00:00", "nersc"],
+        'runfunction': run_raises_systemexit,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, --start > --end',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_DATA, "--start", "2019-01-02T00:00:00", "--end", "2019-01-01T00:00:00", "nersc"],
+        'runfunction': run_raises_valueerror,
     },
     {
         'name':       'cli.cache_slurm',
@@ -429,7 +480,7 @@ def run_cache_connector(config, to_file=False):
         print("Executing: %s" % ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
-    for validator in config['validators']:
+    for validator in config.get('validators', []):
         if isinstance(output_str, bytes):
             validator(output_str.decode())
         else:
