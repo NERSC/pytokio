@@ -72,7 +72,7 @@ class CacheableDict(dict):
         for key, val in json.load(open_func(self.input_file, 'r')).items():
             self.__setitem__(key, val)
 
-    def save_cache(self, output_file=None):
+    def save_cache(self, output_file=None, **kwargs):
         """Serializes self into a JSON output.
 
         Save the dictionary in a JSON file.  This output can be read back in using
@@ -81,21 +81,22 @@ class CacheableDict(dict):
         Args:
             output_file (str or None): Path to file to which json should be
                 written.  If None, write to stdout.  Default is None.
+            kwargs (dict): Additional arguments to be passed to json.dumps()
         """
         if output_file is None:
-            self._save_cache(sys.stdout)
+            self._save_cache(sys.stdout, **kwargs)
         else:
             with open(output_file, 'w') as output:
-                self._save_cache(output)
+                self._save_cache(output, **kwargs)
 
-    def _save_cache(self, output):
+    def _save_cache(self, output, **kwargs):
         """Generates serialized representation of self
 
         Args:
             output: Object with a ``.write()`` method into which the serialized
                 form of self will be passed
         """
-        output.write(json.dumps(self))
+        output.write(json.dumps(self, **kwargs))
 
 class SubprocessOutputDict(dict):
     """Generic class to support connectors that parse the output of a subprocess
