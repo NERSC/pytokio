@@ -116,7 +116,7 @@ class Archiver(dict):
                 })
                 self[dataset_name].group_metadata.update({'source': 'esnet_snmp'})
 
-    def archive(self, esnetsnmp=None):
+    def archive(self, input_file=None):
         """Extract and encode data from ESnet's SNMP service
 
         Queries the ESnet SNMP REST service, interprets resulting data, and
@@ -128,32 +128,34 @@ class Archiver(dict):
 
         esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
             start=self.query_start,
-            end=self.query_end)
+            end=self.query_end,
+            input_file=input_file)
 
         self.init_datasets(self.config.keys())
 
-        # Retrieve all counters from REST API
-        last_payload_ck = None
-        for endpoint, interface in self.interfaces:
-            for direction in 'in', 'out':
-                raw_result = esnetsnmp.get_interface_counters(
-                    endpoint=endpoint,
-                    interface=interface,
-                    direction=direction,
-                    agg_func='average',
-                    interval=self.timestep)
+        # Retrieve all counters from REST API if not loaded from cache
+        if input_file is None:
+            last_payload_ck = None
+            for endpoint, interface in self.interfaces:
+                for direction in 'in', 'out':
+                    raw_result = esnetsnmp.get_interface_counters(
+                        endpoint=endpoint,
+                        interface=interface,
+                        direction=direction,
+                        agg_func='average',
+                        interval=self.timestep)
 
-                # verify that the payload returned data and didn't hit an API rate limit
-                payload = raw_result.get('data')
-                if not payload:
-                    raise RuntimeError("%s:%s:%s returned no data" % (endpoint, interface, direction))
+                    # verify that the payload returned data and didn't hit an API rate limit
+                    payload = raw_result.get('data')
+                    if not payload:
+                        raise RuntimeError("%s:%s:%s returned no data" % (endpoint, interface, direction))
 
-                # verify that the payload returned a consistent number of data points
-                this_payload_ck = len(payload)
-                if last_payload_ck is not None and this_payload_ck != last_payload_ck:
-                    raise RuntimeError(
-                        "%s:%s:%s returned %d entries, but previous contained %d"
-                        % (endpoint, interface, direction, this_payload_ck, last_payload_ck))
+                    # verify that the payload returned a consistent number of data points
+                    this_payload_ck = len(payload)
+                    if last_payload_ck is not None and this_payload_ck != last_payload_ck:
+                        raise RuntimeError(
+                            "%s:%s:%s returned %d entries, but previous contained %d"
+                            % (endpoint, interface, direction, this_payload_ck, last_payload_ck))
 
         # Loop over all retrieved data
         for dataset_name, config in self.config.items():
@@ -195,7 +197,7 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
                 hdf5_file.name,
                 timeseries.dataset.shape))
 
-def archive_esnet_snmp(init_start, init_end, interfaces, timestep, output_file, query_start, query_end, esnetsnmp=None):
+def archive_esnet_snmp(init_start, init_end, interfaces, timestep, output_file, query_start, query_end, input_file=None):
     """Retrieves remote data and stores it in TOKIO time series format
 
     Given a start and end time, retrieves all of the relevant contents of a
@@ -216,13 +218,13 @@ def archive_esnet_snmp(init_start, init_end, interfaces, timestep, output_file, 
             retrieved, inclusive.
         query_end (datetime.datetime): Time before which remote data should be
             retrieved, inclusive.
-        esnetsnmp (tokio.connectors.esnet_snmp.EsnetSnmp or None): Connection
-            handler for ESnet SNMP REST API.  If None, create one dynamically.
-            Useful if a cached ESnet SNMP data file is being used for testing.
+        input_file (str or None): Path to a cached input.  If specified, the
+            remote REST API will not be contacted and the contents of this file
+            will be instead loaded.
     """
     datasets = Archiver(query_start=query_start, query_end=query_end, interfaces=interfaces, timestep=timestep)
 
-    datasets.archive(esnetsnmp)
+    datasets.archive(input_file=input_file)
 
     datasets.finalize()
 
@@ -303,14 +305,6 @@ def main(argv=None):
     for endpoint, ifs in query_args.items():
         interfaces += [(endpoint, interface) for interface in ifs]
 
-    # Load cached esnetsnmp handler (if requested)
-    esnetsnmp = None
-    if args.input is not None:
-        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
-            start=query_start,  # no-op since input_file is specified
-            end=query_end,      # no-op since input_file is specified
-            input_file=args.input)
-
     archive_esnet_snmp(
         init_start=init_start,
         init_end=init_end,
@@ -319,4 +313,4 @@ def main(argv=None):
         output_file=args.output,
         query_start=query_start,
         query_end=query_end,
-        esnetsnmp=esnetsnmp)
+        input_file=args.input)
