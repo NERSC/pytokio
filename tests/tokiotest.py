@@ -214,7 +214,10 @@ SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
 SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
 SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
 
-SAMPLE_ESNET_SNMP_DATA = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
+SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
+SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"
+SAMPLE_ESNET_SNMP_END = "2019-02-11T23:59:59"
+SAMPLE_ESNET_SNMP_ENDPT = "nersc"
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
