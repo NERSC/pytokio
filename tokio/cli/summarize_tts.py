@@ -65,27 +65,53 @@ def print_tts_hdf5_summary(results):
     """
     Format and print the summary data calculated by summarize_tts_hdf5()
     """
-    print(("Data Read:            %5.1f %s" % humanize_units(results['read_bytes'])))
-    print(("Data Written:         %5.1f %s" % humanize_units(results['write_bytes'])))
-    print(("Missing data points:  %9d" % results['missing_pts']))
-    print(("Expected data points: %9d" % results['total_pts']))
-    print(("Percent data missing: %8.1f%%" % results['missing_pct']))
-    print(("First non-empty row:  %9d" % results['first_nonzero_idx']))
-    print(("Last non-empty row:   %9d" % results['last_nonzero_idx']))
+    print("Data Read:            %5.1f %s" % humanize_units(results['read_bytes']))
+    print("Data Written:         %5.1f %s" % humanize_units(results['write_bytes']))
+    print("Missing data points:  %9d" % results['missing_pts'])
+    print("Expected data points: %9d" % results['total_pts'])
+    print("Percent data missing: %8.1f%%" % results['missing_pct'])
+    print("First non-empty row:  %9d" % results['first_nonzero_idx'])
+    print("Last non-empty row:   %9d" % results['last_nonzero_idx'])
 
 def summarize_timesteps(hdf5_file):
+    """Summarizes total read/write bytes at each timestamp.
+
+    Summarizes read/write bytes for each time step using the HDF5 interface
+    instead of converting to a DataFrame or TimeSeries first.  Returns a dict
+    of form::
+
+        {
+            "1546761600": {
+                "read_bytes": 6135848142.0,
+                "write_bytes": 6135848142.0
+            },
+            "1546761630": {
+                "read_bytes": 5261439143.0,
+                "write_bytes": 6135848142.0
+            },
+            "1546761660": {
+                "read_bytes": 4321548241.0
+                "write_bytes": 6135848142.0,
+            },
+            ...
+        }
+
     """
-    Summarize read/write bytes for each time step using the raw HDF5 interface
-    rather than casting into a DataFrame or TimeSeries
-    """
+    datasets = {
+        '/datatargets/writebytes': 'write_bytes',
+        '/datatargets/readbytes': 'read_bytes'
+    }
     results = {}
-    for dataset_name in '/datatargets/writebytes', '/datatargets/readbytes':
+    for dataset_name in datasets.keys():
         timestamps = hdf5_file.get_timestamps(dataset_name)[...]
         sum_bytes = hdf5_file[dataset_name][:, :].sum(axis=1)
         for index, timestamp in enumerate(timestamps):
-            output_key = 'read_bytes' if 'read' in dataset_name else 'write_bytes'
+            output_key = datasets.get(dataset_name)
             output_val = sum_bytes[index]
-            results[str(timestamp)] = {output_key: output_val}
+            timestamp_str = str(timestamp)
+            if timestamp_str not in results:
+                results[timestamp_str] = {}
+            results[timestamp_str][output_key] = output_val
 
     return results
 
