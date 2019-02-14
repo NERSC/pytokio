@@ -218,6 +218,9 @@ SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
 SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"
 SAMPLE_ESNET_SNMP_END = "2019-02-11T23:59:59"
 SAMPLE_ESNET_SNMP_ENDPT = "nersc"
+SAMPLE_ESNET_SNMP_FILE2 = os.path.join(INPUT_DIR, 'esnet_snmp-2.json.gz')
+SAMPLE_ESNET_SNMP_START2 = "2019-02-11T01:01:00"
+SAMPLE_ESNET_SNMP_END2 = "2019-02-11T01:04:00"
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
