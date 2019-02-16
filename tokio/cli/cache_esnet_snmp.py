@@ -10,21 +10,22 @@ import tokio.connectors.esnet_snmp
 import tokio.config
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
+DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
 
 def main(argv=None):
     """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--start", type=str,
-                        help="start time of query in %s format" % DATE_FMT)
+                        help="start time of query in %s format" % DATE_FMT_PRINT)
     parser.add_argument("-e", "--end", type=str,
-                        help="end time of query in %s format" % DATE_FMT)
+                        help="end time of query in %s format" % DATE_FMT_PRINT)
     parser.add_argument("-j", "--json", action="store_true", default=True,
                         help="return output in JSON format")
     parser.add_argument("-c", "--csv", action="store_true",
                         help="return output in CSV format")
-    parser.add_argument('--debug', action='store_true',
-                        help="produce debug messages")
+#   parser.add_argument('--debug', action='store_true',
+#                       help="produce debug messages")
     parser.add_argument("-i", "--input", type=str, default=None,
                         help="read input from this JSON instead of accessing REST API")
     parser.add_argument("-o", "--output", type=str, default=None,
@@ -35,24 +36,26 @@ def main(argv=None):
                         + ' "endpoint0:if0,endpoint1:if1,..." etc')
     args = parser.parse_args(argv)
 
-    if args.debug:
-        tokio.DEBUG = True
+#   if args.debug:
+#       tokio.DEBUG = True
 
     # Parse endpoints and interfaces
     if ':' not in args.endpoints:
-        query_args = tokio.config.CONFIG.get('esnet_snmp_interfaces', {}).get(args.endpoints).copy()
+        query_args = tokio.config.CONFIG.get('esnet_snmp_interfaces', {}).get(args.endpoints, {}).copy()
     else:
         query_args = {}
         for kvpair in args.endpoints.split(","):
             key, value = kvpair.split(":", 1)
-            query_args[key] = value
+            if key not in query_args:
+                query_args[key] = []
+            query_args[key].append(value)
 
     if not query_args:
         errstr = "Invalid endpoint specification.\n\n"
         errstr += "Valid endpoints:" + "\n  ".join(tokio.config.CONFIG.get('esnet_snmp_interfaces', {}).keys())
         errstr += "\n\nor endpoint:interface[,endpoint:interface[,endpoint:interface]]"
         sys.stderr.write(errstr + "\n")
-        raise RuntimeError("Invalid endpoint specification")
+        raise ValueError("Invalid endpoint specification")
 
     if args.end and not args.start:
         parser.error("--start must be specified with --end")
@@ -62,8 +65,7 @@ def main(argv=None):
         if args.end:
             end = datetime.datetime.strptime(args.end, DATE_FMT)
     except ValueError:
-        sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT)
-        raise
+        raise ValueError("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
 
     if not args.start:
         start = datetime.datetime.now() - datetime.timedelta(hours=1)
@@ -72,7 +74,7 @@ def main(argv=None):
 
     # Basic input bounds checking
     if start >= end:
-        raise Exception('--start >= --end')
+        raise ValueError('--start >= --end')
 
     if args.input:
         esnetdata = tokio.connectors.esnet_snmp.EsnetSnmp(start=start, end=end, input_file=args.input)
@@ -107,5 +109,5 @@ def main(argv=None):
         else:
             esnetdata.save_cache(cache_file, indent=4, sort_keys=True)
             sys.stdout.write("\n")
-    else:
-        raise Exception("No output format specified")
+#   else:
+#       # should never be encountered; default is args.json = True
