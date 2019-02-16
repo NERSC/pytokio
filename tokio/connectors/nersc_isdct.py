@@ -280,7 +280,7 @@ def _merge_parsed_counters(parsed_counters_list):
     """
     all_data = {}
     for parsed_counters in parsed_counters_list:
-        if parsed_counters is None:
+        if not parsed_counters:
             continue
         elif len(parsed_counters) > 1:
             raise Exception("Received multiple serial numbers from parse_dct_counters_file")
