@@ -112,6 +112,7 @@ def test_idempotency():
 
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+@nose.tools.raises(IndexError)
 def test_out_of_bounds():
     """
     cli.archive_esnet_snmp with out-of-bounds
