@@ -45,7 +45,26 @@ class DatasetDict(dict):
                 "delta": False,
                 "column": "BYTES_WRITTEN",
             },
-            # XXX more?
+            'datatargets/readops': {
+                "units": "ops",
+                "delta": False,
+                "column": "READ_REQUESTS",
+            },
+            'datatargets/writeops': {
+                "units": "ops",
+                "delta": False,
+                "column": "WRITE_REQUESTS",
+            },
+            'mdtargets/opens': {
+                "units": "ops",
+                "delta": False,
+                "column": "OPEN_COUNT",
+            },
+            'mdtargets/closes': {
+                "units": "ops",
+                "delta": False,
+                "column": "OPEN_COUNT",
+            },
         }
 
         # Initialize raw datasets - extend query by one extra timestep so we can calculate deltas
@@ -113,7 +132,11 @@ class DatasetDict(dict):
 
         dataset_names = [
             'datatargets/readbytes',
-            'datatargets/writebytes'
+            'datatargets/writebytes',
+            'datatargets/readops',
+            'datatargets/writeops',
+            'mdtargets/opens',
+            'mdtargets/closes'
         ]
 
         self.init_datasets(dataset_names, ggiostatdb.node_names)
