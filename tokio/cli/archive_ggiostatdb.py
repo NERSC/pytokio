@@ -16,6 +16,10 @@ DATE_FMT_PRINT = "YYYY-MM-DDTHH:MM:SS"
 
 SCHEMA_VERSION = "1"
 
+LAMBDA_MAPS = {
+    'sum': lambda x, y: x + y,
+}
+
 class DatasetDict(dict):
     """A dictionary containing TimeSeries objects
 
@@ -128,6 +132,7 @@ class DatasetDict(dict):
             raise ValueError("GGIOSTAT database schema does not match expectation")
 
         # Loop through all the results of the timeseries query
+        reducer = LAMBDA_MAPS.get('sum')
         for row in results:
             # GGIOSTAT timestamps are stored as seconds since epoch -- convert to datetime.datetime
             timestamp = datetime.datetime.fromtimestamp(row[col_map['SECONDS']])
@@ -135,11 +140,11 @@ class DatasetDict(dict):
             for dataset_name in dataset_names:
                 target_dbcol = self.config[dataset_name].get('column')
                 if target_dbcol is not None:
-                    # XXX LAMBDA
                     self[dataset_name].insert_element(
                         timestamp,
                         target_name,
-                        row[col_map[target_dbcol]])
+                        row[col_map[target_dbcol]],
+                        reducer)
                 else:
                     errmsg = "%s in self.config but missing 'column' setting" % dataset_name
                     raise KeyError(errmsg)
