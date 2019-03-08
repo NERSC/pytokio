@@ -18,18 +18,46 @@ The typical output of ``mmperfmon query usage`` may look something like::
       2 2019-01-11-10:01:00     0.22    0.57  31371.0 MB  18785.6 MB    1.7 kB    1.7 kB
       3 2019-01-11-10:02:00     0.14    0.55  31371.0 MB  18785.1 MB    1.7 kB    1.7 kB
 
+Whereas the typical output of ``mmperfmon query gpfsnsdds`` is::
+
+    Legend:
+     1: xxxxxxxx.nersc.gov|GPFSNSDDisk|na07md01|gpfs_nsdds_bytes_read
+     2: xxxxxxxx.nersc.gov|GPFSNSDDisk|na07md02|gpfs_nsdds_bytes_read
+     3: xxxxxxxx.nersc.gov|GPFSNSDDisk|na07md03|gpfs_nsdds_bytes_read
+
+    Row           Timestamp gpfs_nsdds_bytes_read gpfs_nsdds_bytes_read gpfs_nsdds_bytes_read 
+      1 2019-03-04-16:01:00             203539391                     0                     0
+      2 2019-03-04-16:02:00             175109739                     0                     0
+      3 2019-03-04-16:03:00              57053762                     0                     0
+
+In general, each Legend: entry has the format::
+
+    col_number: hostname|subsystem[|device_id]|counter_name
+
+where
+
+* col_number is an aribtrary number
+* hostname is the fully qualified NSD server hostname
+* subsystem is the type of component being measured (CPU, memory, network, disk)
+* device_id is optional and represents the instance of the subsystem being
+  measured (e.g., CPU core ID, network interface, or disk identifier)
+* counter_name is the specific metric being measured
+
 """
 
 import os
 import re
+import json
+import gzip
 import tarfile
 import datetime
 import warnings
+import mimetypes
 
 import pandas
 
 from .common import SubprocessOutputDict, walk_file_collection
-from ..common import to_epoch
+from ..common import to_epoch, recast_string, JSONEncoder
 
 _REX_LEGEND = re.compile(r'^\s*(\d+):\s+([^|]+)\|([^|]+)\|(\S+)\s*$')
 _REX_ROWHEAD = re.compile(r'^\s*Row\s+Timestamp')
@@ -71,6 +99,15 @@ class Mmperfmon(SubprocessOutputDict):
         self.col_offsets = []
         self.load()
 
+    def __repr__(self):
+        """Returns string representation of self
+
+        This does not convert back into a format that attempts to resemble the
+        mmperfmon output because the process of loading mmperfmon output is
+        lossy.
+        """
+        return self.to_json()
+
     @classmethod
     def from_str(cls, input_str):
         """Instantiate from a string
@@ -110,9 +147,36 @@ class Mmperfmon(SubprocessOutputDict):
                 warnings.warn("Parsing error in %s" % member_name)
                 raise
 
+    def load_cache(self, cache_file=None):
+        """Loads from one of two formats of cache files
+
+        Because self.save_cache() outputs to a different format from
+        self.load_str(), load_cache() must be able to ingest both formats.
+        """
+        if cache_file:
+            self.cache_file = cache_file
+
+        _, encoding = mimetypes.guess_type(self.cache_file)
+        if encoding == 'gzip':
+            input_fp = gzip.open(self.cache_file, 'rt')
+        else:
+            input_fp = open(self.cache_file, 'r')
+
+        try:
+            loaded_json = json.load(input_fp)
+            for key, value in loaded_json:
+                key = recast_string(key)
+                self[key] = value
+        except json.decoder.JSONDecodeError:
+            input_fp.close()
+            super(Mmperfmon, self).load_cache(cache_file=cache_file)
+
 
     def load_str(self, input_str):
-        """Parse the output of the subprocess output to initialize self
+        """Parses the output of the subprocess output to initialize self
+
+        Args:
+            input_str (str): Text output of the ``mmperfmon query`` command
         """
         for line in input_str.splitlines():
             # decode the legend
@@ -122,6 +186,11 @@ class Mmperfmon(SubprocessOutputDict):
             if match is not None:
                 # extract values
                 row, hostname, counter = (match.group(1), match.group(2), match.group(4))
+                # counter will catch LUN names in the case of nsd-level counters
+                if '|' in counter:
+                    # an optional device_id is specified; append it to the hostname
+                    misc_label, counter = counter.rsplit('|', 1)
+                    hostname += ":" + misc_label
                 self.legend[int(row)] = {'host': hostname, 'counter': counter}
                 # the reverse map doesn't hurt to have
                 # self.legend[hostname] = {'row': int(row), 'counter': counter}
@@ -136,16 +205,14 @@ class Mmperfmon(SubprocessOutputDict):
             match = _REX_ROW.search(line)
             if match is not None and self.col_offsets:
                 fields = [line[istart:istop] for istart, istop in self.col_offsets]
-                # TODO: convert timestamp into an epoch seconds
-                timestamp = fields[0].strip()
+                timestamp = to_epoch(datetime.datetime.strptime(fields[0], MMPERFMON_DATE_FMT))
                 for index, val in enumerate(fields[1:]):
-                    # TODO: convert val from str into a native data type
                     counter = self.legend[index+1]['counter']
                     hostname = self.legend[index+1]['host']
                     if timestamp not in self:
                         self[timestamp] = {}
                     to_update = self[timestamp].get(hostname, {})
-                    to_update[counter] = val.strip()
+                    to_update[counter] = recast_string(val.strip())
                     if hostname not in self[timestamp]:
                         self[timestamp][hostname] = to_update
 
@@ -163,7 +230,7 @@ class Mmperfmon(SubprocessOutputDict):
         for timestamp, hosts in self.items():
             metrics = hosts.get(host)
             if metrics is not None:
-                timestamp_o = datetime.datetime.strptime(timestamp, MMPERFMON_DATE_FMT)
+                timestamp_o = datetime.datetime.fromtimestamp(timestamp)
                 to_df[timestamp_o] = {}
                 for key, value in metrics.items():
                     new_value = value_unit_to_bytes(value)
@@ -188,7 +255,7 @@ class Mmperfmon(SubprocessOutputDict):
             for hostname, counters in hosts.items():
                 value = counters.get(metric)
                 if value is not None:
-                    timestamp_o = datetime.datetime.strptime(timestamp, MMPERFMON_DATE_FMT)
+                    timestamp_o = datetime.datetime.fromtimestamp(timestamp)
                     if timestamp_o not in to_df:
                         to_df[timestamp_o] = {}
                     new_value = value_unit_to_bytes(value)
@@ -208,6 +275,13 @@ class Mmperfmon(SubprocessOutputDict):
 
         return self.to_dataframe_by_metric(metric=by_metric)
             
+    def to_json(self, **kwargs):
+        """Returns a json-encoded string representation of self.
+
+        Returns:
+            str: JSON representation of self
+        """
+        return json.dumps(self, cls=JSONEncoder, **kwargs)
 
 def get_col_pos(line, align=None):
     """Return column offsets of a left-aligned text table
@@ -275,7 +349,7 @@ def value_unit_to_bytes(value_unit):
     """
     try:
         val, unit = value_unit.split()
-    except ValueError:
+    except AttributeError:  # occurs of value_unit isn't a string
         return value_unit
 
     val = float(val)
