@@ -32,12 +32,19 @@ class CacheableDict(dict):
         self.input_file = input_file
         self.load()
 
-    def load(self):
+    def load(self, input_file=None):
         """Wrapper around the filetype-specific loader.
 
         Infer the type of input being given, dispatch the correct loading
         function, and populate keys/values.
+
+        Args:
+            input_file (str or None): The input file to load.  If not specified,
+                uses whatever self.input_file is
         """
+        if input_file:
+            self.input_file = input_file
+
         if self.input_file is None:
             return
 
@@ -49,19 +56,30 @@ class CacheableDict(dict):
         except ValueError:
             self.load_native()
 
-    def load_native(self):
+    def load_native(self, input_file=None):
         """Parse an uncached, native object
 
         This is a stub that should be overloaded on derived classes.
+
+        Args:
+            input_file (str or None): The input file to load.  If not specified,
+                uses whatever self.input_file is
         """
         pass
 
-    def load_json(self):
+    def load_json(self, input_file=None):
         """Loads input from serialized JSON
 
         Load the serialized format of this object, encoded as a json dictionary.
         This is the converse of the save_cache() method.
+
+        Args:
+            input_file (str or None): The input file to load.  If not specified,
+                uses whatever self.input_file is
         """
+        if input_file:
+            self.input_file = input_file
+
         _, encoding = mimetypes.guess_type(self.input_file)
 
         if encoding == 'gzip':
@@ -116,9 +134,16 @@ class SubprocessOutputDict(dict):
         self.from_string = from_string
         self.subprocess_cmd = []
 
-    def load(self):
+    def load(self, cache_file=None):
         """Load based on initialization state of object
+
+        Args:
+            cache_file (str or None): The cached input file to load.  If not
+                specified, uses whatever self.cache_file is
         """
+        if cache_file:
+            self.cache_file = cache_file
+
         if self.from_string is not None:
             self.load_str(self.from_string)
         elif self.cache_file:
@@ -155,9 +180,16 @@ class SubprocessOutputDict(dict):
             # Python 3 - subprocess.check_output returns encoded bytes
             self.load_str(output_str.decode())
 
-    def load_cache(self):
+    def load_cache(self, cache_file=None):
         """Load subprocess output from a cached text file
+
+        Args:
+            cache_file (str or None): The cached input file to load.  If not
+                specified, uses whatever self.cache_file is
         """
+        if cache_file:
+            self.cache_file = cache_file
+
         _, encoding = mimetypes.guess_type(self.cache_file)
         if encoding == 'gzip':
             input_fp = gzip.open(self.cache_file, 'rt')
