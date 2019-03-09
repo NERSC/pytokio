@@ -28,7 +28,7 @@ def main(argv=None):
     mmperfmon = tokio.connectors.mmperfmon.Mmperfmon(args.input[0])
     if len(args.input) > 1:
         for input_filename in args.input[1:]:
-            mmperfmon.load_cache(input_filename)
+            mmperfmon.load(input_filename)
 
     # Serialize the object
     cache_file = args.output
