@@ -3,16 +3,27 @@
 import os
 import gzip
 import json
+import nose
 
 import tokio.connectors.mmperfmon
 import tokiotest
 
-def validate_object(obj):
-    """Ensure that a obj is a valid Mmperfmon object
+def validate_iterable(obj):
+    """Ensure that a obj is a valid data structure of some sort
     """
     assert obj is not None
     print("object has length %d" % len(obj))
     assert len(obj) > 0
+
+def validate_object(obj):
+    """Ensure that a obj is a valid Mmperfmon object
+    """
+    validate_iterable(obj)
+
+    # ensure that all top-level keys are timestamps
+    for timestamp in obj:
+        print("key [%s] is type [%s]" % (timestamp, type(timestamp)))
+        assert isinstance(timestamp, int)
 
 def test_get_col_pos():
     """connectors.mmperfmon.get_col_pos()
@@ -50,13 +61,13 @@ def test_to_df():
         print("\nRetrieving dataframe for host [%s]" % sample_host)
         dataframe = mmpout.to_dataframe(by_host=sample_host)
         print(dataframe)
-        validate_object(dataframe)
+        validate_iterable(dataframe)
 
     for sample_metric in tokiotest.SAMPLE_MMPERFMON_METRICS:
         print("\nRetrieving dataframe for metric [%s]" % sample_metric)
         dataframe = mmpout.to_dataframe(by_metric=sample_metric)
         print(dataframe)
-        validate_object(dataframe)
+        validate_iterable(dataframe)
 
 def test_load_single_single():
     """connectors.mmperfmon.Mmperfmon, load single, load diff single
@@ -70,7 +81,7 @@ def test_load_single_single():
         print("\nRetrieving dataframe for host [%s]" % sample_host)
         dataframe = mmpout.to_dataframe(by_host=sample_host)
         print(dataframe)
-        validate_object(dataframe)
+        validate_iterable(dataframe)
 
 def test_load_multi_single_idempotent():
     """connectors.mmperfmon.Mmperfmon, load multiple, load single
@@ -112,4 +123,20 @@ def test_unpacked_input():
     print("Loading from %s" % tokiotest.SAMPLE_MMPERFMON_UNPACKED_INPUT)
     mmp_data = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_UNPACKED_INPUT)
     tokiotest.cleanup_untar(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
+    validate_object(mmp_data)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_mmperfmon_serializer():
+    """connectors.mmperfmon.Mmperfmon: can serialize and deserialize circularly
+    """
+    # Read from a cache file
+    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(cache_file=tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT)
+
+    # Serialize the object, then re-read it and verify it
+    print("Caching to %s" % tokiotest.TEMP_FILE.name)
+    mmp_data.save_cache(tokiotest.TEMP_FILE.name)
+
+    # Open a second file handle to this cached file to load it
+    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(cache_file=tokiotest.TEMP_FILE.name)
+    tokiotest.TEMP_FILE.close()
     validate_object(mmp_data)
