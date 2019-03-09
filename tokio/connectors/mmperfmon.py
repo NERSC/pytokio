@@ -164,7 +164,7 @@ class Mmperfmon(SubprocessOutputDict):
 
         try:
             loaded_json = json.load(input_fp)
-            for key, value in loaded_json:
+            for key, value in loaded_json.items():
                 key = recast_string(key)
                 self[key] = value
         except json.decoder.JSONDecodeError:
