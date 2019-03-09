@@ -223,6 +223,7 @@ SAMPLE_ESNET_SNMP_START2 = "2019-02-11T01:01:00"
 SAMPLE_ESNET_SNMP_END2 = "2019-02-11T01:04:00"
 
 SAMPLE_MMPERFMON_USAGE_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-usage.txt.gz')
+SAMPLE_MMPERFMON_NSDDS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-nsdds.txt.gz')
 SAMPLE_MMPERFMON_NUMOPS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
 SAMPLE_MMPERFMON_TGZ_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tgz')
 SAMPLE_MMPERFMON_TAR_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tar')
