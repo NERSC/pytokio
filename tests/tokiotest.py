@@ -222,6 +222,14 @@ SAMPLE_ESNET_SNMP_FILE2 = os.path.join(INPUT_DIR, 'esnet_snmp-2.json.gz')
 SAMPLE_ESNET_SNMP_START2 = "2019-02-11T01:01:00"
 SAMPLE_ESNET_SNMP_END2 = "2019-02-11T01:04:00"
 
+SAMPLE_MMPERFMON_USAGE_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-usage.txt.gz')
+SAMPLE_MMPERFMON_NUMOPS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
+SAMPLE_MMPERFMON_TGZ_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tgz')
+SAMPLE_MMPERFMON_TAR_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tar')
+SAMPLE_MMPERFMON_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'mmperfmon_dir')
+SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
+
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
     """

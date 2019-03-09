@@ -7,14 +7,6 @@ import json
 import tokio.connectors.mmperfmon
 import tokiotest
 
-SAMPLE_USAGE_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon-usage.txt.gz')
-SAMPLE_NUMOPS_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
-SAMPLE_TGZ_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon.tgz')
-SAMPLE_TAR_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon.tar')
-SAMPLE_UNPACKED_INPUT = os.path.join(tokiotest.INPUT_DIR, 'mmperfmon_dir')
-SAMPLE_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
-SAMPLE_HOSTS = ['ngfsv468.nersc.gov']
-
 def validate_object(obj):
     """Ensure that a obj is a valid Mmperfmon object
     """
@@ -51,16 +43,16 @@ def test_get_col_pos():
 def test_to_df():
     """connectors.mmperfmon.Mmperfmon.to_dataframe()
     """
-    mmpout = tokio.connectors.mmperfmon.Mmperfmon.from_file(SAMPLE_USAGE_INPUT)
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon.from_file(tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT)
     validate_object(mmpout)
 
-    for sample_host in SAMPLE_HOSTS:
+    for sample_host in tokiotest.SAMPLE_MMPERFMON_HOSTS:
         print("\nRetrieving dataframe for host [%s]" % sample_host)
         dataframe = mmpout.to_dataframe(by_host=sample_host)
         print(dataframe)
         validate_object(dataframe)
 
-    for sample_metric in SAMPLE_METRICS:
+    for sample_metric in tokiotest.SAMPLE_MMPERFMON_METRICS:
         print("\nRetrieving dataframe for metric [%s]" % sample_metric)
         dataframe = mmpout.to_dataframe(by_metric=sample_metric)
         print(dataframe)
@@ -69,12 +61,12 @@ def test_to_df():
 def test_load_single_single():
     """connectors.mmperfmon.Mmperfmon, load single, load diff single
     """
-    mmpout = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_NUMOPS_INPUT)
-    mmpout.load_str(gzip.open(SAMPLE_USAGE_INPUT).read())
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_NUMOPS_INPUT)
+    mmpout.load_str(gzip.open(tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT).read())
     print(json.dumps(mmpout, indent=4, sort_keys=True))
     validate_object(mmpout)
 
-    for sample_host in SAMPLE_HOSTS:
+    for sample_host in tokiotest.SAMPLE_MMPERFMON_HOSTS:
         print("\nRetrieving dataframe for host [%s]" % sample_host)
         dataframe = mmpout.to_dataframe(by_host=sample_host)
         print(dataframe)
@@ -83,15 +75,15 @@ def test_load_single_single():
 def test_load_multi_single_idempotent():
     """connectors.mmperfmon.Mmperfmon, load multiple, load single
     """
-    print("Loading from %s" % SAMPLE_TGZ_INPUT)
-    mmpout = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_TGZ_INPUT)
+    print("Loading from %s" % tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
     validate_object(mmpout)
 
     mmpout_orig = json.dumps(mmpout, sort_keys=True)
 
     # load a subset of the original load
-    print("Reloading from %s" % SAMPLE_USAGE_INPUT)
-    input_str = gzip.open(SAMPLE_USAGE_INPUT, 'r').read()
+    print("Reloading from %s" % tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT)
+    input_str = gzip.open(tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT, 'r').read()
     mmpout.load_str(input_str)
     validate_object(mmpout)
 
@@ -100,24 +92,24 @@ def test_load_multi_single_idempotent():
 def test_tgz_input():
     """connectors.mmperfmon.Mmperfmon, .tgz input file
     """
-    print("Loading from %s" % SAMPLE_TGZ_INPUT)
-    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_TGZ_INPUT)
+    print("Loading from %s" % tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
+    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
     validate_object(mmp_data)
 
 def test_tar_input():
     """connectors.mmperfmon.Mmperfmon, .tar input file
     """
-    tokiotest.gunzip(SAMPLE_TGZ_INPUT, SAMPLE_TAR_INPUT)
-    print("Loading from %s" % SAMPLE_TAR_INPUT)
-    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_TAR_INPUT)
-    tokiotest.try_unlink(SAMPLE_TAR_INPUT)
+    tokiotest.gunzip(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT, tokiotest.SAMPLE_MMPERFMON_TAR_INPUT)
+    print("Loading from %s" % tokiotest.SAMPLE_MMPERFMON_TAR_INPUT)
+    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_TAR_INPUT)
+    tokiotest.try_unlink(tokiotest.SAMPLE_MMPERFMON_TAR_INPUT)
     validate_object(mmp_data)
 
 def test_unpacked_input():
     """connectors.mmperfmon.Mmperfmon, directory input
     """
-    tokiotest.untar(SAMPLE_TGZ_INPUT)
-    print("Loading from %s" % SAMPLE_UNPACKED_INPUT)
-    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(SAMPLE_UNPACKED_INPUT)
-    tokiotest.cleanup_untar(SAMPLE_TGZ_INPUT)
+    tokiotest.untar(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
+    print("Loading from %s" % tokiotest.SAMPLE_MMPERFMON_UNPACKED_INPUT)
+    mmp_data = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_UNPACKED_INPUT)
+    tokiotest.cleanup_untar(tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT)
     validate_object(mmp_data)
