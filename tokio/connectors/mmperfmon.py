@@ -167,7 +167,7 @@ class Mmperfmon(SubprocessOutputDict):
             for key, value in loaded_json.items():
                 key = recast_string(key)
                 self[key] = value
-        except json.decoder.JSONDecodeError:
+        except ValueError:
             input_fp.close()
             super(Mmperfmon, self).load_cache(cache_file=cache_file)
 
@@ -238,7 +238,7 @@ class Mmperfmon(SubprocessOutputDict):
                     to_df[timestamp_o][new_key] = new_value
 
         return pandas.DataFrame.from_dict(to_df, orient='index')
-                
+
 
     def to_dataframe_by_metric(self, metric):
         """Returns data for a specific metric as a DataFrame
@@ -274,7 +274,7 @@ class Mmperfmon(SubprocessOutputDict):
             return self.to_dataframe_by_host(host=by_host)
 
         return self.to_dataframe_by_metric(metric=by_metric)
-            
+
     def to_json(self, **kwargs):
         """Returns a json-encoded string representation of self.
 
@@ -357,4 +357,3 @@ def value_unit_to_bytes(value_unit):
     if multiple is not None:
         return val * multiple
     return value_unit
-
