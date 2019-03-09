@@ -359,14 +359,14 @@ def get_col_pos(line, align=None):
         list: List of tuples of integer offsets denoting the start index
             (inclusive) and stop index (exclusive) for each column.
     """
-    col_pos = None
+    col_pos = []
     last_start = None
     for index, char in enumerate(line):
+        # if this is the first space after a word
         if char == ' ' and last_start is not None:
-            if col_pos is None:
-                col_pos = [(0, last_start)]
             col_pos.append((last_start, index))
             last_start = None
+        # if this is the first letter in a word
         elif char != ' ' and last_start is None:
             last_start = index 
 
@@ -374,18 +374,23 @@ def get_col_pos(line, align=None):
         col_pos.append((last_start, None))
 
     if len(col_pos) > 1:
-        if align == 'left':
-            # TODO - create test to exercise this - it probably doesn't handle the final column correctly!
+        if align and (align[0] == 'l' or align[0] == 'L'):
             old_col_pos = col_pos
             col_pos = []
             for index, (start, stop) in enumerate(old_col_pos[:-1]):
-                col_pos.append((start, old_col_pos[index+1][0]))
-        elif align == 'right':
-            # TODO - create test to exercise this
+                # change end point to start point of next column
+                col_pos.append((start, old_col_pos[index+1][0] - 1))
+            # force last column out to the end of the line
+            col_pos.append((col_pos[-1][1] + 1, None))
+
+        elif align and (align[0] == 'r' or align[0] == 'R'):
             old_col_pos = col_pos
-            col_pos = []
+            # force the first column to the beginning of the line
+            col_pos = [(0, col_pos[0][1])]
             for index, (start, stop) in enumerate(old_col_pos[1:]):
-                col_pos.append((old_col_pos[index][1]+1, stop))
+                # change start point to end point of previous column
+                col_pos.append((old_col_pos[index][1] + 1, stop))
+
 
     return col_pos
 
