@@ -94,6 +94,19 @@ def test_load_single_single():
         print(dataframe)
         validate_iterable(dataframe)
 
+def test_load_wrapping():
+    """connectors.mmperfmon.Mmperfmon, wrapping cols + subdevices
+    """
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_NSDDS_INPUT)
+    print(json.dumps(mmpout, indent=4, sort_keys=True))
+    validate_object(mmpout)
+
+    for sample_host in tokiotest.SAMPLE_MMPERFMON_HOSTS:
+        print("\nRetrieving dataframe for host [%s]" % sample_host)
+        dataframe = mmpout.to_dataframe(by_host=sample_host)
+        print(dataframe)
+        validate_iterable(dataframe)
+
 def test_load_multi_single_idempotent():
     """connectors.mmperfmon.Mmperfmon, load multiple, load single
     """
