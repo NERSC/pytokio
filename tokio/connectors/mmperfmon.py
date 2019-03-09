@@ -269,13 +269,9 @@ class Mmperfmon(SubprocessOutputDict):
                     if isinstance(value, dict):
                         for deviceid, devicevalue in value.items():
                             new_key = key + ":" + deviceid 
-                            new_value = value_unit_to_bytes(devicevalue)
-                            new_key = new_key + "_bytes" if new_value != value else key
-                            to_df[timestamp_o][new_key] = new_value
+                            to_df[timestamp_o][new_key] = devicevalue
                     else:
-                        new_value = value_unit_to_bytes(value)
-                        new_key = key + "_bytes" if new_value != value else key
-                        to_df[timestamp_o][new_key] = new_value
+                        to_df[timestamp_o][key] = value
 
         dataframe = pandas.DataFrame.from_dict(to_df, orient='index')
         dataframe.index.name = 'timestamp'
@@ -306,10 +302,10 @@ class Mmperfmon(SubprocessOutputDict):
                 if isinstance(value, dict):
                     for deviceid, devicevalue in value.items():
                         key = hostname + ":" + deviceid
-                        to_df[timestamp_o][key] = value_unit_to_bytes(devicevalue)
+                        to_df[timestamp_o][key] = devicevalue
                 else:
                     key = hostname
-                    to_df[timestamp_o][key] = value_unit_to_bytes(value)
+                    to_df[timestamp_o][key] = value
 
         dataframe = pandas.DataFrame.from_dict(to_df, orient='index')
         dataframe.index.name = 'timestamp'
