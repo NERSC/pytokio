@@ -33,6 +33,7 @@ import tokio.cli.cache_esnet_snmp
 import tokio.cli.cache_isdct
 import tokio.cli.cache_lfsstatus
 import tokio.cli.cache_lmtdb
+import tokio.cli.cache_mmperfmon
 import tokio.cli.cache_nersc_globuslogs
 import tokio.cli.cache_nersc_jobsdb
 import tokio.cli.cache_slurm
@@ -161,6 +162,48 @@ def run_raises_systemexit(binary, argv):
 
 
 CACHE_CONNECTOR_CONFIGS = [
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv --metric, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       ['--csv', '--metric', tokiotest.SAMPLE_MMPERFMON_METRICS[0], tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_csv,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv --host, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       ['--csv', '--host', tokiotest.SAMPLE_MMPERFMON_HOSTS[0], tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_csv,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv without --host/--metric',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'runfunction': run_raises_systemexit,
+        'args':       ['--csv', tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, tarfile input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, multiple inputs',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT, tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_json,],
+    },
     {
         'name':       'cli.cache_nersc_globuslogs',
         'description': 'cli.cache_nersc_globuslogs, cached input',
