@@ -227,7 +227,8 @@ SAMPLE_MMPERFMON_NUMOPS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-gpfsNumberOpe
 SAMPLE_MMPERFMON_TGZ_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tgz')
 SAMPLE_MMPERFMON_TAR_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tar')
 SAMPLE_MMPERFMON_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'mmperfmon_dir')
-SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+# SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free_bytes', 'mem_total_bytes']
 SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
 
 class CaptureOutputs(object):
