@@ -96,6 +96,7 @@ class Mmperfmon(SubprocessOutputDict):
         super(Mmperfmon, self).__init__(*args, **kwargs)
         self.subprocess_cmd = None
         self.legend = {}
+        self.rows = {}
         self.col_offsets = []
         self.load()
 
@@ -120,13 +121,16 @@ class Mmperfmon(SubprocessOutputDict):
         """
         return cls(cache_file=cache_file)
 
-    def load(self):
+    def load(self, cache_file=None):
         """Load either a tarfile, directory, or single mmperfmon output file
 
         Tries to load self.cache_file; if it is a directory or tarfile, it is
         handled by self.load_multiple; otherwise falls through to the load_str
         code path.
         """
+        if cache_file:
+            self.cache_file = cache_file
+
         try:
             self.load_multiple(input_file=self.cache_file)
         except tarfile.ReadError:
@@ -178,6 +182,11 @@ class Mmperfmon(SubprocessOutputDict):
         Args:
             input_str (str): Text output of the ``mmperfmon query`` command
         """
+        # clean out state from any previous parsings
+        self.legend = {}
+        self.rows = {}
+        self.col_offsets = []
+
         for line in input_str.splitlines():
             # decode the legend
             if not isinstance(line, str):
@@ -187,11 +196,11 @@ class Mmperfmon(SubprocessOutputDict):
                 # extract values
                 row, hostname, counter = (match.group(1), match.group(2), match.group(4))
                 # counter will catch LUN names in the case of nsd-level counters
+                device_id = None
                 if '|' in counter:
                     # an optional device_id is specified; append it to the hostname
-                    misc_label, counter = counter.rsplit('|', 1)
-                    hostname += ":" + misc_label
-                self.legend[int(row)] = {'host': hostname, 'counter': counter}
+                    device_id, counter = counter.rsplit('|', 1)
+                self.legend[int(row)] = {'host': hostname, 'counter': counter, 'device_id': device_id}
                 # the reverse map doesn't hurt to have
                 # self.legend[hostname] = {'row': int(row), 'counter': counter}
                 continue
@@ -205,16 +214,40 @@ class Mmperfmon(SubprocessOutputDict):
             match = _REX_ROW.search(line)
             if match is not None and self.col_offsets:
                 fields = [line[istart:istop] for istart, istop in self.col_offsets]
-                timestamp = to_epoch(datetime.datetime.strptime(fields[0], MMPERFMON_DATE_FMT))
-                for index, val in enumerate(fields[1:]):
-                    counter = self.legend[index+1]['counter']
-                    hostname = self.legend[index+1]['host']
-                    if timestamp not in self:
-                        self[timestamp] = {}
-                    to_update = self[timestamp].get(hostname, {})
-                    to_update[counter] = recast_string(val.strip())
-                    if hostname not in self[timestamp]:
-                        self[timestamp][hostname] = to_update
+                rowid = int(fields[0].strip())
+                if rowid not in self.rows:
+                    self.rows[rowid] = fields
+                else:
+                    # skip the rowid and timestamp columns after the first time a row appears
+                    self.rows[rowid] += fields[2:]
+
+        # begin processing the fully tabularized data structure
+        for rowid in sorted(self.rows.keys()):
+            fields = self.rows[rowid]
+            timestamp = to_epoch(datetime.datetime.strptime(fields[1], MMPERFMON_DATE_FMT))
+            for index, val in enumerate(fields[2:]):
+                orig_counter = self.legend[index + 1]['counter']
+                hostname = self.legend[index + 1]['host']
+                device_id = self.legend[index + 1].get('device_id')
+
+                # turn number strings into numerics
+                old_value = recast_string(val.strip())
+
+                # attempt to turn human-readable byte quantities into numbers of bytes
+                new_value = value_unit_to_bytes(old_value)
+                new_counter = orig_counter + "_bytes" if type(old_value) != type(new_value) else orig_counter
+
+                if timestamp not in self:
+                    self[timestamp] = {}
+                to_update = self[timestamp].get(hostname, {})
+                if device_id:
+                    if new_counter not in to_update:
+                        to_update[new_counter] = {}
+                    to_update[new_counter].update({device_id: new_value})
+                else:
+                    to_update[new_counter] = new_value 
+                if hostname not in self[timestamp]:
+                    self[timestamp][hostname] = to_update
 
     def to_dataframe_by_host(self, host):
         """Returns data from a specific host as a DataFrame
@@ -233,11 +266,20 @@ class Mmperfmon(SubprocessOutputDict):
                 timestamp_o = datetime.datetime.fromtimestamp(timestamp)
                 to_df[timestamp_o] = {}
                 for key, value in metrics.items():
-                    new_value = value_unit_to_bytes(value)
-                    new_key = key + "_bytes" if new_value != value else key
-                    to_df[timestamp_o][new_key] = new_value
+                    if isinstance(value, dict):
+                        for deviceid, devicevalue in value.items():
+                            new_key = key + ":" + deviceid 
+                            new_value = value_unit_to_bytes(devicevalue)
+                            new_key = new_key + "_bytes" if new_value != value else key
+                            to_df[timestamp_o][new_key] = new_value
+                    else:
+                        new_value = value_unit_to_bytes(value)
+                        new_key = key + "_bytes" if new_value != value else key
+                        to_df[timestamp_o][new_key] = new_value
 
-        return pandas.DataFrame.from_dict(to_df, orient='index')
+        dataframe = pandas.DataFrame.from_dict(to_df, orient='index')
+        dataframe.index.name = 'timestamp'
+        return dataframe
 
 
     def to_dataframe_by_metric(self, metric):
@@ -254,14 +296,24 @@ class Mmperfmon(SubprocessOutputDict):
         for timestamp, hosts in self.items():
             for hostname, counters in hosts.items():
                 value = counters.get(metric)
-                if value is not None:
-                    timestamp_o = datetime.datetime.fromtimestamp(timestamp)
-                    if timestamp_o not in to_df:
-                        to_df[timestamp_o] = {}
-                    new_value = value_unit_to_bytes(value)
-                    to_df[timestamp_o][hostname] = new_value
+                if value is None:
+                    continue
 
-        return pandas.DataFrame.from_dict(to_df, orient='index')
+                timestamp_o = datetime.datetime.fromtimestamp(timestamp)
+                if timestamp_o not in to_df:
+                    to_df[timestamp_o] = {}
+
+                if isinstance(value, dict):
+                    for deviceid, devicevalue in value.items():
+                        key = hostname + ":" + deviceid
+                        to_df[timestamp_o][key] = value_unit_to_bytes(devicevalue)
+                else:
+                    key = hostname
+                    to_df[timestamp_o][key] = value_unit_to_bytes(value)
+
+        dataframe = pandas.DataFrame.from_dict(to_df, orient='index')
+        dataframe.index.name = 'timestamp'
+        return dataframe
 
 
     def to_dataframe(self, by_host=None, by_metric=None):
@@ -307,14 +359,17 @@ def get_col_pos(line, align=None):
         list: List of tuples of integer offsets denoting the start index
             (inclusive) and stop index (exclusive) for each column.
     """
-    col_pos = []
+    col_pos = None
     last_start = None
     for index, char in enumerate(line):
         if char == ' ' and last_start is not None:
-                col_pos.append((last_start, index))
-                last_start = None
+            if col_pos is None:
+                col_pos = [(0, last_start)]
+            col_pos.append((last_start, index))
+            last_start = None
         elif char != ' ' and last_start is None:
             last_start = index 
+
     if last_start:
         col_pos.append((last_start, None))
 
