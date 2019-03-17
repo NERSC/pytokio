@@ -6,6 +6,7 @@ of TOKIO Time Series HDF5 files.
 """
 
 import datetime
+import warnings
 import tokio.tools.common
 import tokio.connectors.hdf5
 
@@ -96,28 +97,30 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
         output.append((h5lmt_file, i_0, i_f))
     return output
 
-def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime_end):
-    """Generate a dataframe containing all relevant data within a date range
+def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime_end, fix_errors=False):
+    """Returns all TOKIO Time Series data within a time range as a DataFrame.
 
-    Given a logical file system name and a dataset within that file system's
-    TOKIO Time Series files, return a dataframe containing all relevant data
-    falling within the given time range from that dataset.  Spans multiple HDF5
-    files if necessary.
+    Given a time range,
+
+    1. Find all TOKIO Time Series HDF5 files that exist and overlap with that time range
+    2. Open each and load all data that falls within the given time range
+    3. Convert loaded data into a single, time-indexed DataFrame
 
     Args:
-        fsname (str): Logical file system name; should match a key within
-            the ``hdf5_files`` config item in ``site.json``.
-        dataset_name (str): Name of a TOKIO Time Series dataset name
-        datetime_start (datetime.datetime): Begin including files corresponding
-            to this start date, inclusive.
-        datetime_end (datetime.datetime): Stop including files with timestamps
-            that follow this end date.  Resulting files _will_ include this
-            date.
+        fsname (str): Name of file system whose data should be retrieved.
+            Should exist as a key within ``tokio.config.CONFIG['hdf5_files']``
+        dataset_name (str): Dataset within each matching HDF5 file to load
+        datetime_start (datetime.datetime): Lower bound of time range to load,
+            inclusive
+        datetime_end (datetime.datetime): Upper bound of time range to load,
+            exclusive
+        fix_errors (bool): Replace negative values with -0.0.  Necessary if any
+            HDF5 files contain negative values as a result of being archived
+            with a buggy version of pytokio.
 
     Returns:
-        pandas.DataFrame or None: DataFrame, indexed in time, containing all of
-        the relevant data from ``dataset_name`` starting at ``datetime_start``
-        (inclusive) and ending at ``datetime_end`` (exclusive)
+        pandas.DataFrame: DataFrame indexed in time and whose columns correspond
+        to those in the given `dataset_name`.
     """
     result = None
 
@@ -139,4 +142,13 @@ def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime
                 ### append in place--maybe more efficient than .append??
                 result = result.reindex(result.index.union(df_slice.index))
                 result.loc[df_slice.index] = df_slice
-    return result
+
+    # Some versions of pytokio's archive_lmtdb were affected by a bug that could
+    # produce negative numbers; this just drops those bad data points
+    if fix_errors and result is not None:
+        errors = (result < 0.0).sum().sum()
+        if errors:
+            result.mask(cond=lambda x: x < 0.0, other=-0.0, inplace=True)
+            warnings.warn("Corrected %d errors" % errors)
+
+    return result.sort_index()
