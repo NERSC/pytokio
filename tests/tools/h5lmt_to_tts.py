@@ -28,9 +28,9 @@ DATASETS = [
     '/mdtargets/getattrs',
 ]
 
-def vprint(*args, **kwargs):
+def vprint(message):
     if VERBOSE:
-        print(*args, **kwargs)
+        print(message)
 
 def h5lmt_to_tts(input_hdf5, output_hdf5, dataset_name):
     """Convert an H5LMT dataset into a TOKIO TimeSeries dataset
@@ -43,8 +43,7 @@ def h5lmt_to_tts(input_hdf5, output_hdf5, dataset_name):
         dataset_name (str): Name of dataset in ``input_file`` to convert
     """
 
-    ts = tokio.timeseries.TimeSeries(dataset_name=dataset_name,
-                                     hdf5_file=input_hdf5)
+    ts = input_hdf5.to_timeseries(dataset_name=dataset_name)
 
     if ts.dataset is None:
         warnings.warn("Failed to attach to %s" % input_hdf5.filename)
@@ -76,7 +75,7 @@ def h5lmt_to_tts(input_hdf5, output_hdf5, dataset_name):
                 iterator.iternext()
             vprint("  Found %d missing elements; %d contained nonzero values" % (num_missing, num_zeroed))
 
-    ts.commit_dataset(output_hdf5)
+    output_hdf5.commit_timeseries(timeseries=ts)
 
 def main():
     """Provide simple CLI for h5lmt_to_tts
