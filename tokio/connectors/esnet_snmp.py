@@ -287,7 +287,8 @@ class EsnetSnmp(common.CacheableDict):
             params['calc'] = interval
 
         request = requests.get(uri, params=params)
-        self.last_response = json.loads(request.text)
+        request.raise_for_status()
+        self.last_response = request.json()
 
         self._insert_result()
 
