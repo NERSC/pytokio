@@ -94,7 +94,7 @@ def query_to_sqlite(esdb, start, end, conn, table):
             try:
                 inserts.append(
                     tuple([field_validate[i](record['_source'].get(x)) for i, x in enumerate(field_sources)]))
-            except TypeError:
+            except (TypeError, ValueError):
                 warnings.warn("Malformed source record; skipping")
     
     cursor.executemany(query, inserts)
