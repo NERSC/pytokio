@@ -146,17 +146,6 @@ class NerscGlobusLogs(es.EsConnection):
                 ``@timestamp`` field
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
-            source_filter (bool or list): Return all fields contained in each
-                document's _source field if True; otherwise, only return source
-                fields contained in the provided list of str.
-            filter_function (function, optional): Function to call before each
-                set of results is appended to the ``scroll_pages`` attribute; if
-                specified, return value of this function is what is appended.
-            flush_every (int or None): trigger the flush function once the
-                number of docs contained across all ``scroll_pages`` reaches
-                this value.  If None, do not apply `flush_function`.
-            flush_function (function, optional): function to call when
-                `flush_every` docs are retrieved.
             scroll (bool): Use the scrolling interface if True.  If False,
                 source_filter/filter_function/flush_every/flush_function are
                 ignored.
