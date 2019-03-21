@@ -60,6 +60,7 @@ def query_to_sqlite(esdb, start, end, conn, table):
     query = "CREATE TABLE IF NOT EXISTS %s (\n" % table
     field_sources = []
     field_names = []
+    field_validate = []
     for index, field in enumerate(SCHEMA):
         field_source = field.get('source')
         field_name = field.get('field', field_source.lower())
@@ -70,21 +71,31 @@ def query_to_sqlite(esdb, start, end, conn, table):
             query += "    %s %s,\n" % (field_name, field_type)
         field_sources.append(field_source)
         field_names.append(field_name)
+        if field_type == 'INTEGER':
+            field_validate.append(lambda x: int(x))
+        elif field_type == 'REAL':
+            field_validate.append(lambda x: float(x))
+        else:
+            field_validate.append(lambda x: x)
     query += ")"
 
     cursor = conn.cursor()
-    print(query)
+    tokio.debug.debug_print(query)
     cursor.execute(query)
 
-    query = "INSERT INTO %s (" % table
+    query = "INSERT OR IGNORE INTO %s (" % table
     query += ", ".join(field_names)
     query += ") VALUES (" + ", ".join(["?"] * len(field_names))
     query += ")"
-    print(query)
+    tokio.debug.debug_print(query)
     inserts = []
     for page in esdb.scroll_pages:
         for record in page:
-            inserts.append(tuple([record['_source'].get(x) for x in field_sources]))
+            try:
+                inserts.append(
+                    tuple([field_validate[i](record['_source'].get(x)) for i, x in enumerate(field_sources)]))
+            except TypeError:
+                warnings.warn("Malformed source record; skipping")
     
     cursor.executemany(query, inserts)
 

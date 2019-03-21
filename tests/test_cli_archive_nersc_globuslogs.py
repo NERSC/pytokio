@@ -4,6 +4,7 @@
 
 import os
 import sqlite3
+import warnings
 
 import nose
 
@@ -45,3 +46,19 @@ def test_basic():
     generate_sqlite(output_file=tokiotest.TEMP_FILE.name)
 
     validate_sqlite(tokiotest.TEMP_FILE.name)
+
+def test_malformed():
+    """connectors.cli.archive_nersc_globuslogs, malformed record
+    """
+    tokiotest.TEMP_FILE.close()
+
+    with warnings.catch_warnings(record=True) as warn:
+        warnings.simplefilter("always")
+        generate_sqlite(output_file=tokiotest.TEMP_FILE.name,
+                        input_file=tokiotest.SAMPLE_GLOBUSLOGS_ERR)
+        print("Caught %d warnings" % len(warn))
+        assert len(warn) > 0
+
+    validate_sqlite(tokiotest.TEMP_FILE.name)
+
+
