@@ -1,0 +1,12 @@
+$ ../bin/cache_esnet_snmp.py -s 2019-02-11T01:00:00 -e 2019-02-11T01:05:00 -j nersc -o esnet_snmp.json
+Caching to esnet_snmp.json
+
+$ gzip -9 !$
+gzip -9 esnet_snmp.json
+
+$ ../bin/cache_esnet_snmp.py -s 2019-02-11T01:01:00 -e 2019-02-11T01:04:00 -j nersc -o esnet_snmp-2.json
+Caching to esnet_snmp-2.json
+
+$ gzip -9 !$
+gzip -9 esnet_snmp-2.json
+

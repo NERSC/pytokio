@@ -73,11 +73,11 @@ class NerscGlobusLogs(es.EsConnection):
         instance.flush_function = lambda x: x
         return instance
 
-    def query(self, start, end, must=None):
+    def query(self, start, end, must=None, scroll=True):
         """Queries Elasticsearch for Globus logs
 
         Accepts a start time, end time, and an optional "must" field which can
-        be used to apply additional term queries.  For example, ``must`` may be
+        be used to apply additional term queries.  For example, ``must`` may be::
 
             [
                 {
@@ -100,6 +100,9 @@ class NerscGlobusLogs(es.EsConnection):
             end (datetime.datetime): upper bound for query (exclusive)
             must (list or None): list of dictionaries to be inserted as
                 additional term-level query parameters.
+            scroll (bool): Use the scrolling interface if True.  If False,
+                source_filter/filter_function/flush_every/flush_function are
+                ignored.
         """
         if must:
             query = copy.deepcopy(QUERY)
@@ -108,7 +111,7 @@ class NerscGlobusLogs(es.EsConnection):
             # no need to deepcopy since query_timeseries() will do that
             query = QUERY
 
-        self.query_timeseries(query, start, end)
+        self.query_timeseries(query, start, end, scroll=scroll)
 
     def query_user(self, start, end, user):
         """Wraps query() with a user restriction
@@ -135,7 +138,7 @@ class NerscGlobusLogs(es.EsConnection):
         """
         self.query(start=start, end=end, must=[{"term": {"TYPE": xfer_type}}])
 
-    def query_timeseries(self, query_template, start, end):
+    def query_timeseries(self, query_template, start, end, scroll=True):
         """Craft and issue query that returns all overlapping records
 
         Args:
@@ -154,6 +157,9 @@ class NerscGlobusLogs(es.EsConnection):
                 this value.  If None, do not apply `flush_function`.
             flush_function (function, optional): function to call when
                 `flush_every` docs are retrieved.
+            scroll (bool): Use the scrolling interface if True.  If False,
+                source_filter/filter_function/flush_every/flush_function are
+                ignored.
         """
         query = es.build_timeseries_query(
             query_template,
@@ -162,12 +168,15 @@ class NerscGlobusLogs(es.EsConnection):
             start_key='start_date',
             end_key='end_date')
 
-        self.query_and_scroll(
-            query=query,
-            source_filter=SOURCE_FILTER,
-            filter_function=self.filter_function,
-            flush_every=self.flush_every,
-            flush_function=self.flush_function)
+        if scroll:
+            self.query_and_scroll(
+                query=query,
+                source_filter=SOURCE_FILTER,
+                filter_function=self.filter_function,
+                flush_every=self.flush_every,
+                flush_function=self.flush_function)
+        else:
+            super(NerscGlobusLogs, self).query(query=query)
 
     def to_dataframe(self):
         """Converts self.scroll_pages to a DataFrame

@@ -20,16 +20,24 @@ try:
 except ImportError:
     _HAVE_ELASTICSEARCH = False
 
+try:
+    import requests.exceptions
+    _HAVE_REQUESTS = True
+except ImportError:
+    _HAVE_REQUESTS = False
+
 import tokiotest
-import tokio.cli.cache_nersc_globuslogs
-import tokio.cli.cache_isdct
 import tokio.cli.cache_collectdes
 import tokio.cli.cache_darshan
+import tokio.cli.cache_esnet_snmp
+import tokio.cli.cache_isdct
+import tokio.cli.cache_lfsstatus
+import tokio.cli.cache_lmtdb
+import tokio.cli.cache_mmperfmon
+import tokio.cli.cache_nersc_globuslogs
+import tokio.cli.cache_nersc_jobsdb
 import tokio.cli.cache_slurm
 import tokio.cli.cache_topology
-import tokio.cli.cache_lfsstatus
-import tokio.cli.cache_nersc_jobsdb
-import tokio.cli.cache_lmtdb
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def verify_sqlite(output_str):
@@ -125,7 +133,77 @@ def run_elasticsearch(binary, argv):
     except elasticsearch.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
+def run_requests(binary, argv):
+    """Run function that traps connection errors from REST
+
+    Args:
+        binary (module): tokio.cli module that contains a main() function
+        argv (list of str): list of CLI arguments to pass to connector
+
+    Returns:
+        Stdout of cache connector script as a string
+    """
+
+    if not _HAVE_REQUESTS:
+        raise nose.SkipTest("requests module not available")
+
+    try:
+        return tokiotest.run_bin(binary, argv)
+    except requests.exceptions.ConnectionError as error:
+        raise nose.SkipTest(error)
+
+@nose.tools.raises(ValueError)
+def run_raises_valueerror(binary, argv):
+    return tokiotest.run_bin(binary, argv)
+
+@nose.tools.raises(SystemExit)
+def run_raises_systemexit(binary, argv):
+    return tokiotest.run_bin(binary, argv)
+
+
 CACHE_CONNECTOR_CONFIGS = [
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv --metric, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       ['--csv', '--metric', tokiotest.SAMPLE_MMPERFMON_METRICS[0], tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_csv,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv --host, gzipped text input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       ['--csv', '--host', tokiotest.SAMPLE_MMPERFMON_HOSTS[0], tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_csv,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon --csv without --host/--metric',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'runfunction': run_raises_systemexit,
+        'args':       ['--csv', tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, tarfile input',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_TGZ_INPUT],
+        'validators': [verify_json,],
+    },
+    {
+        'name':       'cli.cache_mmperfmon',
+        'description': 'cli.cache_mmperfmon, multiple inputs',
+        'binary':     tokio.cli.cache_mmperfmon,
+        'args':       [tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT, tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT],
+        'validators': [verify_json,],
+    },
     {
         'name':       'cli.cache_nersc_globuslogs',
         'description': 'cli.cache_nersc_globuslogs, cached input',
@@ -226,6 +304,79 @@ CACHE_CONNECTOR_CONFIGS = [
         'binary':     tokio.cli.cache_darshan,
         'args':       ['--base', '--perf', '--total', tokiotest.SAMPLE_DARSHAN_LOG],
         'validators': [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp default args',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --json, remote connection',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--json", "nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --csv, remote connection',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--csv", "nersc"],
+        'runfunction': run_requests,
+        'validators':  [verify_csv,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --json, cached input',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "--json", "nersc"],
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp --csv, cached input',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "--csv", "nersc"],
+        'validators':  [verify_csv,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, explicit endpoint:interface',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "blah0:interf0"],
+        'validators':  [verify_json,],
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, invalid endpoint:interface',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "blah"],
+        'runfunction': run_raises_valueerror,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, invalid --start format',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "--start", "invalid", "nersc"],
+        'runfunction': run_raises_valueerror,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, --end without --start',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "--end", "2019-01-01T00:00:00", "nersc"],
+        'runfunction': run_raises_systemexit,
+    },
+    {
+        'name':        'cli.cache_esnet_snmp',
+        'description': 'cli.cache_esnet_snmp, --start > --end',
+        'binary':      tokio.cli.cache_esnet_snmp,
+        'args':        ["--input", tokiotest.SAMPLE_ESNET_SNMP_FILE, "--start", "2019-01-02T00:00:00", "--end", "2019-01-01T00:00:00", "nersc"],
+        'runfunction': run_raises_valueerror,
     },
     {
         'name':       'cli.cache_slurm',
@@ -372,7 +523,7 @@ def run_cache_connector(config, to_file=False):
         print("Executing: %s" % ' '.join(argv))
         output_str = runfunction(config['binary'], argv)
 
-    for validator in config['validators']:
+    for validator in config.get('validators', []):
         if isinstance(output_str, bytes):
             validator(output_str.decode())
         else:

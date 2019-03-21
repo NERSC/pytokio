@@ -10,7 +10,7 @@ def main(argv=None):
     """Entry point for the CLI interface
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("isdctfile", type=str, help="darshan logs to process")
+    parser.add_argument("isdctfile", type=str, help="NERSC ISDCT dump to process")
     parser.add_argument("-j", "--json", action="store_true", default=True,
                         help="return output in JSON format")
     parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")

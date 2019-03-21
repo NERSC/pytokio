@@ -18,7 +18,7 @@ import datetime
 import warnings
 import numpy
 import pandas
-from tokio.common import isstr
+from tokio.common import isstr, recast_string
 from . import common
 
 REX_SERIAL_NO = r'(Intel SSD|SMART Attributes|SMART and Health Information).*(CVF[^ ]+-\d+)'
@@ -280,7 +280,7 @@ def _merge_parsed_counters(parsed_counters_list):
     """
     all_data = {}
     for parsed_counters in parsed_counters_list:
-        if parsed_counters is None:
+        if not parsed_counters:
             continue
         elif len(parsed_counters) > 1:
             raise Exception("Received multiple serial numbers from parse_dct_counters_file")
@@ -308,19 +308,7 @@ def _merge_parsed_counters(parsed_counters_list):
                 new_value = value
                 unit = None
 
-            ### the order here is important, but hex that is not prefixed with
-            ### 0x may be misinterpreted as integers.  if such counters ever
-            ### surface, they must be explicitly cast above
-            for cast in (int, float, lambda x: int(x, 16)):
-                try:
-                    new_value = cast(value)
-                    break
-                except ValueError:
-                    pass
-            if value == "True":
-                new_value = True
-            elif value == "False":
-                new_value = False
+            new_value = recast_string(value)
 
             ### endurance_analyzer can be numeric or an error string
             if counter == 'endurance_analyzer':

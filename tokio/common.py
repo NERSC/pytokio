@@ -96,3 +96,32 @@ def to_epoch(datetime_obj):
     """
 
     return int(time.mktime(datetime_obj.timetuple()))
+
+def recast_string(value):
+    """Converts a string to some type of number or True/False if possible
+
+    Args:
+        value (str): A string that may represent an int or float
+
+    Returns:
+        int, float, bool, or str: The most precise numerical or boolean
+        representation of ``value`` if ``value`` is a valid string-encoded
+        version of that type.  Returns the unchanged string otherwise.
+    """
+
+    ### the order here is important, but hex that is not prefixed with
+    ### 0x may be misinterpreted as integers.
+    new_value = value
+    for cast in (int, float, lambda x: int(x, 16)):
+        try:
+            new_value = cast(value)
+            break
+        except ValueError:
+            pass
+
+    if value == "True":
+        new_value = True
+    elif value == "False":
+        new_value = False
+
+    return new_value
