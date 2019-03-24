@@ -64,6 +64,7 @@ class NerscGlobusLogs(es.EsConnection):
         self.filter_function = lambda x: x['hits']['hits']
         self.flush_every = 50000
         self.flush_function = lambda x: x
+        self.source_filter = SOURCE_FILTER
 
     @classmethod
     def from_cache(cls, *args, **kwargs):
@@ -160,7 +161,7 @@ class NerscGlobusLogs(es.EsConnection):
         if scroll:
             self.query_and_scroll(
                 query=query,
-                source_filter=SOURCE_FILTER,
+                source_filter=self.source_filter,
                 filter_function=self.filter_function,
                 flush_every=self.flush_every,
                 flush_function=self.flush_function)
