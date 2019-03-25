@@ -77,7 +77,7 @@ def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
         units = UNITS
 
     for unit in units:
-        if bytect >= unit[0]:
+        if abs(bytect) >= unit[0]:
             return fmt % (bytect / unit[0], unit[1])
 
     return fmt % (bytect, "bytes" if bytect != 1 else "byte")
