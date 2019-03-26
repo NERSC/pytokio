@@ -17,14 +17,14 @@ UNITS = [
     (2**10, "KiB")
 ]
 UNITS_10 = [
-    (10**24, "YiB"),
-    (10**21, "ZiB"),
-    (10**18, "EiB"),
-    (10**15, "PiB"),
-    (10**12, "TiB"),
-    (10**9, "GiB"),
-    (10**6, "MiB"),
-    (10**3, "KiB")
+    (10**24, "YB"),
+    (10**21, "ZB"),
+    (10**18, "EB"),
+    (10**15, "PB"),
+    (10**12, "TB"),
+    (10**9, "GB"),
+    (10**6, "MB"),
+    (10**3, "KB")
 ]
 
 class ConfigError(RuntimeError):
@@ -81,6 +81,30 @@ def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
             return fmt % (bytect / unit[0], unit[1])
 
     return fmt % (bytect, "bytes" if bytect != 1 else "byte")
+
+def humanize_bytes_to(bytect, unit, fmt="%.1f %s"):
+    """Converts bytes into a specific human-readable unit
+
+    Args:
+        bytect (int): Number of bytes
+        unit (str): Unit in which bytes should be expressed
+        fmt (str or None): Format of string to return; must contain %f/%d and %s
+            for the quantity and units, respectively.
+
+    Returns:
+        str: Quantity and units expressed in a human-readable quantity
+    """
+    find_unit = unit.lower()
+    if find_unit[1] == 'i':
+        units = UNITS
+    else:
+        units = UNITS_10
+
+    for unit in units:
+        if find_unit == unit[1].lower():
+            return fmt % (bytect / unit[0], unit[1])
+
+    raise ValueError("unknown unit")
 
 def to_epoch(datetime_obj):
     """Convert datetime.datetime into epoch seconds
