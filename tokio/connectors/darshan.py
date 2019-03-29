@@ -63,6 +63,38 @@ DARSHAN_PARSER_BIN = 'darshan-parser'
 
 DARSHAN_FILENAME_REX = re.compile(r'([^_%s]+)_([^%s]*?)_id(\d+)_(\d+)-(\d+)-(\d+)-(\d+)_(\d+).darshan' % (os.path.sep, os.path.sep))
 
+V2_TO_V3 = {
+    "CP_BYTES_READ": "POSIX_BYTES_READ",
+    "CP_BYTES_WRITTEN": "POSIX_BYTES_WRITTEN",
+    "CP_POSIX_READS": "POSIX_READS",
+    "CP_POSIX_WRITES": "POSIX_WRITES",
+    "CP_FILE_NOT_ALIGNED": "POSIX_FILE_NOT_ALIGNED",
+    "CP_CONSEC_READS": "POSIX_CONSEC_READS",
+    "CP_CONSEC_WRITES": "POSIX_CONSEC_WRITES",
+    "CP_POSIX_MMAPS": "POSIX_MMAPS",
+    "CP_POSIX_OPENS": "POSIX_OPENS",
+    "CP_POSIX_SEEKS": "POSIX_SEEKS",
+    "CP_POSIX_STATS": "POSIX_STATS",
+    "CP_POSIX_FDSYNCS": "POSIX_FDSYNCS",
+    "CP_POSIX_FSYNCS": "POSIX_FSYNCS",
+    "CP_SEQ_READS": "POSIX_SEQ_READS",
+    "CP_SEQ_WRITES": "POSIX_SEQ_WRITES",
+    "CP_RW_SWITCHES": "POSIX_RW_SWITCHES",
+
+    "CP_F_CLOSE_TIMESTAMP": "POSIX_F_CLOSE_START_TIMESTAMP",
+    "CP_F_OPEN_TIMESTAMP": "POSIX_F_OPEN_START_TIMESTAMP",
+
+    # note: no analog to POSIX_F_OPEN_END_TIMESTAMP
+    #                    POSIX_F_OPEN_END_TIMESTAMP
+
+    "CP_F_READ_START_TIMESTAMP": "POSIX_F_READ_START_TIMESTAMP",
+    "CP_F_READ_END_TIMESTAMP": "POSIX_F_READ_END_TIMESTAMP",
+
+    "CP_F_WRITE_START_TIMESTAMP": "POSIX_F_WRITE_START_TIMESTAMP",
+    "CP_F_WRITE_END_TIMESTAMP": "POSIX_F_WRITE_END_TIMESTAMP",
+}
+"""Mapping of Darshan 2.x counter names to Darshan 3.x"""
+
 class Darshan(SubprocessOutputDict):
     def __init__(self, log_file=None, *args, **kwargs):
         """Initialize the object from either a Darshan log or a cache file.
@@ -251,8 +283,10 @@ class Darshan(SubprocessOutputDict):
                     value = int(value)
                 insert_base[counter] = value
 
+        version = 3
         section = None
         counter = None
+        counter_prefix = None
         module_section = None
         # This regex must match every possible module name
         module_rex = re.compile(r'^# ([A-Z\-0-9/]+) module data\s*$')
@@ -264,14 +298,21 @@ class Darshan(SubprocessOutputDict):
                 section = "header"
                 if section not in list(self.keys()):
                     self[section] = {}
+                version = int(line.rsplit(None, 1)[-1].split('.')[0])
 
             elif section == "header" and line.startswith("# mounted file systems"):
                 section = "mounts"
                 if section not in list(self.keys()):
                     self[section] = {}
 
-            elif section == "mounts" and line.startswith("# **********************"):  # understand the utility of these stars
+            elif version > 2 and section == "mounts" and line.startswith("# **********************"):  # understand the utility of these stars
                 section = "counters"
+                if section not in list(self.keys()):
+                    self[section] = {}
+
+            elif version == 2 and section == "mounts" and line.startswith("#<rank>\t<file>"): # darshan 2.x
+                section = "counters"
+                module_section = "posix" # default everything to POSIX
                 if section not in list(self.keys()):
                     self[section] = {}
 
@@ -295,7 +336,7 @@ class Darshan(SubprocessOutputDict):
                 if self._parser_mode == "BASE":
                     # module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_base_counters(line)
                     _, rank, _, counter, value, file_name, _, _ = parse_base_counters(line)
-                    if module_section is not None:
+                    if module_section is not None and version > 2:
                         # If it is none, is_valid_counter check below will bail
                         counter_prefix = module_section + "_"
                 elif self._parser_mode == "TOTAL":
@@ -327,6 +368,7 @@ class Darshan(SubprocessOutputDict):
                           value=value,
                           counter_prefix=counter_prefix)
         return self
+
 
 def parse_header(line):
     """Parse the header lines of ``darshan-parser``.
@@ -397,10 +439,12 @@ def parse_mounts(line):
         entry, or ``(None, None)`` if the line is not a valid mount
         table entry.
     """
-    if line.startswith("# mount entry:\t"):
+    if line.startswith("# mount entry:"):
         key, val = line.split('\t')[1:3]
         return key, val.strip()
     return None, None
+
+
 
 def parse_base_counters(line):
     """Parse a counter line from ``darshan-parser --base``.
@@ -414,14 +458,27 @@ def parse_base_counters(line):
         line (str): A single line of output from ``darshan-parser --base``
 
     Returns:
-        tuple: Returns a tuple containing eight values, each corresponding
-        to a field represented in `line`.  If `line` is not a valid counter
-        line, all values will be None.
+        tuple: Returns a tuple containing eight values.  If `line` is not a
+        valid counter line, all values will be None.  The returned values are::
+
+        0. module name
+        1. MPI rank
+        2. record id
+        3. counter name
+        4. counter value
+        5. file name
+        6. mount point
+        7. file system type
+
     """
     if not line.startswith("#"):
         args = line.split('\t')
         if len(args) == 8:
             return tuple(args)
+        elif len(args) == 7:
+            return ("all", args[0], args[1], V2_TO_V3.get(args[2], args[2]),
+                    args[3], args[4], args[5], args[6])
+
     return None, None, None, None, None, None, None, None
 
 def parse_total_counters(line):
