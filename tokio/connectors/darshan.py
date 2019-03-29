@@ -257,8 +257,8 @@ class Darshan(SubprocessOutputDict):
                 if counter.startswith(counter_prefix):
                     # Strip off the counter_prefix from the counter name
                     counter = counter[len(counter_prefix):]
-                else:
-                    raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
+#               elif version > 2:
+#                   raise Exception("counter %s does not start with prefix %s" % (counter, counter_prefix))
 
             # Otherwise insert the record--this logic should be made more flexible
             if section not in self:
@@ -274,10 +274,8 @@ class Darshan(SubprocessOutputDict):
                     self[section][module][file_name][rank] = {}
                 insert_base = self[section][module][file_name][rank]
 
-            while counter in insert_base:
-                if version > 2:
-                    raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
-                counter = "." + counter
+            if counter in insert_base:
+                raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
 
             if '.' in value:
                 value = float(value)
@@ -314,7 +312,7 @@ class Darshan(SubprocessOutputDict):
 
             elif version == 2 and section == "mounts" and line.startswith("#<rank>\t<file>"): # darshan 2.x
                 section = "counters"
-                module_section = "posix" # default everything to POSIX
+                module_section = "POSIX" # default everything to POSIX
                 if section not in list(self.keys()):
                     self[section] = {}
 
@@ -337,8 +335,13 @@ class Darshan(SubprocessOutputDict):
             elif section == 'counters':
                 if self._parser_mode == "BASE":
                     # module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_base_counters(line)
-                    _, rank, _, counter, value, file_name, _, _ = parse_base_counters(line)
-                    if module_section is not None and version > 2:
+                    module, rank, record_id, counter, value, file_name, mount_pt, fs_type = parse_base_counters(line)
+                    if version == 2:
+                        # required because Darshan records do not contain the beginning
+                        # of the file path, so we cannot infer the connection to the
+                        # mount table without building a bogus path-like unique identifier
+                        file_name = "%s/%s/%s" % (mount_pt, record_id, file_name)
+                    if module_section is not None:
                         # If it is none, is_valid_counter check below will bail
                         counter_prefix = module_section + "_"
                 elif self._parser_mode == "TOTAL":
@@ -478,7 +481,7 @@ def parse_base_counters(line):
         if len(args) == 8:
             return tuple(args)
         elif len(args) == 7:
-            return ("all", args[0], args[1], V2_TO_V3.get(args[2], args[2]),
+            return ("POSIX", args[0], args[1], V2_TO_V3.get(args[2], args[2]),
                     args[3], args[4], args[5], args[6])
 
     return None, None, None, None, None, None, None, None
