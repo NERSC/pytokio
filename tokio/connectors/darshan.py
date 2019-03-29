@@ -274,14 +274,16 @@ class Darshan(SubprocessOutputDict):
                     self[section][module][file_name][rank] = {}
                 insert_base = self[section][module][file_name][rank]
 
-            if counter in insert_base:
-                raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
+            while counter in insert_base:
+                if version > 2:
+                    raise Exception("Duplicate counter %s found in %s->%s->%s (rank=%s)" % (counter, section, module, file_name, rank))
+                counter = "." + counter
+
+            if '.' in value:
+                value = float(value)
             else:
-                if '.' in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-                insert_base[counter] = value
+                value = int(value)
+            insert_base[counter] = value
 
         version = 3
         section = None
