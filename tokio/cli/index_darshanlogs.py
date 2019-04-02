@@ -286,11 +286,12 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
     for counter in HEADER_COUNTERS:
         header[counter] = counters.get(counter)
 
-    header['exe'] = counters.get('exe')[0]
+    # some Darshan logs have no exename for some reason
+    header['exe'] = counters.get('exe', [None])[0]
+    header['exename'] = os.path.basename(header['exe']) if header['exe'] else None
 
     # username is resolved here so that it can be indexed without having to mess around
     header['username'] = darshan_data.filename_metadata.get('username')
-    header['exename'] = os.path.basename(header['exe'])
 
     return {
         'summaries': reduced_counters,
