@@ -313,6 +313,10 @@ def test_get_timestamps():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s" % input_type
         yield func, input_file
+        func = _test_get_columns
+        func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s, /missing suffix" % input_type
+        yield func, input_file
+
 
 def _test_get_timestamps(input_file):
     """
@@ -321,6 +325,26 @@ def _test_get_timestamps(input_file):
     print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        assert hdf5_file.get(dataset_name) is not None
+        timestamps = hdf5_file.get_timestamps(dataset_name)
+        assert len(timestamps[:]) > 0
+
+        # ensure that every timestamp is equidistant
+        prev_delta = None
+        for index in range(1, len(timestamps[:])):
+            delta = timestamps[index] - timestamps[index - 1]
+            if prev_delta is not None:
+                assert prev_delta == delta
+            prev_delta = delta
+
+def _test_get_timestamps_missing(input_file):
+    """
+    Ensure that get_timestamps() returns valid results with /missing suffix
+    """
+    print("Testing %s" % input_file)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        dataset_name += '/missing'
         assert hdf5_file.get(dataset_name) is not None
         timestamps = hdf5_file.get_timestamps(dataset_name)
         assert len(timestamps[:]) > 0
