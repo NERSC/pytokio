@@ -759,6 +759,10 @@ class Hdf5(h5py.File):
         Returns:
             numpy.ndarray: Array of column names, or empty if no columns defined
         """
+        # Look for special 'missing' dataset hack
+        if len(dataset_name.strip('/').split('/')) == 3:
+            dataset_name = dataset_name.rsplit('/', 1)[0]
+
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
 

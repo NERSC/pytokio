@@ -218,6 +218,10 @@ def get_timestamps_key(hdf5_file, dataset_name):
     Read into an HDF5 file and extract the name of the dataset containing the
     timestamps correspond to the given dataset_name
     """
+    # Look for special 'missing' dataset hack
+    if len(dataset_name.strip('/').split('/')) == 3:
+        dataset_name = dataset_name.rsplit('/', 1)[0]
+
     # Get dataset out of HDF5 file.  If dataset doesn't exist, throw exception
     hdf5_dataset = hdf5_file[dataset_name]
 

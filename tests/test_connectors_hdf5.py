@@ -263,6 +263,10 @@ def test_get_columns():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_columns() with %s" % input_type
         yield func, input_file
+        func = _test_get_columns_missing
+        func.description = "connectors.hdf5.Hdf5.get_columns() with %s, /missing suffix" % input_type
+        yield func, input_file
+
 
 def _test_get_columns(input_file):
     """
@@ -271,6 +275,21 @@ def _test_get_columns(input_file):
     print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
+        result = hdf5_file.get(dataset_name)
+        print('result: %s' % result)
+        assert result is not None
+        column_names = hdf5_file.get_columns(dataset_name)
+        assert len(column_names) > 0
+
+def _test_get_columns_missing(input_file):
+    """
+    Ensure that get_columns() works with /missing suffix
+    """
+    print("Testing %s" % input_file)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        dataset_name += '/missing'
         print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
         result = hdf5_file.get(dataset_name)
         print('result: %s' % result)
