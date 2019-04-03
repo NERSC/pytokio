@@ -219,8 +219,10 @@ def get_timestamps_key(hdf5_file, dataset_name):
     timestamps correspond to the given dataset_name
     """
     # Look for special 'missing' dataset hack
-    if len(dataset_name.strip('/').split('/')) == 3:
-        dataset_name = dataset_name.rsplit('/', 1)[0]
+    reduced_dataset_name, _ = reduce_dataset_name(dataset_name)
+    if reduced_dataset_name != dataset_name:
+        dataset_name = reduced_dataset_name
+
 
     # Get dataset out of HDF5 file.  If dataset doesn't exist, throw exception
     hdf5_dataset = hdf5_file[dataset_name]
@@ -245,3 +247,19 @@ def get_timestamps(hdf5_file, dataset_name):
     Return the timestamps dataset for a given dataset name
     """
     return hdf5_file[get_timestamps_key(hdf5_file, dataset_name)]
+
+def reduce_dataset_name(key):
+    """Divide a dataset name into is base and modifier
+
+    Args:
+        dataset_name (str): Key to reference a dataset that may or may not have
+            a modifier suffix
+    Returns:
+        tuple of (str, str or None): First string is the base key, the second
+            string is the modifier.
+    """
+    if key.endswith('/missing'):
+        return tuple(key.rsplit('/', 1))
+    return key, None
+
+
