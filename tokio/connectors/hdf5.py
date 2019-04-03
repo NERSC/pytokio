@@ -888,6 +888,15 @@ class Hdf5(h5py.File):
         timestamps = self.get_timestamps(dataset_name)[...]
         if len(columns) < values.shape[1]:
             columns.resize(values.shape[1])
+
+        # transform missing data into NaNs
+        mask = missing_values(values) != 0
+        try:
+            values[mask] = numpy.nan
+        except ValueError: # ValueError: cannot convert float NaN to integer
+            # don't bother converting non-float arrays' -0.0 into NaNs
+            pass
+
         dataframe = pandas.DataFrame(data=values,
                                      index=[datetime.datetime.fromtimestamp(t) for t in timestamps],
                                      columns=columns)

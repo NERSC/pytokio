@@ -255,8 +255,12 @@ def get_fullness_hdf5(file_system, datetime_target):
         datetime_end=datetime_target + datetime.timedelta(hours=1))
 
     # Bail if nothing is found
-    if not df_bytes or not df_bytes_tot:
+    if df_bytes is None or df_bytes_tot is None or len(df_bytes) == 0 or len(df_bytes_tot) == 0:
         return {}
+
+    # NAs must be filled or else fullness/total values will be spuriously low
+    df_bytes = df_bytes.fillna(method='ffill').fillna(method='bfill')
+    df_bytes_tot = df_bytes_tot.fillna(method='ffill').fillna(method='bfill')
 
     # Find closest matching timestamp
     iloc = df_bytes.index.get_loc(datetime_target, method='nearest')
