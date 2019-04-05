@@ -200,7 +200,8 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
 
     Args:
         darshan_log (str): Path to a Darshan log file
-        max_mb (float): Skip logs of size larger than this value
+        max_mb (float): For logs of size larger than this value, use the
+            embedded (lite) darshan parser which uses minimal memory
 
     Returns:
         dict: Contains three keys (summaries, mounts, and headers) whose values
@@ -209,8 +210,8 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
             common mount point.
     """
     if 0.0 < max_mb <= (os.path.getsize(darshan_log) / 1048576.0):
-        errmsg = "Using lite parser for %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
-        warnings.warn(errmsg)
+#       errmsg = "Using lite parser for %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
+#       warnings.warn(errmsg)
         return summarize_by_fs_lite(darshan_log)
 
     try:
@@ -261,6 +262,8 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
             reduced_counters[mount][counter] = 0
         for counter in REAL_COUNTERS:
             reduced_counters[mount][counter] = 0.0
+        # needed so the log filename can be referenced during updates to the summaries table
+        reduced_counters[mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
     logical_mount_names = {}
@@ -485,6 +488,10 @@ def summarize_by_fs_lite(darshan_log):
             reduced_counters.pop(key, None)
         else:
             mountpts[key] = logical_mount_names.get(key, key)
+
+    for mount in reduced_counters:
+        # needed so the log filename can be referenced during updates to the summaries table
+        reduced_counters[mount]['filename'] = os.path.basename(darshan_log)
 
     return {
         'summaries': reduced_counters,
@@ -804,7 +811,7 @@ def main(argv=None):
     parser.add_argument('-t', '--threads', default=1, type=int,
                         help="Number of concurrent processes (default: 1)")
     parser.add_argument('-o', '--output', type=str, default='darshanlogs.db', help="Name of output file (default: darshanlogs.db)")
-    parser.add_argument('-m', '--max-mb', type=int, default=0, help="Maximum log file size to consider (default: 0 (disabled))")
+    parser.add_argument('-m', '--max-mb', type=float, default=0.0, help="Maximum log file before switching to lite parser (default: 0.0 (disabled))")
     parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity level (default: none)")
     parser.add_argument('-q', '--quiet', action='store_true', help="Suppress warnings for invalid Darshan logs")
     args = parser.parse_args(argv)

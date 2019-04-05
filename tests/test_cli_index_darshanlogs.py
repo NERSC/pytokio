@@ -123,6 +123,28 @@ def test_multithreaded():
     verify_index_db(tokiotest.TEMP_FILE.name)
 
 @tokiotest.needs_darshan
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_max_mb():
+    """cli.index_darshanlogs, lite parser
+    """
+    tokiotest.check_darshan()
+    argv = ['--max-mb', str(1.0/1024.0), '--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
+    print("Executing: %s" % " ".join(argv))
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    verify_index_db(tokiotest.TEMP_FILE.name)
+
+
+@tokiotest.needs_darshan
+def test_lite_vs_full():
+    """cli.index_darshanlogs, lite/full parser equivalence
+    """
+    tokiotest.check_darshan()
+    for darshan_log in SAMPLE_DARSHAN_LOGS:
+        dict1 = tokio.cli.index_darshanlogs.summarize_by_fs(darshan_log)
+        dict2 = tokio.cli.index_darshanlogs.summarize_by_fs_lite(darshan_log)
+        assert dict1 == dict2
+
+@tokiotest.needs_darshan
 def test_get_file_mount():
     """cli.index_darshanlogs.get_file_mount
     """
@@ -195,11 +217,11 @@ def test_summarize_by_fs():
     assert 'username' in result['headers']
     assert 'exename' in result['headers']
 
-    print("Verify max_mb functionality")
-    warnings.filterwarnings('ignore')
-    result = tokio.cli.index_darshanlogs.summarize_by_fs(tokiotest.SAMPLE_DARSHAN_LOG,
-                                                         max_mb=1.0/1024.0)
-    assert not result
+#   print("Verify max_mb functionality")
+#   warnings.filterwarnings('ignore')
+#   result = tokio.cli.index_darshanlogs.summarize_by_fs(tokiotest.SAMPLE_DARSHAN_LOG,
+#                                                        max_mb=1.0/1024.0)
+#   assert not result
 
 def make_index_db(dest_db, mod_queries=None, src_db=tokiotest.SAMPLE_DARSHAN_INDEX_DB):
     """Creates a copy of the sample db with missing data
