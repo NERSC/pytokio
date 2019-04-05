@@ -120,17 +120,7 @@ class Darshan(SubprocessOutputDict):
         if log_file is None:
             self.load()
         else:
-            # try to infer metadata from file name
-            regex_match = DARSHAN_FILENAME_REX.search(log_file)
-            if regex_match:
-                self.filename_metadata['username'] = regex_match.group(1)
-                self.filename_metadata['exename'] = regex_match.group(2)
-                self.filename_metadata['jobid'] = regex_match.group(3)
-                self.filename_metadata['start_month'] = int(regex_match.group(4))
-                self.filename_metadata['start_day'] = int(regex_match.group(5))
-                self.filename_metadata['start_second_in_day'] = int(regex_match.group(6))
-                self.filename_metadata['logmod'] = int(regex_match.group(7))
-                self.filename_metadata['shutdown_secs'] = int(regex_match.group(8))
+            self.filename_metadata = parse_filename_metadata(log_file)
 
     def __repr__(self):
         """Serialize self into JSON.
@@ -536,3 +526,28 @@ def parse_perf_counters(line):
         return None, None
 
     return key.strip(), value.strip()
+
+def parse_filename_metadata(filename):
+    """Extracts metadata from a Darshan log's file name
+
+    Args:
+        filename (str): Name of a Darshan log file.  Can be basename or a full
+            path.
+    Returns:
+        dict: key-value pairs describing the metadata extracted from the file
+            name.
+    """
+    filename_metadata = {}
+    # try to infer metadata from file name
+    regex_match = DARSHAN_FILENAME_REX.search(filename)
+    if regex_match:
+        filename_metadata['username'] = regex_match.group(1)
+        filename_metadata['exename'] = regex_match.group(2)
+        filename_metadata['jobid'] = regex_match.group(3)
+        filename_metadata['start_month'] = int(regex_match.group(4))
+        filename_metadata['start_day'] = int(regex_match.group(5))
+        filename_metadata['start_second_in_day'] = int(regex_match.group(6))
+        filename_metadata['logmod'] = int(regex_match.group(7))
+        filename_metadata['shutdown_secs'] = int(regex_match.group(8))
+
+    return filename_metadata
