@@ -434,7 +434,8 @@ def summarize_by_fs_lite(darshan_log):
             fields = line.split()
             if len(fields) < 8:
                 continue
-            counter = fields[3].lower().split('_', 1)[-1]
+            counter = fields[3].split('_', 1)[-1]
+            counter = tokio.connectors.darshan.V2_TO_V3.get(counter, counter).lower()
             value = None
             reducer = None
             if counter in INTEGER_COUNTERS:
