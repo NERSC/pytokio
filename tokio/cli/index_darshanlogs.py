@@ -72,6 +72,7 @@ import time
 import sqlite3
 import operator
 import functools
+import subprocess
 import argparse
 import warnings
 import multiprocessing
@@ -163,12 +164,39 @@ def get_file_mount(filename, mount_list):
                 if match:
                     logical = fsname
             return (mount, logical)
-        if (filename == "<STDOUT>" or filename == "<STDERR>") and mount == "UNKNOWN":
+        if filename in ("<STDOUT>", "<STDERR>") and mount == "UNKNOWN":
             return mount, mount
-    return None;
+    return None
 
 def summarize_by_fs(darshan_log, max_mb=0.0):
     """Generates summary scalar values for a Darshan log
+
+    Uses the Darshan connector to generate per-file system summary metrics for
+    a Darshan log.  The output is a dictionary of the form::
+
+        {
+            "headers": {
+                "end_time": 1490000983,
+                ...
+                "walltime": 117
+            },
+            "mounts": {
+                "/scratch2": "/scratch2",
+                "UNKNOWN": "UNKNOWN"
+            },
+            "summaries": {
+                "/scratch2": {
+                    "bytes_read": 0,
+                    ...
+                    "writes": 16402
+                },
+                "UNKNOWN": {
+                    "bytes_read": 0,
+                    ...
+                    "writes": 74
+                }
+            }
+        }
 
     Args:
         darshan_log (str): Path to a Darshan log file
@@ -180,10 +208,10 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
             from the POSIX module which are reduced over all files sharing a
             common mount point.
     """
-    if max_mb > 0.0 and (os.path.getsize(darshan_log) / 1024.0 / 1024.0) > max_mb:
-        errmsg = "Skipping %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
+    if 0.0 < max_mb <= (os.path.getsize(darshan_log) / 1048576.0):
+        errmsg = "Using lite parser for %s due to size (%d MiB)" % (darshan_log, (os.path.getsize(darshan_log) / 1024 / 1024))
         warnings.warn(errmsg)
-        return {}
+        return summarize_by_fs_lite(darshan_log)
 
     try:
         darshan_data = tokio.connectors.darshan.Darshan(darshan_log, silent_errors=True)
@@ -233,7 +261,6 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
             reduced_counters[mount][counter] = 0
         for counter in REAL_COUNTERS:
             reduced_counters[mount][counter] = 0.0
-        reduced_counters[mount]['filename'] = os.path.basename(darshan_data.log_file)
 
     # Reduce each counter according to its mount point
     logical_mount_names = {}
@@ -297,6 +324,166 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
 
     # username is resolved here so that it can be indexed without having to mess around
     header['username'] = darshan_data.filename_metadata.get('username')
+
+    return {
+        'summaries': reduced_counters,
+        'headers': header,
+        'mounts': mountpts
+    }
+
+def summarize_by_fs_lite(darshan_log):
+    """Generates summary scalar values for a Darshan log
+
+    Unlike the summarize_by_fs() function, this does not use the Darshan
+    connector and instead walks through the file serially.  This works around
+    memory and performance problems inherent in the Darshan connector for very
+    large Darshan logs.
+
+    Its output is a dictionary of the form::
+
+        {
+            "headers": {
+                "end_time": 1490000983,
+                ...
+                "walltime": 117
+            },
+            "mounts": {
+                "/scratch2": "scratch2",
+                "UNKNOWN": "UNKNOWN"
+            },
+            "summaries": {
+                "/scratch2": {
+                    "bytes_read": 0,
+                    ...
+                    "writes": 16402
+                },
+                "UNKNOWN": {
+                    "bytes_read": 0,
+                    ...
+                    "writes": 74
+                }
+            }
+        }
+
+    Args:
+        darshan_log (str): Path to a Darshan log file
+
+    Returns:
+        dict: Contains three keys (summaries, mounts, and headers) whose values
+            are dicts of key-value pairs corresponding to scalar summary values
+            from the POSIX module which are reduced over all files sharing a
+            common mount point.
+    """
+    if not os.path.isfile(darshan_log):
+        if not QUIET:
+            errmsg = "Unable to open %s" % darshan_log
+            warnings.warn(errmsg)
+        return {}
+
+    # hack in UNKNOWN for the stdio module since it does not appear in the mount table
+    mount_list = ["UNKNOWN"]
+
+    logical_mount_names = {} # mapping of mountpoint : logical fs name
+    header = {
+        'filename': os.path.basename(darshan_log),
+    }
+    reduced_counters = {}
+
+    dparser = subprocess.Popen(['darshan-parser', '--base', darshan_log],
+                               stdout=subprocess.PIPE)
+
+    while True:
+        line = dparser.stdout.readline().decode('utf-8')
+        if not line:
+            break
+
+        # find header lines
+        if line.startswith('# darshan log version:'):
+            header['version'] = line.split(":", 1)[-1].strip()
+            continue
+        elif line.startswith('# exe:'):
+            header['exe'] = line.split(":", 1)[-1].strip().split()
+            continue
+        elif line.startswith('# uid:'):
+            header['uid'] = int(line.split(":", 1)[-1].strip())
+            continue
+        elif line.startswith('# jobid:'):
+            header['jobid'] = line.split(":", 1)[-1].strip()
+            continue
+        elif line.startswith('# start_time:'):
+            header['start_time'] = int(line.split(":", 1)[-1])
+            continue
+        elif line.startswith('# end_time:'):
+            header['end_time'] = int(line.split(":", 1)[-1])
+            continue
+        elif line.startswith('# nprocs:'):
+            header['nprocs'] = int(line.split(":", 1)[-1])
+            continue
+        elif line.startswith('# run time:'):
+            header['walltime'] = int(line.split(":", 1)[-1])
+            continue
+
+        # find mount table lines
+        elif line.startswith('# mount entry:'):
+            mountpt = line.split(':', 1)[-1].strip().split(None, 1)[0]
+            mount_list.append(mountpt)
+            continue
+
+        # find counter lines
+        elif line.startswith('POSIX') or line.startswith('STDIO'):
+            fields = line.split()
+            if len(fields) < 8:
+                continue
+            counter = fields[3].lower().split('_', 1)[-1]
+            value = None
+            reducer = None
+            if counter in INTEGER_COUNTERS:
+                value = int(fields[4])
+                reducer = INTEGER_COUNTERS.get(counter)
+            elif counter in REAL_COUNTERS:
+                value = float(fields[4])
+                reducer = REAL_COUNTERS.get(counter)
+            if value is None:
+                continue
+
+            mount = fields[-2]
+            mount = get_file_mount(mount, mount_list)
+            if mount is None:
+                continue
+
+            mount, logical = mount
+            logical_mount_names[mount] = logical
+            if mount not in reduced_counters:
+                reduced_counters[mount] = {}
+
+            if counter not in reduced_counters[mount]:
+                reduced_counters[mount][counter] = value
+            elif not reducer:
+                reduced_counters[mount][counter] = value
+            else:
+                reduced_counters[mount][counter] = reducer(reduced_counters[mount][counter], value)
+
+            continue
+
+    # fix header entries
+    header['exe'] = header['exe'][0]
+    header['exename'] = os.path.basename(header['exe'])
+
+    # username is resolved here so that it can be indexed without having to mess around
+    filename_metadata = tokio.connectors.darshan.parse_filename_metadata(darshan_log)
+    header['username'] = filename_metadata.get('username')
+
+    # Populate the mounts data and remove all mount points that were not used
+    mountpts = {}
+    for key in list(reduced_counters.keys()):
+        # check_val works only when all the keys are positive counters
+        print(reduced_counters[key].keys())
+        check_val = sum([reduced_counters[key].get(x, 0) for x in (
+            'bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
+        if check_val == 0:
+            reduced_counters.pop(key, None)
+        else:
+            mountpts[key] = logical_mount_names.get(key, key)
 
     return {
         'summaries': reduced_counters,
@@ -592,8 +779,6 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
 
     conn.close()
     vprint("Updated %s" % output_file, 1)
-
-    return
 
 def vprint(string, level):
     """Print a message if verbosity is enabled
