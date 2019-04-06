@@ -144,14 +144,21 @@ def test_lite_vs_full():
         print("Attempting " + darshan_log)
         dict1 = tokio.cli.index_darshanlogs.summarize_by_fs(darshan_log)
         dict2 = tokio.cli.index_darshanlogs.summarize_by_fs_lite(darshan_log)
+        print("=== Full ===")
         print(json.dumps(dict1, indent=4, sort_keys=True))
+        print("=== Lite ===")
         print(json.dumps(dict2, indent=4, sort_keys=True))
 
-        #assert dict1 == dict2
+        # assert dict1 == dict2
         for table in 'headers', 'mounts':
+            print("Comparing table '%s'; len full(%d) vs lite(%d)" % (table, len(dict1[table]), len(dict2[table])))
             assert len(dict1[table]) == len(dict2[table])
             for key, val in dict1[table].items():
-                print("%s->key[%s]: lite(%s) == full(%s)?" % (table, key, dict2[table].get(key), val))
+                print("%s->key[%s]: lite(%s) == full(%s)?" % (
+                    table,
+                    key,
+                    dict2[table].get(key),
+                    val))
                 assert dict2[table].get(key) == val
 
         assert len(dict1['summaries']) == len(dict2['summaries'])

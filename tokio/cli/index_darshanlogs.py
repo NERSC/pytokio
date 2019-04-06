@@ -166,6 +166,12 @@ def get_file_mount(filename, mount_list):
             return (mount, logical)
         if filename in ("<STDOUT>", "<STDERR>") and mount == "UNKNOWN":
             return mount, mount
+        # filename should be a fully qualified path in darshan3 logs; if
+        # if it is not, then the log has been anonymized _and_ this record
+        # does not correspond to a file.  here we assume it is an
+        # anonymized representation of <STDOUT> or <STDERR>
+        elif os.sep not in filename:
+            return "UNKNOWN", "UNKNOWN"
     return None
 
 def summarize_by_fs(darshan_log, max_mb=0.0):
@@ -181,7 +187,7 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
                 "walltime": 117
             },
             "mounts": {
-                "/scratch2": "/scratch2",
+                "/scratch2": "scratch2",
                 "UNKNOWN": "UNKNOWN"
             },
             "summaries": {
