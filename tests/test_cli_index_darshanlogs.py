@@ -4,6 +4,7 @@
 
 import os
 import glob
+import json
 import shutil
 import sqlite3
 import warnings
@@ -140,9 +141,35 @@ def test_lite_vs_full():
     """
     tokiotest.check_darshan()
     for darshan_log in SAMPLE_DARSHAN_LOGS:
+        print("Attempting " + darshan_log)
         dict1 = tokio.cli.index_darshanlogs.summarize_by_fs(darshan_log)
         dict2 = tokio.cli.index_darshanlogs.summarize_by_fs_lite(darshan_log)
-        assert dict1 == dict2
+        print(json.dumps(dict1, indent=4, sort_keys=True))
+        print(json.dumps(dict2, indent=4, sort_keys=True))
+
+        #assert dict1 == dict2
+        for table in 'headers', 'mounts':
+            assert len(dict1[table]) == len(dict2[table])
+            for key, val in dict1[table].items():
+                print("%s->key[%s]: lite(%s) == full(%s)?" % (table, key, dict2[table].get(key), val))
+                assert dict2[table].get(key) == val
+
+        assert len(dict1['summaries']) == len(dict2['summaries'])
+        for mount in dict1['summaries']:
+            assert mount in dict2['summaries']
+            for key, val in dict1['summaries'][mount].items():
+                if key in ('posix_files', 'stdio_files', 'f_close_end_timestamp', 'f_open_end_timestamp'):
+                    # darshan2 cannot distinguish stdio records from posix records
+                    # darshan2 also does not have equivalent start timestamps
+                    continue
+                print("summaries->%s->key[%s]: lite(%s) == full(%s)?" % (mount, key, dict2['summaries'][mount].get(key), val))
+                if dict2['summaries'][mount].get(key) != val:
+                    print("=== Full ===")
+                    print(json.dumps(dict1['summaries'][mount], indent=4, sort_keys=True))
+                    print("=== Lite ===")
+                    print(json.dumps(dict2['summaries'][mount], indent=4, sort_keys=True))
+                assert dict2['summaries'][mount].get(key) == val
+
 
 @tokiotest.needs_darshan
 def test_get_file_mount():
