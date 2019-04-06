@@ -519,6 +519,53 @@ def summarize_by_fs_lite(darshan_log):
         'mounts': mountpts
     }
 
+def insert_summary(conn, summary):
+    """Inserts the output of summarize_by_fs into database
+
+    This inserts a single summary into a database.  This is useful if you do not
+    want to wait until the entirety of the logs are parsed before beginning to
+    insert them into the database.  Makes the most sense when the time to parse
+    a log far exceeds the time to insert its records.
+
+    Args:
+        conn (sqlite3.Connection): Database connection into which record should
+            be inserted
+        summary (dict): Dictionary of the form returned by the summarize_by_fs()
+            function
+    """
+    cursor = conn.cursor()
+
+    # Update mounts table
+    for mountpt, fsname in summary['mounts'].items():
+        vprint("INSERT OR IGNORE INTO %s (mountpt, fsname) VALUES (?, ?)" % MOUNTS_TABLE, 4)
+        vprint("Parameters: %s" % str((mountpt, fsname)), 4)
+        cursor.execute("INSERT OR IGNORE INTO %s (mountpt, fsname) VALUES (?, ?)" % MOUNTS_TABLE, (mountpt, fsname))
+
+    # Update headers table
+    header_counters = ["filename", "exe", "username", "exename"] + HEADER_COUNTERS
+    query = "INSERT INTO %s (" % HEADERS_TABLE
+    query += ", ".join(header_counters)
+    query += ") VALUES (" + ",".join(["?"] * len(header_counters))
+    query += ")"
+    vprint(query, 4)
+    vprint("Parameters: %s" % str(tuple([summary['headers'][x] for x in header_counters])), 4)
+    cursor.execute(query, tuple([summary['headers'][x] for x in header_counters])) # easier debugging
+
+    # Update summaries table
+    base_query = "INSERT INTO %s (" % SUMMARIES_TABLE
+    base_query += "\n  log_id,\n  fs_id,\n  " + ",\n  ".join(SUMMARY_COUNTERS) + ") VALUES (\n"
+    for mountpt, summary_datum in summary['summaries'].items():
+        query = base_query + "  (SELECT log_id from headers where filename = '%s'),\n" % summary_datum['filename']
+        query += "  (SELECT fs_id from mounts where mountpt = '%s'),\n  " % mountpt
+        query += ", ".join(["?"] * len(SUMMARY_COUNTERS))
+        query += ")"
+        vprint(query, 4)
+        vprint("Parameters: %s" % str(tuple([summary_datum.get(x) for x in SUMMARY_COUNTERS])), 4)
+        cursor.execute(query, tuple([summary_datum.get(x) for x in SUMMARY_COUNTERS]))
+
+    cursor.close()
+    conn.commit()
+
 def create_mount_table(conn):
     """Creates the mount table
     """
@@ -541,8 +588,6 @@ def update_mount_table(conn, mount_points):
     """
     cursor = conn.cursor()
 
-    # We force the addition of UNKNOWN so stdio's stdout/stderr counters are
-    # still included
     for mount_point in mount_points.items():
         vprint("INSERT OR IGNORE INTO %s (mountpt, fsname) VALUES (?, ?)" % MOUNTS_TABLE, 4)
         vprint("Parameters: %s" % str(mount_point), 4)
@@ -583,16 +628,6 @@ def update_headers_table(conn, header_data):
 
     header_counters = ["filename", "exe", "username", "exename"] + HEADER_COUNTERS
 
-    # "INSERT OR IGNORE INTO" below allows duplicate summaries rows to be added.
-    # This is generally harmless as long as you always INNER JOIN summaries to
-    # headers when calculating reduced metrics over the whole summaries table,
-    # but not all users may know to do this.
-    #
-    # In practice the following will only trigger a sqlite3.IntegrityError if
-    # the database was corrupted in such a way that the headers table lost some
-    # values but the summaries table did not.  The way the database is populated
-    # here makes that impossible, but someone may hack the database on their own
-    # and cause problems.
     query = "INSERT INTO %s (" % HEADERS_TABLE
     query += ", ".join(header_counters)
     query += ") VALUES (" + ",".join(["?"] * len(header_counters))
@@ -740,7 +775,7 @@ def process_log_list(conn, log_list):
 
     return new_log_list
 
-def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
+def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0, bulk_insert=True):
     """Calculate the sum bytes read/written
 
     Given a list of input files, parse each as a Darshan log in parallel to
@@ -757,6 +792,8 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
         output_file (str): Path to a SQLite database file to populate
         threads (int): Number of subprocesses to spawn for Darshan log parsing
         max_mb (float): Skip logs of size larger than this value
+        bulk_insert (bool): If False, have each thread update the database
+            as soon as it has parsed a log
 
     Returns:
         dict: Reduced data along different reduction dimensions
@@ -770,6 +807,13 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     new_log_list = process_log_list(conn, log_list)
     vprint("Built log list in %.1f seconds" % (time.time() - t_start), 2)
 
+    # Create tables and indices
+    t_start = time.time()
+    create_mount_table(conn)
+    create_headers_table(conn)
+    create_summaries_table(conn)
+    vprint("Initialized tables in %.1f seconds" % (time.time() - t_start), 2)
+
     # Analyze the remaining logs in parallel
     t_start = time.time()
     log_records = []
@@ -778,32 +822,33 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     if threads > 1:
         for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
             if result:
-                log_records.append(result)
-                mount_points.update(result['mounts'])
+                if bulk_insert:
+                    log_records.append(result)
+                    mount_points.update(result['mounts'])
+                else:
+                    insert_summary(conn, result)
     else:
         for result in [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]:
             if result:
-                log_records.append(result)
-                mount_points.update(result['mounts'])
+                if bulk_insert:
+                    log_records.append(result)
+                    mount_points.update(result['mounts'])
+                else:
+                    insert_summary(conn, result)
+
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
-    # Create tables and indices
-    t_start = time.time()
-    create_mount_table(conn)
-    create_headers_table(conn)
-    create_summaries_table(conn)
-    vprint("Initialized tables in %.1f seconds" % (time.time() - t_start), 2)
-
     # Insert new data that was collected in parallel
-    t_start = time.time()
-    update_mount_table(conn, mount_points)
-    vprint("Updated mounts table in %.1f seconds" % (time.time() - t_start), 2)
-    t_start = time.time()
-    update_headers_table(conn, [x['headers'] for x in log_records])
-    vprint("Updated headers table in %.1f seconds" % (time.time() - t_start), 2)
-    t_start = time.time()
-    update_summaries_table(conn, [x['summaries'] for x in log_records])
-    vprint("Updated summaries table in %.1f seconds" % (time.time() - t_start), 2)
+    if bulk_insert:
+        t_start = time.time()
+        update_mount_table(conn, mount_points)
+        vprint("Updated mounts table in %.1f seconds" % (time.time() - t_start), 2)
+        t_start = time.time()
+        update_headers_table(conn, [x['headers'] for x in log_records])
+        vprint("Updated headers table in %.1f seconds" % (time.time() - t_start), 2)
+        t_start = time.time()
+        update_summaries_table(conn, [x['summaries'] for x in log_records])
+        vprint("Updated summaries table in %.1f seconds" % (time.time() - t_start), 2)
 
     conn.close()
     vprint("Updated %s" % output_file, 1)
@@ -825,7 +870,6 @@ def main(argv=None):
     global VERBOSITY
     global QUIET
 
-
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")
     parser.add_argument('-t', '--threads', default=1, type=int,
@@ -834,6 +878,7 @@ def main(argv=None):
     parser.add_argument('-m', '--max-mb', type=float, default=0.0, help="Maximum log file before switching to lite parser (default: 0.0 (disabled))")
     parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity level (default: none)")
     parser.add_argument('-q', '--quiet', action='store_true', help="Suppress warnings for invalid Darshan logs")
+    parser.add_argument('--no-bulk-insert', action='store_true', help="Insert each log record as soon as it is processed")
     args = parser.parse_args(argv)
 
     VERBOSITY = args.verbose
@@ -842,4 +887,5 @@ def main(argv=None):
     index_darshanlogs(log_list=args.darshanlogs,
                       threads=args.threads,
                       max_mb=args.max_mb,
+                      bulk_insert=not args.no_bulk_insert,
                       output_file=args.output)

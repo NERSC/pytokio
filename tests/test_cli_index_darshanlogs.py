@@ -49,7 +49,9 @@ def verify_index_db(output_file):
             %s AS s
         INNER JOIN
             %s AS h ON h.log_id = s.log_id,
-            %s AS m ON m.fs_id = s.fs_id""" % (
+            %s AS m ON m.fs_id = s.fs_id
+        ORDER BY
+            s.log_id""" % (
                 tokio.cli.index_darshanlogs.SUMMARIES_TABLE,
                 tokio.cli.index_darshanlogs.HEADERS_TABLE,
                 tokio.cli.index_darshanlogs.MOUNTS_TABLE))
@@ -58,6 +60,8 @@ def verify_index_db(output_file):
     assert len(rows) == table_len[tokio.cli.index_darshanlogs.SUMMARIES_TABLE]
 
     conn.close()
+
+    return rows
 
 def get_table_len(table, output_file=None, conn=None, cursor=None):
     """Retrieve the row count for a table in the index db
@@ -134,6 +138,41 @@ def test_max_mb():
     tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
 
+@tokiotest.needs_darshan
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_no_bulk_insert():
+    """cli.index_darshanlogs --no-bulk-insert
+    """
+    tokiotest.check_darshan()
+    tokiotest.TEMP_FILE.close()
+
+    # generate database using bulk insert code path (default)
+    assert not os.path.isfile(tokiotest.TEMP_FILE.name)
+    argv = ['--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
+    print("Executing: %s" % " ".join(argv))
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    rows_truth = verify_index_db(tokiotest.TEMP_FILE.name)
+
+    # generate database using non-bulk insert code path
+    os.unlink(tokiotest.TEMP_FILE.name)
+    assert not os.path.isfile(tokiotest.TEMP_FILE.name)
+    argv = ['--no-bulk-insert', '--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
+    print("Executing: %s" % " ".join(argv))
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    rows_test = verify_index_db(tokiotest.TEMP_FILE.name)
+
+    assert len(rows_truth) == len(rows_test)
+    for rowid, row in enumerate(rows_truth):
+        print("Truth row:     %s" % str(row))
+        print("Pinserted row: %s" % str(rows_test[rowid]))
+        assert row == rows_test[rowid]
+
+    # might as well check idempotence too!
+    assert os.path.isfile(tokiotest.TEMP_FILE.name)
+    argv = ['--no-bulk-insert', '--output', tokiotest.TEMP_FILE.name] + SAMPLE_DARSHAN_LOGS
+    print("Executing: %s" % " ".join(argv))
+    tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
+    rows_test = verify_index_db(tokiotest.TEMP_FILE.name)
 
 @tokiotest.needs_darshan
 def test_lite_vs_full():
