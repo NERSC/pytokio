@@ -24,6 +24,7 @@ def verify_index_db(output_file):
     """Verifies schemata and correctness of an index database
     """
     conn = sqlite3.connect(output_file)
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     rows = cursor.fetchall()
@@ -161,12 +162,24 @@ def test_no_bulk_insert():
     tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     rows_test = verify_index_db(tokiotest.TEMP_FILE.name)
 
+    assert rows_truth
     assert len(rows_truth) == len(rows_test)
     for rowid, row in enumerate(rows_truth):
         print("Truth row:     %s" % str(row))
         print("Pinserted row: %s" % str(rows_test[rowid]))
         # note the [2:]; skip the log_id and fs_id since they are arbitrary
-        assert row[2:] == rows_test[rowid][2:]
+        # assert row[2:] == rows_test[rowid][2:]
+        compared_rows = 0
+        for rowname in row.keys():
+            if not rowname.endswith('_id'):
+                compared_rows += 1
+                print("(%s)%s == (%s)%s?" % (
+                    rowname,
+                    row[rowname],
+                    rowname,
+                    rows_test[rowid][rowname]))
+                assert row[rowname] == rows_test[rowid][rowname]
+        assert compared_rows
 
     # might as well check idempotence too!
     assert os.path.isfile(tokiotest.TEMP_FILE.name)
