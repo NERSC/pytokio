@@ -259,9 +259,9 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
     for mount in mount_list:
         reduced_counters[mount] = {}
         for counter in INTEGER_COUNTERS:
-            reduced_counters[mount][counter] = 0
+            reduced_counters[mount][counter] = None
         for counter in REAL_COUNTERS:
-            reduced_counters[mount][counter] = 0.0
+            reduced_counters[mount][counter] = None
         # needed so the log filename can be referenced during updates to the summaries table
         reduced_counters[mount]['filename'] = os.path.basename(darshan_data.log_file)
 
@@ -284,10 +284,10 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
                 for counter, reduction in INTEGER_COUNTERS.items():
                     logged_val = counters.get(counter.upper())
                     if logged_val is not None:
-                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val)
+                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val) if reduced_counters[mount][counter] is not None else logged_val
                     elif (counter == 'posix_files' and module == 'posix') \
                     or (counter == 'stdio_files' and module == 'stdio'):
-                        reduced_counters[mount][counter] += 1
+                        reduced_counters[mount][counter] = reduced_counters[mount][counter] + 1 if reduced_counters[mount][counter] is not None else 1
                     # else:
                         # if counter doesn't exist in Darshan log and isn't one
                         # of our special counters, skip it do nothing--don't
@@ -297,13 +297,13 @@ def summarize_by_fs(darshan_log, max_mb=0.0):
                 for counter, reduction in REAL_COUNTERS.items():
                     logged_val = counters.get(counter.upper())
                     if logged_val is not None:
-                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val)
+                        reduced_counters[mount][counter] = reduction(reduced_counters[mount][counter], logged_val) if reduced_counters[mount][counter] is not None else logged_val
 
     # Populate the mounts data and remove all mount points that were not used
     mountpts = {}
     for key in list(reduced_counters.keys()):
         # check_val works only when all the keys are positive counters
-        check_val = sum([reduced_counters[key][x] for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
+        check_val = sum([reduced_counters[key][x] if reduced_counters[key][x] is not None else 0 for x in ('bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
         if check_val == 0:
             reduced_counters.pop(key, None)
         else:
@@ -390,7 +390,7 @@ def summarize_by_fs_lite(darshan_log):
     header = {
         'filename': os.path.basename(darshan_log),
     }
-    reduced_counters = {}
+    reduced_counters = {} # mounts->counters
 
     dparser = subprocess.Popen(['darshan-parser', '--base', darshan_log],
                                stdout=subprocess.PIPE)
@@ -401,8 +401,11 @@ def summarize_by_fs_lite(darshan_log):
             break
 
         # find header lines
+        fieldoffset = 0
         if line.startswith('# darshan log version:'):
             header['version'] = line.split(":", 1)[-1].strip()
+            if header['version'].startswith('2'):
+                fieldoffset = 1
             continue
         elif line.startswith('# exe:'):
             header['exe'] = line.split(":", 1)[-1].strip().split()
@@ -435,17 +438,17 @@ def summarize_by_fs_lite(darshan_log):
         # find counter lines
         elif line.startswith('POSIX') or line.startswith('STDIO'):
             fields = line.split()
-            if len(fields) < 8:
+            if len(fields) < 7:
                 continue
-            counter = fields[3].split('_', 1)[-1]
+            counter = fields[fieldoffset + 3].split('_', 1)[-1]
             counter = tokio.connectors.darshan.V2_TO_V3.get(counter, counter).lower()
             value = None
             reducer = None
             if counter in INTEGER_COUNTERS:
-                value = int(fields[4])
+                value = int(fields[fieldoffset + 4])
                 reducer = INTEGER_COUNTERS.get(counter)
             elif counter in REAL_COUNTERS:
-                value = float(fields[4])
+                value = float(fields[fieldoffset + 4])
                 reducer = REAL_COUNTERS.get(counter)
             if value is None:
                 continue
@@ -465,7 +468,7 @@ def summarize_by_fs_lite(darshan_log):
             elif not reducer:
                 reduced_counters[mount][counter] = value
             else:
-                reduced_counters[mount][counter] = reducer(reduced_counters[mount][counter], value)
+                reduced_counters[mount][counter] = reducer(reduced_counters[mount][counter], value) if reduced_counters[mount][counter] is not None else value
 
             continue
 
@@ -481,13 +484,24 @@ def summarize_by_fs_lite(darshan_log):
     mountpts = {}
     for key in list(reduced_counters.keys()):
         # check_val works only when all the keys are positive counters
-        print(reduced_counters[key].keys())
         check_val = sum([reduced_counters[key].get(x, 0) for x in (
             'bytes_read', 'bytes_written', 'reads', 'writes', 'opens', 'stats')])
         if check_val == 0:
             reduced_counters.pop(key, None)
         else:
             mountpts[key] = logical_mount_names.get(key, key)
+
+    # fill in counters that should exist but weren't encountered.  This happens
+    # for counters that are not shared between POSIX and STDIO and is just here
+    # to make the data structure from this parser identical to the full parser
+    for counter in INTEGER_COUNTERS:
+        for mount in reduced_counters:
+            if counter not in reduced_counters[mount]:
+                reduced_counters[mount][counter] = None
+    for counter in REAL_COUNTERS:
+        for mount in reduced_counters:
+            if counter not in reduced_counters[mount]:
+                reduced_counters[mount][counter] = None
 
     for mount in reduced_counters:
         # needed so the log filename can be referenced during updates to the summaries table
@@ -624,8 +638,8 @@ def update_summaries_table(conn, summary_data):
             query += ", ".join(["?"] * len(SUMMARY_COUNTERS))
             query += ")"
             vprint(query, 4)
-            vprint("Parameters: %s" % str(tuple([summary_datum[x] for x in SUMMARY_COUNTERS])), 4)
-            cursor.execute(query, tuple([summary_datum[x] for x in SUMMARY_COUNTERS]))
+            vprint("Parameters: %s" % str(tuple([summary_datum.get(x) for x in SUMMARY_COUNTERS])), 4)
+            cursor.execute(query, tuple([summary_datum.get(x) for x in SUMMARY_COUNTERS]))
 
     cursor.close()
     conn.commit()
