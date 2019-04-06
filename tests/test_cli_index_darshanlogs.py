@@ -51,7 +51,7 @@ def verify_index_db(output_file):
             %s AS h ON h.log_id = s.log_id,
             %s AS m ON m.fs_id = s.fs_id
         ORDER BY
-            s.log_id""" % (
+            h.filename""" % (
                 tokio.cli.index_darshanlogs.SUMMARIES_TABLE,
                 tokio.cli.index_darshanlogs.HEADERS_TABLE,
                 tokio.cli.index_darshanlogs.MOUNTS_TABLE))
