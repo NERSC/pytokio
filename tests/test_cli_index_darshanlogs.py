@@ -165,7 +165,8 @@ def test_no_bulk_insert():
     for rowid, row in enumerate(rows_truth):
         print("Truth row:     %s" % str(row))
         print("Pinserted row: %s" % str(rows_test[rowid]))
-        assert row == rows_test[rowid]
+        # note the [2:]; skip the log_id and fs_id since they are arbitrary
+        assert row[2:] == rows_test[rowid][2:]
 
     # might as well check idempotence too!
     assert os.path.isfile(tokiotest.TEMP_FILE.name)
