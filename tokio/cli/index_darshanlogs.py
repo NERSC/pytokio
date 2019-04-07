@@ -401,17 +401,17 @@ def summarize_by_fs_lite(darshan_log):
     dparser = subprocess.Popen(['darshan-parser', '--base', darshan_log],
                                stdout=subprocess.PIPE)
 
+    logvers = 3
     while True:
         line = dparser.stdout.readline().decode('utf-8')
         if not line:
             break
 
         # find header lines
-        fieldoffset = 0
         if line.startswith('# darshan log version:'):
             header['version'] = line.split(":", 1)[-1].strip()
             if header['version'].startswith('2'):
-                fieldoffset = 1
+                logvers = 2
             continue
         elif line.startswith('# exe:'):
             header['exe'] = line.split(":", 1)[-1].strip().split()
@@ -437,25 +437,44 @@ def summarize_by_fs_lite(darshan_log):
 
         # find mount table lines
         elif line.startswith('# mount entry:'):
-            mountpt = line.split(':', 1)[-1].strip().split(None, 1)[0]
+            if logvers == 2:
+                mountpt = line.split(':', 1)[-1].strip().split(None, 1)[-1].rsplit(None, 1)[0]
+            else:
+                mountpt = line.split(':', 1)[-1].strip().split(None, 1)[0]
             mount_list.append(mountpt)
             continue
 
         # find counter lines
-        elif line.startswith('POSIX') or line.startswith('STDIO'):
+        elif not line.startswith('#'):
             fields = line.split()
             if len(fields) < 7:
                 continue
-            counter = fields[fieldoffset + 3].split('_', 1)[-1]
-            counter = tokio.connectors.darshan.V2_TO_V3.get(counter, counter).lower()
+
             value = None
             reducer = None
-            if counter in INTEGER_COUNTERS:
-                value = int(fields[fieldoffset + 4])
-                reducer = INTEGER_COUNTERS.get(counter)
-            elif counter in REAL_COUNTERS:
-                value = float(fields[fieldoffset + 4])
-                reducer = REAL_COUNTERS.get(counter)
+
+            # extract key and value; different field layout for darshan2 logs
+            if logvers == 2:
+                counter = fields[2].split('_', 1)[-1]
+                counter = tokio.connectors.darshan.V2_TO_V3.get(counter, counter).lower()
+                if counter in INTEGER_COUNTERS:
+                    value = int(fields[3])
+                    reducer = INTEGER_COUNTERS.get(counter)
+                elif counter in REAL_COUNTERS:
+                    value = float(fields[3])
+                    reducer = REAL_COUNTERS.get(counter)
+            else:
+                # only consider POSIX and STDIO modules for v3
+                if fields[0] not in ('POSIX', 'STDIO'):
+                    continue
+                counter = fields[3].split('_', 1)[-1].lower()
+                if counter in INTEGER_COUNTERS:
+                    value = int(fields[4])
+                    reducer = INTEGER_COUNTERS.get(counter)
+                elif counter in REAL_COUNTERS:
+                    value = float(fields[4])
+                    reducer = REAL_COUNTERS.get(counter)
+
             if value is None:
                 continue
 
