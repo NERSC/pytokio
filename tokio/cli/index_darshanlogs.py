@@ -841,18 +841,16 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0, bulk_insert=
     if threads > 1:
         for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
             if result:
-                if bulk_insert:
-                    log_records.append(result)
-                    mount_points.update(result['mounts'])
-                else:
+                log_records.append(result)
+                mount_points.update(result['mounts'])
+                if not bulk_insert:
                     insert_summary(conn, result)
     else:
         for result in [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]:
             if result:
-                if bulk_insert:
-                    log_records.append(result)
-                    mount_points.update(result['mounts'])
-                else:
+                log_records.append(result)
+                mount_points.update(result['mounts'])
+                if not bulk_insert:
                     insert_summary(conn, result)
 
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
