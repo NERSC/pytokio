@@ -407,7 +407,7 @@ def build_timeseries_query(orig_query, start, end):
             if target_key in obj:
                 return obj[target_key]
         elif isinstance(obj, dict):
-            iterator = dict.iteritems
+            iterator = dict.items
             if target_key in obj:
                 return obj[target_key]
         else:
