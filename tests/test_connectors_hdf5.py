@@ -5,10 +5,12 @@ Test the HDF5 connector
 
 import datetime
 import random
+import warnings
+import shutil
 import nose
 import numpy
 import tokiotest
-import tokio.connectors
+import tokio.connectors.hdf5
 
 DATASETS_1D = [
     'FSStepsGroup/FSStepsDataSet',
@@ -34,6 +36,21 @@ GET_SET_TRUE_VERSIONS = {
 }
 
 INVALID_DATASET = '/abc/def'
+
+def generate_light_timeseries(file_name=tokiotest.SAMPLE_COLLECTDES_HDF5):
+    """
+    Return a TimeSeries object that's initialized against the tokiotest sample
+    input.  Uses light=True when attaching to prevent loading the entire dataset
+    into memory.
+    """
+    output_hdf5 = tokio.connectors.hdf5.Hdf5(file_name, 'r')
+    timeseries = tokio.timeseries.TimeSeries()
+
+    output_hdf5.to_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET, light=True)
+#   timeseries.attach(output_hdf5, dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET, light=True)
+    return timeseries
+
+
 
 def test_h5lmt():
     """connectors.hdf5.Hdf5() h5lmt support
@@ -229,7 +246,12 @@ def _test_get_index(input_file):
                 target_datetime = datetime.datetime.fromtimestamp(timestamps[target_index]) \
                                   + datetime.timedelta(seconds=fuzz)
                 new_index = hdf5_file.get_index(dataset_name, target_datetime)
-                print("%d(%s) == %d(%s)? %s" % (target_index, type(target_index), new_index, type(new_index), target_index == new_index))
+                print("%d(%s) == %d(%s)? %s" % (
+                    target_index,
+                    type(target_index),
+                    new_index,
+                    type(new_index),
+                    target_index == new_index))
                 assert target_index == new_index
                 assert (dataset[new_index] == dataset[target_index]).all()
 
@@ -241,6 +263,10 @@ def test_get_columns():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_columns() with %s" % input_type
         yield func, input_file
+        func = _test_get_columns_missing
+        func.description = "connectors.hdf5.Hdf5.get_columns() with %s, /missing suffix" % input_type
+        yield func, input_file
+
 
 def _test_get_columns(input_file):
     """
@@ -249,6 +275,21 @@ def _test_get_columns(input_file):
     print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
+        result = hdf5_file.get(dataset_name)
+        print('result: %s' % result)
+        assert result is not None
+        column_names = hdf5_file.get_columns(dataset_name)
+        assert len(column_names) > 0
+
+def _test_get_columns_missing(input_file):
+    """
+    Ensure that get_columns() works with /missing suffix
+    """
+    print("Testing %s" % input_file)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        dataset_name += '/missing'
         print("Getting %s from %s" % (dataset_name, hdf5_file.filename))
         result = hdf5_file.get(dataset_name)
         print('result: %s' % result)
@@ -272,6 +313,10 @@ def test_get_timestamps():
         func = _test_get_columns
         func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s" % input_type
         yield func, input_file
+        func = _test_get_columns
+        func.description = "connectors.hdf5.Hdf5.get_timestamps() with %s, /missing suffix" % input_type
+        yield func, input_file
+
 
 def _test_get_timestamps(input_file):
     """
@@ -280,6 +325,26 @@ def _test_get_timestamps(input_file):
     print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
     for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        assert hdf5_file.get(dataset_name) is not None
+        timestamps = hdf5_file.get_timestamps(dataset_name)
+        assert len(timestamps[:]) > 0
+
+        # ensure that every timestamp is equidistant
+        prev_delta = None
+        for index in range(1, len(timestamps[:])):
+            delta = timestamps[index] - timestamps[index - 1]
+            if prev_delta is not None:
+                assert prev_delta == delta
+            prev_delta = delta
+
+def _test_get_timestamps_missing(input_file):
+    """
+    Ensure that get_timestamps() returns valid results with /missing suffix
+    """
+    print("Testing %s" % input_file)
+    hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
+    for dataset_name in tokiotest.SAMPLE_TIMESERIES_DATASETS:
+        dataset_name += '/missing'
         assert hdf5_file.get(dataset_name) is not None
         timestamps = hdf5_file.get_timestamps(dataset_name)
         assert len(timestamps[:]) > 0
@@ -376,3 +441,159 @@ def test_set_versions():
 
     hdf5.close()
     test_get_versions(hdf5_filename=tokiotest.TEMP_FILE.name)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_commit_timeseries():
+    """connectors.hdf5.Hdf5.commit_timeseries()
+    """
+    tokiotest.TEMP_FILE.close()
+
+    # Connect to the sample input file
+    timeseries1 = tokiotest.generate_timeseries()
+
+    # Create a new HDF5 file into which timeseries1 will be copied
+    hdf5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'w')
+
+    # Write the output out as a new HDF5 file
+    hdf5_file.commit_timeseries(timeseries1)
+    hdf5_file.close()
+
+    # Read that newly generated HDF5 file back in
+    timeseries2 = tokiotest.generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
+
+    # Compare the original to the reprocessed
+    print("Comparing before/after read/write/read")
+    tokiotest.compare_timeseries(timeseries2, timeseries1, verbose=True)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_commit_timeseries_bad_bounds():
+    """connectors.hdf5.Hdf5.commit_timeseries() with out-of-bounds
+    """
+    tokiotest.TEMP_FILE.close()
+
+    # Connect to the sample input file
+    timeseries1 = tokiotest.generate_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET)
+    timeseries2 = tokiotest.generate_timeseries(dataset_name=tokiotest.SAMPLE_COLLECTDES_DSET2)
+
+    # Write the output as a new HDF5 file (should work like normal)
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'w') as hdf5_file:
+        hdf5_file.commit_timeseries(timeseries1)
+
+    # Now trim down the dataset so it no longer spans the same range as the
+    # existing HDF5 file - this should work, because the HDF5 will simply retain
+    # its start/end since the new data being committed is a complete subset
+    print("Attempting trimmed down dataset")
+    timeseries1.trim_rows(3)
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
+        hdf5_file.commit_timeseries(timeseries1)
+
+    # Add back the rows we took off, and then some - this should NOT work
+    # because the data now goes beyond the original maximum timestamp for the
+    # file
+    print("Attempting bloated existing dataset")
+    timeseries1.add_rows(12)
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
+        print('Global start: %s' % hdf5_file.attrs.get('start'))
+        print('Global end:   %s' % hdf5_file.attrs.get('end'))
+        caught = False
+        try:
+            hdf5_file.commit_timeseries(timeseries1)
+        except IndexError:
+            caught = True
+        assert caught
+
+    # Now commit a completely new dataset that doesn't fit - this should throw
+    # a warning (or should we make it throw an exception?)
+    print("Attempting bloated non-existent dataset")
+    timeseries2.add_rows(12)
+    timeseries2.dataset_name = '/blah/blah'
+    timeseries2.timestamp_key = '/blah/timestamps'
+    with tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name) as hdf5_file:
+        print('Global start: %s' % hdf5_file.attrs.get('start'))
+        print('Global end:   %s' % hdf5_file.attrs.get('end'))
+        caught = False
+        try:
+            hdf5_file.commit_timeseries(timeseries2)
+        except IndexError:
+            caught = True
+#       with warnings.catch_warnings(record=True) as warn:
+#           caught = True
+#           # cause all warnings to always be triggered
+#           warnings.simplefilter("always")
+#           hdf5_file.commit_timeseries(timeseries2)
+#           print len(warn)
+#           assert len(warn) == 1
+#           print warn[-1].category, type(warn[-1].category)
+#           assert issubclass(warn[-1].category, UserWarning)
+#           assert "some warning message" in str(warn[-1].message)
+        assert caught
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_uneven_columns():
+    """connectors.hdf5.Hdf5.to_timeseries(with uneven columns)
+    """
+
+    # We expect to trigger some warnings here
+    warnings.filterwarnings('ignore')
+
+    tokiotest.TEMP_FILE.close()
+    # copy the input file into a new temporary file with which we can tinker
+    with open(tokiotest.SAMPLE_COLLECTDES_HDF5, 'rb') as input_file:
+        with open(tokiotest.TEMP_FILE.name, 'wb') as output_file:
+            shutil.copyfileobj(input_file, output_file)
+
+    print("Ensure that the input dataset has even column lengths before we make them uneven")
+    h5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'r+')
+    dataset = h5_file[tokiotest.SAMPLE_COLLECTDES_DSET]
+    orig_col_names = list(h5_file.get_columns(dataset.name))
+    result = len(orig_col_names) == dataset.shape[1]
+    print(orig_col_names)
+    print(dataset.attrs['columns'])
+    print("%-3d == %3d? %s" % (len(orig_col_names), dataset.shape[1], result))
+    assert result
+
+    print("Test case where there are more column names than shape of dataset")
+    extra_columns = orig_col_names + ['argle', 'bargle', 'fffff']
+    timeseries = tokiotest.generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
+    timeseries.set_columns(extra_columns)
+    result = len(timeseries.columns) == timeseries.dataset.shape[1]
+    print("%-3d == %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result))
+    assert result
+    for icol in range(timeseries.dataset.shape[1]):
+        print("%-15s(%-15s) == %15s(%-15s)? %s" % (
+            extra_columns[icol],
+            type(extra_columns[icol]),
+            timeseries.columns[icol],
+            type(timeseries.columns[icol]),
+            extra_columns[icol] == timeseries.columns[icol]))
+        assert extra_columns[icol] == timeseries.columns[icol]
+
+    print("Test cases where column names are incomplete compared to shape of dataset")
+    fewer_columns = orig_col_names[0:-(3*len(orig_col_names)//4)]
+    timeseries = tokiotest.generate_timeseries(file_name=tokiotest.TEMP_FILE.name)
+    timeseries.set_columns(fewer_columns)
+    result = len(timeseries.columns) < timeseries.dataset.shape[1]
+    print("%-3d < %3d? %s" % (len(timeseries.columns), timeseries.dataset.shape[1], result))
+    assert result
+    for icol, fewer_col in enumerate(fewer_columns):
+        print("%-15s == %15s? %s" % (fewer_col, timeseries.columns[icol],
+                                     fewer_col == timeseries.columns[icol]))
+        assert fewer_col == timeseries.columns[icol]
+
+def test_light_attach():
+    """connectors.hdf5.Hdf5.attach_dataset(light=True)
+    """
+    tokiotest.TEMP_FILE.close()
+
+    full = tokiotest.generate_timeseries()
+    light = generate_light_timeseries()
+    tokiotest.compare_timeseries(light, full, verbose=True)
+
+def test_get_insert_pos():
+    """connectors.hdf5.get_insert_pos()
+    """
+    # TODO
+    # 1. ensure correctness of turning timestamp into an index
+    # 2. ensure that create_col=False works
+    # 3. ensure that create_col=True works
+    raise nose.SkipTest("test not implemented")

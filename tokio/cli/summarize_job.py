@@ -363,152 +363,121 @@ def retrieve_lmt_data(results, file_system):
     if results['_file_system'] is None:
         return results
 
+    PROCESS_DATASETS = [
+        {
+            'dataset': '/datatargets/readrates',
+            'summarize_func': summarize_byterate_df,
+            'summary_key': 'read',
+        },
+        {
+            'dataset': '/datatargets/writerates',
+            'summarize_func': summarize_byterate_df,
+            'summary_key': 'written',
+        },
+        {
+            'dataset': '/dataservers/cpuload',
+            'summarize_func': summarize_cpu_df,
+            'summary_key': 'oss',
+        },
+        {
+            'dataset': '/mdservers/cpuload',
+            'summarize_func': summarize_cpu_df,
+            'summary_key': 'mds',
+        },
+        {
+            'dataset': '/mdtargets/openrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'open',
+        },
+        {
+            'dataset': '/mdtargets/closerates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'close',
+        },
+        {
+            'dataset': '/mdtargets/mknodrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'mknod',
+        },
+        {
+            'dataset': '/mdtargets/linkrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'link',
+        },
+        {
+            'dataset': '/mdtargets/unlinkrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'unlink',
+        },
+        {
+            'dataset': '/mdtargets/mkdirrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'mkdir',
+        },
+        {
+            'dataset': '/mdtargets/rmdirrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'rmdir',
+        },
+        {
+            'dataset': '/mdtargets/renamerates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'rename',
+        },
+        {
+            'dataset': '/mdtargets/getxattrrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'getxattr',
+        },
+        {
+            'dataset': '/mdtargets/statfsrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'statfs',
+        },
+        {
+            'dataset': '/mdtargets/setattrrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'setattr',
+        },
+        {
+            'dataset': '/mdtargets/getattrrates',
+            'summarize_func': summarize_mds_ops_df,
+            'summary_key': 'getattr',
+        },
+        {
+            # Missing data requires using a key that directly maps to a dataset,
+            # since any transformation may destroy information on what data
+            # are missing.
+            'dataset': '/dataservers/cpuload/missing',
+            'summarize_func': summarize_missing_df,
+            'summary_key': None,
+        },
+    ]
+
+    errors = 0
     module_results = {}
-    try:
-        # Read rates
-        module_results.update(summarize_byterate_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
+    for process_args in PROCESS_DATASETS:
+        try:
+            dataframe = tokio.tools.hdf5.get_dataframe_from_time_range(
                 results['_file_system'],
-                '/datatargets/readrates',
+                process_args['dataset'],
                 results['_datetime_start'],
-                results['_datetime_end']),
-            'read'
-        ))
-        # Write rates
-        module_results.update(summarize_byterate_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/datatargets/writerates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'written'
-        ))
-        # OSS cpu loads
-        module_results.update(summarize_cpu_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/dataservers/cpuload',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'oss'
-        ))
-        # MDS cpu loads
-        module_results.update(summarize_cpu_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdservers/cpuload',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'mds'
-        ))
-        # MDS ops
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/openrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'open'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/closerates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'close'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/mknodrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'mknod'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/linkrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'link'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/unlinkrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'unlink'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/mkdirrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'mkdir'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/rmdirrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'rmdir'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/renamerates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'rename'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/getxattrrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'getxattr'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/statfsrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'statfs'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/setattrrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'setattr'
-        ))
-        module_results.update(summarize_mds_ops_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/mdtargets/getattrrates',
-                results['_datetime_start'],
-                results['_datetime_end']),
-            'getattr'
-        ))
-        # Missing data - this requires using a key that directly maps to a
-        # dataset, since any transformation may destroy information on what data
-        # are missing.
-        module_results.update(summarize_missing_df(
-            tokio.tools.hdf5.get_dataframe_from_time_range(
-                results['_file_system'],
-                '/datatargets/readbytes',
-                results['_datetime_start'],
-                results['_datetime_end'])))
-    except IOError as error:
-        warnings.warn(str(error))
+                results['_datetime_end'])
+            if dataframe is None:
+                if not errors:
+                    # only print the first error per HDF5 file
+                    warnings.warn("No HDF5 data for %s from %s to %s on %s" % (
+                                  process_args['dataset'],
+                                  results['_datetime_start'],
+                                  results['_datetime_end'],
+                                  results['_file_system']))
+                errors += 1
+            elif process_args.get('summary_key'):
+                module_results.update(process_args['summarize_func'](dataframe, process_args['summary_key']))
+            else:
+                module_results.update(process_args['summarize_func'](dataframe))
+        except IOError as error:
+            warnings.warn(str(error))
 
     merge_dicts(results, module_results, prefix='fs_')
     return results

@@ -12,21 +12,18 @@ metrics.
 
 import os
 import re
-import sys
-import json
-import gzip
 import tarfile
-import mimetypes
 import time
 import datetime
 import warnings
 import numpy
 import pandas
-from tokio.common import isstr
+from tokio.common import isstr, recast_string
+from . import common
 
 REX_SERIAL_NO = r'(Intel SSD|SMART Attributes|SMART and Health Information).*(CVF[^ ]+-\d+)'
 
-class NerscIsdct(dict):
+class NerscIsdct(common.CacheableDict):
     """Dictionary subclass that self-populates with ISDCT output data
     """
     def __init__(self, input_file):
@@ -37,9 +34,8 @@ class NerscIsdct(dict):
                 directory containing the output of NERSC's ISDCT collection
                 script.
         """
-        super(NerscIsdct, self).__init__(self)
-        self.input_file = input_file
-        self.load()
+        super(NerscIsdct, self).__init__(input_file=input_file)
+
         # synthesize metrics independent of the input format
         self._synthesize_metrics()
 
@@ -53,14 +49,16 @@ class NerscIsdct(dict):
             raise Exception("Input file %s does not exist" % self.input_file)
 
         try:
-            self.load_isdct()
+            # try load_native first, because load_native understands that
+            # self.input_file may actually be a directory
+            self.load_native()
         except tarfile.ReadError:
             try:
                 self.load_json()
             except ValueError as error:
                 raise ValueError(str(error) + " (is this a valid json file?)")
 
-    def load_isdct(self):
+    def load_native(self):
         """Load ISDCT output from a tar(.gz).
 
         Load a collection of ISDCT outputs as created by the NERSC ISDCT script.
@@ -72,7 +70,7 @@ class NerscIsdct(dict):
         timestamp_str = None
         min_mtime = None
         parsed_counters_list = []
-        for (member_name, mtime, member_handle) in walk_file_collection(self.input_file):
+        for (member_name, mtime, member_handle) in common.walk_file_collection(self.input_file):
             # is this a magic timestamp file?
             if 'timestamp_' in member_name:
                 timestamp_str = member_name.split('_')[-1]
@@ -119,42 +117,6 @@ class NerscIsdct(dict):
         merged_counters = _merge_parsed_counters(parsed_counters_list)
         for key, val in merged_counters.items():
             self.__setitem__(key, val)
-
-    def load_json(self):
-        """Load input from serialized json.
-
-        Load the serialized format of this object, encoded as a json dictionary
-        where counters are keyed by the device serial number.  The converse of
-        the save_cache() method below.
-        """
-        _, encoding = mimetypes.guess_type(self.input_file)
-
-        if encoding == 'gzip':
-            open_func = gzip.open
-        else:
-            open_func = open
-
-        for key, val in json.load(open_func(self.input_file, 'r')).items():
-            self.__setitem__(key, val)
-
-    def save_cache(self, output_file=None):
-        """Serialize self into a json output.
-
-        Save the dictionary in a json file.  This output can be read back in using
-        load_json().
-
-        Args:
-            output_file (str or None): Path to file to which json should be
-                written.  If None, write to stdout.  Default is None.
-        """
-        if output_file is None:
-            self._save_cache(sys.stdout)
-        else:
-            with open(output_file, 'w') as output:
-                self._save_cache(output)
-
-    def _save_cache(self, output):
-        output.write(json.dumps(self))
 
     def to_dataframe(self, only_numeric=False):
         """Express self as a dataframe.
@@ -318,7 +280,7 @@ def _merge_parsed_counters(parsed_counters_list):
     """
     all_data = {}
     for parsed_counters in parsed_counters_list:
-        if parsed_counters is None:
+        if not parsed_counters:
             continue
         elif len(parsed_counters) > 1:
             raise Exception("Received multiple serial numbers from parse_dct_counters_file")
@@ -346,19 +308,7 @@ def _merge_parsed_counters(parsed_counters_list):
                 new_value = value
                 unit = None
 
-            ### the order here is important, but hex that is not prefixed with
-            ### 0x may be misinterpreted as integers.  if such counters ever
-            ### surface, they must be explicitly cast above
-            for cast in (int, float, lambda x: int(x, 16)):
-                try:
-                    new_value = cast(value)
-                    break
-                except ValueError:
-                    pass
-            if value == "True":
-                new_value = True
-            elif value == "False":
-                new_value = False
+            new_value = recast_string(value)
 
             ### endurance_analyzer can be numeric or an error string
             if counter == 'endurance_analyzer':
@@ -366,7 +316,7 @@ def _merge_parsed_counters(parsed_counters_list):
                     new_value = None
                     unit = None
                 elif unit is None:
-                    # because Intel reports this counter multiple times using different print formats
+                    # Intel reports this counter multiple times using different print formats
                     unit = 'years'
 
             ### Insert the key-value pair and its unit of measurement (if available)
@@ -530,44 +480,6 @@ def parse_counters_fileobj(fileobj, nodename=None):
 
     if device_sn is None:
         warnings.warn("Could not find device serial number in %s" % fileobj.name)
-    else:
-        return {device_sn : data}
+        return {}
 
-def walk_file_collection(input_source):
-    """Walk all member files of an input source.
-
-    Iterator that visits every member of an input source (either directory or
-    tarfile) and yields its file name, last modify time, and a file handle to
-    its contents.
-
-    Args:
-        input_source (str): A path to either a directory containing files or a
-            tarfile containing files.
-
-    Yields:
-        tuple: Attributes for a member of `input_source` with the following
-        data:
-
-        * str: fully qualified path corresponding to its name
-        * float: last modification time expressed as seconds since epoch
-        * file: handle to access the member's contents
-    """
-
-    if os.path.isdir(input_source):
-        for root, _, files in os.walk(input_source):
-            for file_name in files:
-                fq_file_name = os.path.join(root, file_name)
-                yield (fq_file_name,
-                       os.path.getmtime(fq_file_name),
-                       open(fq_file_name, 'r'))
-    else:
-        _, encoding = mimetypes.guess_type(input_source)
-        if encoding == 'gzip':
-            file_obj = tarfile.open(input_source, 'r:gz')
-        else:
-            file_obj = tarfile.open(input_source, 'r')
-        for member in file_obj.getmembers():
-            if member.isfile():
-                yield (member.name,
-                       member.mtime,
-                       file_obj.extractfile(member))
+    return {device_sn : data}

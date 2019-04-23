@@ -6,10 +6,10 @@ import sys
 import datetime
 import argparse
 import warnings
-import h5py
 import tokio.debug
 import tokio.timeseries
 import tokio.connectors.lmtdb
+import tokio.connectors.hdf5
 from tokio.common import isstr
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -156,7 +156,6 @@ class DatasetDict(dict):
                                                                  timestep=self.timestep,
                                                                  num_columns=len(columns),
                                                                  column_names=columns,
-                                                                 hdf5_file=None,
                                                                  sort_hex=self.sort_hex)
 
     def finalize(self):
@@ -455,17 +454,21 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
                 warnings.warn("Dataset key %s is not in schema" % dataset_name)
             continue
         if hdf5_dataset_name not in hdf5_file:
-            new_dataset = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                      start=init_start,
-                                                      end=init_end,
-                                                      timestep=dataset.timestep,
-                                                      num_columns=dataset.dataset.shape[1],
-                                                      hdf5_file=hdf5_file)
-            new_dataset.commit_dataset(hdf5_file)
+            # attempt to convert dataset into a timeseries
+            timeseries = hdf5_file.to_timeseries(dataset_name=hdf5_dataset_name)
+
+            # if dataset -> timeseries failed, create and commit a new, empty timeseries
+            if timeseries is None:
+                timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                         start=init_start,
+                                                         end=init_end,
+                                                         timestep=dataset.timestep,
+                                                         num_columns=dataset.dataset.shape[1])
+                hdf5_file.commit_timeseries(timeseries=timeseries)
             print("Initialized %s in %s with size %s" % (
                 hdf5_dataset_name,
                 hdf5_file.name,
-                new_dataset.dataset.shape))
+                timeseries.dataset.shape))
 
 def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_start, query_end):
     """
@@ -481,14 +484,14 @@ def archive_lmtdb(lmtdb, init_start, init_end, timestep, output_file, query_star
 
     datasets.finalize()
 
-    with h5py.File(output_file) as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(output_file) as hdf5_file:
         hdf5_file.attrs['version'] = SCHEMA_VERSION
 
         init_hdf5_file(datasets, init_start, init_end, hdf5_file)
 
         for dataset in datasets.values():
             print("Writing out %s" % dataset.dataset_name)
-            dataset.commit_dataset(hdf5_file)
+            hdf5_file.commit_timeseries(dataset)
 
     tokio.debug.debug_print("Wrote output to %s" % output_file)
 

@@ -7,6 +7,7 @@ import os
 import sys
 import json
 import time
+import math
 import datetime
 import argparse
 import warnings
@@ -33,10 +34,10 @@ def summarize_reduced_data(data):
         'n': 0,
         'sum_bytes_read': 0,
         'sum_bytes_write': 0,
-        'oss_ave': 0.0,
-        'oss_max': 0.0,
-        'mds_ave': 0.0,
-        'mds_max': 0.0,
+        'oss_ave': -0.0,
+        'oss_max': -0.0,
+        'mds_ave': -0.0,
+        'mds_max': -0.0,
         'missing_ost_read': 0,
         'missing_ost_write': 0,
         'missing_oss_cpu': 0,
@@ -59,10 +60,11 @@ def summarize_reduced_data(data):
         if 'ave_mds_cpu' in datum:
             totals['mds_ave'] += datum['ave_mds_cpu'] * points_in_bin
 
-        if datum['max_oss_cpu'] > totals['oss_max']:
-            totals['oss_max'] = datum['max_oss_cpu']
-        else:
-            totals['oss_max'] = totals['oss_max']
+        if 'max_oss_cpu' in datum:
+            if datum['max_oss_cpu'] > totals['oss_max']:
+                totals['oss_max'] = datum['max_oss_cpu']
+            else:
+                totals['oss_max'] = totals['oss_max']
 
         if 'max_mds_cpu' in datum:
             if datum['max_mds_cpu'] > totals['mds_max']:
@@ -338,23 +340,21 @@ def print_data_summary(data, units='TiB'):
         print_str += "\n"
 
     # Data server summary
-    if 'oss_ave' in totals:
+    if math.copysign(1, totals.get('oss_max', -0.0)) > 0.0:
         print_str += "Average OSS CPU:        %(oss_ave)6.2f%%" % totals
         if 'frac_missing_oss_cpu' in totals:
             print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_oss_cpu'])
         else:
             print_str += "\n"
-    if 'oss_ave' in totals:
         print_str += "Max OSS CPU:            %(oss_max)6.2f%%\n" % totals
 
     # Metadata server summary
-    if 'mds_ave' in totals:
+    if math.copysign(1, totals.get('mds_max', -0.0)) > 0.0:
         print_str += "Average MDS CPU:        %(mds_ave)6.2f%%" % totals
         if 'frac_missing_mds_cpu' in totals:
             print_str += ", %5.1f%% missing\n" % (100.0 * totals['frac_missing_mds_cpu'])
         else:
             print_str += "\n"
-    if 'mds_max' in totals:
         print_str += "Max MDS CPU:            %(mds_max)6.2f%%\n" % totals
 
     return print_str

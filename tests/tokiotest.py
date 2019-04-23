@@ -7,9 +7,12 @@ import os
 import sys
 import gzip
 import errno
+import shutil
+import tarfile
 import tempfile
 import subprocess
 import datetime
+import numpy # for compare_timeseries
 
 try:
     import StringIO as io
@@ -40,14 +43,48 @@ SAMPLE_DARSHAN_JOBHOST = 'edison'
 SAMPLE_DARSHAN_START_TIME = '2017-03-20 02:07:47'
 SAMPLE_DARSHAN_END_TIME = '2017-03-20 02:09:43'
 SAMPLE_DARSHAN_FILE_SYSTEM = 'scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS = '/scratch1,/scratch2'
-SAMPLE_DARSHAN_ALL_MOUNTS_LOGICAL = 'scratch1,scratch2'
+
 SAMPLE_DARSHAN_SONEXION_ID = 'snx11035'
 SAMPLE_DARSHAN_LOG_DIR = os.path.join(INPUT_DIR, 'darshanlogs')
 SAMPLE_DARSHAN_LOG_USER = 'glock'
 SAMPLE_DARSHAN_LOG_DIR_KEY = 'testsystem'
 SAMPLE_DARSHAN_JOBID_2 = 4487503
 SAMPLE_DARSHAN_LOGS_PER_DIR = 2 # minimum number of darshan logs in each day of DARSHAN_LOG_DIR
+SAMPLE_DARSHAN_INDEX_DB = os.path.join(INPUT_DIR, 'darshanlogs.db')
+# SAMPLE_DARSHAN_INDEX_DB_EXES contains a subset of SELECT exename FROM headers;
+# they're expressed as numbers and not sensible exe names (like ph.x) because
+# the Darshan logs used to generate darshanlogs.db were obfuscated
+SAMPLE_DARSHAN_INDEX_DB_EXES = [
+    '1221559022',
+    '2054166464',
+    '1700134137'
+]
+# SAMPLE_DARSHAN_INDEX_DB_USER is one of the values returned by 
+# SELECT username FROM HEADERS
+SAMPLE_DARSHAN_INDEX_DB_USER = 'aa4hm0jcwfg'
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS = [
+    '/global/cscratch1',
+    '/global/u2',
+]
+SAMPLE_DARSHAN_INDEX_DB_ALL_MOUNTS_LOGICAL = [
+    'cscratch',
+    'homes-u2',
+]
+
+SAMPLE_DARSHAN_FQLOG = os.path.join(INPUT_DIR, 'glock_vpicio_uni_id4478544_3-20-7667-18385393005962577517_1.darshan')
+SAMPLE_DARSHAN_FQLOG_META = {
+    "username": "glock",
+    "exename": "vpicio_uni",
+    "jobid": "4478544",
+    "start_month": 3,
+    "start_day": 20,
+    # don't test the rest for now
+}
+
+# Darshan logs that test weird edge cases.  Just throwing these into the
+# INPUT_DIR is good enough since some tests will glob against inputs/*.darshan
+SAMPLE_DARSHAN_LOG_NOPOSIX = os.path.join(INPUT_DIR, 'noposix.darshan') # lacks a POSIX module
+SAMPLE_DARSHAN_LOG_NOPOSIXOPENS = os.path.join(INPUT_DIR, 'noposix.darshan') # only posix op was a stat
 
 ### For lfsstatus connector/tool.  These values must reflect the contents of
 ### SAMPLE_OSTMAP_FILE and SAMPLE_OSTFULLNESS_FILE for the tests to actually
@@ -151,7 +188,10 @@ SAMPLE_COLLECTDES_HDF5 = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_COLLECTDES_DSET = '/datatargets/readrates'
 SAMPLE_COLLECTDES_DSET2 = '/datatargets/writerates'
 
-SAMPLE_COLLECTDES_INDEX = 'cori-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_INDEX = 'gerty-collectd-*' # this test will ONLY work at NERSC
+SAMPLE_GLOBUSLOGS_INDEX = 'dtn-dtn-log*' # this test will ONLY work at NERSC
+SAMPLE_COLLECTDES_HOST = 'localhost'
+SAMPLE_COLLECTDES_PORT = 9200
 SAMPLE_COLLECTDES_QUERY = {
     "query": {
         "bool": {
@@ -169,6 +209,26 @@ SAMPLE_COLLECTDES_QUERY = {
         },
     },
 }
+
+SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
+SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
+SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
+
+SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
+SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"
+SAMPLE_ESNET_SNMP_END = "2019-02-11T23:59:59"
+SAMPLE_ESNET_SNMP_ENDPT = "nersc"
+SAMPLE_ESNET_SNMP_FILE2 = os.path.join(INPUT_DIR, 'esnet_snmp-2.json.gz')
+SAMPLE_ESNET_SNMP_START2 = "2019-02-11T01:01:00"
+SAMPLE_ESNET_SNMP_END2 = "2019-02-11T01:04:00"
+
+SAMPLE_MMPERFMON_USAGE_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-usage.txt.gz')
+SAMPLE_MMPERFMON_NUMOPS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
+SAMPLE_MMPERFMON_TGZ_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tgz')
+SAMPLE_MMPERFMON_TAR_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tar')
+SAMPLE_MMPERFMON_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'mmperfmon_dir')
+SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
@@ -332,3 +392,51 @@ def try_unlink(output_filename):
     if os.path.exists(output_filename):
         print("Destroying %s" % output_filename)
         os.unlink(output_filename)
+
+# TimeSeries and HDF5 tests have some mutual dependency, so factor out those
+# test components here
+
+def compare_timeseries(timeseries1, timeseries2, verbose=False):
+    """
+    Compare two TimeSeries objects' datasets column by column
+    """
+    for timeseries1_index, column in enumerate(list(timeseries1.columns)):
+        timeseries2_index = timeseries2.column_map[column]
+        if verbose:
+            col_sum1 = timeseries1.dataset[:, timeseries1_index].sum()
+            col_sum2 = timeseries2.dataset[:, timeseries2_index].sum()
+            print("%-14s: %.16e vs. %.16e" % (column, col_sum1, col_sum2))
+        assert numpy.array_equal(timeseries1.dataset[:, timeseries1_index],
+                                 timeseries2.dataset[:, timeseries2_index])
+
+def generate_timeseries(file_name=SAMPLE_COLLECTDES_HDF5,
+                        dataset_name=SAMPLE_COLLECTDES_DSET):
+    """
+    Return a TimeSeries object that's initialized against the sample input
+    """
+    output_hdf5 = tokio.connectors.hdf5.Hdf5(file_name, 'r')
+    print("Creating timeseries from %s" % file_name)
+    timeseries = output_hdf5.to_timeseries(dataset_name=dataset_name)
+
+    return timeseries
+
+def untar(input_filename):
+    """Unpack a tarball to test support for that input type
+    """
+    cleanup_untar(input_filename)
+    tar = tarfile.open(input_filename)
+    tar.extractall(path=INPUT_DIR)
+    tar.close()
+
+def cleanup_untar(input_filename):
+    """Clean up the artifacts created by this test's untar() function
+    """
+    tar = tarfile.open(input_filename)
+    for member in tar.getmembers():
+        fq_name = os.path.join(INPUT_DIR, member.name)
+        if os.path.exists(fq_name) and fq_name.startswith(INPUT_DIR): # one final backstop
+            print("Removing %s" % fq_name)
+            if member.isdir():
+                shutil.rmtree(fq_name)
+            else:
+                os.unlink(fq_name)

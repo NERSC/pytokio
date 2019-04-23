@@ -2,6 +2,7 @@
 """
 
 import re
+import copy
 import datetime
 from tokio.connectors.common import SubprocessOutputDict
 
@@ -39,6 +40,15 @@ DELTIM_KEYS = set([
     'mounttime',
 ])
 
+REKEY_TABLES = {
+    'io totals by client application': 'client',
+    'io totals by client host': 'host',
+    'io totals by hpss client gateway (ui) host': 'host',
+#   'largest users': 'user', # degenerate users will occur if one user uses multiple client apps
+    'migration purge report': 'sc',
+#   'tape drive report': 'drivetyp',
+}
+
 class HpssDailyReport(SubprocessOutputDict):
     """Representation for the daily report that HPSS can generate
     """
@@ -68,6 +78,12 @@ class HpssDailyReport(SubprocessOutputDict):
             if finish_line != start_line and 'records' in parsed_table:
                 if parsed_table['system'] not in self:
                     self.__setitem__(parsed_table['system'], {})
+
+                # convert a list of records into a dict of indices
+                if parsed_table['title'] in REKEY_TABLES:
+                    parsed_table = _rekey_table(parsed_table,
+                                                key=REKEY_TABLES[parsed_table['title']])
+
                 self[parsed_table['system']][parsed_table['title']] = parsed_table['records']
             start_line += 1
 
@@ -90,21 +106,18 @@ def _parse_section(lines, start_line=0):
         {
             "system": "archive",
             "title": "io totals by hpss client gateway (ui) host",
-            "records": [
-                {
-                    "host": "heart",
+            "records": {
+                "heart": {
                     "io_gb": "148740.6",
                     "ops": "27991",
                     "users": "53",
                 },
-                {
-                    "host": "dtn11",
+                "dtn11": {
                     "io_gb": "29538.6",
                     "ops": "1694",
                     "users": "5",
                 },
-                {
-                    "host": "total",
+                "total": {
                     "io_gb": "178279.2",
                     "ops": "29685",
                     "users": "58",
@@ -255,6 +268,60 @@ def _find_columns(line, sep="=", gap=' ', strict=False):
         columns.append((col_start, len(line) - col_start))
 
     return columns
+
+def _rekey_table(table, key):
+    """Converts a list of records into a dict of records
+
+    Converts a table of records as returned by _parse_section() of the form::
+
+        {
+            "records": [
+                {
+                    "host": "heart",
+                    "io_gb": "148740.6",
+                    "ops": "27991",
+                    "users": "53",
+                },
+                ...
+            ]
+        }
+
+    Into a table of key-value pairs the form::
+
+        {
+            "records": {
+                "heart": {
+                    "io_gb": "148740.6",
+                    "ops": "27991",
+                    "users": "53",
+                },
+                ...
+            }
+        }
+
+    Does not handle degenerate keys when re-keying, so only some tables with a
+    uniquely identifying key can be rekeyed.
+
+    Args:
+        table (dict): Output of the _parse_section() function
+        key (str): Key to pull out of each element of table['records'] to use as
+            the key for each record
+
+    Returns:
+        dict: Table with records expressed as key-value pairs instead of a list
+    """
+    new_table = copy.deepcopy(table)
+    new_records = {}
+
+    for record in new_table['records']:
+        new_key = record.pop(key)
+        if new_key in new_records:
+            raise KeyError("Degenerate key %s=%s" % (key, new_key))
+        new_records[new_key] = record
+
+    new_table['records'] = new_records
+
+    return new_table
 
 def _hpss_timedelta_to_secs(timedelta_str):
     """Convert HPSS-encoded timedelta string into seconds

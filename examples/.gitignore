@@ -6,3 +6,5 @@ tokio.analysis.umami.py
 tokio.connectors.nersc_isdct-demo.py
 tokio.tools.hdf5-demo.py
 tokio.tools.hdf5-heatmap.py
+
+dailytraffic_*.json

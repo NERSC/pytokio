@@ -54,11 +54,14 @@ Note:
     ASCII translation.
 """
 
+import os
 import re
 import json
 from tokio.connectors.common import SubprocessOutputDict
 
 DARSHAN_PARSER_BIN = 'darshan-parser'
+
+DARSHAN_FILENAME_REX = re.compile(r'([^_%s]+)_([^%s]*?)_id(\d+)_(\d+)-(\d+)-(\d+)-(\d+)_(\d+).darshan' % (os.path.sep, os.path.sep))
 
 class Darshan(SubprocessOutputDict):
     def __init__(self, log_file=None, *args, **kwargs):
@@ -81,8 +84,21 @@ class Darshan(SubprocessOutputDict):
         self.log_file = log_file
         self._parser_mode = None
         self.subprocess_cmd = [DARSHAN_PARSER_BIN]
+        self.filename_metadata = {}
         if log_file is None:
             self.load()
+        else:
+            # try to infer metadata from file name
+            regex_match = DARSHAN_FILENAME_REX.search(log_file)
+            if regex_match:
+                self.filename_metadata['username'] = regex_match.group(1)
+                self.filename_metadata['exename'] = regex_match.group(2)
+                self.filename_metadata['jobid'] = regex_match.group(3)
+                self.filename_metadata['start_month'] = int(regex_match.group(4))
+                self.filename_metadata['start_day'] = int(regex_match.group(5))
+                self.filename_metadata['start_second_in_day'] = int(regex_match.group(6))
+                self.filename_metadata['logmod'] = int(regex_match.group(7))
+                self.filename_metadata['shutdown_secs'] = int(regex_match.group(8))
 
     def __repr__(self):
         """Serialize self into JSON.

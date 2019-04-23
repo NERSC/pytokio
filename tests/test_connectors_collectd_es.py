@@ -1,120 +1,151 @@
 #!/usr/bin/env python
-"""
-Test the ElasticSearch collectd connector.  Some of these tests will essentially
-pass only at NERSC because of the assumptions built into the indices.
+"""Test the Elasticsearch collectd connector
+
+Ensures that the connector-specific queries are working when Elasticsearch is
+available.  Will require modifying tokiotest.SAMPLE_COLLECTDES_* to work at
+non-NERSC sites.
 """
 
+import copy
+import gzip
+import json
 import datetime
-import nose
+
+import tokio.connectors.es
+import tokio.connectors.collectd_es
+import tokiotest
 try:
     import elasticsearch.exceptions
-    import tokio.connectors.collectd_es
     _HAVE_ELASTICSEARCH = True
 except ImportError:
     _HAVE_ELASTICSEARCH = False
-import tokiotest
-# import logging
 
-### the ElasticSearch python library can be VERY noisy on failures
+# elasticsearch can be VERY noisy on failures
+# import logging
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
-### PAGE_SIZE is number of documents to return per page
-PAGE_SIZE = 200
+FAKE_PAGES = []
+for fake_page in json.load(gzip.open(tokiotest.SAMPLE_COLLECTDES_FILE)):
+    FAKE_PAGES.append({
+        '_scroll_id': 1,
+        'hits': {
+            'hits': fake_page
+        }
+    })
+FAKE_PAGES.append({'_scroll_id': 1, 'hits': {'hits': []}})
 
-### QUERY_WINDOW is how long of a time period to search over
-QUERY_WINDOW = datetime.timedelta(seconds=10)
-
-FLUSH_STATE = {
-    'pages': []
-}
-
-def flush_function(es_obj):
+def test_query_interfaces():
+    """connectors.collectd_es.CollectdEs.query_*
     """
-    save our bundled pages into json
+    global _HAVE_ELASTICSEARCH
+
+    end = datetime.datetime.now() - datetime.timedelta(hours=1)
+    # adjust the timedelta to match the data source's data generate rates
+    start = end - datetime.timedelta(seconds=10)
+
+    esdb = None
+    if _HAVE_ELASTICSEARCH:
+        esdb = tokio.connectors.collectd_es.CollectdEs(
+            host=tokiotest.SAMPLE_COLLECTDES_HOST,
+            port=tokiotest.SAMPLE_COLLECTDES_PORT,
+            index=tokiotest.SAMPLE_COLLECTDES_INDEX)
+        try:
+            esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
+            esdb.query(tokio.connectors.collectd_es.BASE_QUERY)
+        except elasticsearch.exceptions.ConnectionError:
+            esdb = None
+
+    if not esdb:
+        esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
+        esdb.local_mode = True
+        print("Testing in local mode")
+    else:
+        print("Testing in remote mode")
+
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_disk,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='disk')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_disk()"
+    yield test_func, esdb, esdb.query_disk, 'plugin', start, end, 'disk'
+
+
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_cpu,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='cpu')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_cpu()"
+    yield test_func, esdb, esdb.query_cpu, 'plugin', start, end, 'cpu'
+
+#   validate_es_query_method(esdb=esdb,
+#                            method=esdb.query_memory,
+#                            field='plugin',
+#                            start=start,
+#                            end=end,
+#                            target_val='memory')
+    test_func = validate_es_query_method
+    test_func.description = "connectors.collectd_es.CollectdEs.query_memory()"
+    yield test_func, esdb, esdb.query_memory, 'plugin', start, end, 'memory'
+
+def validate_es_query_method(esdb, method, field, start, end, target_val):
+    """Tests a connector-specific query method
+
+    Exercises a connector-specific query method in a way that fully validates
+    functionality against a remote Elasticsearch service that contains arbitrary
+    data (but in the correct format) if available.  If a remote Elasticsearch
+    service is not available, still validates that the API works.
+
+    Args:
+        esdb: Instance of an object derived from connectors.es.EsConnection
+            to test
+        method: query method of ``esdb`` that should be called
+        field (str): key corresponding to the _source field that ``method`` is
+            querying.  Required to verify that ``method`` returns only those
+            records that match this field.
+        start (datetime.datetime): Passed as ``method``'s ``start`` argument
+        end (datetime.datetime): Passed as ``method``'s ``end`` argument
+        target_val: a value of ``field`` that will return more than zero results
+            when issued to a remote Elasticsearch service.  If operating in
+            local mode, this can be any value.
     """
-    global FLUSH_STATE
+    if esdb.local_mode:
+        esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
+#       method(start, end, target_val)
+        method(start, end)
+        assert esdb.scroll_pages
+    else:
+        print("Searching for %s" % target_val)
+#       method(start, end, target_val)
+        method(start, end)
+        assert esdb.scroll_pages
+        print("Got %d pages" % len(esdb.scroll_pages))
+        num_recs = sum([len(page) for page in esdb.scroll_pages])
+        print("Got %d records" % num_recs)
 
-    ### assert es_obj.page_size == flush_every as passed to es_obj.query_and_scroll
-    assert len(es_obj.scroll_pages) == 1
+        valid_records = 0
+        for page in esdb.scroll_pages:
+            for rec in page:
+                if rec['_source'][field] != target_val:
+                    print("%s != %s" % (rec['_source'][field], target_val))
+                    assert rec['_source'][field] == target_val
+                valid_records += 1
+        print("Validated %d records" % valid_records)
 
-    ### "flush" to the global state
-    FLUSH_STATE['pages'].append(es_obj.scroll_pages[0])
+    esdb.scroll_pages = []
 
-    ### empty the page buffer
-    es_obj.scroll_pages = []
-
-def test_flush_function_correctness():
+def test_to_dataframe():
+    """connectors.collectd_es.CollectdEs.to_dataframe()
     """
-    CollectdEs flush function correctness
-    """
-    if not _HAVE_ELASTICSEARCH:
-        raise nose.SkipTest("elasticsearch module not available")
-
-    # Define start/end time.  Because we don't know what's in the remote server,
-    # we can't really make this deterministic; just use a five second window
-    # ending now.
-    t_stop = datetime.datetime.now() - datetime.timedelta(hours=1)
-    t_start = t_stop - QUERY_WINDOW
-
-    # note that strftime("%s") is not standard POSIX; this may not work
-    query = tokio.connectors.collectd_es.build_timeseries_query(
-        tokiotest.SAMPLE_COLLECTDES_QUERY,
-        t_start,
-        t_stop)
-
-    # Connect
-    try:
-        es_obj = tokio.connectors.collectd_es.CollectdEs(
-            host='localhost',
-            port=9200,
-            index=tokiotest.SAMPLE_COLLECTDES_INDEX,
-            page_size=PAGE_SIZE)
-        ############################################################################
-        # Accumulate results using a flush_function
-        ############################################################################
-        es_obj.query_and_scroll(
-            query=query,
-            flush_every=PAGE_SIZE,
-            flush_function=flush_function
-        )
-    except elasticsearch.exceptions.ConnectionError as error:
-        raise nose.SkipTest(error)
-
-
-    # Run flush function on the last page
-    if len(es_obj.scroll_pages) > 0:
-        flush_function(es_obj)
-
-    # If no pages were found, there is a problem
-    assert len(FLUSH_STATE['pages']) > 0
-
-    if not len(FLUSH_STATE['pages']) > 2:
-        raise nose.SkipTest("time range only got %d pages; cannot test flush function"
-                            % len(FLUSH_STATE['pages']))
-
-    ############################################################################
-    # Accumulate results on the object without a flush function
-    ############################################################################
-    es_obj.query_and_scroll(query)
-
-    ############################################################################
-    # Ensure that both return identical hits
-    ############################################################################
-    flush_function_hits = set([])
-    for page in FLUSH_STATE['pages']:
-        flush_function_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print("flush_function populated %d documents" % len(flush_function_hits))
-
-    no_flush_hits = set([])
-    for page in es_obj.scroll_pages:
-        no_flush_hits |= set([x['_id'] for x in page['hits']['hits']])
-    print("no flush function populated %d documents" % len(no_flush_hits))
-
-    # Ensure that our ground-truth query actually returned something
-    assert len(no_flush_hits) > 0
-
-    # Catch obviously wrong number of returned results
-    assert len(no_flush_hits) == len(flush_function_hits)
-
-    # Catch cases where mismatching results are returned
-    assert flush_function_hits == no_flush_hits
+    esdb = tokio.connectors.collectd_es.CollectdEs(host=None, port=None, index=None)
+    esdb.local_mode = True
+    esdb.fake_pages = copy.deepcopy(FAKE_PAGES)
+    esdb.query_disk(datetime.datetime.now(), datetime.datetime.now())
+    dataframe = esdb.to_dataframe()
+    print(dataframe)
+    assert len(dataframe) > 0

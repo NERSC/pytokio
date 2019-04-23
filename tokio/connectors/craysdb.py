@@ -6,10 +6,10 @@ within the network fabric to provide topological information.
 """
 
 import sys
-from tokio.connectors.common import SubprocessOutputDict
+from . import common
 from tokio.common import isstr
 
-class CraySdbProc(SubprocessOutputDict):
+class CraySdbProc(common.SubprocessOutputDict):
     """Dictionary subclass that self-populates with Cray SDB data.
 
     Presents certain views of the Cray Service Database (SDB) as a

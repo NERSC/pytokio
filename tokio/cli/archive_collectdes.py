@@ -382,19 +382,19 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
                                                      end=global_end,
                                                      timestep=timestep,
                                                      num_columns=num_columns,
-                                                     column_names=datasets[real_dataset_name].columns,
-                                                     hdf5_file=None)
+                                                     column_names=datasets[real_dataset_name].columns)
 
             # we can't update an average, so zero out all prior values that
             # we will be overwriting
             reset_timeseries(datasets[real_dataset_name], query_start, query_end)
         else:
-            timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                     start=init_start,
-                                                     end=init_end,
-                                                     timestep=timestep,
-                                                     num_columns=num_columns,
-                                                     hdf5_file=hdf5_file)
+            timeseries = hdf5_file.to_timeseries(dataset_name=hdf5_dataset_name)
+            if timeseries is None:
+                timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                         start=init_start,
+                                                         end=init_end,
+                                                         timestep=timestep,
+                                                         num_columns=num_columns)
         datasets[dataset_name] = timeseries
 
     # Process all pages retrieved (this is computationally expensive)
@@ -433,7 +433,7 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
     _time0 = time.time()
     for dataset_name, dataset in datasets.items():
         if '/_' not in dataset_name:
-            dataset.commit_dataset(hdf5_file)
+            hdf5_file.commit_timeseries(dataset)
 
     if tokio.debug.DEBUG:
         print("Committed data to disk in %.4f seconds" % (time.time() - _time0))

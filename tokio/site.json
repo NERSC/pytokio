@@ -23,10 +23,28 @@
         "cscratch": "snx11168"
     },
     "hdf5_files": {
-        "scratch1": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11025.h5lmt",
-        "scratch2": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11035.h5lmt",
-        "scratch3": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11036.h5lmt",
-        "cscratch": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/cori_snx11168.h5lmt"
+        "scratch1": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/snx11025.hdf5",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11025.h5lmt"
+        ],
+        "scratch2": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/snx11035.hdf5",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11035.h5lmt"
+        ],
+        "scratch3": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/snx11036.hdf5",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/edison_snx11036.h5lmt"
+        ],
+        "cscratch": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/snx11168.hdf5",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/cori_snx11168.h5lmt"
+        ],
+        "coribb": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/coribb.hdf5"
+        ],
+        "esnet_nersc": [
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/esnet_nersc.hdf5"
+        ]
     },
     "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
     "lfsstatus_fullness_files": [
@@ -54,5 +72,26 @@
     "lfsstatus_fullness_providers": [
         "hdf5",
         "nersc_lfsstate"
-    ]
+    ],
+    "esnet_snmp_uri": "https://graphite.es.net/snmp/west",
+    "esnet_snmp_interfaces": {
+        "nersc": {
+            "sunn-cr5": [
+                "to_nersc_ip-d_v4",
+                "to_nersc_ip-d_v6",
+                "to_nersc_ip-b",
+                "to_nersc_ip-b_v6"
+            ],
+            "sacr-cr5": [
+                "to_nersc_ip-e"
+        ]
+        },
+        "alcf": {
+            "star-cr5": [
+                "to_anl_hpc_ip-a_v4v6",
+                "to_anl_hpc_ip-b_v4v6",
+                "to_anl_ip-g-hpc"
+            ]
+        }
+    }
 }

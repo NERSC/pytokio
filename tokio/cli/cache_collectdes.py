@@ -46,6 +46,7 @@ def main(argv=None):
                         help="port of ElasticSearch endpoint (default: 9200)")
     parser.add_argument('-i', '--index', type=str, default='cori-collectd-*',
                         help='ElasticSearch index to query (default:cori-collectd-*)')
+    parser.add_argument("-c", "--csv", action="store_true", help="return output in CSV format")
     args = parser.parse_args(argv)
 
     if args.debug:
@@ -63,8 +64,9 @@ def main(argv=None):
     if query_start >= query_end:
         raise Exception('query_start >= query_end')
 
-    # Read input from a cached json file (generated previously via the --json
-    # option) or by querying ElasticSearch?
+    # Read input from a cached json file (generated previously) or by querying
+    # Elasticsearch directly
+    must = []
     if args.input is None:
         ### Try to connect
         esdb = tokio.connectors.collectd_es.CollectdEs(
@@ -87,21 +89,20 @@ def main(argv=None):
 
         tokio.debug.debug_print("Loaded results from %s:%s" % (args.host, args.port))
     else:
-        _, encoding = mimetypes.guess_type(args.input)
-        if encoding == 'gzip':
-            input_file = gzip.open(args.input, 'r')
-        else:
-            input_file = open(args.input, 'r')
-        pages = json.load(input_file)
-        input_file.close()
+        esdb = tokio.connectors.collectd_es.CollectdEs.from_cache(args.input)
+        # the following query is arbitrary but is required to parse the cached output
+        esdb.query_disk(query_start, query_end)
         tokio.debug.debug_print("Loaded results from %s" % args.input)
 
     # Write output
-    if args.output:
-        _, encoding = mimetypes.guess_type(args.output)
-        output_file = gzip.open(args.output, 'w') if encoding == 'gzip' else open(args.output, 'w')
-        json.dump(pages, output_file)
-        output_file.close()
-        print("Wrote output to %s" % args.output)
+    cache_file = args.output
+    if cache_file is not None:
+        print("Caching to %s" % cache_file)
+
+    if args.csv:
+        if cache_file is None:
+            print(esdb.to_dataframe().to_csv())
+        else:
+            esdb.to_dataframe().to_csv(cache_file)
     else:
-        print(json.dumps(pages, indent=4, sort_keys=True))
+        esdb.save_cache(cache_file)

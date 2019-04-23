@@ -146,3 +146,11 @@ def test_all():
     verify_perf_counters(darshan)
     verify_base_counters(darshan)
     verify_total_counters(darshan)
+
+def test_filename_metadata():
+    """darshan.Darshan filename metadata"""
+    darshan = tokio.connectors.darshan.Darshan(tokiotest.SAMPLE_DARSHAN_FQLOG)
+    assert darshan.filename_metadata
+    for key, value in tokiotest.SAMPLE_DARSHAN_FQLOG_META.items():
+        assert key in darshan.filename_metadata
+        assert darshan.filename_metadata[key] == value
