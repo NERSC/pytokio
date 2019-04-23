@@ -13,8 +13,14 @@
         "^/global/project": "project2",
         "^/global/projectb": "projectb",
         "^/global/projecta": "projecta",
+        "^/global/dna": "global-dna",
+        "^/project/": "project2",
+        "^/projecta/": "projecta",
+        "^/projectb/": "projectb",
         "^/global/u1": "homes-u1",
         "^/global/u2": "homes-u2",
+        "^/global/homes": "homes",
+        "^/global/common": "global-common",
         "^/gpfs/mira-fs0": "mirafs0",
         "^/gpfs/mira-fs1": "mirafs1",
         "^/lus/theta-fs0": "thetafs0"
@@ -30,7 +36,8 @@
         "scratch1": "snx11025",
         "scratch2": "snx11035",
         "scratch3": "snx11036",
-        "cscratch": "snx11168"
+        "cscratch": "snx11168",
+        "thetafs0": "snx11214"
     },
     "hdf5_files": {
         "scratch1": [
@@ -52,8 +59,29 @@
         "coribb": [
             "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/coribb.hdf5"
         ],
+        "thetafs0": [
+            "/global/homes/g/glock/src/git/tokio-datadag/hdf5/%Y-%m-%d/snx11214.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/%Y-%m-%d/snx11214.hdf5"
+        ],
+        "mirafs0": [
+            "/global/homes/g/glock/src/git/tokio-datadag/hdf5/%Y-%m-%d/mira-fs0.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/%Y-%m-%d/mira-fs0.hdf5"
+        ],
+        "mirafs1": [
+            "/global/homes/g/glock/src/git/tokio-datadag/hdf5/%Y-%m-%d/mira-fs1.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/%Y-%m-%d/mira-fs1.hdf5"
+        ],
         "esnet_nersc": [
-            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/esnet_nersc.hdf5"
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/esnet_nersc.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/esnet_nersc/esnet_nersc-%Y-%m-%d.hdf5"
+        ],
+        "esnet_alcf": [
+            "/global/u2/g/glock/src/git/tokio-datadag/hdf5/esnet_alcf/esnet_alcf-%Y-%m-%d.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/esnet_alcf/esnet_alcf-%Y-%m-%d.hdf5"
+        ],
+        "esnet_olcf": [
+            "/global/u2/g/glock/src/git/tokio-datadag/hdf5/esnet_olcf/esnet_olcf-%Y-%m-%d.hdf5",
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/esnet_olcf/esnet_olcf-%Y-%m-%d.hdf5"
         ]
     },
     "isdct_files": "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/Intel_DCT_%Y%m%d.tgz",
@@ -70,11 +98,36 @@
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
 
     ],
+    "darshan_indices": {
+        "cori": [
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/%Y-%m-%d/darshanlogs-cori.db",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/darshanlogs-cori.db"
+        ],
+        "edison": [
+            "/Users/glock/src/git/work/tokio-datadag/hdf5/%Y-%m-%d/darshanlogs-edison.db",
+            "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/darshanlogs-edison.db"
+        ]
+    },
     "darshan_log_dirs": {
         "cori": "/global/cscratch1/sd/darshanlogs",
         "edison": "/global/cscratch1/sd/darshanlogs/edison"
     },
-    "hpss_report_files": "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d",
+    "globus_sum_by_endpoints": [
+        "/global/u2/g/glock/src/git/tokio-datadag/globus_summaries/summary_by_endpoints_%Y-%m-%d.json.gz",
+        "/Users/glock/src/git/work/tokio-datadag/globus_summaries/summary_by_endpoints_%Y-%m-%d.json.gz"
+    ],
+    "globus_hourly_sum": [
+        "/global/u2/g/glock/src/git/tokio-datadag/alcf_globuslogs/anl_alcf_gridftp_user_hour_%Y.db",
+        "/Users/glock/src/git/work/tokio-datadag/alcf_globuslogs/anl_alcf_gridftp_user_hour_%Y.db"
+    ],
+    "hpss_report_files": [
+        "/project/projectdirs/mpccc/hpss/daily_rpt/daily_rpt_%Y%m%d",
+        "/Users/glock/src/git/work/tokio-datadag/hpss_reports/daily_rpt_%Y%m%d"
+    ],
+    "daily_io_db": [
+        "/global/u2/g/glock/src/git/tokio-datadag/daily_io_traffic.db",
+        "/Users/glock/src/git/work/tokio-datadag/daily_io_traffic.db"
+    ],
     "jobinfo_jobid_providers": [
         "slurm",
         "nersc_jobsdb"
@@ -94,13 +147,38 @@
             ],
             "sacr-cr5": [
                 "to_nersc_ip-e"
-        ]
+            ]
         },
         "alcf": {
             "star-cr5": [
                 "to_anl_hpc_ip-a_v4v6",
                 "to_anl_hpc_ip-b_v4v6",
+                "to_anl_ip-a",
+                "to_anl_ip-b",
+                "1_2_1"
+            ],
+            "chic-cr5": [
+                "to_anl_ip-g",
                 "to_anl_ip-g-hpc"
+            ],
+            "anl-mr2": [
+                "ae0.1830",
+                "ae0.1940"
+            ],
+            "fnal-mr2": [
+                "xe-8_3_0.1800"
+            ]
+        },
+        "olcf": {
+            "ornl-cr5": [
+                "to_ornl_ip-a",
+                "to_ornl_ip-a_v6",
+                "7_1_1"
+            ],
+            "nash-cr5": [
+                "to_ornl_ip-d",
+                "to_ornl_ip-d_v6",
+                "1_2_1"
             ]
         }
     }
