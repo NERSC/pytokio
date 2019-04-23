@@ -497,6 +497,11 @@ def summarize_by_fs_lite(darshan_log):
 
             continue
 
+    # if the file could be opened and read but contained no valid Darshan data,
+    # it will have a valid header but no counters; bail
+    if not reduced_counters:
+        return {}
+
     # fix header entries
     header['exe'] = header['exe'][0]
     header['exename'] = os.path.basename(header['exe'])
