@@ -17,10 +17,7 @@ import argparse
 import warnings
 import multiprocessing
 import tokio.connectors.darshan
-import index_darshanlogs
-
-VERBOSITY = 0
-QUIET = False
+from . import index_darshanlogs
 
 def summarize_by_fs(darshan_log, max_mb=0.0):
     """
@@ -203,6 +200,11 @@ def summarize_by_fs_fast(darshan_log):
 
             continue
 
+    # if the file could be opened and read but contained no valid Darshan data,
+    # it will have a valid header but no counters; bail
+    if not reduced_counters:
+        return {}
+
     # fix header entries
     header['exe'] = header['exe'][0]
     header['exename'] = os.path.basename(header['exe'])
@@ -319,9 +321,6 @@ def index_darshanlogs_mira(log_list, output_file, threads=1, max_mb=0.0, bulk_in
 def main(argv=None):
     """Entry point for the CLI interface
     """
-    global VERBOSITY
-    global QUIET
-
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")
     parser.add_argument('-t', '--threads', default=1, type=int,
@@ -333,8 +332,8 @@ def main(argv=None):
     parser.add_argument('--no-bulk-insert', action='store_true', help="Insert each log record as soon as it is processed")
     args = parser.parse_args(argv)
 
-    VERBOSITY = args.verbose
-    QUIET = args.quiet
+    index_darshanlogs.VERBOSITY = args.verbose
+    index_darshanlogs.QUIET = args.quiet
 
     index_darshanlogs_mira(log_list=args.darshanlogs,
                            threads=args.threads,
