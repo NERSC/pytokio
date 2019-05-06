@@ -58,7 +58,10 @@ def setup_package():
         install_requires=REQUIREMENTS,
         extras_require={
             'collectdes': ['elasticsearch>=5.4'],
+            'nersc_globuslogs': ['elasticsearch>=5.4'],
             'esnet_snmp': ['requests'],
+            'lmtdb': ['mysqlclient'],
+            'nersc_jobsdb': ['mysqlclient'],
         },
         python_requires=">=2.7",
 
