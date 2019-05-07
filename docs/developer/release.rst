@@ -61,8 +61,8 @@ Cutting a first beta release
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Create a branch from ``rc`` called ``0.N``
-2. In that branch, update the version from ``0.N.0.devX`` to ``0.N.0b1`
-3. Commit to ``0.N`
+2. In that branch, update the version from ``0.N.0.devX`` to ``0.N.0b1``
+3. Commit to ``0.N``
 4. Tag/release ``v0.N.0b1`` from GitHub's UI from the ``0.N`` branch
 5. Update the version in ``0.N`` from ``0.N.0b1`` to ``0.N.0b2`` to prepare for
    a hypothetical next release
