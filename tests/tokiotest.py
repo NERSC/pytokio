@@ -124,13 +124,15 @@ SAMPLE_VERSIONS_HDF5 = os.path.join(INPUT_DIR, 'versions_test.hdf5')
 SAMPLE_H5LMT_DATES = ['2017-03-20', '2017-03-21']
 SAMPLE_TOKIOTS_FILE = os.path.join(INPUT_DIR, 'sample_tokiots.hdf5')
 SAMPLE_TIMESERIES_FILES = {
-    "TOKIO HDF5": SAMPLE_TOKIOTS_FILE,
+#   "TOKIO collectdes HDF5": SAMPLE_TOKIOTS_FILE,
+    "TOKIO lmtdb HDF5": SAMPLE_LMTDB_TTS_HDF5,
     "pylmt HDF5": SAMPLE_H5LMT_FILE,
 }
 # SAMPLE_TIMESERIES_DATASETS are the datasets contained in SAMPLE_TIMESERIES_FILES
 SAMPLE_TIMESERIES_DATASETS = [
     "datatargets/readbytes",
-    "datatargets/writerates"
+    "datatargets/writerates",
+    "mdtargets/openrates",
 ]
 # TIMESERIES_DATASETS_MOST only needs to contain datasets that are created or
 # accessed in different ways.

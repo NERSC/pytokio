@@ -175,33 +175,45 @@ def test_mapped_dataset():
     func.description = "connectors.hdf5 transpose mapping"
     yield func, tokiotest.SAMPLE_H5LMT_FILE
 
-def _test_mapped_dataset(input_file):
+def _test_mapped_dataset(input_file, datasets=None):
     """
     Load two views of the same data set (rates and bytes) and ensure that they
     are being correctly calculated.
     """
+    if datasets is None:
+        datasets = [
+            {
+                'rate': 'datatargets/readrates',
+                'tot': 'datatargets/readbytes', 
+            },
+            {
+                'rate': 'mdtargets/openrates',
+                'tot': 'mdtargets/opens', 
+            },
+        ]
     numpy.set_printoptions(formatter={'float': '{: 0.1f}'.format},
                            edgeitems=5,
                            linewidth=100)
     print("Testing %s" % input_file)
     hdf5_file = tokio.connectors.hdf5.Hdf5(input_file)
-    readbytes = hdf5_file['datatargets/readbytes']
-    readrates = hdf5_file['datatargets/readrates']
-    timestamps = hdf5_file.get_timestamps('datatargets/readbytes')[0:2]
-    timestep = timestamps[1] - timestamps[0]
+    for dataset_pair in datasets:
+        totals = hdf5_file[dataset_pair['tot']]
+        rates = hdf5_file[dataset_pair['rate']]
+        timestamps = hdf5_file.get_timestamps(dataset_pair['rate'])[0:2]
+        timestep = timestamps[1] - timestamps[0]
 
-    print("Timestep appears to be %s" % timestep)
-    print("readbytes is")
-    print(readbytes[:, :])
-    print()
-    print("readrates is")
-    print(readrates[:, :] * timestep)
-    print()
-    print("Are readrates a factor of %.2f away from readbytes?" % timestep)
+        print("Timestep appears to be %s" % timestep)
+        print(dataset_pair['tot'] + " is")
+        print(totals[:, :])
+        print()
+        print(dataset_pair['rate'] + " is")
+        print(rates[:, :] * timestep)
+        print()
+        print("Are rates a factor of %.2f away from totals?" % timestep)
 
-    equivalency = numpy.isclose(readrates[:, :] * timestep, readbytes[:, :])
-    print((readrates[:, :] * timestep) - readbytes[:, :])
-    assert equivalency.all()
+        equivalency = numpy.isclose(rates[:, :] * timestep, totals[:, :])
+        print(((rates[:, :] * timestep) - totals[:, :]).sum())
+        assert equivalency.all()
 
 def _test_transpose_mapping(input_file):
     """
