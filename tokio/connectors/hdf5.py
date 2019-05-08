@@ -387,168 +387,168 @@ SCHEMA_DATASET_PROVIDERS = {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/openrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/closes": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/closerates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/mknods": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/mknodrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/links": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/linkrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/unlinks": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/unlinkrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/mkdirs": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/mkdirrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/rmdirs": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/rmdirrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/renames": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/renamerates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/getxattrs": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/getxattrrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/statfss": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/statfsrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/setattrs": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/setattrrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/getattrs": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/getattrrates",
-                'to_rates': True,
+                'to_rates': False,
             },
         },
         "mdtargets/openrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/opens",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/closerates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/closes",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/mknodrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/mknods",
-                'to_rates': False,
+                'to_rates': True
             },
         },
         "mdtargets/linkrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/links",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/unlinkrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/unlinks",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/mkdirrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/mkdirs",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/rmdirrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/rmdirs",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/renamerates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/renames",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/getxattrrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/getxattrs",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/statfsrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/statfss",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/setattrrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/setattrs",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
         "mdtargets/getattrrates": {
             'func': convert_counts_rates,
             'args': {
                 'from_key': "mdtargets/getattrs",
-                'to_rates': False,
+                'to_rates': True,
             },
         },
     },
