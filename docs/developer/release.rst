@@ -80,10 +80,16 @@ Applying fixes to a beta release
 Cutting a second beta release
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Tag/release ``v0.N.0b2`` from GitHub's UI from the ``0.N`` branch
-2. Update the version in ``0.N`` from ``0.N.0b2`` to ``0.N.0b3`` (or ``b4``, etc)
+1. Tag the version (``git tag v0.N.0-beta2``) on the ``0.N`` branch
+2. ``git push --tags`` to send the new tag up to GitHub
+3. **Make sure the tag passes all tests in Travis**
+4. Build the source tarball using the release process described in the `Releasing pytokio`_
+   section
+5. Release ``v0.N.0-beta2`` from GitHub's UI and upload the tarball from the
+   previous step
+6. Update the version in ``0.N`` from ``0.N.0b2`` to ``0.N.0b3`` (or ``b4``, etc)
    to prepare for a hypothetical next release
-3. Commit to ``0.N``
+7. Commit to ``0.N``
 
 Releasing pytokio
 --------------------------------------------------------------------------------
