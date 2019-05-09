@@ -71,7 +71,7 @@ MMPERFMON_UNITS_TO_BYTES = {
 
 class Mmperfmon(SubprocessOutputDict):
     """
-    Representation for the mmperfmon query command.  Generates a dict of form
+    Representation for the mmperfmon query command.  Generates a dict of form::
 
         {
             timestamp0: {
@@ -137,8 +137,8 @@ class Mmperfmon(SubprocessOutputDict):
 
         Args:
             input_file (str): Path to either a directory or a tarfile containing
-                multiple text files, each of which contains the output of a
-                single mmperfmon invocation.
+            multiple text files, each of which contains the output of a single
+            mmperfmon invocation.
         """
         for (member_name, _, member_handle) in walk_file_collection(input_file):
             try:
@@ -224,7 +224,7 @@ class Mmperfmon(SubprocessOutputDict):
 
         Returns:
             pandas.DataFrame: All measurements from the given host.  Columns
-                correspond to different metrics; indexed in time.
+            correspond to different metrics; indexed in time.
         """
         to_df = {}
         for timestamp, hosts in self.items():
@@ -248,7 +248,7 @@ class Mmperfmon(SubprocessOutputDict):
 
         Returns:
             pandas.DataFrame: All measurements of the given metric for all
-                hosts.  Columns represent hosts; indexed in time.
+            hosts.  Columns represent hosts; indexed in time.
         """
         to_df = {}
         for timestamp, hosts in self.items():
@@ -305,7 +305,7 @@ def get_col_pos(line, align=None):
 
     Returns:
         list: List of tuples of integer offsets denoting the start index
-            (inclusive) and stop index (exclusive) for each column.
+        (inclusive) and stop index (exclusive) for each column.
     """
     col_pos = []
     last_start = None

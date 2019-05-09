@@ -301,7 +301,7 @@ class Slurm(SubprocessOutputDict):
 
         Returns:
             tuple: Two-item tuple of (earliest start time, latest end time) in
-                whatever type ``self['start']`` and ``self['end']`` are stored
+            whatever type ``self['start']`` and ``self['end']`` are stored
         """
         min_start = None
         max_end = None

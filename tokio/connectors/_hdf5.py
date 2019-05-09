@@ -164,7 +164,7 @@ def map_dataset(hdf5_file, from_key, *args, **kwargs):
     """Create a MappedDataset
 
     Creates a MappedDataset from an h5py.File (or derivative).  Functionally
-    similar to h5py.File.__getitem__.
+    similar to :meth:`h5py.File.__getitem__`.
 
     Args:
         hdf5_file (h5py.File or connectors.hdf5.Hdf5): file containing dataset of interest
@@ -256,7 +256,7 @@ def reduce_dataset_name(key):
             a modifier suffix
     Returns:
         tuple of (str, str or None): First string is the base key, the second
-            string is the modifier.
+        string is the modifier.
     """
     if key.endswith('/missing'):
         return tuple(key.rsplit('/', 1))

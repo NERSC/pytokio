@@ -44,6 +44,10 @@ def enumerate_dated_files(start, end, template,
             files.
         timedelta (datetime.timedelta): Increment to use when iterating between
             `start` and `end` while looking for matching files.
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
 
     if end < start:
@@ -78,6 +82,10 @@ def _expand_check_paths(template, lookup_key):
         lookup_key (str or None): When `type(template)` is dict, use this key
             to identify the key-value to use as template.  If None and
             ``template`` is a dict, iterate through all values of `template`.
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
     check_paths = []
     if isinstance(template, dict):
@@ -104,6 +112,10 @@ def _match_files(check_paths, use_time, match_first):
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
 
     matching = []
