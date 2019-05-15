@@ -90,11 +90,15 @@ def process_page(page):
     Go through a list of docs and insert their data into a numpy matrix.  In
     the future this should be a flush function attached to the CollectdEs
     connector class.
+
+    Args:
+        page (dict): A single page of output from an Elasticsearch scroll
+            query.  Should contain a ``hits`` key.
     """
 
     _time0 = time.time()
     inserts = []
-    for doc in page.get('hits', []).get('hits', []):
+    for doc in page:
         # basic validity checking
         if '_source' not in doc:
             warnings.warn("No _source in doc")
@@ -328,8 +332,31 @@ def normalize_cpu_datasets(inserts, datasets):
 
 def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_end,
                   timestep, num_servers, devices_per_server, threads=1):
-    """
+    """Stores a page from Elasticsearch query in an HDF5 file
     Take pages from ElasticSearch query and store them in output_file
+
+    Args:
+        pages (list): A list of page objects (dictionaries)
+        output_file (str): Path to an HDF5 file in which page data should be
+            stored
+        init_start (datetime.datetime): Lower bound of time (inclusive) to be
+            stored in the ``output_file``.  Used when creating a non-existent
+            HDF5 file.
+        init_end (datetime.datetime): Upper bound of time (inclusive) to be
+            stored in the ``output_file``.  Used when creating a non-existent
+            HDF5 file.
+        query_start (datetime.datetime): Retrieve data greater than or equal to
+            this time from Elasticsearch
+        query_end (datetime.datetime); Retrieve data less than this time from
+            Elasticsearch
+        timestep (int): Time, in seconds, between successive sample intervals
+            to be used when initializing ``output_file``
+        num_servers (int): Number of discrete servers in the cluster.  Used
+            when initializing ``output_file``.
+        devices_per_server (int): Number of SSDs per server.  Used when
+            initializing ``output_file``.
+        threads (int): Number of parallel threads to utilize when parsing the
+            Elasticsearch output
     """
     datasets = {}
 
