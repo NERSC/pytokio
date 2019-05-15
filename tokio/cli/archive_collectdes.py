@@ -94,7 +94,7 @@ def process_page(page):
 
     _time0 = time.time()
     inserts = []
-    for doc in page:
+    for doc in page.get('hits', []).get('hits', []):
         # basic validity checking
         if '_source' not in doc:
             warnings.warn("No _source in doc")
