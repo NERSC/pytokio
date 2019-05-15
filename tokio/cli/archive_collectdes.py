@@ -550,8 +550,7 @@ def main(argv=None):
                              tokio.connectors.collectd_es.QUERY_MEMORY_DATA]:
             esdb.query_timeseries(plugin_query,
                                   query_start,
-                                  query_end,
-                                  timeout=args.timeout)
+                                  query_end)
             if pages is None:
                 pages = esdb.scroll_pages
             else:
