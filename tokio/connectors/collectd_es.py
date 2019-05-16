@@ -69,7 +69,7 @@ class CollectdEs(es.EsConnection):
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
         """
-        self._query_timeseries(QUERY_DISK_DATA, start, end)
+        self.query_timeseries(QUERY_DISK_DATA, start, end)
 
     def query_memory(self, start, end):
         """Query Elasticsearch for collectd memory plugin data.
@@ -78,7 +78,7 @@ class CollectdEs(es.EsConnection):
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
         """
-        self._query_timeseries(QUERY_MEMORY_DATA, start, end)
+        self.query_timeseries(QUERY_MEMORY_DATA, start, end)
 
     def query_cpu(self, start, end):
         """Query Elasticsearch for collectd cpu plugin data.
@@ -87,24 +87,50 @@ class CollectdEs(es.EsConnection):
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
         """
-        self._query_timeseries(QUERY_CPU_DATA, start, end)
+        self.query_timeseries(QUERY_CPU_DATA, start, end)
 
-    def _query_timeseries(self, query_template, start, end):
-        """Map connection-wide attributes to self.query_timeseries arguments
+    def query_timeseries(self, query_template, start, end, source_filter=None,
+                         filter_function=None, flush_every=None,
+                         flush_function=None):
+        """Map connection-wide attributes to super(self).query_timeseries arguments
 
         Args:
             query_template (dict): a query object containing at least one
                 ``@timestamp`` field
             start (datetime.datetime): lower bound for query (inclusive)
             end (datetime.datetime): upper bound for query (exclusive)
+            source_filter (bool or list): Return all fields contained in each
+                document's _source field if True; otherwise, only return source
+                fields contained in the provided list of str.  If None, use the
+                default for this connector.
+            filter_function (function, optional): Function to call before each
+                set of results is appended to the ``scroll_pages`` attribute; if
+                specified, return value of this function is what is appended.
+                If None, use the default for this connector.
+            flush_every (int or None): trigger the flush function once the
+                number of docs contained across all ``scroll_pages`` reaches
+                this value.  If None, do not apply `flush_function`.  If None,
+                use the default for this connector.
+            flush_function (function, optional): function to call when
+                `flush_every` docs are retrieved.  If None, use the default for
+                this connector.
         """
-        return self.query_timeseries(query_template=query_template,
-                                     start=start,
-                                     end=end,
-                                     source_filter=SOURCE_FILTER,
-                                     filter_function=self.filter_function,
-                                     flush_every=self.flush_every,
-                                     flush_function=self.flush_function)
+        if source_filter is None:
+            source_filter = SOURCE_FILTER
+        if filter_function is None:
+            filter_function = self.filter_function
+        if flush_every is None:
+            flush_every = self.flush_every
+        if flush_function is None:
+            flush_function = self.flush_function
+        return super(CollectdEs, self)\
+            .query_timeseries(query_template=query_template,
+                              start=start,
+                              end=end,
+                              source_filter=source_filter,
+                              filter_function=filter_function,
+                              flush_every=flush_every,
+                              flush_function=flush_function)
 
     def to_dataframe(self):
         """Converts self.scroll_pages to a DataFrame
