@@ -28,6 +28,7 @@ import os
 import re
 import glob
 import subprocess
+import prep_release
 
 RELEASE = False # set to True when building a release distribution
 
