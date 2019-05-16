@@ -766,7 +766,7 @@ class Hdf5(h5py.File):
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
 
-        return self.__getitem__(dataset_name).attrs[COLUMN_NAME_KEY].astype('U')
+        return self.__getitem__(dataset_name).attrs.get(COLUMN_NAME_KEY).astype('U')
 
     def _get_columns_h5lmt(self, dataset_name):
         """Get the column names of an h5lmt dataset
