@@ -364,103 +364,106 @@ def pages_to_hdf5(pages, output_file, init_start, init_end, query_start, query_e
     if os.path.isfile(output_file):
         file_exists = True
 
-    hdf5_file = tokio.connectors.hdf5.Hdf5(output_file)
-    schema_version = hdf5_file.get_version()
+    with tokio.connectors.hdf5.Hdf5(output_file) as hdf5_file:
+        schema_version = hdf5_file.get_version()
 
-    # New files have a blank slate and should use the latest; existing files may
-    # have orphaned duplicate data if two schemata are encoded at once
-    if file_exists and schema_version != SCHEMA_VERSION:
-        warnings.warn("%s existing version %s will be upgraded in-place to %s"
-            % (output_file, schema_version, SCHEMA_VERSION))
+        # New files have a blank slate and should use the latest; existing files may
+        # have orphaned duplicate data if two schemata are encoded at once
+        if file_exists and schema_version != SCHEMA_VERSION:
+            warnings.warn("%s existing version %s will be upgraded in-place to %s"
+                % (output_file, schema_version, SCHEMA_VERSION))
 
-    # Update to the latest schema version no matter what
-    schema_version = SCHEMA_VERSION
-    hdf5_file.attrs['version'] = SCHEMA_VERSION
-    schema = tokio.connectors.hdf5.SCHEMA.get(schema_version)
-    if schema is None:
-        raise KeyError("Schema version %d in %s is not known by connectors.hdf5" % (SCHEMA_VERSION, output_file))
+        # Update to the latest schema version no matter what
+        schema_version = SCHEMA_VERSION
+        hdf5_file.attrs['version'] = SCHEMA_VERSION
+        schema = tokio.connectors.hdf5.SCHEMA.get(schema_version)
+        if schema is None:
+            raise KeyError("Schema version %d in %s is not known by connectors.hdf5" % (SCHEMA_VERSION, output_file))
 
-    # Initialize datasets
-    for dataset_name in DATASETS:
-        hdf5_dataset_name = schema.get(dataset_name)
-        if hdf5_dataset_name is None:
-            if '/_' not in dataset_name:
-                warnings.warn("Dataset %s in %s is not in schema version %s (passing through)" % (dataset_name, output_file, schema_version))
-            hdf5_dataset_name = dataset_name
-        if dataset_name.lstrip('/').startswith('datatargets'):
-            num_columns = num_servers * devices_per_server
-        else:
-            num_columns = num_servers
+        # Initialize datasets
+        for dataset_name in DATASETS:
+            hdf5_dataset_name = schema.get(dataset_name)
+            if hdf5_dataset_name is None:
+                if '/_' not in dataset_name:
+                    warnings.warn("Dataset %s in %s is not in schema version %s (passing through)" % (dataset_name, output_file, schema_version))
+                hdf5_dataset_name = dataset_name
+            if dataset_name.lstrip('/').startswith('datatargets'):
+                num_columns = num_servers * devices_per_server
+            else:
+                num_columns = num_servers
 
-        # If this is a metadataset, initialize it with the shape and columns of
-        # the dataset it describes so that we can use the same index values for
-        # both.  This requires the parent dataset's TimeSeries to already be
-        # defined and attached, which requires DATASETS to be an OrderedDict so
-        # that we aren't initializing metadatasets before datasets.
-        real_dataset_name = metadataset2dataset_key(dataset_name)
-        if real_dataset_name:
-            if real_dataset_name not in datasets:
-                raise KeyError("Cannot init metadataset %s; dataset %s does not exist" %
-                               (dataset_name, real_dataset_name))
-            global_start = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[0])
-            global_end = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[-1] + datasets[real_dataset_name].timestep)
-            timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                     start=global_start,
-                                                     end=global_end,
-                                                     timestep=timestep,
-                                                     num_columns=num_columns,
-                                                     column_names=datasets[real_dataset_name].columns)
-
-            # we can't update an average, so zero out all prior values that
-            # we will be overwriting
-            reset_timeseries(datasets[real_dataset_name], query_start, query_end)
-        else:
-            timeseries = hdf5_file.to_timeseries(dataset_name=hdf5_dataset_name)
-            if timeseries is None:
+            # If this is a metadataset, initialize it with the shape and columns of
+            # the dataset it describes so that we can use the same index values for
+            # both.  This requires the parent dataset's TimeSeries to already be
+            # defined and attached, which requires DATASETS to be an OrderedDict so
+            # that we aren't initializing metadatasets before datasets.
+            real_dataset_name = metadataset2dataset_key(dataset_name)
+            if real_dataset_name:
+                if real_dataset_name not in datasets:
+                    raise KeyError("Cannot init metadataset %s; dataset %s does not exist" %
+                                   (dataset_name, real_dataset_name))
+                global_start = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[0])
+                global_end = datetime.datetime.fromtimestamp(datasets[real_dataset_name].timestamps[-1] + datasets[real_dataset_name].timestep)
                 timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
-                                                         start=init_start,
-                                                         end=init_end,
+                                                         start=global_start,
+                                                         end=global_end,
                                                          timestep=timestep,
-                                                         num_columns=num_columns)
-        datasets[dataset_name] = timeseries
+                                                         num_columns=num_columns,
+                                                         column_names=datasets[real_dataset_name].columns)
 
-    # Process all pages retrieved (this is computationally expensive)
-    _time0 = time.time()
-    updates = []
-    if threads > 1:
-        # updates = multiprocessing.Pool(16).map(process_page, pages)
-        for update in multiprocessing.Pool(threads).imap_unordered(process_page, pages):
-            updates.append(update)
-    else:
-        for page in pages:
-            updates.append(process_page(page))
-    _timef = time.time()
-    _extract_time = _timef - _time0
-    tokio.debug.debug_print("Extracted %d elements from %d pages in %.4f seconds" \
-                            % (sum([len(x) for x in updates]),
-                               len(pages),
-                               _extract_time))
+                # we can't update an average, so zero out all prior values that
+                # we will be overwriting
+                reset_timeseries(datasets[real_dataset_name], query_start, query_end)
+            else:
+                timeseries = hdf5_file.to_timeseries(dataset_name=hdf5_dataset_name)
+                if timeseries is None:
+                    timeseries = tokio.timeseries.TimeSeries(dataset_name=hdf5_dataset_name,
+                                                             start=init_start,
+                                                             end=init_end,
+                                                             timestep=timestep,
+                                                             num_columns=num_columns)
+            datasets[dataset_name] = timeseries
 
-    # Take the processed list of data to insert and actually insert them
-    _time0 = time.time()
-    for update in updates:
-        update_datasets(update, datasets)
-    _timef = time.time()
-    _update_time = _timef - _time0
-    if tokio.debug.DEBUG:
-        print("Inserted %d elements from %d pages in %.4f seconds" \
-            % (len(updates), len(pages), _update_time))
-        print("Processed %d pages in %.4f seconds" \
-            % (len(pages), _extract_time + _update_time))
+        # Process all pages retrieved (this is computationally expensive)
+        _time0 = time.time()
+        updates = []
+        if threads > 1:
+            pool = multiprocessing.Pool(threads)
+            for update in pool.imap_unordered(process_page, pages):
+                updates.append(update)
+            # explicitly terminate to prevent HDF5 locking problems caused by
+            # un-gc'ed file handles
+            pool.terminate()
+        else:
+            for page in pages:
+                updates.append(process_page(page))
+        _timef = time.time()
+        _extract_time = _timef - _time0
+        tokio.debug.debug_print("Extracted %d elements from %d pages in %.4f seconds" \
+                                % (sum([len(x) for x in updates]),
+                                   len(pages),
+                                   _extract_time))
 
-    for update in updates:
-        normalize_cpu_datasets(update, datasets)
+        # Take the processed list of data to insert and actually insert them
+        _time0 = time.time()
+        for update in updates:
+            update_datasets(update, datasets)
+        _timef = time.time()
+        _update_time = _timef - _time0
+        if tokio.debug.DEBUG:
+            print("Inserted %d elements from %d pages in %.4f seconds" \
+                % (len(updates), len(pages), _update_time))
+            print("Processed %d pages in %.4f seconds" \
+                % (len(pages), _extract_time + _update_time))
 
-    # Write datasets out to HDF5 file
-    _time0 = time.time()
-    for dataset_name, dataset in datasets.items():
-        if '/_' not in dataset_name:
-            hdf5_file.commit_timeseries(dataset)
+        for update in updates:
+            normalize_cpu_datasets(update, datasets)
+
+        # Write datasets out to HDF5 file
+        _time0 = time.time()
+        for dataset_name, dataset in datasets.items():
+            if '/_' not in dataset_name:
+                hdf5_file.commit_timeseries(dataset)
 
     if tokio.debug.DEBUG:
         print("Committed data to disk in %.4f seconds" % (time.time() - _time0))
