@@ -16,4 +16,4 @@ import tokio.analysis
 # Exceptions
 from tokio.common import ConfigError
 
-__version__ = '0.12.0b4'
+__version__ = '0.12.0b5'
