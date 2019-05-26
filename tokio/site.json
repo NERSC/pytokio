@@ -21,7 +21,7 @@
         "^na\\d+md\\d+$": "mdtarget"
     },
     "mmperfmon_server_map": {
-        "^ngfsv24[23]": "mdserver"
+        "^ngfsv49[23]": "mdserver"
     },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",

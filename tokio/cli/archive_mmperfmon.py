@@ -69,7 +69,7 @@ class Archiver(dict):
             init_start (datetime.datetime): Lower bound of time to be archived,
                 inclusive
             init_end (datetime.datetime): Upper bound of time to be archived,
-                inclusive # TODO - is this inclusive?
+                exclusive
             timestep (int): Number of seconds between successive data points.
             num_luns (int or None): Number of LUNs expected to appear in mmperfmon
                 outputs.  If None, autodetect.
@@ -364,7 +364,7 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
             the timesteps, inclusive
         init_end (datetime.datetime): If a dataset does not already exist within
             the HDF5 file, create one using this as the upper bound for the
-            timesteps (exclusive?)
+            timesteps, exclusive
         hdf5_file (str): Path to the HDF5 file in which datasets should be
             initialized
     """
