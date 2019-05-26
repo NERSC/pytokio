@@ -1,8 +1,24 @@
 """Retrieves mmperfmon counters and store them in TOKIO Timeseries format
+
+Command-line tool that loads a tokio.connectors.mmperfmon.Mmperfmon object and
+encodes it as a TOKIO TimeSeries object.  Syntax to create a new HDF5 is:
+
+    $ archive_mmperfmon --timestep=60 --init-start 2019-05-15T00:00:00 \\
+        --init-end 2019-05-16T00:00:00 mmperfmon.2019-05-15.tgz
+
+where mmperfmon.2019-05-15.tgz is one or more files that can be loaded by
+`tokio.connectors.mmperfmon.Mmperfmon.from_file`.
+
+When updating an existing HDF5 file, the minimum required syntax is
+
+    $ archive_mmperfmon --timestep=60 mmperfmon.2019-05-15.tgz
+
+The init start/end times are only required when creating an empty HDF5 file.
 """
 
 import re
 import sys
+import operator
 import datetime
 import argparse
 import warnings
@@ -24,12 +40,19 @@ COUNTER_MAP = {
     "cpu_user": "cpuuser",
     "mem_free_bytes": "memfree",
     "mem_total_bytes": "memtotal",
-    "net_r_bytes": "netinbytes",
-    "net_s_bytes": "netoutbytes",
+    "net_r_bytes": "netinbytes", # not implemented
+    "net_s_bytes": "netoutbytes", # not implemented
 }
 
 UNITS_MAP = {
-    # TODO
+    "cpusys": "%",
+    "cpuuser": "%",
+    "readbytes": "bytes",
+    "writebytes": "bytes",
+    "memfree": "bytes",
+    "memtotal": "bytes",
+    "netinbytes": "bytes", # not implemented
+    "netoutbytes": "bytes", # not implemented
 }
 
 class Archiver(dict):
@@ -108,10 +131,17 @@ class Archiver(dict):
         """
         num_luns = set([])
         num_servers = set([])
+        min_timestamp = None
+        max_timestamp = None
 
         # first figure out the dimensions of each dataset and cache type maps
         datasets = {}
-        for fqhosts in mmpm.values():
+        for timestamp, fqhosts in mmpm.items():
+            timestamp_int = int(timestamp)
+            if min_timestamp is None or timestamp_int < min_timestamp:
+                min_timestamp = timestamp_int
+            if max_timestamp is None or timestamp_int > max_timestamp:
+                max_timestamp = timestamp_int
             for fqhost, counters in fqhosts.items():
                 num_servers.add(fqhost)
                 server_type = self.server_type(fqhost)
@@ -130,21 +160,33 @@ class Archiver(dict):
                                 datasets[dataset_name] = set([])
                             datasets[dataset_name].add(column)
                     else:
-                        dataset_name = "%ss/%s" % (server_type, COUNTER_MAP.get(counter, counter))
+                        canonical_counter = COUNTER_MAP.get(counter, counter)
+                        dataset_name = "%ss/%s" % (server_type, canonical_counter)
                         if dataset_name not in datasets:
                             datasets[dataset_name] = set([])
                         datasets[dataset_name].add(fqhost)
+
+                        # little hacky bits to patch together missing datasets
+                        if canonical_counter == 'cpuuser':
+                            dataset_name = "%ss/cpuload" % server_type
+                            if dataset_name not in datasets:
+                                datasets[dataset_name] = set([])
+                            datasets[dataset_name].add(fqhost)
 
         # figure out number of luns and servers if necessary
         if self.num_luns is None:
             self.num_luns = len(num_luns)
         if self.num_servers is None:
             self.num_servers = len(num_servers)
+        if self.init_start is None:
+            self.init_start = datetime.datetime.fromtimestamp(min_timestamp)
+        if self.init_end is None:
+            self.init_end = datetime.datetime.fromtimestamp(max_timestamp)
 
         # then initialize all datasets
         for dataset_name, columns in datasets.items():
-            tokio.debug.debug_print("Initializing %s with %d columns" %
-                                    (dataset_name, len(columns)))
+            tokio.debug.debug_print("Initializing %s with %d columns between %s and %s" %
+                                    (dataset_name, len(columns), self.init_start, self.init_end))
             self.init_dataset(
                 dataset_name=dataset_name,
                 columns=list(columns))
@@ -156,6 +198,12 @@ class Archiver(dict):
         they have been populated.  Such actions are configured entirely in
         self.config and require no external input.
         """
+
+        # convert CPU loads to percents
+        for dataset_name in self.keys():
+            if dataset_name.endswith('cpuuser') or dataset_name.endswith('cpusys'):
+                self[dataset_name].dataset *= 100.0
+
         self.set_timeseries_metadata(self.keys())
 
     def set_timeseries_metadata(self, dataset_names):
@@ -173,7 +221,7 @@ class Archiver(dict):
                 self[dataset_name].group_metadata.update({'source': 'mmperfmon'})
 
     def archive(self, mmpm):
-        """Extract and encode data from an mmperfmon output file
+        """Extracts and encode data from an Mmperfmon object
 
         Uses the mmperfmon connector to populate one or more TimeSeries objects.
 
@@ -184,11 +232,7 @@ class Archiver(dict):
         """
         self.init_datasets(mmpm)
 
-        # then populate all datasets
-        num_timestamps = set([])
-        num_counters = set([])
         for timestamp_int, fqhosts in mmpm.items():
-            num_timestamps.add(timestamp_int)
             for fqhost, counters in fqhosts.items():
                 server_type = self.server_type(fqhost)
                 for counter, value in counters.items():
@@ -214,21 +258,25 @@ class Archiver(dict):
                                 column_name=column,
                                 value=actual_value)
                     else:
-                        dataset_name = "%ss/%s" % (server_type, COUNTER_MAP.get(counter, counter))
+                        canonical_counter = COUNTER_MAP.get(counter, counter)
+                        dataset_name = "%ss/%s" % (server_type, canonical_counter)
                         # insert element
                         self[dataset_name].insert_element(
                             timestamp=datetime.datetime.fromtimestamp(int(timestamp_int)),
                             column_name=fqhost,
                             value=value)
 
-                    num_counters.add(counter)
+                        # little hacky bits to patch together missing datasets
+                        if canonical_counter == "cpuuser":
+                            dataset_name = "%ss/cpuload" % server_type
+                            self[dataset_name].insert_element(
+                                timestamp=datetime.datetime.fromtimestamp(int(timestamp_int)),
+                                column_name=fqhost,
+                                value=value,
+                                reducer=operator.add)
 
-        tokio.debug.debug_print("Found %d timestamps" % len(num_timestamps))
         tokio.debug.debug_print("Found %d hosts" % self.num_servers)
-        tokio.debug.debug_print("Found %d counters" % len(num_counters))
-        tokio.debug.debug_print("Datasets:")
-        for dataset in self.keys():
-            tokio.debug.debug_print("  %s" % dataset)
+        tokio.debug.debug_print("Found %d timestamps" % len(set(list(mmpm.keys()))))
 
     def lun_type(self, lun_name):
         """Infers the dataset name to which a LUN should belong
@@ -299,8 +347,23 @@ class Archiver(dict):
         return "dataserver"
 
 def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
-    """
-    Initialize the datasets at full dimensions in the HDF5 file if necessary
+    """Creates HDF5 datasets within a file based on TimeSeries objects
+
+    Idempotently ensures that `hdf5_file` contains a dataset corresponding to
+    each tokio.timeseries.TimeSeries object contained in the `datasets` object.
+
+    Args:
+        datasets (Archiver): Dictionary keyed by dataset name and whose values
+            are tokio.timeseries.TimeSeries objects.  One HDF5 dataset will be
+            created for each TimeSeries object.
+        init_start (datetime.datetime): If a dataset does not already exist
+            within the HDF5 file, create it using this as a lower bound for
+            the timesteps, inclusive
+        init_end (datetime.datetime): If a dataset does not already exist within
+            the HDF5 file, create one using this as the upper bound for the
+            timesteps (exclusive?)
+        hdf5_file (str): Path to the HDF5 file in which datasets should be
+            initialized
     """
     schema = tokio.connectors.hdf5.SCHEMA.get(SCHEMA_VERSION)
     for dataset_name, dataset in datasets.items():
@@ -309,6 +372,7 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
             if '/_' not in dataset_name:
                 warnings.warn("Dataset key %s is not in schema" % dataset_name)
             continue
+
         if hdf5_dataset_name not in hdf5_file:
             # attempt to convert dataset into a timeseries
             timeseries = hdf5_file.to_timeseries(dataset_name=hdf5_dataset_name)
@@ -369,7 +433,7 @@ def archive_mmperfmon(init_start, init_end, timestep, num_luns, num_servers, out
     with tokio.connectors.hdf5.Hdf5(output_file) as hdf5_file:
         hdf5_file.attrs['version'] = SCHEMA_VERSION
 
-        init_hdf5_file(datasets, init_start, init_end, hdf5_file)
+        init_hdf5_file(datasets, datasets.init_start, datasets.init_end, hdf5_file)
 
         for dataset in datasets.values():
             print("Writing out %s" % dataset.dataset_name)
@@ -404,20 +468,23 @@ def main(argv=None):
         tokio.debug.DEBUG = True
 
     # Convert CLI options into datetime
-    try:
-        init_start = datetime.datetime.strptime(args.init_start, DATE_FMT)
-        init_end = datetime.datetime.strptime(args.init_end, DATE_FMT)
-    except ValueError:
-        sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
-        raise
+    init_start = None
+    init_end = None
+    if args.init_start is not None or args.init_end is not None:
+        try:
+            init_start = datetime.datetime.strptime(args.init_start, DATE_FMT)
+            init_end = datetime.datetime.strptime(args.init_end, DATE_FMT)
+        except ValueError:
+            sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
+            raise
 
-    # Basic input bounds checking
-    if init_start >= init_end:
-        raise ValueError('init_start >= init_end')
-    elif init_start >= init_end:
-        raise ValueError('init_start >= init_end')
-    elif args.timestep < 1:
-        raise ValueError('--timestep must be > 0')
+        # Basic input bounds checking
+        if init_start >= init_end:
+            raise ValueError('init_start >= init_end')
+        elif init_start >= init_end:
+            raise ValueError('init_start >= init_end')
+        elif args.timestep < 1:
+            raise ValueError('--timestep must be > 0')
 
     archive_mmperfmon(
         init_start=init_start,
