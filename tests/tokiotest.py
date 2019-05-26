@@ -233,6 +233,8 @@ SAMPLE_MMPERFMON_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'mmperfmon_dir')
 # SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
 SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free_bytes', 'mem_total_bytes']
 SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
+SAMPLE_MMPERFMON_MULTI = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-mini.tgz')
+SAMPLE_MMPERFMON_MULTI_SUBSET = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-micro.tgz')
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
