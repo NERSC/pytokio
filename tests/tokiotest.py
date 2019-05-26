@@ -13,6 +13,7 @@ import tempfile
 import subprocess
 import datetime
 import numpy # for compare_timeseries
+import h5py
 
 try:
     import StringIO as io
@@ -235,6 +236,9 @@ SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free_bytes', 'mem_total_
 SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
 SAMPLE_MMPERFMON_MULTI = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-mini.tgz')
 SAMPLE_MMPERFMON_MULTI_SUBSET = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-micro.tgz')
+SAMPLE_MMPERFMON_MULTI_START = "2019-05-15T00:00:00"
+SAMPLE_MMPERFMON_MULTI_END = "2019-05-16T00:00:00"
+SAMPLE_MMPERFMON_TIMESTEP = 60
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
@@ -446,3 +450,57 @@ def cleanup_untar(input_filename):
                 shutil.rmtree(fq_name)
             else:
                 os.unlink(fq_name)
+
+def summarize_hdf5(hdf5_file):
+    """
+    Return some summary metrics of an hdf5 file in a mostly content-agnostic way
+    """
+    # characterize the h5file in a mostly content-agnostic way
+    summary = {
+        'sums': {},
+        'shapes': {},
+        'updates': {},
+    }
+
+    def characterize_object(obj_name, obj_data):
+        """retain some properties of each dataset in an hdf5 file"""
+        if isinstance(obj_data, h5py.Dataset):
+            summary['shapes'][obj_name] = obj_data.shape
+            # note that this will break if the hdf5 file contains non-numeric datasets
+            if len(obj_data.shape) == 1:
+                summary['sums'][obj_name] = obj_data[:].sum()
+            elif len(obj_data.shape) == 2:
+                summary['sums'][obj_name] = obj_data[:, :].sum()
+            elif len(obj_data.shape) == 3:
+                summary['sums'][obj_name] = obj_data[:, :, :].sum()
+            summary['updates'][obj_name] = obj_data.attrs.get('updated')
+
+    hdf5_file.visititems(characterize_object)
+
+    return summary
+
+def identical_datasets(summary0, summary1):
+    """
+    compare the contents of two HDF5s for similarity
+    """
+    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
+    num_compared = 0
+    for metric in 'sums', 'shapes':
+        for key, value in summary0[metric].items():
+            num_compared += 1
+            assert key in summary1[metric]
+            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
+            assert summary1[metric][key] == value
+
+    # check to make sure summary1 was modified after summary0 was generated
+    for obj, update in summary0['updates'].items():
+        if update is not None:
+            result = summary1['updates'][obj] > summary0['updates'][obj]
+            print("%s newer than %s? %s" % (summary1['updates'][obj],
+                                            summary0['updates'][obj],
+                                            result))
+            assert result
+
+    assert num_compared > 0
+
+
