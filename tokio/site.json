@@ -16,6 +16,13 @@
         "^/global/u1": "homes-u1",
         "^/global/u2": "homes-u2"
     },
+    "mmperfmon_lun_map": {
+        "^ddn\\d+dt\\d+$": "datatarget",
+        "^na\\d+md\\d+$": "mdtarget"
+    },
+    "mmperfmon_md_servers": {
+        "^ngfsv24[23]": "mdserver"
+    },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",
         "scratch2": "snx11035",
