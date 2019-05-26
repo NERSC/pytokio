@@ -10,7 +10,7 @@ import tokio.debug
 
 import tokio.connectors
 import tokio.tools
-import tokio.analysis
+# import tokio.analysis # do not import by default
 # import tokio.cli # do not import by default
 
 # Exceptions
