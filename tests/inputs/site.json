@@ -21,10 +21,13 @@
     },
     "mmperfmon_lun_map": {
         "^ddn\\d+dt\\d+$": "datatarget",
+        "^xx\\d+yy\\d+$": "datatarget",
+        "^zz\\d+qq\\d+$": "mdtarget",
         "^na\\d+md\\d+$": "mdtarget"
     },
-    "mmperfmon_md_servers": {
-        "^ngfsv24[23]": "mdserver"
+    "mmperfmon_server_map": {
+        "^ngfsv49[23]": "mdserver",
+        "^xxxxx49[23]": "mdserver"
     },
     "fsname_to_backend_name": {
         "scratch1": "snx11025",

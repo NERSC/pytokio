@@ -308,6 +308,7 @@ class Archiver(dict):
 
         for regex, ltype in self.lun_map.items():
             if regex.match(lun_name):
+                self.lun_types[lun_name] = ltype
                 return ltype
 
         return ""
@@ -342,9 +343,11 @@ class Archiver(dict):
 
         for regex, stype in self.server_map.items():
             if regex.match(server_name):
-                return server_name
+                self.server_types[server_name] = stype
+                return stype
 
-        return "dataserver"
+        self.server_types[server_name] = "dataserver"
+        return self.server_types[server_name]
 
 def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
     """Creates HDF5 datasets within a file based on TimeSeries objects
