@@ -20,7 +20,7 @@
         "^ddn\\d+dt\\d+$": "datatarget",
         "^na\\d+md\\d+$": "mdtarget"
     },
-    "mmperfmon_md_servers": {
+    "mmperfmon_server_map": {
         "^ngfsv24[23]": "mdserver"
     },
     "fsname_to_backend_name": {

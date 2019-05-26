@@ -239,6 +239,24 @@ SAMPLE_MMPERFMON_MULTI_SUBSET = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-mi
 SAMPLE_MMPERFMON_MULTI_START = "2019-05-15T00:00:00"
 SAMPLE_MMPERFMON_MULTI_END = "2019-05-16T00:00:00"
 SAMPLE_MMPERFMON_TIMESTEP = 60
+SAMPLE_MMPERFMON_OST = "xx55yy55"
+SAMPLE_MMPERFMON_MDT = "zz55qq55"
+SAMPLE_MMPERFMON_OSS = "xxxxx207.site.edu"
+SAMPLE_MMPERFMON_MDS = "xxxxx493.site.edu"
+SAMPLE_MMPERFMON_DATASETS = [ # these datasets should all be generated in SAMPLE_MMPERFMON_MULTI
+    'dataservers/cpuuser',
+    'dataservers/cpusys',
+    'dataservers/memtotal',
+    'dataservers/memfree',
+    'mdservers/cpuuser',
+    'mdservers/cpusys',
+    'mdservers/memtotal',
+    'mdservers/memfree',
+    'datatargets/readbytes',
+    'datatargets/writebytes',
+    'mdtargets/readbytes',
+    'mdtargets/writebytes',
+]
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
