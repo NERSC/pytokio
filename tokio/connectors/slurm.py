@@ -2,7 +2,8 @@
 """Connect to Slurm via Slurm CLI outputs.
 
 This connector provides Python bindings to retrieve information made available
-through the standard Slurm saccount and scontrol CLI commands.
+through the standard Slurm saccount and scontrol CLI commands.  It is currently
+very limited in functionality.
 """
 
 import json
@@ -20,6 +21,46 @@ from tokio.connectors.common import SubprocessOutputDict
 
 SACCT = 'sacct'
 SCONTROL = 'scontrol'
+
+DEFAULT_KEYS = ['jobidraw', 'start', 'end']
+
+def jobs_running_between(start, end, keys=None):
+    """Generate a list of Slurm jobs that ran between a time range
+
+    Args:
+        start (datetime.datetime): Find jobs that ended at or after this time
+        end (datetime.datetime): Find jobs that started at or before this time
+        state (str): Any valid sacct state
+        keys (list): List of Slurm fields to return for each running job
+
+    Returns:
+        tokio.connectors.slurm.Slurm: Slurm object containing jobs whose
+        runtime overlapped with the start and end times
+    """
+    args = [
+        '--parsable',
+        '--starttime', start.strftime("%Y-%m-%dT%H:%M:%S"),
+        '--endtime', end.strftime("%Y-%m-%dT%H:%M:%S"),
+        '--state', 'R',
+        '--allusers',
+    ]
+
+    if keys is None:
+        args += ['--format', ','.join(DEFAULT_KEYS)]
+    else:
+        args += ['--format', ','.join(keys)]
+
+    try:
+        print(" ".join([SACCT] + args))
+        output_str = subprocess.check_output([SACCT] + args)
+        if not isstr(output_str):
+            output_str = output_str.decode() # for python3
+    except OSError as error:
+        if error.errno == errno.ENOENT:
+            raise type(error)(error.errno, "Slurm CLI (%s command) not found" % SCONTROL)
+        raise
+
+    return Slurm(from_string=output_str)
 
 def expand_nodelist(node_string):
     """Expand Slurm compact nodelist into a set of nodes.
@@ -191,7 +232,7 @@ class Slurm(SubprocessOutputDict):
         elif self.jobid is None:
             raise Exception("either jobid or cache_file must be specified on init")
         else:
-            self.load_keys('jobidraw', 'start', 'end', 'nodelist')
+            self.load_keys(*(DEFAULT_KEYS + ['nodelist']))
 
     def load_keys(self, *keys):
         """Retrieve a list of keys from sacct and insert them into self.
@@ -388,6 +429,7 @@ def parse_sacct(sacct_str):
             if jobidraw in result:
                 warnings.warn("Duplicate raw jobid '%s' found" % jobidraw)
             for col, key in enumerate(cols):
-                record[key] = fields[col]
+                if key:
+                    record[key] = fields[col]
             result[jobidraw] = record
     return result

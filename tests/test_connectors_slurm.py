@@ -37,7 +37,7 @@ def verify_slurm_json(slurm_json):
 
 def test_load_slurm_cache():
     """
-    Initialize Slurm from cache file
+    tokio.connectors.slurm.Slurm: from cache file
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     verify_slurm(slurm_data)
@@ -45,7 +45,7 @@ def test_load_slurm_cache():
 @tokiotest.needs_slurm
 def test_load_slurm_sacct():
     """
-    Initialize Slurm from sacct command
+    tokio.connectors.slurm.Slurm: from sacct
     """
     tokiotest.check_slurm()
     try:
@@ -60,7 +60,7 @@ def test_load_slurm_sacct():
 
 def test_slurm_to_json():
     """
-    Slurm.to_json() baseline functionality
+    tokio.connectors.slurm.Slurm.to_json()
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     json_str = slurm_data.to_json()
@@ -69,7 +69,7 @@ def test_slurm_to_json():
 
 def test_slurm_to_json_kwargs():
     """
-    Slurm.to_json() functionality with json.dumps kwargs
+    tokio.connectors.slurm.Slurm.to_json() with json.dumps kwargs
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     json_str_sm = slurm_data.to_json(indent=2, sort_keys=True)
@@ -81,7 +81,7 @@ def test_slurm_to_json_kwargs():
 
 def test_slurm_to_dataframe():
     """
-    Slurm.to_dataframe() functionality and correctness
+    tokio.connectors.slurm.Slurm.to_dataframe()
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
 
@@ -122,7 +122,7 @@ def expand_nodelist(min_nid, max_nid):
 
 def test_expand_nodelist():
     """
-    expand_nodelist functionality
+    tokio.connectors.slurm.expand_nodelist()
     """
     min_node = random.randint(1, 6000)
     max_node = min_node + random.randint(1, 10000)
@@ -130,7 +130,7 @@ def test_expand_nodelist():
 
 def test_compact_nodelist():
     """
-    compact_nodelist functionality (from set and string)
+    tokio.connectors.slurm.compact_nodelist() from set and string
     """
     min_node = random.randint(1, 6000)
     max_node = min_node + random.randint(1, 10000)
@@ -150,7 +150,7 @@ def test_compact_nodelist():
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_slurm_serializer():
     """
-    Serialize and deserialize connectors.Slurm
+    tokio.connectors.slurm.Slurm: serialize and deserialize
     """
     tokiotest.check_slurm()
     # Read from a cache file
@@ -165,22 +165,37 @@ def test_slurm_serializer():
 
 def test_get_job_ids():
     """
-    Slurm.get_job_ids() functionality
+    tokio.connectors.slurm.Slurm.get_job_ids()
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     assert len(slurm_data.get_job_ids()) == tokiotest.SAMPLE_SLURM_CACHE_JOBCT
 
 def test_get_job_nodes():
     """
-    Slurm.get_job_nodes() functionality
+    tokio.connectors.slurm.Slurm.get_job_nodes()
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     assert len(slurm_data.get_job_nodes()) == tokiotest.SAMPLE_SLURM_CACHE_NODECT
 
 def test_get_job_startend():
     """
-    Slurm.get_job_startend() functionality
+    tokio.connectors.slurm.Slurm.get_job_startend()
     """
     slurm_data = tokio.connectors.slurm.Slurm(cache_file=tokiotest.SAMPLE_SLURM_CACHE_FILE)
     start, end = slurm_data.get_job_startend()
     assert (end - start).total_seconds() < tokiotest.SAMPLE_SLURM_CACHE_MAX_WALLSECS
+
+@tokiotest.needs_slurm
+def test_jobs_running_between():
+    """tokio.connectors.slurm.jobs_running_between()
+
+    This only works if sacct is working and jobs were running seven days ago
+    """
+    tokiotest.check_slurm()
+    start_time = datetime.datetime.now() - datetime.timedelta(days=7)
+    end_time = start_time + datetime.timedelta(minutes=1)
+    slurm_data = tokio.connectors.slurm.jobs_running_between(
+        start=start_time,
+        end=end_time)
+    print("Found %d jobs running now" % len(slurm_data))
+    assert len(slurm_data) > 0
