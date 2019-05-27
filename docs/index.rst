@@ -25,6 +25,7 @@ been documented in the `pytokio architecture paper`_ presented at the
     user/install
     user/architecture
     user/command-line
+    user/timeseries
 
 .. toctree::
     :caption: API Documentation
