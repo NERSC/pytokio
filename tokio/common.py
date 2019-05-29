@@ -104,7 +104,7 @@ def recast_string(value):
         value (str): A string that may represent an int or float
 
     Returns:
-        int, float, bool, or str: The most precise numerical or boolean
+        int, float, bool, str, or None: The most precise numerical or boolean
         representation of ``value`` if ``value`` is a valid string-encoded
         version of that type.  Returns the unchanged string otherwise.
     """
@@ -123,5 +123,7 @@ def recast_string(value):
         new_value = True
     elif value == "False":
         new_value = False
+    elif value == "null": # for mmperfmon
+        new_value = None
 
     return new_value

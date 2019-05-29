@@ -233,6 +233,10 @@ class Mmperfmon(SubprocessOutputDict):
                 # turn number strings into numerics
                 old_value = recast_string(val.strip())
 
+                # skip null values entirely as if they never existed
+                if old_value is None:
+                    continue
+
                 # attempt to turn human-readable byte quantities into numbers of bytes
                 new_value = value_unit_to_bytes(old_value)
                 new_counter = orig_counter + "_bytes" if type(old_value) != type(new_value) else orig_counter
@@ -240,12 +244,14 @@ class Mmperfmon(SubprocessOutputDict):
                 if timestamp not in self:
                     self[timestamp] = {}
                 to_update = self[timestamp].get(hostname, {})
+
                 if device_id:
                     if new_counter not in to_update:
                         to_update[new_counter] = {}
                     to_update[new_counter].update({device_id: new_value})
                 else:
                     to_update[new_counter] = new_value 
+
                 if hostname not in self[timestamp]:
                     self[timestamp][hostname] = to_update
 
