@@ -3,10 +3,16 @@
 tokio.timeseries.TimeSeries methods
 """
 
+import datetime
 import random
+import nose
 import numpy
 import tokio
 from tokiotest import generate_timeseries, compare_timeseries
+
+START = datetime.datetime(2019, 5, 28, 1, 0, 0)
+END = datetime.datetime(2019, 5, 28, 2, 0, 0)
+DELTIM = datetime.timedelta(seconds=10)
 
 def test_rearrange():
     """
@@ -210,3 +216,67 @@ def test_add_rows():
     assert prev_deltim > 0
     assert timeseries.timestamps.shape[0] == timeseries.dataset.shape[0]
     assert (timeseries.timestamps.shape[0] - add_rows) == orig_row_count
+
+def _test_insert_element(timeseries, timestamp, column_name, value, reducer, expect_failure):
+    worked = timeseries.insert_element(
+        timestamp=timestamp,
+        column_name=column_name,
+        value=value,
+        reducer=reducer)
+
+    print("worked? ", worked)
+    if expect_failure:
+        assert not worked
+    else:
+        assert worked
+
+def test_insert_element():
+    """TimeSeries.insert_element()
+    """
+    timeseries = tokio.timeseries.TimeSeries(
+        dataset_name='test_dataset',
+        start=START,
+        end=END,
+        timestep=DELTIM.total_seconds(),
+        num_columns=5,
+        column_names=['a', 'b', 'c', 'd', 'e'])
+
+    func = _test_insert_element
+    func.description = "TimeSeries.insert_element(): insert element at first position"
+    yield func, timeseries, START, 'a', 1.0, None, False
+
+    func.description = "TimeSeries.insert_element(): insert element at last position"
+    yield func, timeseries, END - DELTIM, 'a', 1.0, None, False
+
+    func.description = "TimeSeries.insert_element(): insert element at negative position"
+    yield func, timeseries, START - DELTIM, 'a', 1.0, None, True
+
+    func.description = "TimeSeries.insert_element(): insert element beyond end position"
+    yield func, timeseries, END, 'a', 1.0, None, True
+
+def test_insert_element_columns():
+    """TimeSeries.insert_element(): insert element in column that does fit"""
+    timeseries = tokio.timeseries.TimeSeries(
+        dataset_name='test_dataset',
+        start=START,
+        end=END,
+        timestep=DELTIM.total_seconds(),
+        num_columns=6,
+        column_names=['a', 'b', 'c', 'd', 'e'])
+
+    _test_insert_element(timeseries, START + DELTIM, 'f', 1.0, None, False)
+
+    assert 'f' in timeseries.columns
+
+@nose.tools.raises(IndexError)
+def test_insert_element_column_overflow():
+    """TimeSeries.insert_element(): insert element in column that doesn't fit"""
+    timeseries = tokio.timeseries.TimeSeries(
+        dataset_name='test_dataset',
+        start=START,
+        end=END,
+        timestep=DELTIM.total_seconds(),
+        num_columns=5,
+        column_names=['a', 'b', 'c', 'd', 'e'])
+
+    _test_insert_element(timeseries, START + DELTIM, 'f', 1.0, None, True)
