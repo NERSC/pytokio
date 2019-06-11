@@ -122,9 +122,11 @@ def test_multithreaded():
     tokiotest.run_bin(tokio.cli.index_darshanlogs, argv)
     verify_index_db(tokiotest.TEMP_FILE.name)
 
+@tokiotest.needs_darshan
 def test_get_file_mount():
     """cli.index_darshanlogs.get_file_mount
     """
+    tokiotest.check_darshan()
     # key = test case, val = true value
     test_cases = {
         '/var/spool/whatever': '/',
