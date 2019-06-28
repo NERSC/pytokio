@@ -1,15 +1,16 @@
 """Retrieves mmperfmon counters and store them in TOKIO Timeseries format
 
-Command-line tool that loads a tokio.connectors.mmperfmon.Mmperfmon object and
-encodes it as a TOKIO TimeSeries object.  Syntax to create a new HDF5 is:
+Command-line tool that loads a :class:`tokio.connectors.mmperfmon.Mmperfmon`
+object and encodes it as a TOKIO TimeSeries object.  Syntax to create a new
+HDF5 is::
 
     $ archive_mmperfmon --timestep=60 --init-start 2019-05-15T00:00:00 \\
         --init-end 2019-05-16T00:00:00 mmperfmon.2019-05-15.tgz
 
-where mmperfmon.2019-05-15.tgz is one or more files that can be loaded by
-`tokio.connectors.mmperfmon.Mmperfmon.from_file`.
+where _mmperfmon.2019-05-15.tgz_ is one or more files that can be loaded by
+:meth:`tokio.connectors.mmperfmon.Mmperfmon.from_file`.
 
-When updating an existing HDF5 file, the minimum required syntax is
+When updating an existing HDF5 file, the minimum required syntax is::
 
     $ archive_mmperfmon --timestep=60 mmperfmon.2019-05-15.tgz
 
