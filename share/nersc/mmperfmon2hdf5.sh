@@ -3,12 +3,15 @@
 #  Tool to archive a day's worth of mmperfmon data into a TOKIO Time Series file
 #
 
-PYTOKIO_HOME=${PYTOKIO_HOME:-/global/homes/g/glock/src/git/pytokio-dev}
+HERE=$(dirname $(readlink -f ${BASH_SOURCE[0]}))
+
+PYTOKIO_HOME=${PYTOKIO_HOME:-$(readlink -f ${HERE}/../..)}
 ARCHIVE_MMPERFMON=${ARCHIVE_MMPERFMON:-$PYTOKIO_HOME/bin/archive_mmperfmon.py}
 TIMESTEP=${TIMESTEP:-60}
 
 declare -A MMPERFMON_DIR_BASES
 MMPERFMON_DIR_BASES[projecta]="/global/projecta/iotest/kkr/gpfs-for-glenn/output"
+MMPERFMON_DIR_BASES[projectb]="/global/projectb/iotest/kkr/gpfs-for-glenn/output"
 MMPERFMON_DIR_BASES[project2]="/global/project/iotest/kkr/gpfs-for-glenn/output"
 
 # you shouldn't have to modify anything below here
@@ -61,8 +64,8 @@ while true; do
     ${ARCHIVE_MMPERFMON} --init-start "${today}T00:00:00" \
                          --init-end "${tomorrow}T00:00:00" \
                          --timestep ${TIMESTEP} \
-                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${today}-*.out \
-                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${yesterday}-23:*.out \
+                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${today}-*.out* \
+                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${yesterday}-23:*.out* \
                          --output "$output_file"
     ret=$?
     tend=$(date +%s)
