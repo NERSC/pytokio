@@ -3,10 +3,11 @@
 """
 
 import os
+import glob
 import datetime
 
 def enumerate_dated_files(start, end, template,
-                          lookup_key=None, match_first=True,
+                          lookup_key=None, match_first=True, expand_glob=False,
                           timedelta=datetime.timedelta(days=1)):
     """Locate existing time-indexed files between a start and end time.
 
@@ -42,6 +43,7 @@ def enumerate_dated_files(start, end, template,
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
+        expand_glob (bool): If True, expand globs after expanding template
         timedelta (datetime.timedelta): Increment to use when iterating between
             `start` and `end` while looking for matching files.
 
@@ -58,7 +60,7 @@ def enumerate_dated_files(start, end, template,
     day = start
     results = []
     while day.date() <= end.date():
-        results += _match_files(check_paths, day, match_first)
+        results += _match_files(check_paths, day, match_first, expand_glob)
         day += timedelta
 
     return results
@@ -102,7 +104,7 @@ def _expand_check_paths(template, lookup_key):
     return check_paths
 
 
-def _match_files(check_paths, use_time, match_first):
+def _match_files(check_paths, use_time, match_first, expand_glob):
     """Locate file(s) that match a templated file path for a given time
 
     Args:
@@ -112,6 +114,7 @@ def _match_files(check_paths, use_time, match_first):
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
+        expand_glob (bool): If True, expand globs after expanding template
 
     Returns:
         list: List of strings, each describing a path to an existing HDF5 file
@@ -119,11 +122,20 @@ def _match_files(check_paths, use_time, match_first):
     """
 
     matching = []
+    print(check_paths)
     for check_path in check_paths:
-        match_path = use_time.strftime(check_path)
-        if os.path.exists(match_path):
-            matching.append(match_path)
-            if match_first:
-                break
+        match_paths = use_time.strftime(check_path)
+        print(match_paths)
+        if expand_glob:
+            match_paths = glob.glob(match_paths)
+        else:
+            match_paths = [match_paths]
+
+        print(match_paths)
+        for match_path in match_paths:
+            if os.path.exists(match_path):
+                matching.append(match_path)
+                if match_first:
+                    break
 
     return matching
