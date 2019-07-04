@@ -434,7 +434,7 @@ def archive_mmperfmon(init_start, init_end, timestep, num_luns, num_servers, out
 
     datasets.finalize()
 
-    with tokio.connectors.hdf5.Hdf5(output_file) as hdf5_file:
+    with tokio.connectors.hdf5.Hdf5(output_file, libver='latest') as hdf5_file:
         hdf5_file.attrs['version'] = SCHEMA_VERSION
 
         init_hdf5_file(datasets, datasets.init_start, datasets.init_end, hdf5_file)
