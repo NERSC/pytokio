@@ -401,6 +401,23 @@ def delete_tempfile():
     if os.path.isfile(TEMP_FILE.name):
         os.unlink(TEMP_FILE.name)
 
+TEMP_DIR = None
+def create_tempdir(delete=True):
+    """
+    Create a temporary directory
+    """
+    global TEMP_DIR
+    TEMP_DIR = tempfile.mkdtemp()
+
+def delete_tempdir():
+    """
+    Destroy the temporary directory regardless of if the wrapped function succeeded
+    or not
+    """
+    global TEMP_DIR
+    if os.path.isdir(TEMP_DIR):
+        shutil.rmtree(TEMP_DIR)
+
 def gunzip(input_filename, output_filename):
     """
     To check support for both compressed and uncompressed data streams, create
