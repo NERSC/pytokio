@@ -122,16 +122,13 @@ def _match_files(check_paths, use_time, match_first, expand_glob):
     """
 
     matching = []
-    print(check_paths)
     for check_path in check_paths:
         match_paths = use_time.strftime(check_path)
-        print(match_paths)
         if expand_glob:
             match_paths = glob.glob(match_paths)
         else:
             match_paths = [match_paths]
 
-        print(match_paths)
         for match_path in match_paths:
             if os.path.exists(match_path):
                 matching.append(match_path)
