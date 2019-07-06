@@ -133,6 +133,6 @@ def _match_files(check_paths, use_time, match_first, expand_glob):
             if os.path.exists(match_path):
                 matching.append(match_path)
                 if match_first:
-                    break
+                    return matching
 
     return matching
