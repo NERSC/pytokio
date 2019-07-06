@@ -75,6 +75,20 @@
         "inputs/%Y-%m-%d/ost-map.txt",
         "inputs/%Y-%m-%d/ost-map_edison.txt"
     ],
+    "mmperfmon_output_files": {
+        "project2": [
+            "/global/project/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/project/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ],
+        "projecta": [
+            "/global/projecta/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/projecta/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ],
+        "projectb": [
+            "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ]
+    },
     "darshan_log_dirs": {
         "testsystem": "inputs/darshanlogs"
     },
