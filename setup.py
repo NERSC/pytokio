@@ -51,7 +51,7 @@ def setup_package():
         long_description="\n".join(DOCLINES[2:]),
         url="http://www.nersc.gov/research-and-development/tokio/",
         download_url="https://www.github.com/nersc/pytokio",
-        license='BSD',
+        license='BSD-3-Clause-LBNL',
         platforms=["Linux", "MacOS-X"],
 
         # Dependencies
@@ -77,6 +77,7 @@ def setup_package():
             'Operating System :: POSIX',
             'Operating System :: Unix',
             'Operating System :: MacOS',
+            'License :: OSI Approved :: BSD License',
         ],
         keywords='I/O performance monitoring'
     )
