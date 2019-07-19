@@ -183,8 +183,12 @@ class DatasetDict(dict):
         for dataset_name in dataset_names:
             if dataset_name in self:
                 if self.config[dataset_name].get('delta'):
-                    # Convert some datasets from absolute byte counts to deltas
-                    self[dataset_name].convert_to_deltas()
+                    # Convert some datasets from absolute byte counts to deltas.
+                    # Note that align='l' changes the semantics of the
+                    # timestamps from right-aligned (which is what LMT provides)
+                    # to left-aligned (which is what the TOKIO Time Series
+                    # format assumes)
+                    self[dataset_name].convert_to_deltas(align='l')
                 else:
                     # Trim off the last row from the non-delta datasets to compensate
                     # for initial over-sizing of the time range by an extra timestamp

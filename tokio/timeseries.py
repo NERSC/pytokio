@@ -254,15 +254,23 @@ class TimeSeries(object):
             self.dataset[t_index, c_index] = value
         return True
 
-    def convert_to_deltas(self):
-        """
-        Convert a matrix of monotonically increasing rows into deltas.  Replaces
-        self.dataset with a matrix with the same number of columns but one fewer
-        row (taken off the bottom of the matrix).  Also adjusts the timestamps
-        dataset.
+    def convert_to_deltas(self, align='l'):
+        """Converts a matrix of monotonically increasing rows into deltas.
+        
+        Replaces self.dataset with a matrix with the same number of columns
+        but one fewer row (taken off the bottom of the matrix).  Also adjusts
+        the timestamps dataset.
+
+        Arguments:
+            align (str): "left" or "right".  Determines whether the contents
+                of a cell labeled with timestamp t0 contains the data between
+                t0 and t0 + dt (left) or t0 and t0 - dt (right).
         """
         self.dataset = timeseries_deltas(self.dataset)
-        self.timestamps = self.timestamps[0:-1]
+        if align[0] == 'l':
+            self.timestamps = self.timestamps[0:-1]
+        elif align[0] == 'r':
+            self.timestamps = self.timestamps[1:]
 
     def trim_rows(self, num_rows=1):
         """
