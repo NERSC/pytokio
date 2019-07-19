@@ -9,3 +9,19 @@ is based on the HDF5 data format and is implemented within the
 The datasets supported by the TTS format and HDF5 connector are:
 
 .. include:: tts_v1.inc
+
+The TTS format strives to achieve semantic consistency in that a row that is
+labeled as ``2019-07-11 03:45:05`` in a table such as:
+
++---------------------+------------+-----------+ 
+| Timestamp           | OST0000    | OST0001   | 
++=====================+============+===========+ 
+| 2019-07-11 03:45:00 | 52382342   | 98239803  | 
++---------------------+------------+-----------+ 
+| 2019-07-11 03:45:05 | 23498237   | 92374926  | 
++---------------------+------------+-----------+ 
+| 2019-07-11 03:45:10 | 90384233   | 19375629  | 
++---------------------+------------+-----------+ 
+
+will contain data corresponding to the time from 3:45:05 (inclusive) to 3:45:10
+(exclusive).
