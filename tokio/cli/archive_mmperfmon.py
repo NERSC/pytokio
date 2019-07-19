@@ -257,7 +257,8 @@ class Archiver(dict):
                             self[dataset_name].insert_element(
                                 timestamp=datetime.datetime.fromtimestamp(int(timestamp_int)),
                                 column_name=column,
-                                value=actual_value)
+                                value=actual_value,
+                                align='r')
                     else:
                         canonical_counter = COUNTER_MAP.get(counter, counter)
                         dataset_name = "%ss/%s" % (server_type, canonical_counter)
@@ -265,7 +266,8 @@ class Archiver(dict):
                         self[dataset_name].insert_element(
                             timestamp=datetime.datetime.fromtimestamp(int(timestamp_int)),
                             column_name=fqhost,
-                            value=value)
+                            value=value,
+                            align='r')
 
                         # little hacky bits to patch together missing datasets
                         if canonical_counter == "cpuuser":
@@ -274,7 +276,8 @@ class Archiver(dict):
                                 timestamp=datetime.datetime.fromtimestamp(int(timestamp_int)),
                                 column_name=fqhost,
                                 value=value,
-                                reducer=operator.add)
+                                reducer=operator.add,
+                                align='r')
 
         tokio.debug.debug_print("Found %d hosts" % self.num_servers)
         tokio.debug.debug_print("Found %d timestamps" % len(set(list(mmpm.keys()))))
