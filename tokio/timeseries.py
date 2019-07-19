@@ -195,18 +195,25 @@ class TimeSeries(object):
         self.column_map[self.columns[index2]] = index2
         self.column_map[self.columns[index1]] = index1
 
-    def get_insert_pos(self, timestamp, column_name, create_col=False):
+    def get_insert_pos(self, timestamp, column_name, create_col=False, align='l'):
         """Determine col and row indices corresponding to timestamp and col name
 
         Args:
             timestamp (datetime.datetime): Timestamp to map to a row index
             column_name (str): Name of column to map to a column index
             create_col (bool): If column_name does not exist, create it?
+            align (str): "left" or "right"; governs whether or not the value
+                given for the ``timestamp`` argument represents the left or
+                right edge of the bin.
+
         Returns:
             (t_index, c_index) (long or None)
         """
         timestamp_epoch = int(time.mktime(timestamp.timetuple()))
         t_index = int((timestamp_epoch - self.timestamps[0]) // self.timestep)
+        if align[0] == 'r':
+            t_index -= 1
+
         if t_index >= self.timestamps.shape[0] or t_index < 0: # check bounds
             return None, None
 
@@ -216,7 +223,7 @@ class TimeSeries(object):
             c_index = self.add_column(column_name)
         return t_index, c_index
 
-    def insert_element(self, timestamp, column_name, value, reducer=None):
+    def insert_element(self, timestamp, column_name, value, reducer=None, align='l'):
         """Inserts a value into a (timestamp, column) element
 
         Given a timestamp (datetime.datetime object) and a column name (string),
@@ -234,13 +241,17 @@ class TimeSeries(object):
                 (timestamp, column_name) coordinate, apply this function to the
                 existing value and the input `value` and store the result  If
                 None, just overwrite the existing value.
+            align (str): "left" or "right"; governs whether or not the value
+                given for the ``timestamp`` argument represents the left or
+                right edge of the bin.
 
         Returns:
             bool: True if insertion was successful, False if no action was taken
         """
         t_index, c_index = self.get_insert_pos(timestamp,
                                                column_name,
-                                               create_col=True)
+                                               create_col=True,
+                                               align=align)
         if t_index is None or c_index is None:
             return False
 
@@ -271,6 +282,8 @@ class TimeSeries(object):
             self.timestamps = self.timestamps[0:-1]
         elif align[0] == 'r':
             self.timestamps = self.timestamps[1:]
+        else:
+            raise RuntimeError("align must be 'l' or 'r'")
 
     def trim_rows(self, num_rows=1):
         """

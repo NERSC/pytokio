@@ -43,6 +43,9 @@ where
   measured (e.g., CPU core ID, network interface, or disk identifier)
 * counter_name is the specific metric being measured
 
+It is also worth noting that mmperfmon treats a timestamp labeled as, for
+example, ``2019-03-04-16:01:00`` as containing all data from the period between
+2019-03-04-16:00:00 and 2019-03-04-16:01:00.
 """
 
 import os
