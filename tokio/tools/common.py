@@ -59,7 +59,7 @@ def enumerate_dated_files(start, end, template,
 
     day = start
     results = []
-    while day.date() <= end.date():
+    while day <= end:
         results += _match_files(check_paths, day, match_first, expand_glob)
         day += timedelta
 

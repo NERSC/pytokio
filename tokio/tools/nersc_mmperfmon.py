@@ -34,7 +34,8 @@ def enumerate_mmperfmon_txt(fsname, datetime_start, datetime_end):
         template=tokio.config.CONFIG['mmperfmon_output_files'],
         lookup_key=fsname,
         match_first=False,
-        expand_glob=True)
+        expand_glob=True,
+        timedelta=datetime.timedelta(hours=1))
 
 # TODO: move this into its own test script
 def test_enumerate_mmperfmon_txt():

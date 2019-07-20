@@ -25,6 +25,7 @@ import argparse
 import warnings
 import tokio.debug
 import tokio.config
+import tokio.tools.nersc_mmperfmon
 import tokio.timeseries
 import tokio.connectors.mmperfmon
 import tokio.connectors.hdf5
@@ -467,31 +468,57 @@ def main(argv=None):
                         help="number of LUNs (default: autodetect)")
     parser.add_argument('--num-servers', type=int, default=None,
                         help="number of NSD servers (default: autodetect)")
-    parser.add_argument("files", type=str, nargs="+",
-                        help="path to mmperfmon output file(s)")
+    parser.add_argument("--files", type=str, nargs="*", help="path to mmperfmon output file to "
+                        + "use instead of query_start/query_end")
+    parser.add_argument("--filesystem", type=str, required=True, help='file system to archive')
+    parser.add_argument("query_start", type=str,
+                        help="start time of query in %s format" % DATE_FMT)
+    parser.add_argument("query_end", type=str,
+                        help="end time of query in %s format" % DATE_FMT)
     args = parser.parse_args(argv)
 
     if args.debug:
         tokio.debug.DEBUG = True
 
+    if (not args.files and not args.query_start and not args.query_end) or \
+       (args.files and args.query_start and args.query_end):
+        parser.error("Must specify either --file or query_start and query_end")
+
     # Convert CLI options into datetime
     init_start = None
     init_end = None
-    if args.init_start is not None or args.init_end is not None:
-        try:
+    try:
+        query_start = datetime.datetime.strptime(args.query_start, DATE_FMT)
+        query_end = datetime.datetime.strptime(args.query_end, DATE_FMT)
+        init_start = query_start
+        init_end = query_end
+        if args.init_start:
             init_start = datetime.datetime.strptime(args.init_start, DATE_FMT)
+        if args.init_end:
             init_end = datetime.datetime.strptime(args.init_end, DATE_FMT)
-        except ValueError:
-            sys.stderr.write("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
-            raise
+    except ValueError:
+        parser.error("Start and end times must be in format %s\n" % DATE_FMT)
+        raise
 
-        # Basic input bounds checking
-        if init_start >= init_end:
-            raise ValueError('init_start >= init_end')
-        elif init_start >= init_end:
-            raise ValueError('init_start >= init_end')
-        elif args.timestep < 1:
-            raise ValueError('--timestep must be > 0')
+    # Basic input bounds checking
+    if query_start >= query_end:
+        parser.error('query_start >= query_end')
+    elif init_start >= init_end:
+        parser.error('init_start >= init_end')
+    elif args.timestep < 1:
+        parser.error('--timestep must be > 0')
+
+    files = args.files
+    if not files:
+        files = tokio.tools.nersc_mmperfmon.enumerate_mmperfmon_txt(
+            fsname=args.filesystem,
+            datetime_start=query_start,
+            datetime_end=query_end)
+
+    if not files:
+        raise RuntimeError("No input files match query range")
+    if args.debug:
+        print("Loading the following files:\n" + "\n  ".join(files))
 
     archive_mmperfmon(
         init_start=init_start,
@@ -500,4 +527,4 @@ def main(argv=None):
         num_luns=args.num_luns,
         num_servers=args.num_servers,
         output_file=args.output,
-        input_files=args.files)
+        input_files=files)
