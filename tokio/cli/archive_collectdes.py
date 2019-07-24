@@ -1,7 +1,10 @@
 """
-Dump a lot of data out of ElasticSearch using the Python API and native
+Dumps a lot of data out of ElasticSearch using the Python API and native
 scrolling support.  Output either as native json from ElasticSearch or as
 serialized TOKIO TimeSeries (TTS) HDF5 files.
+
+Can use ``PYTOKIO_ES_USER`` and ``PYTOKIO_ES_PASSWORD`` environment variables to
+pass on to the Elasticsearch connector for http authentication.
 """
 
 import os
@@ -538,11 +541,18 @@ def main(argv=None):
     # option) or by querying ElasticSearch?
     if args.input is None:
         ### Try to connect
-        esdb = tokio.connectors.collectd_es.CollectdEs(
-            host=args.host,
-            port=args.port,
-            index=args.index,
-            timeout=args.timeout)
+        kwargs = {
+            'host': args.host,
+            'port': args.port,
+            'index': args.index,
+            'timeout': args.timeout
+        }
+        username = os.environ.get("PYTOKIO_ES_USER")
+        password = os.environ.get("PYTOKIO_ES_PASSWORD")
+        if username and password:
+            kwargs['http_auth'] = (username, password)
+
+        esdb = tokio.connectors.collectd_es.CollectdEs(**kwargs)
 
         pages = None
         for plugin_query in [tokio.connectors.collectd_es.QUERY_CPU_DATA,
