@@ -559,10 +559,17 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     t_start = time.time()
     log_records = []
     mount_points = {}
-    for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
-        if result:
-            log_records.append(result)
-            mount_points.update(result['mounts'])
+    # multiprocessing is super flaky (e.g., it deadlocks on macOS), so provide an escape hatch
+    if threads > 1:
+        for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
+            if result:
+                log_records.append(result)
+                mount_points.update(result['mounts'])
+    else:
+        for result in [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]:
+            if result:
+                log_records.append(result)
+                mount_points.update(result['mounts'])
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
     # Create tables and indices
