@@ -26,6 +26,8 @@ def main(argv=None):
                         help="return output in CSV format")
 #   parser.add_argument('--debug', action='store_true',
 #                       help="produce debug messages")
+    parser.add_argument("--timeout", type=float, default=30.0,
+                        help="connection timeout, in seconds (default: 30 sec)")
     parser.add_argument("-i", "--input", type=str, default=None,
                         help="read input from this JSON instead of accessing REST API")
     parser.add_argument("-o", "--output", type=str, default=None,
@@ -87,11 +89,13 @@ def main(argv=None):
             for interface in interfaces:
                 ret = esnetdata.get_interface_counters(endpoint=endpoint, interface=interface,
                                                        direction="in",
-                                                       agg_func='average')
+                                                       agg_func='average',
+                                                       timeout=args.timeout)
                 ret = esnetdata.get_interface_counters(endpoint=endpoint,
                                                        interface=interface,
                                                        direction="out",
-                                                       agg_func='average')
+                                                       agg_func='average',
+                                                       timeout=args.timeout)
 
     # Serialize the object
     cache_file = args.output

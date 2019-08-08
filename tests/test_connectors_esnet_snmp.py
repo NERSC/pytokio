@@ -80,7 +80,8 @@ def test_esnetsnmp_get_interface_counters():
     try:
         esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
-                                         direction='in')
+                                         direction='in',
+                                         timeout=5)
     except requests.exceptions.ConnectionError as error:
         raise nose.SkipTest(error)
 
@@ -161,7 +162,8 @@ def test_to_dataframe():
     esnetsnmp.get_interface_counters(
         endpoint=endpoint,
         interface=interface,
-        direction='in')
+        direction='in',
+        timeout=5)
 
     dataframe = esnetsnmp.to_dataframe(multiindex=False)
     print(dataframe)
