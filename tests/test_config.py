@@ -5,6 +5,15 @@ Ensure that the tokio site config loads correctly
 
 import os
 import json
+try:
+    import StringIO as io
+except ImportError:
+    import io
+HAVE_YAML = True
+try:
+    import yaml
+except ImportError:
+    HAVE_YAML = False
 import nose
 import tokiotest
 import tokio.config
@@ -205,3 +214,36 @@ def test_config_post_load_from_file():
 
     # Then verify that all the runtime values have now changed
     compare_config_to_runtime(config_file)
+
+def test_yaml_expaner():
+    """tokio.config: YAML environment expansion
+    """
+    if not HAVE_YAML:
+        raise nose.SkipTest("pyyaml not available")
+
+    yaml_input = {
+        'path': '${PATH}',
+        'static': 'static1',
+        'nested': {
+            'key1': '${USER}',
+            'key2': 'static2',
+        },
+        'undefined': '${ARASDFLKJASDLFKAJSDFASLFSADKGOIWWEIEIEIE}'
+    }
+
+    yaml_file = io.StringIO(yaml.dump(yaml_input))
+    result = tokio.config.load_and_expand_yaml(yaml_file)
+
+    print("result['path']=%s; os.environ.get('PATH')=%s" % (result['path'], os.environ.get("PATH")))
+    assert result['path'] == os.environ.get('PATH')
+    print("result['static']=%s; yaml_input['static']=%s" % (result['static'], yaml_input['static']))
+    assert result['static'] == yaml_input['static']
+    print("result['nested']['key1']=%s; os.environ.get('USER')=%s" % (result['nested']['key1'], os.environ.get("USER")))
+    assert result['nested']['key1'] == os.environ.get('USER')
+    print("result['nested']['key2']=%s; yaml_input['nested']['key2']=%s" % (result['nested']['key2'], yaml_input['nested']['key2']))
+    assert result['nested']['key2'] == yaml_input['nested']['key2']
+
+    print("result['undefined']=%s; yaml_input['undefined']=%s" % (result['undefined'], yaml_input['undefined']))
+    assert result['undefined'] != yaml_input['undefined']
+
+    assert not result['undefined']

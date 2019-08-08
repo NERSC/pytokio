@@ -1,12 +1,27 @@
 #!/usr/bin/env python
-"""
-Load the pytokio configuration file, which is encoded as json and contains
-various site-specific constants, paths, and defaults.
+"""Loads the pytokio configuration file.
+
+The pytokio configuration file can be either a JSON or YAML file that contains
+various site-specific constants, paths, and defaults.  pytokio should import
+correctly and all connectors should be functional in the absence of a
+configuration file.
+
+If the PyYAML package is available, the configuration file may reference
+environment variables which get correctly resolved during import.
+
+A subset of configuration parameters can be overridden by environment variables
+prefixed with PYTOKIO_.
 """
 
 import os
+import re
 import json
 from tokio.common import isstr
+HAVE_YAML = True
+try:
+    import yaml
+except ImportError:
+    HAVE_YAML = False
 
 #: Global variable containing the configuration
 CONFIG = {} 
@@ -16,6 +31,16 @@ PYTOKIO_CONFIG_FILE = ""
 
 #: Path of default site configuration file
 DEFAULT_CONFIG_FILE = ""
+
+#: Config parameters that can be overridden using PYTOKIO_* environment variable
+MAGIC_VARIABLES = [
+    'HDF5_FILES',
+    'ISDCT_FILES',
+    'LFSSTATUS_FULLNESS_FILES',
+    'LFSSTATUS_MAP_FILES',
+    'DARSHAN_LOG_DIRS',
+    'ESNET_SNMP_URI'
+]
 
 def init_config():
     """Loads the global configuration.
@@ -40,7 +65,12 @@ def init_config():
 
     try:
         with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
-            loaded_config = json.load(config_file)
+            if HAVE_YAML:
+                print("following yaml code path")
+                loaded_config = load_and_expand_yaml(config_file)
+            else:
+                print("following json code path")
+                loaded_config = json.load(config_file)
     except (OSError, IOError):
         loaded_config = {}
 
@@ -61,7 +91,7 @@ def init_config():
 
     # Check for magic environment variables to override the contents of the config
     # file at runtime
-    for _magic_variable in ['HDF5_FILES', 'ISDCT_FILES', 'LFSSTATUS_FULLNESS_FILES', 'LFSSTATUS_MAP_FILES', 'DARSHAN_LOG_DIRS', 'ESNET_SNMP_URI']:
+    for _magic_variable in MAGIC_VARIABLES:
         _magic_value = os.environ.get("PYTOKIO_" + _magic_variable)
         if _magic_value is not None:
             try:
@@ -70,5 +100,25 @@ def init_config():
                 CONFIG[_magic_variable.lower()] = _magic_value
             else:
                 CONFIG[_magic_variable.lower()] = _magic_value_decoded
+
+def load_and_expand_yaml(file_handle):
+    """Loads YAML config file and expands all environment variables contained
+    therein
+
+    Args:
+        file_handle (file): File containing YAML to load
+    """
+    path_matcher = re.compile(r'.*\$\{([^}^{]+)\}.*')
+
+    def path_constructor(loader, node):
+        return os.path.expandvars(node.value)
+
+    class EnvVarLoader(yaml.SafeLoader):
+        pass
+
+    EnvVarLoader.add_implicit_resolver('!path', path_matcher, None)
+    EnvVarLoader.add_constructor('!path', path_constructor)
+
+    return yaml.load(file_handle, Loader=EnvVarLoader)
 
 init_config()
