@@ -244,6 +244,4 @@ def test_yaml_expaner():
     assert result['nested']['key2'] == yaml_input['nested']['key2']
 
     print("result['undefined']=%s; yaml_input['undefined']=%s" % (result['undefined'], yaml_input['undefined']))
-    assert result['undefined'] != yaml_input['undefined']
-
-    assert not result['undefined']
+    assert '$' in result['undefined']

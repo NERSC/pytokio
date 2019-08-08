@@ -66,10 +66,8 @@ def init_config():
     try:
         with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
             if HAVE_YAML:
-                print("following yaml code path")
                 loaded_config = load_and_expand_yaml(config_file)
             else:
-                print("following json code path")
                 loaded_config = json.load(config_file)
     except (OSError, IOError):
         loaded_config = {}
