@@ -16,6 +16,24 @@ MMPERFMON_DIR_BASES[project2]="/global/project/iotest/kkr/gpfs-for-glenn/output"
 
 # you shouldn't have to modify anything below here
 
+# Parse arguments
+usage() { echo "$0 usage:" && grep " .)\ #" $0; exit 0; }
+
+FORCE=0
+
+while getopts "fh" arg; do
+  case $arg in
+    f) # do not abort on invalid dates
+      FORCE=1
+      ;;
+    h | *) # display help
+      usage
+      exit 0
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
 FSNAME=$1
 DATE=$2
 
@@ -55,24 +73,30 @@ while true; do
     tomorrow=$(date -d "$today + 1 day" "+%Y-%m-%d")
     echo "[$(date)] Archiving ${FSNAME} for ${today}"
 
-    output_file="${FSNAME}_${today}.hdf5"
+    if [ ! -d "$today" ]; then
+        mkdir -vp "$today"
+    fi
 
-    # Because each *.out file starts on the first, not zeroth, minute of the hour,
-    # we need to go back an hour to get the first data point for each day.  This is
-    # why the following globs refer to the 23rd hour of yesterday
+    output_file="$today/${FSNAME}.hdf5"
+
     tstart=$(date +%s)
     ${ARCHIVE_MMPERFMON} --init-start "${today}T00:00:00" \
                          --init-end "${tomorrow}T00:00:00" \
                          --timestep ${TIMESTEP} \
-                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${today}-*.out* \
-                         ${MMPERFMON_DIR_BASE}/*/ngfsv*.nersc.gov.${yesterday}-23:*.out* \
-                         --output "$output_file"
+                         --filesystem "$FSNAME" \
+                         --output "$output_file" \
+                         "${today}T00:00:00" \
+                         "${tomorrow}T00:00:00"
+#                        "${today}T23:59:59"
+
     ret=$?
     tend=$(date +%s)
 
     if [ ! -f "$output_file" ]; then
         echo "[$(date)] ERROR: did not create $output_file" >&2
-        exit $ret
+        if [ ! $FORCE ]; then
+            exit $ret
+        fi
     else
         echo "[$(date)] Wrote output to $output_file in $((tend - tstart)) seconds"
     fi
