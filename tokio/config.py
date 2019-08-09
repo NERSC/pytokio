@@ -7,7 +7,10 @@ correctly and all connectors should be functional in the absence of a
 configuration file.
 
 If the PyYAML package is available, the configuration file may reference
-environment variables which get correctly resolved during import.
+environment variables which get correctly resolved during import.  This requires
+that the configuration file only reference $VARIABLES in unquoted strings;
+quoted strings (such as those when loading JSON-formatted YAML) will not be
+expanded.
 
 A subset of configuration parameters can be overridden by environment variables
 prefixed with PYTOKIO_.

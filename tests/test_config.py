@@ -215,33 +215,78 @@ def test_config_post_load_from_file():
     # Then verify that all the runtime values have now changed
     compare_config_to_runtime(config_file)
 
-def test_yaml_expaner():
+def test_yaml_expander():
     """tokio.config: YAML environment expansion
     """
     if not HAVE_YAML:
         raise nose.SkipTest("pyyaml not available")
 
-    yaml_input = {
-        'path': '${PATH}',
+    reference_data = {
+        'path': '${ENVVAR1}',
         'static': 'static1',
         'nested': {
-            'key1': '${USER}',
+            'key1': '${ENVVAR2}',
             'key2': 'static2',
         },
-        'undefined': '${ARASDFLKJASDLFKAJSDFASLFSADKGOIWWEIEIEIE}'
+        'undefined': '${ARASDFLKJASDLFKAJSDFASLFSADKGOIWWEIEIEIE}',
+        'something': "${TEST_WITH_UNDERSCORES}",
     }
 
-    yaml_file = io.StringIO(yaml.dump(yaml_input))
+    yaml_input = yaml.dump(reference_data)
+    print("YAML representation is as follows")
+    print("========================================")
+    print(yaml_input)
+
+    # spike in an environment variable
+    spike_ins = {
+        "TEST_WITH_UNDERSCORES": "success",
+        "ENVVAR1": "hocus pocus",
+        "ENVVAR2": "3.14125",
+    }
+    for key, value in spike_ins.items():
+        os.environ[key] = value
+
+    # load in YAML while env vars are set
+    yaml_file = io.StringIO(yaml_input)
     result = tokio.config.load_and_expand_yaml(yaml_file)
 
-    print("result['path']=%s; os.environ.get('PATH')=%s" % (result['path'], os.environ.get("PATH")))
-    assert result['path'] == os.environ.get('PATH')
-    print("result['static']=%s; yaml_input['static']=%s" % (result['static'], yaml_input['static']))
-    assert result['static'] == yaml_input['static']
-    print("result['nested']['key1']=%s; os.environ.get('USER')=%s" % (result['nested']['key1'], os.environ.get("USER")))
-    assert result['nested']['key1'] == os.environ.get('USER')
-    print("result['nested']['key2']=%s; yaml_input['nested']['key2']=%s" % (result['nested']['key2'], yaml_input['nested']['key2']))
-    assert result['nested']['key2'] == yaml_input['nested']['key2']
+    # delete env vars before dereferencing loaded YAML to ensure that the values
+    # were correctly copied from the environment into Python
+    for key, value in spike_ins.items():
+        del os.environ[key]
 
-    print("result['undefined']=%s; yaml_input['undefined']=%s" % (result['undefined'], yaml_input['undefined']))
+    print("result['path']=%s == $ENVVAR1 (%s)?" % (result['path'], spike_ins.get("ENVVAR1")))
+    assert result['path'] == spike_ins.get('ENVVAR1')
+
+    print("result['static']=%s == ref['static']=%s?" % (result['static'], reference_data['static']))
+    assert result['static'] == reference_data['static']
+
+    print("result['nested']['key1'] (%s) == $ENVVAR2 (%s)?" % (result['nested']['key1'], spike_ins.get("ENVVAR2")))
+    assert result['nested']['key1'] == spike_ins.get('ENVVAR2')
+
+    print("result['nested']['key2'] (%s) == ref['nested']['key2'] (%s)?" % (result['nested']['key2'], reference_data['nested']['key2']))
+    assert result['nested']['key2'] == reference_data['nested']['key2']
+
+    print("result['undefined']=%s; ref['undefined']=%s" % (result['undefined'], reference_data['undefined']))
     assert '$' in result['undefined']
+
+    json_input = json.dumps(reference_data, indent=4, sort_keys=True)
+    print("JSON representation is as follows")
+    print("========================================")
+    print(json_input)
+
+    # now try using the JSON-serialized version of the config - it should not
+    # expand anything, because YAML will not expand any quoted strings
+    for key, value in spike_ins.items():
+        os.environ[key] = value
+
+    # load in YAML while env vars are set
+    yaml_file = io.StringIO(json_input)
+    result = tokio.config.load_and_expand_yaml(yaml_file)
+
+    # delete env vars before dereferencing loaded YAML to ensure that the values
+    # were correctly copied from the environment into Python
+    for key, value in spike_ins.items():
+        del os.environ[key]
+
+    assert result == reference_data
