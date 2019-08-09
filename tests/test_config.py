@@ -120,11 +120,13 @@ def compare_config_to_runtime(config_file):
     config_contents = json.load(open(config_file, 'r'))
     for key, expected_value in config_contents.items():
         runtime_value = tokio.config.CONFIG[key]
-        print("Verifying tokio.config.%s:\n  [%s] == [%s]" % (
+        print("Verifying tokio.config.%s:\n  [(%s)%s] == [(%s)%s]" % (
             key.upper(),
+            type(expected_value),
             str(expected_value),
+            type(runtime_value),
             str(runtime_value)))
-        assert type(runtime_value) == type(expected_value)
+        assert type(runtime_value) == type(expected_value) or (isinstance(runtime_value, basestring) and isinstance(expected_value, basestring))
         assert runtime_value == expected_value
 
 @nose.tools.with_setup(setup=flush_env, teardown=restore_env)
@@ -232,7 +234,9 @@ def test_yaml_expander():
         'something': "${TEST_WITH_UNDERSCORES}",
     }
 
-    yaml_input = yaml.dump(reference_data)
+    # default_flow_style=False required for some versions of pyyaml or else it
+    # will quote environment variables and break the deserialization
+    yaml_input = yaml.dump(reference_data, default_flow_style=False) 
     print("YAML representation is as follows")
     print("========================================")
     print(yaml_input)
@@ -245,6 +249,7 @@ def test_yaml_expander():
     }
     for key, value in spike_ins.items():
         os.environ[key] = value
+        print("Defining %s=%s -> %s" % (key, value, os.environ.get(key)))
 
     # load in YAML while env vars are set
     yaml_file = io.StringIO(yaml_input)
@@ -253,6 +258,7 @@ def test_yaml_expander():
     # delete env vars before dereferencing loaded YAML to ensure that the values
     # were correctly copied from the environment into Python
     for key, value in spike_ins.items():
+        print("Undefining %s" % key)
         del os.environ[key]
 
     print("result['path']=%s == $ENVVAR1 (%s)?" % (result['path'], spike_ins.get("ENVVAR1")))
@@ -278,6 +284,7 @@ def test_yaml_expander():
     # now try using the JSON-serialized version of the config - it should not
     # expand anything, because YAML will not expand any quoted strings
     for key, value in spike_ins.items():
+        print("Defining %s=%s -> %s" % (key, value, os.environ.get(key)))
         os.environ[key] = value
 
     # load in YAML while env vars are set
@@ -287,6 +294,7 @@ def test_yaml_expander():
     # delete env vars before dereferencing loaded YAML to ensure that the values
     # were correctly copied from the environment into Python
     for key, value in spike_ins.items():
+        print("Undefining %s" % key)
         del os.environ[key]
 
     assert result == reference_data
