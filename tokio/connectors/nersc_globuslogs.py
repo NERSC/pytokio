@@ -174,4 +174,4 @@ class NerscGlobusLogs(es.EsConnection):
         Returns:
             pandas.DataFrame: Contents of the last query's pages
         """
-        return super(NerscGlobusLogs, self).to_dataframe(fields=SOURCE_FILTER)
+        return super(NerscGlobusLogs, self).to_dataframe(fields=self.source_filter)
