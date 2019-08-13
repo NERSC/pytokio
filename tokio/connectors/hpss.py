@@ -5,6 +5,7 @@ import re
 import copy
 import datetime
 from tokio.connectors.common import SubprocessOutputDict
+from ..common import to_epoch
 
 REX_HEADING_LINE = re.compile(r"^[= ]+$")
 REX_EMPTY_LINE = re.compile(r"^\s*$")
@@ -44,10 +45,153 @@ REKEY_TABLES = {
     'io totals by client application': 'client',
     'io totals by client host': 'host',
     'io totals by hpss client gateway (ui) host': 'host',
-#   'largest users': 'user', # degenerate users will occur if one user uses multiple client apps
+    # 'largest users': 'user', # degenerate users will occur if one user uses multiple client apps
     'migration purge report': 'sc',
-#   'tape drive report': 'drivetyp',
+    # 'tape drive report': 'drivetyp',
 }
+
+class HsiLog(SubprocessOutputDict):
+    """Provides an interface for log files containing HSI and HTAR transactions
+
+    Results in a dictionary-like object of the following format::
+
+        {
+            "hsi": [
+                {
+                    "access_latency_sec": 0.03,
+                    "account_id": 35136,
+                    "bytes": 0,
+                    "bytes_sec": 0.0,
+                    "client_pid": 1035,
+                    "cos_id": 0,
+                    "dest_path": "/home/g/glock/blah.bin",
+                    "hpss_uid": 35136,
+                    "opname": "LH",
+                    "remote_host": "someuniv.edu",
+                    "return_code": -1,
+                    "source_path": "blah.bin",
+                    "timestamp": 1565420701
+                },
+                ...
+            "htar": [
+                {
+                    "account_id": 58888,
+                    "bytes": 58178668032,
+                    "bytes_sec": 146472.0,
+                    "client_pid": 14301,
+                    "cos_id": 5,
+                    "duration_sec": 397.2,
+                    "hpss_path": "/nersc/projects/blah.tar",
+                    "hpss_uid": 58888,
+                    "htar_op": "create",
+                    "opname": "LH",
+                    "remote_ftp_host": "",
+                    "remote_host": "cori02-224.nersc.gov",
+                    "return_code": 0,
+                    "timestamp": 1565420728
+                }
+            ]
+        }
+
+    where the top-level keys are either "hsi" or "htar", and their values are
+    lists containing every HSI or HTAR transaction, respectively.
+
+    The keys generally follow the raw nomenclature used in the HSI logs which
+    can be found on `Mike Gleicher's website`_.  Perhaps most relevant are the
+    opnames, which can be one of
+
+    * FU - file unlink.  Has no destination filename field or account id.
+    * FR - file rename.  Has no account id.
+    * LH - transfer into HPSS ("Local to HPSS")
+    * HL - transfer out of HPSS ("HPSS to Local")
+    * HH - internal file copy ("HPSS-to-HPSS")
+
+    For posterity,
+
+    - ``access_latency_sec`` is the time to open the file.  This includes the
+      latency to pull the tape and insert it into the drive.
+    - ``bytes`` and ``bytes_sec`` are the size and rate of data transfer
+    - ``duration_sec`` is the time to complete the transfer
+    - ``return_code`` is zero on success, nonzero otherwise
+
+    .. Mike Gleicher's website: http://pal.mgleicher.us/HSI_Admin/log_files.html
+
+    """
+    def __init__(self, *args, **kwargs):
+        super(HsiLog, self).__init__(*args, **kwargs)
+        self.load()
+
+    @classmethod
+    def from_str(cls, input_str):
+        """Instantiate from a string
+        """
+        return cls(from_string=input_str)
+
+    @classmethod
+    def from_file(cls, cache_file):
+        """Instantiate from a cache file
+        """
+        return cls(cache_file=cache_file)
+
+    def load_str(self, input_str):
+        """Parse the HPSS daily report text
+        """
+        bad_recs = 0
+        for line in input_str.splitlines():
+            # log lines use spaces/tabs to mean different things, e.g.,
+            # Sat Aug 10 00:05:13 2019 bucket.ssl.berkeley.edu hsi 69615 1360^ILH^I-1^I0.03^I0^I0.0^I0^Is6c0.out.20190727_085506.1^I/home/c/cobb/seti/s6_data/ao/s6c0/2019/s6c0.out.20190727_085506.1^I69615
+            args = line.split(' ', 8)
+            app = args[6] # hsi or htar
+            app_args = args.pop()
+            args += app_args.split('\t')
+
+            if app == 'hsi':
+                try:
+                    rec = {
+                        'client_pid': int(args[8]),
+                        'opname': args[9],
+                        'return_code': int(args[10]),
+                        'access_latency_sec': float(args[11]),
+                        'bytes': int(args[12]),
+                        'bytes_sec': 1000.0 * float(args[13]),
+                        'cos_id': int(args[14]),
+                        'source_path': args[15],
+                    }
+                    # not all operations (e.g., FU) have the final two fields
+                    if args[9] != 'FU':
+                        rec['dest_path'] = args[16]
+                        if args[9] != 'FR':
+                            rec['account_id'] = int(args[17])
+                    
+                except:
+                    print(line)
+                    raise
+            elif app == 'htar':
+                rec = {
+                    'client_pid': int(args[8]),
+                    'htar_op': args[9],
+                    'opname': args[10],
+                    'return_code': int(args[11]),
+                    'bytes': int(args[12]),
+                    'duration_sec': float(args[13]),
+                    'bytes_sec': float(args[14]),
+                    'hpss_path': args[15],
+                    'cos_id': int(args[-2]),
+                    'account_id': int(args[-1])
+                }
+                if len(args) == 19:
+                    # whose idea was it to make the column count variable?
+                    rec['remote_ftp_host'] = args[-3]
+            else:
+                bad_recs += 1
+                continue
+
+            rec['hpss_uid'] = int(args[7])
+            rec['remote_host'] = args[5]
+            rec['timestamp'] = to_epoch(datetime.datetime.strptime(" ".join(args[0:5]), "%a %b %d %H:%M:%S %Y"))
+            if app not in self:
+                self[app] = []
+            self[app].append(rec)
 
 class HpssDailyReport(SubprocessOutputDict):
     """Representation for the daily report that HPSS can generate
@@ -56,6 +200,18 @@ class HpssDailyReport(SubprocessOutputDict):
         super(HpssDailyReport, self).__init__(*args, **kwargs)
         self.date = None
         self.load()
+
+    @classmethod
+    def from_str(cls, input_str):
+        """Instantiate from a string
+        """
+        return cls(from_string=input_str)
+
+    @classmethod
+    def from_file(cls, cache_file):
+        """Instantiate from a cache file
+        """
+        return cls(cache_file=cache_file)
 
     def load_str(self, input_str):
         """Parse the HPSS daily report text
@@ -161,8 +317,7 @@ def _parse_section(lines, start_line=0):
     # line below column headings.
     if ':' not in lines[start_line]:
         return results, start_line
-    else:
-        system, title = lines[start_line].split(':', 1)
+    system, title = lines[start_line].split(':', 1)
 
     # Determine column delimiters
     separator_line = lines[start_line + 2]
