@@ -62,8 +62,8 @@ class FtpLog(SubprocessOutputDict):
 
         Mon Dec 31 00:06:46 2018 dtn01-int.nersc.gov /home/o/operator/.check_ftp.25651  b          POPN_Cmd          r r  ftp      operator fd  0
         Mon Dec 31 00:06:46 2018 0.010               dtn01-int.nersc.gov                33         /home/o/opera...  b o  PRTR_Cmd r        ftp operator fd 0
-        Mon Dec 31 00:06:48 2018 0.430               sgn-pub-01.nersc.gov               0          /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
-        Mon Feb  4 16:45:04 2019 457.800             sgn-pub-01.nersc.gov               7184842752 /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
+        Mon Dec 31 00:06:48 2018 0.430               sgn-pub-01.nersc.gov               0          /home/g/glock...  b o  RETR_Cmd r        ftp wwwhpss
+        Mon Feb  4 16:45:04 2019 457.800             sgn-pub-01.nersc.gov               7184842752 /home/g/glock...  b o  RETR_Cmd r        ftp wwwhpss
         Fri Jul 12 15:32:43 2019 2.080               gert01-224.nersc.gov               2147483647 /home/n/nickb...  b i  PSTO_Cmd r        ftp nickb    fd 0
         Mon Jul 29 15:44:22 2019 0.800               dtn02.nersc.gov                    464566784  /home/n/nickb...  b o  PRTR_Cmd r        ftp nickb    fd 0
 
@@ -75,8 +75,10 @@ class FtpLog(SubprocessOutputDict):
                 {
                     "bytes": 0,
                     "bytes_sec": 0.0,
+                    "dest_path": "/home/g/glock...",
                     "duration_sec": 0.43,
                     "end_timestamp": 1546243608.0,
+                    "hpss_uid": "wwwhpss",
                     "opname": "HL",
                     "remote_host": "sgn-pub-01.nersc.gov",
                     "start_timestamp": 1546243607.57
@@ -87,8 +89,10 @@ class FtpLog(SubprocessOutputDict):
                 {
                     "bytes": 33,
                     "bytes_sec": 3300.0,
+                    "dest_path": "/home/o/opera...",
                     "duration_sec": 0.01,
                     "end_timestamp": 1546243606.0,
+                    "hpss_uid": "operator",
                     "opname": "HL",
                     "remote_host": "dtn01-int.nersc.gov",
                     "start_timestamp": 1546243605.99
@@ -100,6 +104,7 @@ class FtpLog(SubprocessOutputDict):
     where the top-level keys are either "ftp" or "pftp", and their values are
     lists containing every FTP or parallel FTP transaction, respectively.
     """
+
     def __init__(self, *args, **kwargs):
         super(FtpLog, self).__init__(*args, **kwargs)
         self.load()
@@ -156,7 +161,8 @@ class FtpLog(SubprocessOutputDict):
             rec['duration_sec'] = float(args[5])
             rec['remote_host'] = args[6]
             rec['bytes'] = int(args[7])
-            # dest_path is unknown
+            rec['dest_path'] = args[8]
+            rec['hpss_uid'] = args[14]
             # access_latency is unknown
 
             # this is kind of messy; end_timestamp is always expressed at
