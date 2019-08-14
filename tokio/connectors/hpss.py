@@ -168,7 +168,7 @@ class FtpLog(SubprocessOutputDict):
 
             # sometimes duration_sec is 0.000 because the logfile contains very limited precision
             if rec['duration_sec'] > 0.0:
-                rec['bytes_sec'] = rec['bytes'] / rec['duration_sec'] 
+                rec['bytes_sec'] = rec['bytes'] / rec['duration_sec']
 
             if app not in self:
                 self[app] = []
@@ -178,7 +178,14 @@ class FtpLog(SubprocessOutputDict):
 class HsiLog(SubprocessOutputDict):
     """Provides an interface for log files containing HSI and HTAR transactions
 
-    Results in a dictionary-like object of the following format::
+    This connector receives input from an HSI log file which takes the form::
+
+        Sat Aug 10 00:05:26 2019 dtn01.nersc.gov      hsi  57074 31117 LH     0  0.02          543608 12356.7 4 /global/project/projectdir... /home/g/glock/... 57074
+        Sat Aug 10 00:05:28 2019 cori02-224.nersc.gov htar 58888 14301 create LH 0 58178668032 397.20 146472.0  /nersc/projects/blah.tar      5                 58888
+        Sat Aug 10 00:05:29 2019 myuniversity.edu     hsi  35136 1391  LH     -1 0.03          0      0.0       0                             xyz.bin           /home/g/glock/xyz.bin 35136
+
+    but uses both tabs and spaces to denote different fields.  This connector
+    then presents this data in a dictionary-like form::
 
         {
             "hsi": [
@@ -285,11 +292,16 @@ class HsiLog(SubprocessOutputDict):
                     if args[9] != 'FR':
                         rec['account_id'] = int(args[17])
 
-                # bytes_sec will be zero for failed ops, metadata ops, etc
+                # bytes_sec can be zero for failed ops, metadata ops, etc.
                 if rec['bytes_sec'] > 0.0:
                     rec['duration_sec'] = rec['bytes'] / rec['bytes_sec']
                 else:
-                    rec['duration_sec'] = 0.0
+                    # It can also be zero if the rate is lower than 0.1 KB/sec
+                    # due to the limited resolution of the log file, leading to
+                    # spurious downstream bytes/sec calculations.  thus we
+                    # always attribute the lowest measurable rate to it, even if
+                    # it's slower.
+                    rec['duration_sec'] = rec['bytes'] / 100.0
             elif app == 'htar':
                 rec = {
                     'client_pid': int(args[8]),
