@@ -103,6 +103,19 @@ class FtpLog(SubprocessOutputDict):
 
     where the top-level keys are either "ftp" or "pftp", and their values are
     lists containing every FTP or parallel FTP transaction, respectively.
+
+    It is important to know that the following keys may be derived, with
+    assumptions, from data in the log rather than directly extracted from the
+    log:
+
+    - ``duration_sec`` has limited time resolution, so it will appear as 0.000
+       when a transfer completed in less than 0.001 seconds.  To reflect that
+       no transfers are infinitely fast, this value always has a floor of 0.001
+       when presented by this class.
+    - ``bytes_sec`` is derived from the ``duration_sec`` field in FTP logs.
+    - ``start_timestamp`` is derived from ``duration_sec`` above, so the same
+      caveats apply for FTP logs.
+
     """
 
     def __init__(self, *args, **kwargs):
@@ -170,11 +183,11 @@ class FtpLog(SubprocessOutputDict):
             # milliseconds.  Thus the start_timestamp can misrepresent the
             # actual millisecond start time which will misrepresent very fast
             # transfers.
-            rec['start_timestamp'] = rec['end_timestamp'] - rec['duration_sec']
+            if rec['duration_sec'] == 0.0:
+                rec['duration_sec'] = 0.001
 
-            # sometimes duration_sec is 0.000 because the logfile contains very limited precision
-            if rec['duration_sec'] > 0.0:
-                rec['bytes_sec'] = rec['bytes'] / rec['duration_sec']
+            rec['start_timestamp'] = rec['end_timestamp'] - rec['duration_sec']
+            rec['bytes_sec'] = rec['bytes'] / rec['duration_sec']
 
             if app not in self:
                 self[app] = []
@@ -252,6 +265,16 @@ class HsiLog(SubprocessOutputDict):
     - ``duration_sec`` is the time to complete the transfer
     - ``return_code`` is zero on success, nonzero otherwise
 
+    It is important to know that the following keys may be derived, with
+    assumptions, from data in the log rather than directly extracted from the
+    log:
+
+    - ``duration_sec`` is derived from the bytes_sec field in HSI logs.  Due to
+      limited time resolution, this value may be overstated for cases where KB/s
+      was under 0.1 KB/sec.
+    - ``start_timestamp`` is derived from ``duration_sec`` above, so the same
+      caveats apply for HSI logs.
+
     """
     def __init__(self, *args, **kwargs):
         super(HsiLog, self).__init__(*args, **kwargs)
@@ -307,7 +330,7 @@ class HsiLog(SubprocessOutputDict):
                     # spurious downstream bytes/sec calculations.  thus we
                     # always attribute the lowest measurable rate to it, even if
                     # it's slower.
-                    rec['duration_sec'] = rec['bytes'] / 100.0
+                    rec['duration_sec'] = rec['bytes'] / 100.0 # bytes/sec
             elif app == 'htar':
                 rec = {
                     'client_pid': int(args[8]),
