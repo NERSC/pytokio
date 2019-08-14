@@ -218,6 +218,7 @@ SAMPLE_COLLECTDES_QUERY = {
 SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
 SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
 SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
+SAMPLE_GLOBUSLOGS_TXT = os.path.join(INPUT_DIR, "globuslogs.txt.gz")
 
 SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
 SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"

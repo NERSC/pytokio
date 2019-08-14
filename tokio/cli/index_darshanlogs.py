@@ -844,20 +844,16 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0, bulk_insert=
     mount_points = {}
     # multiprocessing is super flaky (e.g., it deadlocks on macOS), so provide an escape hatch
     if threads > 1:
-        for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
-            if result:
-                log_records.append(result)
-                mount_points.update(result['mounts'])
-                if not bulk_insert:
-                    insert_summary(conn, result)
+        mpcontext = multiprocessing.get_context('forkserver')
+        with mpcontext.Pool(processes=threads) as pool:
+            results = pool.imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list)
     else:
-        for result in [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]:
-            if result:
-                log_records.append(result)
-                mount_points.update(result['mounts'])
-                if not bulk_insert:
-                    insert_summary(conn, result)
+        results = [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]
 
+    for result in results:
+        if result:
+            log_records.append(result)
+            mount_points.update(result['mounts'])
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
     # Insert new data that was collected in parallel
