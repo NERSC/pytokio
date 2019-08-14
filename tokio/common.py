@@ -56,6 +56,8 @@ class JSONEncoder(json.JSONEncoder):
             return int(time.mktime(obj.timetuple()))
         elif isinstance(obj, numpy.int64):
             return int(obj)
+        elif isinstance(o, set):
+            return list(o)
         return json.JSONEncoder.default(self, obj)
 
 def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
@@ -82,20 +84,24 @@ def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
 
     return fmt % (bytect, "bytes" if bytect != 1 else "byte")
 
-def to_epoch(datetime_obj):
+def to_epoch(datetime_obj, astype=int):
     """Convert datetime.datetime into epoch seconds
 
     Currently assumes input datetime is expressed in localtime.  Does not handle
-    timezones very well.
+    timezones very well.  Once Python2 support is dropped from pytokio, this will
+    be replaced by Python3's datetime.datetime.timestamp() method.
 
     Args:
         datetime_obj (datetime.datetime): Datetime to convert to seconds-since-epoch
+        astype: Whether you want the resulting timestamp as an int or float
 
     Returns:
-        int: Seconds since epoch
+        int or float: Seconds since epoch
     """
 
-    return int(time.mktime(datetime_obj.timetuple()))
+    if astype == float:
+        return time.mktime(datetime_obj.timetuple()) + datetime_obj.microsecond / 1e6
+    return astype(time.mktime(datetime_obj.timetuple()))
 
 def recast_string(value):
     """Converts a string to some type of number or True/False if possible
