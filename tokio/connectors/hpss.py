@@ -58,22 +58,48 @@ class FtpLog(SubprocessOutputDict):
 
     HPSS FTP log files contain transfer records that look something like::
 
-        Mon Dec 31 00:06:43 2018 0.070 shire-g0.nersc.gov 2581 /home/b/backup/sysinfo/shire-g0/18/12/sum31 b i STOR_Cmd r ftp backup
-        Mon Dec 31 00:06:43 2018 0.020 shire-g0.nersc.gov 0 /home/b/backup/sysinfo/shire-g0/18/12/hsi_sudo.log31 b i STOR_Cmd r ftp backup
-        Mon Dec 31 00:06:44 2018 0.470 sgn-pub-01.nersc.gov 0 /home/r/regan/www/HipMer/s_1_2_sequence.fastq.gz b o RETR_Cmd r ftp wwwhpss
-        Mon Dec 31 00:06:46 2018 dtn01-int.nersc.gov /home/o/operator/.check_ftp.25651 b POPN_Cmd w r ftp operator fd 0
-        Mon Dec 31 00:06:46 2018 0.080 dtn01-int.nersc.gov 33 /home/o/operator/.check_ftp.25651 b i PSTO_Cmd r ftp operator fd 0
-        Mon Dec 31 00:06:46 2018 dtn01-int.nersc.gov /home/o/operator/.check_ftp.25651 b POPN_Cmd r r ftp operator fd 0
+        #0   1   2  3        4    5                   6                                  7          8                 9 10 11       12       13  14       15 16
 
+        Mon Dec 31 00:06:46 2018 dtn01-int.nersc.gov /home/o/operator/.check_ftp.25651  b          POPN_Cmd          r r  ftp      operator fd  0
+        Mon Dec 31 00:06:46 2018 0.010               dtn01-int.nersc.gov                33         /home/o/opera...  b o  PRTR_Cmd r        ftp operator fd 0
+        Mon Dec 31 00:06:48 2018 0.430               sgn-pub-01.nersc.gov               0          /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
+        Mon Feb  4 16:45:04 2019 457.800             sgn-pub-01.nersc.gov               7184842752 /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
+        Fri Jul 12 15:32:43 2019 2.080               gert01-224.nersc.gov               2147483647 /home/n/nickb...  b i  PSTO_Cmd r        ftp nickb    fd 0
+        Mon Jul 29 15:44:22 2019 0.800               dtn02.nersc.gov                    464566784  /home/n/nickb...  b o  PRTR_Cmd r        ftp nickb    fd 0
+
+    which this class deserializes and represents as a dictionary-like object of
+    the form::
+
+        {
+            "ftp": [
+                {
+                    "bytes": 0,
+                    "bytes_sec": 0.0,
+                    "duration_sec": 0.43,
+                    "end_timestamp": 1546243608.0,
+                    "opname": "HL",
+                    "remote_host": "sgn-pub-01.nersc.gov",
+                    "start_timestamp": 1546243607.57
+                },
+                ...
+            ],
+            "pftp": [
+                {
+                    "bytes": 33,
+                    "bytes_sec": 3300.0,
+                    "duration_sec": 0.01,
+                    "end_timestamp": 1546243606.0,
+                    "opname": "HL",
+                    "remote_host": "dtn01-int.nersc.gov",
+                    "start_timestamp": 1546243605.99
+                },
+               ... 
+            ]
+        }
+
+    where the top-level keys are either "ftp" or "pftp", and their values are
+    lists containing every FTP or parallel FTP transaction, respectively.
     """
-#0   1   2  3        4    5                   6                                  7          8                 9 10 11       12       13  14       15 16
-#Mon Dec 31 00:06:46 2018 dtn01-int.nersc.gov /home/o/operator/.check_ftp.25651  b          POPN_Cmd          r r  ftp      operator fd  0
-#Mon Dec 31 00:06:46 2018 0.010               dtn01-int.nersc.gov                33         /home/o/opera...  b o  PRTR_Cmd r        ftp operator fd 0
-#Mon Dec 31 00:06:48 2018 0.430               sgn-pub-01.nersc.gov               0          /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
-#Mon Feb  4 16:45:04 2019 457.800             sgn-pub-01.nersc.gov               7184842752 /home/r/regan...  b o  RETR_Cmd r        ftp wwwhpss
-#Fri Jul 12 15:32:43 2019 2.080               gert01-224.nersc.gov               2147483647 /home/n/nickb...  b i  PSTO_Cmd r        ftp nickb    fd 0
-#Mon Jul 29 15:44:22 2019 0.800               dtn02.nersc.gov                    464566784  /home/n/nickb...  b o  PRTR_Cmd r        ftp nickb    fd 0
-
     def __init__(self, *args, **kwargs):
         super(FtpLog, self).__init__(*args, **kwargs)
         self.load()
@@ -196,8 +222,8 @@ class HsiLog(SubprocessOutputDict):
     lists containing every HSI or HTAR transaction, respectively.
 
     The keys generally follow the raw nomenclature used in the HSI logs which
-    can be found on `Mike Gleicher's website`_.  Perhaps most relevant are the
-    opnames, which can be one of
+    can be found on `Mike Gleicher's website <http://pal.mgleicher.us/HSI_Admin/log_files.html>`_.
+    Perhaps most relevant are the opnames, which can be one of
 
     * FU - file unlink.  Has no destination filename field or account id.
     * FR - file rename.  Has no account id.
@@ -212,8 +238,6 @@ class HsiLog(SubprocessOutputDict):
     - ``bytes`` and ``bytes_sec`` are the size and rate of data transfer
     - ``duration_sec`` is the time to complete the transfer
     - ``return_code`` is zero on success, nonzero otherwise
-
-    .. Mike Gleicher's website: http://pal.mgleicher.us/HSI_Admin/log_files.html
 
     """
     def __init__(self, *args, **kwargs):
@@ -473,7 +497,7 @@ def _parse_section(lines, start_line=0):
 def _find_columns(line, sep="=", gap=' ', strict=False):
     """Determine the column start/end positions for a header line separator
 
-    Takes a line separator such as the one denoted below:
+    Takes a line separator such as the one denoted below::
 
         Host             Users      IO_GB
         ===============  =====  =========
