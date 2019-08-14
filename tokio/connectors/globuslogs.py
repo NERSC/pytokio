@@ -10,9 +10,12 @@ The keys and values are pretty well demarcated, with the only hiccup being
 around file names that contain spaces.
 """
 
+import re
 import time
 import datetime
 from tokio.connectors.common import SubprocessOutputList
+
+PEELER_REX = re.compile("^([A-Z]+)=(.*?)\s+([A-Z]+=.*)$")
 
 class GlobusLog(SubprocessOutputList):
     """Interface into a Globus transfer log
@@ -84,22 +87,17 @@ class GlobusLog(SubprocessOutputList):
         for line in input_str.splitlines():
             rec = {}
             remainder = line
+
             while remainder:
-                key, remainder = remainder.split("=", 1)
-                if key in ("FILE", "VOLUME"):
-                    # allow for spaces in paths
-                    if '=' not in remainder:
-                        value = remainder
-                        remainder = ""
-                    else:
-                        value, remainder = remainder.split('=', 1)
-                        value, nextkey = value.rsplit(None, 1)
-                        remainder = nextkey + "=" + remainder
-                elif ' ' in remainder:
-                    value, remainder = remainder.split(None, 1)
-                else:
-                    value = remainder
+                # we use a regex here because file paths may contain both spaces and =
+                match = PEELER_REX.match(remainder)
+                if not match:
+                    key, value = remainder.split('=', 1)
                     remainder = ""
+                else:
+                    key = match.group(1)
+                    value = match.group(2)
+                    remainder = match.group(3)
                 rec[key] = value
 
             # recast keys
@@ -125,8 +123,8 @@ def _listify_ips(ip_str):
     return [ip_str]
 
 RECAST_KEYS = {
-    "DATE": lambda x: time.mktime(datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timetuple()),
-    "START": lambda x: time.mktime(datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timetuple()),
+    "DATE": lambda x: datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timestamp(),
+    "START": lambda x: datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timestamp(),
     "BUFFER": int,
     "BLOCK": int,
     "NBYTES": int,
