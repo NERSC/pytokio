@@ -854,6 +854,9 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0, bulk_insert=
         if result:
             log_records.append(result)
             mount_points.update(result['mounts'])
+                if not bulk_insert:
+                    insert_summary(conn, result)
+
     vprint("Ingested %d logs in %.1f seconds" % (len(log_records), time.time() - t_start), 2)
 
     # Insert new data that was collected in parallel
