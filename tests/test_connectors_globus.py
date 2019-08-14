@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import json
+import tokiotest
 import tokio.connectors.globuslogs
 
 def test_connector_globuslogs():
