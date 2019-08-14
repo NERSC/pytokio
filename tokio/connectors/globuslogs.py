@@ -13,6 +13,7 @@ around file names that contain spaces.
 import re
 import time
 import datetime
+from tokio.common import to_epoch
 from tokio.connectors.common import SubprocessOutputList
 
 PEELER_REX = re.compile("^([A-Z]+)=(.*?)\s+([A-Z]+=.*)$")
@@ -123,8 +124,8 @@ def _listify_ips(ip_str):
     return [ip_str]
 
 RECAST_KEYS = {
-    "DATE": lambda x: datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timestamp(),
-    "START": lambda x: datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f").timestamp(),
+    "DATE": lambda x: to_epoch(datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f"), float),
+    "START": lambda x: to_epoch(datetime.datetime.strptime(x, "%Y%m%d%H%M%S.%f"), float),
     "BUFFER": int,
     "BLOCK": int,
     "NBYTES": int,
