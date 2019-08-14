@@ -75,9 +75,9 @@ class FtpLog(SubprocessOutputDict):
                 {
                     "bytes": 0,
                     "bytes_sec": 0.0,
-                    "dest_path": "/home/g/glock...",
                     "duration_sec": 0.43,
                     "end_timestamp": 1546243608.0,
+                    "hpss_path": "/home/g/glock...",
                     "hpss_uid": "wwwhpss",
                     "opname": "HL",
                     "remote_host": "sgn-pub-01.nersc.gov",
@@ -89,9 +89,9 @@ class FtpLog(SubprocessOutputDict):
                 {
                     "bytes": 33,
                     "bytes_sec": 3300.0,
-                    "dest_path": "/home/o/opera...",
                     "duration_sec": 0.01,
                     "end_timestamp": 1546243606.0,
+                    "hpss_path": "/home/o/opera...",
                     "hpss_uid": "operator",
                     "opname": "HL",
                     "remote_host": "dtn01-int.nersc.gov",
@@ -161,7 +161,7 @@ class FtpLog(SubprocessOutputDict):
             rec['duration_sec'] = float(args[5])
             rec['remote_host'] = args[6]
             rec['bytes'] = int(args[7])
-            rec['dest_path'] = args[8]
+            rec['hpss_path'] = args[8]
             rec['hpss_uid'] = args[14]
             # access_latency is unknown
 
