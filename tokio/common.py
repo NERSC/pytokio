@@ -56,8 +56,8 @@ class JSONEncoder(json.JSONEncoder):
             return int(time.mktime(obj.timetuple()))
         elif isinstance(obj, numpy.int64):
             return int(obj)
-        elif isinstance(o, set):
-            return list(o)
+        elif isinstance(obj, set):
+            return list(obj)
         return json.JSONEncoder.default(self, obj)
 
 def humanize_bytes(bytect, base10=False, fmt="%.1f %s"):
