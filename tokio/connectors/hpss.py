@@ -5,6 +5,7 @@ import re
 import copy
 import time
 import datetime
+from tokio.common import to_epoch
 from tokio.connectors.common import SubprocessOutputDict
 
 REX_HEADING_LINE = re.compile(r"^[= ]+$")
@@ -104,18 +105,6 @@ class FtpLog(SubprocessOutputDict):
     where the top-level keys are either "ftp" or "pftp", and their values are
     lists containing every FTP or parallel FTP transaction, respectively.
 
-    It is important to know that the following keys may be derived, with
-    assumptions, from data in the log rather than directly extracted from the
-    log:
-
-    - ``duration_sec`` has limited time resolution, so it will appear as 0.000
-       when a transfer completed in less than 0.001 seconds.  To reflect that
-       no transfers are infinitely fast, this value always has a floor of 0.001
-       when presented by this class.
-    - ``bytes_sec`` is derived from the ``duration_sec`` field in FTP logs.
-    - ``start_timestamp`` is derived from ``duration_sec`` above, so the same
-      caveats apply for FTP logs.
-
     """
 
     def __init__(self, *args, **kwargs):
@@ -171,23 +160,15 @@ class FtpLog(SubprocessOutputDict):
                 skip_recs += 1
                 continue
 
+            # this is a low-resolution representation
             rec['duration_sec'] = float(args[5])
+            rec['duration_sec_resolution'] = _get_ascii_resolution(args[5])
+
             rec['remote_host'] = args[6]
             rec['bytes'] = int(args[7])
             rec['hpss_path'] = args[8]
             rec['hpss_uid'] = args[14]
             # access_latency is unknown
-
-            # this is kind of messy; end_timestamp is always expressed at
-            # one-second resolution, while duration_sec is resolved down to
-            # milliseconds.  Thus the start_timestamp can misrepresent the
-            # actual millisecond start time which will misrepresent very fast
-            # transfers.
-            if rec['duration_sec'] == 0.0:
-                rec['duration_sec'] = 0.001
-
-            rec['start_timestamp'] = rec['end_timestamp'] - rec['duration_sec']
-            rec['bytes_sec'] = rec['bytes'] / rec['duration_sec']
 
             if app not in self:
                 self[app] = []
@@ -265,16 +246,6 @@ class HsiLog(SubprocessOutputDict):
     - ``duration_sec`` is the time to complete the transfer
     - ``return_code`` is zero on success, nonzero otherwise
 
-    It is important to know that the following keys may be derived, with
-    assumptions, from data in the log rather than directly extracted from the
-    log:
-
-    - ``duration_sec`` is derived from the bytes_sec field in HSI logs.  Due to
-      limited time resolution, this value may be overstated for cases where KB/s
-      was under 0.1 KB/sec.
-    - ``start_timestamp`` is derived from ``duration_sec`` above, so the same
-      caveats apply for HSI logs.
-
     """
     def __init__(self, *args, **kwargs):
         super(HsiLog, self).__init__(*args, **kwargs)
@@ -298,8 +269,8 @@ class HsiLog(SubprocessOutputDict):
         bad_recs = 0
         for line in input_str.splitlines():
             # log lines use spaces/tabs to mean different things, e.g.,
-            # Sat Aug 10 00:05:13 2019 bucket.ssl.berkeley.edu hsi 69615 1360^ILH^I-1^I0.03^I0^I0.0^I0^Is6c0.out.20190727_085506.1^I/home/c/cobb/seti/s6_data/ao/s6c0/2019/s6c0.out.20190727_085506.1^I69615
-            args = line.split(' ', 8)
+            # Sat Aug 10 00:05:13 2019 xyz.berkeley.edu hsi 69615 1360^ILH^I-1^I0.03^I0^I0.0^I0^Is6c0.out.20190727_085506.1^I/home/g/glock/blah.20190727_085506.1^I69615
+            args = re.split(pattern=' +', string=line, maxsplit=8)
             app = args[6] # hsi or htar
             app_args = args.pop()
             args += app_args.split('\t')
@@ -310,8 +281,10 @@ class HsiLog(SubprocessOutputDict):
                     'opname': args[9],
                     'return_code': int(args[10]),
                     'access_latency_sec': float(args[11]),
+                    'access_latency_sec_resolution': _get_ascii_resolution(args[11]),
                     'bytes': int(args[12]),
                     'bytes_sec': 1000.0 * float(args[13]),
+                    'bytes_sec_resolution': 1000.0 * _get_ascii_resolution(args[13]),
                     'cos_id': int(args[14]),
                     'source_path': args[15],
                 }
@@ -321,16 +294,6 @@ class HsiLog(SubprocessOutputDict):
                     if args[9] != 'FR':
                         rec['account_id'] = int(args[17])
 
-                # bytes_sec can be zero for failed ops, metadata ops, etc.
-                if rec['bytes_sec'] > 0.0:
-                    rec['duration_sec'] = rec['bytes'] / rec['bytes_sec']
-                else:
-                    # It can also be zero if the rate is lower than 0.1 KB/sec
-                    # due to the limited resolution of the log file, leading to
-                    # spurious downstream bytes/sec calculations.  thus we
-                    # always attribute the lowest measurable rate to it, even if
-                    # it's slower.
-                    rec['duration_sec'] = rec['bytes'] / 100.0 # bytes/sec
             elif app == 'htar':
                 rec = {
                     'client_pid': int(args[8]),
@@ -339,7 +302,9 @@ class HsiLog(SubprocessOutputDict):
                     'return_code': int(args[11]),
                     'bytes': int(args[12]),
                     'duration_sec': float(args[13]),
+                    'duration_sec_resolution': _get_ascii_resolution(args[13]),
                     'bytes_sec': float(args[14]),
+                    'bytes_sec_resolution': _get_ascii_resolution(args[14]),
                     'hpss_path': args[15],
                     'cos_id': int(args[-2]),
                     'account_id': int(args[-1])
@@ -353,8 +318,7 @@ class HsiLog(SubprocessOutputDict):
 
             rec['hpss_uid'] = int(args[7])
             rec['remote_host'] = args[5]
-            rec['end_timestamp'] = time.mktime(datetime.datetime.strptime(" ".join(args[0:5]), "%a %b %d %H:%M:%S %Y").timetuple())
-            rec['start_timestamp'] = rec['end_timestamp'] - rec['duration_sec']
+            rec['end_timestamp'] = to_epoch(datetime.datetime.strptime(" ".join(args[0:5]), "%a %b %d %H:%M:%S %Y"), float)
 
             if app not in self:
                 self[app] = []
@@ -666,3 +630,25 @@ def _hpss_timedelta_to_secs(timedelta_str):
         seconds = -1
 
     return seconds
+
+def _get_ascii_resolution(numeric_str):
+    """Determines the maximum resolution of an ascii-encoded numerical value
+
+    Necessary because HPSS logs contain numeric values at different and
+    often-insufficient resolutions.  For example, tiny but finite transfers can
+    show up as taking 0.000 seconds, which results in infinitely fast transfers
+    when calculated naively.  This function gives us a means to guess at what
+    the real speed might've been.
+
+    Does not work with scientific notation.
+
+    Args:
+        numeric_str (str): An ascii-encoded integer or float
+
+    Returns:
+        float: The smallest number that can be expressed using the resolution
+        provided with ``numeric_str``
+    """
+    if '.' in numeric_str:
+        return 1.0 / 10**(float(len(numeric_str.rsplit('.', 1)[-1])))
+    return 1.0
