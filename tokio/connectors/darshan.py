@@ -364,12 +364,9 @@ class Darshan(SubprocessOutputDict):
         module_rex = re.compile(r'^# ([A-Z\-0-9/]+) module data\s*$')
 
         for line in lines:
-            if isstr(line):
-                # Python 2 - subprocess.check_output returns a string
-                self.load_str(line)
-            else:
+            if not isstr(line):
                 # Python 3 - subprocess.check_output returns encoded bytes
-                self.load_str(line.decode())
+                line = line.decode()
 
             # Is this the start of a new section?
             # Why do we look at section, refactorize failed
