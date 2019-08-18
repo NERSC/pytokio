@@ -59,6 +59,7 @@ import re
 import json
 import errno
 import subprocess
+import warnings
 from .common import SubprocessOutputDict
 from ..common import isstr
 
@@ -257,10 +258,12 @@ class Darshan(SubprocessOutputDict):
 
         # Python 2 - subprocess.check_output returns a string
         self.load_str(iter(dparser.stdout.readline, ''))
+        dparser.stdout.close()
+        dparser.wait()
 
-        if not dparser.returncode:
-            warnings.warn("%s returned nonzero exit code (%d)" % (cmd, error.returncode))
-            output_str = error.output
+        retcode = dparser.returncode
+        if retcode != 0:
+            warnings.warn("%s returned nonzero exit code (%d)" % (cmd, retcode))
 
     def load_str(self, input_str):
         """Load from either a json cache or the output of darshan-parser
@@ -364,6 +367,8 @@ class Darshan(SubprocessOutputDict):
         module_rex = re.compile(r'^# ([A-Z\-0-9/]+) module data\s*$')
 
         for line in lines:
+            if not line:
+                break
             if not isstr(line):
                 # Python 3 - subprocess.check_output returns encoded bytes
                 line = line.decode()
