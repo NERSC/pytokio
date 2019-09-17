@@ -117,7 +117,7 @@ def compare_config_to_runtime(config_file):
 
     # Load the reference file and compare its contents to the tokio.config namespace
     print("Comparing runtime config to %s" % config_file)
-    config_contents = json.load(open(config_file, 'r'))
+    config_contents = json.load(open(config_file, 'rt'))
     for key, expected_value in config_contents.items():
         runtime_value = tokio.config.CONFIG[key]
         print("Verifying tokio.config.%s:\n  [(%s)%s] == [(%s)%s]" % (
@@ -210,7 +210,7 @@ def test_config_post_load_from_file():
     # Then load the config file into buffer
     config_file = os.path.join(tokiotest.INPUT_DIR, 'sample_config.json')
     # and manually set each loaded variable as a tokio.config attribute
-    config_contents = json.load(open(config_file, 'r'))
+    config_contents = json.load(open(config_file, 'rt'))
     for key, set_value in config_contents.items():
         tokio.config.CONFIG[key] = set_value
 
