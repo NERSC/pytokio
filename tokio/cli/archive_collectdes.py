@@ -580,9 +580,9 @@ def main(argv=None):
     else:
         _, encoding = mimetypes.guess_type(args.input)
         if encoding == 'gzip':
-            input_file = gzip.open(args.input, 'r')
+            input_file = gzip.open(args.input, 'rt')
         else:
-            input_file = open(args.input, 'r')
+            input_file = open(args.input, 'rt')
         pages = json.load(input_file)
         input_file.close()
         tokio.debug.debug_print("Loaded results from %s" % args.input)

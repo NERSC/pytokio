@@ -67,7 +67,7 @@ def init_config():
     PYTOKIO_CONFIG_FILE = os.environ.get('PYTOKIO_CONFIG', DEFAULT_CONFIG_FILE)
 
     try:
-        with open(PYTOKIO_CONFIG_FILE, 'r') as config_file:
+        with open(PYTOKIO_CONFIG_FILE, 'rt') as config_file:
             if HAVE_YAML:
                 loaded_config = load_and_expand_yaml(config_file)
             else:

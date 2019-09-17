@@ -126,7 +126,7 @@ class EsConnection(object):
         if encoding == 'gzip':
             input_fp = gzip.open(cache_file, 'rt')
         else:
-            input_fp = open(cache_file, 'r')
+            input_fp = open(cache_file, 'rt')
 
         # convert cached hits into something resembling a real Elasticsearch response
         pages = []
