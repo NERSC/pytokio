@@ -62,6 +62,7 @@ def setup_package():
             'esnet_snmp': ['requests'],
             'lmtdb': ['mysqlclient'],
             'nersc_jobsdb': ['mysqlclient'],
+            'yamlconfig': ['pyyaml'],
         },
         python_requires=">=2.7",
 

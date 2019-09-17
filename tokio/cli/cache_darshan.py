@@ -15,6 +15,8 @@ def main(argv=None):
     parser.add_argument('--base', action='store_true', help='darshan log field data [default]')
     parser.add_argument('--total', action='store_true', help='aggregated darshan field data')
     parser.add_argument('--perf', action='store_true', help='derived perf data')
+    parser.add_argument('--modules', type=str, default=None, help="comma-delimited list of modules to return")
+    parser.add_argument('--counters', type=str, default=None, help="comma-delimited list of counters to return")
     parser.add_argument("-o", "--output", type=str, default=None, help="output file")
     args = parser.parse_args(argv)
 
@@ -26,7 +28,10 @@ def main(argv=None):
         darshan.darshan_parser_perf()
 
     if args.base or (not args.perf and not args.total):
-        darshan.darshan_parser_base()
+        darshan.darshan_parser_base(
+            modules=args.modules.split(",") if args.modules else None,
+            counters=args.counters.split(",") if args.counters else None,
+        )
 
     # Serialize the object
     cache_file = args.output

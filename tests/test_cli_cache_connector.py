@@ -21,7 +21,7 @@ except ImportError:
     _HAVE_ELASTICSEARCH = False
 
 try:
-    import requests.exceptions
+    from requests.exceptions import Timeout, ConnectionError, HTTPError
     _HAVE_REQUESTS = True
 except ImportError:
     _HAVE_REQUESTS = False
@@ -149,7 +149,7 @@ def run_requests(binary, argv):
 
     try:
         return tokiotest.run_bin(binary, argv)
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
 @nose.tools.raises(ValueError)

@@ -38,7 +38,7 @@ class Umami(collections.OrderedDict):
         column as a metric.  The Umami attributes (labels, etc) are not
         expressed.
         """
-        to_df = {}
+        to_df = collections.OrderedDict()
         for metric, measurement in self.items():
             for index, timestamp in enumerate(measurement.timestamps):
                 if stringify_key:
@@ -47,7 +47,7 @@ class Umami(collections.OrderedDict):
                     key = timestamp
 
                 if key not in to_df:
-                    to_df[key] = {}
+                    to_df[key] = collections.OrderedDict()
                 to_df[key].update({metric: measurement.values[index]})
         return to_df
 

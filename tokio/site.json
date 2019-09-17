@@ -14,7 +14,10 @@
         "^/global/projectb": "projectb",
         "^/global/projecta": "projecta",
         "^/global/u1": "homes-u1",
-        "^/global/u2": "homes-u2"
+        "^/global/u2": "homes-u2",
+        "^/gpfs/mira-fs0": "mirafs0",
+        "^/gpfs/mira-fs1": "mirafs1",
+        "^/lus/theta-fs0": "thetafs0"
     },
     "mmperfmon_lun_map": {
         "^ddn\\d+dt\\d+$": "datatarget",
