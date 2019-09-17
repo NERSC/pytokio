@@ -249,6 +249,11 @@ def run_apidoc(_):
         argv.insert(0, sphinx.apidoc.__file__)
         sphinx.apidoc.main(argv)
 
+    import tokio
+    with open(os.path.join('user', 'tts_v1.inc'), 'w') as outputfp:
+        for key in sorted(tokio.connectors.hdf5.SCHEMA['1'].keys()):
+            outputfp.write("- " + key + "\n")
+
 def setup(app):
     app.connect('builder-inited', run_apidoc)
 

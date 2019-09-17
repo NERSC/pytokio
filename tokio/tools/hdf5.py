@@ -9,11 +9,30 @@ import datetime
 import tokio.tools.common
 import tokio.connectors.hdf5
 
-def enumerate_h5lmts(fsname, datetime_start, datetime_end):
-    """Return all time-indexed HDF5 files falling between a time range
 
-    Given a starting datetime and (optionally) an ending datetime, return all
-    HDF5 files that contain data inside of that date range (inclusive).
+def enumerate_h5lmts(fsname, datetime_start, datetime_end):
+    """Alias for :meth:`tokio.tools.hdf5.enumerate_hdf5`"""
+    return enumerate_hdf5(fsname, datetime_start, datetime_end)
+
+def enumerate_hdf5(fsname, datetime_start, datetime_end):
+    """Returns all time-indexed HDF5 files falling between a time range
+
+    Given a starting and ending datetime, returns the names of all HDF5 files
+    that should contain data falling within that date range (inclusive).
+
+    Args:
+        fsname (str): Logical file system name; should match a key within
+            the ``hdf5_files`` config item in ``site.json``.
+        datetime_start (datetime.datetime): Begin including files corresponding
+            to this start date, inclusive.
+        datetime_end (datetime.datetime): Stop including files with timestamps
+            that follow this end date.  Resulting files _will_ include this
+            date.
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end
+        dates.
     """
     return tokio.tools.common.enumerate_dated_files(start=datetime_start,
                                                     end=datetime_end,
@@ -22,9 +41,31 @@ def enumerate_h5lmts(fsname, datetime_start, datetime_end):
                                                     match_first=True)
 
 def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
-    """
-    Given the name of an Hdf5 file and a start/end date+time, returns a list of
-    tuples containing
+    """Retrieve filenames and indices within files corresponding to a date range
+
+    Given a logical file system name and a dataset within that file system's
+    TOKIO Time Series files, return a list of all file names and the indices
+    within those files that fall within the specified date range.
+
+    Args:
+        fsname (str): Logical file system name; should match a key within
+            the ``hdf5_files`` config item in ``site.json``.
+        dataset_name (str): Name of a TOKIO Time Series dataset name
+        datetime_start (datetime.datetime): Begin including files corresponding
+            to this start date, inclusive.
+        datetime_end (datetime.datetime): Stop including files with timestamps
+            that follow this end date.  Resulting files _will_ include this
+            date.
+
+    Returns:
+        list: List of three-item tuples of types (str, int, int), where
+
+        * element 0 is the path to an existing HDF5 file
+        * element 1 is the first index (inclusive) of ``dataset_name`` within
+          that file containing data that falls within the specified date range
+        * element 2 is the last index (exclusive) of ``dataset_name`` within
+          that file containing data that falls within the specified date range
+
     """
     if datetime_end is None:
         datetime_end = datetime_start
@@ -56,20 +97,35 @@ def get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end):
     return output
 
 def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime_end):
+    """Generate a dataframe containing all relevant data within a date range
+
+    Given a logical file system name and a dataset within that file system's
+    TOKIO Time Series files, return a dataframe containing all relevant data
+    falling within the given time range from that dataset.  Spans multiple HDF5
+    files if necessary.
+
+    Args:
+        fsname (str): Logical file system name; should match a key within
+            the ``hdf5_files`` config item in ``site.json``.
+        dataset_name (str): Name of a TOKIO Time Series dataset name
+        datetime_start (datetime.datetime): Begin including files corresponding
+            to this start date, inclusive.
+        datetime_end (datetime.datetime): Stop including files with timestamps
+            that follow this end date.  Resulting files _will_ include this
+            date.
+
+    Returns:
+        pandas.DataFrame or None: DataFrame, indexed in time, containing all of
+        the relevant data from ``dataset_name`` starting at ``datetime_start``
+        (inclusive) and ending at ``datetime_end`` (exclusive)
     """
-    Returns the same content as get_group_data_from_time_range into a dataframe
-    """
-    files_and_indices = get_files_and_indices(fsname, dataset_name, datetime_start, datetime_end)
     result = None
 
-    if not files_and_indices:
-#       raise IOError("No relevant hdf5 files found in %s between %s - %s" % (
-#           tokio.config.CONFIG['h5lmt_file'],
-#           datetime_start,
-#           datetime_end))
+    hdf5_filenames = enumerate_h5lmts(fsname, datetime_start, datetime_end)
+    if not hdf5_filenames:
         return result
 
-    for hdf_filename in enumerate_h5lmts(fsname, datetime_start, datetime_end):
+    for hdf_filename in hdf5_filenames:
         with tokio.connectors.hdf5.Hdf5(hdf_filename, mode='r') as hdf_file:
             df_slice = hdf_file.to_dataframe(dataset_name)
             df_slice = df_slice[(df_slice.index >= datetime_start)
@@ -83,4 +139,4 @@ def get_dataframe_from_time_range(fsname, dataset_name, datetime_start, datetime
                 ### append in place--maybe more efficient than .append??
                 result = result.reindex(result.index.union(df_slice.index))
                 result.loc[df_slice.index] = df_slice
-    return result.sort_index()
+    return result

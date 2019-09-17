@@ -11,8 +11,8 @@ import nose
 import h5py
 import numpy
 import tokio
-import tokiotest
 import tokio.cli.archive_lmtdb
+import tokiotest
 
 # expressed as fraction, not percent; used to account for differences in how
 # pylmt and pytokio handle missing data
@@ -62,34 +62,6 @@ def update_tts(output_file, q_start, q_end):
     tokio.cli.archive_lmtdb.main(argv)
     print("Updated %s" % output_file)
 
-def summarize_hdf5(hdf5_file):
-    """
-    Return some summary metrics of an hdf5 file in a mostly content-agnostic way
-    """
-    # characterize the h5file in a mostly content-agnostic way
-    summary = {
-        'sums': {},
-        'shapes': {},
-        'updates': {},
-    }
-
-    def characterize_object(obj_name, obj_data):
-        """retain some properties of each dataset in an hdf5 file"""
-        if isinstance(obj_data, h5py.Dataset):
-            summary['shapes'][obj_name] = obj_data.shape
-            # note that this will break if the hdf5 file contains non-numeric datasets
-            if len(obj_data.shape) == 1:
-                summary['sums'][obj_name] = obj_data[:].sum()
-            elif len(obj_data.shape) == 2:
-                summary['sums'][obj_name] = obj_data[:, :].sum()
-            elif len(obj_data.shape) == 3:
-                summary['sums'][obj_name] = obj_data[:, :, :].sum()
-            summary['updates'][obj_name] = obj_data.attrs.get('updated')
-
-    hdf5_file.visititems(characterize_object)
-
-    return summary
-
 def check_positivity(hdf5_file):
     """
     Return some summary metrics of an hdf5 file in a mostly content-agnostic way
@@ -100,30 +72,6 @@ def check_positivity(hdf5_file):
 
     hdf5_file.visititems(assert_positive)
 
-
-def identical_datasets(summary0, summary1):
-    """
-    compare the contents of two HDF5s for similarity
-    """
-    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
-    num_compared = 0
-    for metric in 'sums', 'shapes':
-        for key, value in summary0[metric].items():
-            num_compared += 1
-            assert key in summary1[metric]
-            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
-            assert summary1[metric][key] == value
-
-    # check to make sure summary1 was modified after summary0 was generated
-    for obj, update in summary0['updates'].items():
-        if update is not None:
-            result = summary1['updates'][obj] > summary0['updates'][obj]
-            print("%s newer than %s? %s" % (summary1['updates'][obj],
-                                            summary0['updates'][obj],
-                                            result))
-            assert result
-
-    assert num_compared > 0
 
 @nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
 def test_bin_archive_lmtdb_overlaps():
@@ -143,7 +91,7 @@ def test_bin_archive_lmtdb_overlaps():
         # initialize a new TimeSeries, populate it, and write it out as HDF5
         generate_tts(tokiotest.TEMP_FILE.name)
         h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
-        summary0 = summarize_hdf5(h5_file)
+        summary0 = tokiotest.summarize_hdf5(h5_file)
         h5_file.close()
 
         q_start = start + datetime.timedelta(seconds=int(test_range[0] * delta))
@@ -154,10 +102,10 @@ def test_bin_archive_lmtdb_overlaps():
         # append an overlapping subset of data to the same HDF5
         update_tts(tokiotest.TEMP_FILE.name, q_start, q_end)
         h5_file = h5py.File(tokiotest.TEMP_FILE.name, 'r')
-        summary1 = summarize_hdf5(h5_file)
+        summary1 = tokiotest.summarize_hdf5(h5_file)
         h5_file.close()
 
-        func = identical_datasets
+        func = tokiotest.identical_datasets
         func.description = ("cli.archive_lmtdb overlap %s" % str(test_range))
 # yield doesn't work because tokiotest.TEMP_FILE doesn't propagate
 #       yield func, summary0, summary1
@@ -172,10 +120,6 @@ def test_bin_archive_lmtdb_nonmonotonic():
     rates rather than being reported as negative.
     """
     tokiotest.TEMP_FILE.close()
-
-    start = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_START)
-    end = datetime.datetime.fromtimestamp(tokiotest.SAMPLE_LMTDB_END)
-    delta = (end - start).total_seconds()
 
     # initialize a new TimeSeries, populate it, and write it out as HDF5
     generate_tts(output_file=tokiotest.TEMP_FILE.name,
@@ -261,12 +205,14 @@ class TestArchiveLmtdbCorrectness(object):
 
             # check the dataset
             func = compare_h5lmt_dataset
-            func.description = "cli.archive_lmtdb: comparing %s dataset inside h5lmt" % dataset_name
+            func.description = \
+                "cli.archive_lmtdb: comparing %s dataset inside h5lmt" % dataset_name
             print(func.description)
             yield func, self.generated, self.ref_h5lmt, dataset_name, False
 
             # check the timestamp
-            func.description = "cli.archive_lmtdb: comparing %s's timestamps dataset inside h5lmt" % dataset_name
+            func.description = \
+                "cli.archive_lmtdb: comparing %s's timestamps dataset inside h5lmt" % dataset_name
             print(func.description)
             yield func, self.generated_tts, self.ref_h5lmt, dataset_name, True
             checked_ct += 1
@@ -278,14 +224,15 @@ class TestArchiveLmtdbCorrectness(object):
         """Compare two TOKIO HDF5 files
         """
         checked_ct = 0
-        for group_name, group_data in self.generated.items():
+        for group_data in self.generated.values():
             for dataset in group_data.values():
                 if not isinstance(dataset, h5py.Dataset):
                     continue
                 dataset_name = dataset.name
 
                 func = compare_tts_dataset
-                func.description = "cli.archive_lmtdb: comparing %s to hdf5 reference" % dataset_name
+                func.description = \
+                    "cli.archive_lmtdb: comparing %s to hdf5 reference" % dataset_name
                 print(func.description)
                 yield func, self.generated, self.ref_hdf5, dataset_name
                 checked_ct += 1

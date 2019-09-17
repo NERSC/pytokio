@@ -44,7 +44,7 @@ def load_darshanlogs(datetime_start=None, datetime_end=None, username=None,
 
     Returns:
         dict: keyed by log file name whose values are connectors.darshan.Darshan
-            objects
+        objects
 
     Todo:
         * Use a default `darshan_log_dir` from `tokio.config`

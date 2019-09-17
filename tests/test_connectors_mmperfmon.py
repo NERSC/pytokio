@@ -25,7 +25,7 @@ def validate_object(obj):
         print("key [%s] is type [%s]" % (timestamp, type(timestamp)))
         assert isinstance(timestamp, int)
 
-def test_get_col_pos():
+def _test_get_col_pos(align=None):
     """connectors.mmperfmon.get_col_pos()
     """
     input_strs = [
@@ -38,7 +38,7 @@ def test_get_col_pos():
     for input_str in input_strs:
         print("Evaluating [%s]" % input_str)
         tokens = input_str.strip().split()
-        offsets = tokio.connectors.mmperfmon.get_col_pos(input_str)
+        offsets = tokio.connectors.mmperfmon.get_col_pos(input_str, align=align)
         print("Offsets are: " + str(offsets))
         assert offsets
         istart = 0
@@ -46,10 +46,21 @@ def test_get_col_pos():
         for index, (istart, istop) in enumerate(offsets):
             token = input_str[istart:istop]
             print("    [%s] vs [%s]" % (token, tokens[index]))
-            assert token == tokens[index]
+            if align:
+#               print("    [%s] vs [%s]" % (token.strip(), tokens[index]))
+                assert token.strip() == tokens[index]
+            else:
+                assert token == tokens[index]
             istart = istop
             num_tokens += 1
+        print("num_tokens = %d; len(tokens) = %d" % (num_tokens, len(tokens)))
         assert num_tokens == len(tokens)
+
+def test_get_col_pos():
+    for align in None, 'left', 'right':
+        func = _test_get_col_pos
+        func.description = "connectors.mmperfmon.get_col_pos(align=%s)" % align
+        yield func, align
 
 def test_to_df():
     """connectors.mmperfmon.Mmperfmon.to_dataframe()
@@ -74,6 +85,19 @@ def test_load_single_single():
     """
     mmpout = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_NUMOPS_INPUT)
     mmpout.load_str(gzip.open(tokiotest.SAMPLE_MMPERFMON_USAGE_INPUT).read())
+    print(json.dumps(mmpout, indent=4, sort_keys=True))
+    validate_object(mmpout)
+
+    for sample_host in tokiotest.SAMPLE_MMPERFMON_HOSTS:
+        print("\nRetrieving dataframe for host [%s]" % sample_host)
+        dataframe = mmpout.to_dataframe(by_host=sample_host)
+        print(dataframe)
+        validate_iterable(dataframe)
+
+def test_load_wrapping():
+    """connectors.mmperfmon.Mmperfmon, wrapping cols + subdevices
+    """
+    mmpout = tokio.connectors.mmperfmon.Mmperfmon(tokiotest.SAMPLE_MMPERFMON_NSDDS_INPUT)
     print(json.dumps(mmpout, indent=4, sort_keys=True))
     validate_object(mmpout)
 

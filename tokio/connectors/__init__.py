@@ -58,3 +58,8 @@ try:
     import tokio.connectors.mmperfmon
 except ImportError:
     pass
+
+try:
+    import tokio.connectors.globuslogs
+except ImportError:
+    pass

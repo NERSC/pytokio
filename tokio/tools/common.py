@@ -3,11 +3,13 @@
 """
 
 import os
+import glob
 import datetime
 
 def enumerate_dated_files(start, end, template,
                           lookup_key=None, match_first=True,
-                          timedelta=datetime.timedelta(days=1)):
+                          timedelta=datetime.timedelta(days=1),
+                          use_glob=False):
     """Locate existing time-indexed files between a start and end time.
 
     Given a start time, end time, and template data structure that describes a
@@ -44,6 +46,11 @@ def enumerate_dated_files(start, end, template,
             files.
         timedelta (datetime.timedelta): Increment to use when iterating between
             `start` and `end` while looking for matching files.
+        use_glob (bool): Expand file globs in template
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
 
     if end < start:
@@ -54,7 +61,7 @@ def enumerate_dated_files(start, end, template,
     day = start
     results = []
     while day.date() <= end.date():
-        results += _match_files(check_paths, day, match_first)
+        results += _match_files(check_paths, day, match_first, use_glob=use_glob)
         day += timedelta
 
     return results
@@ -78,6 +85,10 @@ def _expand_check_paths(template, lookup_key):
         lookup_key (str or None): When `type(template)` is dict, use this key
             to identify the key-value to use as template.  If None and
             ``template`` is a dict, iterate through all values of `template`.
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
     check_paths = []
     if isinstance(template, dict):
@@ -94,7 +105,7 @@ def _expand_check_paths(template, lookup_key):
     return check_paths
 
 
-def _match_files(check_paths, use_time, match_first):
+def _match_files(check_paths, use_time, match_first, use_glob):
     """Locate file(s) that match a templated file path for a given time
 
     Args:
@@ -104,14 +115,25 @@ def _match_files(check_paths, use_time, match_first):
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
+        use_glob (bool): Expand file globs in template
+
+    Returns:
+        list: List of strings, each describing a path to an existing HDF5 file
+        that should contain data relevant to the requested start and end dates.
     """
 
     matching = []
     for check_path in check_paths:
         match_path = use_time.strftime(check_path)
-        if os.path.exists(match_path):
-            matching.append(match_path)
-            if match_first:
-                break
+        expanded_match_paths = glob.glob(match_path) if use_glob else [match_path]
+        match = False
+        for expanded_match_path in expanded_match_paths:
+            if os.path.exists(expanded_match_path):
+                matching.append(expanded_match_path)
+                match = True
+                if match_first:
+                    break
+        if match and match_first:
+            break
 
     return matching

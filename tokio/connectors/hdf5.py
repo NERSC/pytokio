@@ -19,6 +19,7 @@ from tokio.connectors._hdf5 import (convert_counts_rates, #pylint: disable=unuse
                                     demux_column,
                                     get_timestamps,
                                     get_timestamps_key,
+                                    reduce_dataset_name,
                                     DEFAULT_TIMESTAMP_DATASET,
                                     TIMESTAMP_KEY,
                                     COLUMN_NAME_KEY)
@@ -34,6 +35,14 @@ SCHEMA = {
         "datatargets/writeops": "/datatargets/writeops",
         "datatargets/readoprates": "/datatargets/readoprates",
         "datatargets/writeoprates": "/datatargets/writeoprates",
+        "mdtargets/readbytes": "/mdtargets/readbytes",
+        "mdtargets/writebytes": "/mdtargets/writebytes",
+        "mdtargets/readrates": "/mdtargets/readrates",
+        "mdtargets/writerates": "/mdtargets/writerates",
+        "mdtargets/readops": "/mdtargets/readops",
+        "mdtargets/writeops": "/mdtargets/writeops",
+        "mdtargets/readoprates": "/mdtargets/readoprates",
+        "mdtargets/writeoprates": "/mdtargets/writeoprates",
         "mdtargets/opens": "/mdtargets/opens",
         "mdtargets/openrates": "/mdtargets/openrates",
         "mdtargets/closes": "/mdtargets/closes",
@@ -69,6 +78,8 @@ SCHEMA = {
         "mdservers/memslab": "/mdservers/memslab",
         "mdservers/memslab_unrecl": "/mdservers/memslab_unrecl",
         "mdservers/memtotal": "/mdservers/memtotal",
+        "mdservers/netinbytes": "/mdservers/netinbytes",
+        "mdservers/netoutbytes": "/mdservers/netoutbytes",
         "dataservers/cpuuser": "/dataservers/cpuuser",
         "dataservers/cpusys": "/dataservers/cpusys",
         "dataservers/cpuidle": "/dataservers/cpuidle",
@@ -80,6 +91,8 @@ SCHEMA = {
         "dataservers/memslab": "/dataservers/memslab",
         "dataservers/memslab_unrecl": "/dataservers/memslab_unrecl",
         "dataservers/memtotal": "/dataservers/memtotal",
+        "dataservers/netinbytes": "/dataservers/netinbytes",
+        "dataservers/netoutbytes": "/dataservers/netoutbytes",
         "fullness/bytes": "/fullness/bytes",
         "fullness/bytestotal": "/fullness/bytestotal",
         "fullness/inodes": "/fullness/inodes",
@@ -760,8 +773,9 @@ class Hdf5(h5py.File):
             numpy.ndarray: Array of column names, or empty if no columns defined
         """
         # Look for special 'missing' dataset hack
-        if len(dataset_name.strip('/').split('/')) == 3:
-            dataset_name = dataset_name.rsplit('/', 1)[0]
+        reduced_dataset_name, _ = reduce_dataset_name(dataset_name)
+        if reduced_dataset_name != dataset_name:
+            dataset_name = reduced_dataset_name
 
         if self.get_version(dataset_name=dataset_name) is None:
             return self._get_columns_h5lmt(dataset_name)
@@ -1180,19 +1194,6 @@ def missing_values(dataset, inverse=False):
                                     one if (x == 0.0 and math.copysign(1, x) < 0.0) else zero)
     return converter(dataset)
 
-
-def reduce_dataset_name(key):
-    """Divide a dataset name into is base and modifier
-    Args:
-        dataset_name (str): Key to reference a dataset that may or may not have
-            a modifier suffix
-    Returns:
-        tuple of (str, str or None): First string is the base key, the second
-            string is the modifier.
-    """
-    if key.endswith('/missing'):
-        return tuple(key.rsplit('/', 1))
-    return key, None
 
 def get_insert_indices(my_timestamps, existing_timestamps):
     """

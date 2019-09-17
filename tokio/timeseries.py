@@ -140,8 +140,8 @@ class TimeSeries(object):
                           % (column_name, index, self.column_map[column_name]))
         self.column_map[column_name] = index
         if index >= (self.dataset.shape[1]):
-            errmsg = "new index %d (%s) exceeds number of columns %d (%s)" % (
-                index, column_name, self.dataset.shape[1], self.columns[-1])
+            errmsg = "new index %d (%s) exceeds number of columns %d (%s) in %s" % (
+                index, column_name, self.dataset.shape[1], self.columns[-1], self.dataset_name)
             raise IndexError(errmsg)
         self.columns.append(str(column_name)) # convert from unicode to str for numpy
         return index
@@ -199,15 +199,15 @@ class TimeSeries(object):
         """Determine col and row indices corresponding to timestamp and col name
 
         Args:
-            timestamp (datetime): Timestamp to map to a row index
+            timestamp (datetime.datetime): Timestamp to map to a row index
             column_name (str): Name of column to map to a column index
             create_col (bool): If column_name does not exist, create it?
         Returns:
             (t_index, c_index) (long or None)
         """
         timestamp_epoch = int(time.mktime(timestamp.timetuple()))
-        t_index = (timestamp_epoch - self.timestamps[0]) // self.timestep
-        if t_index >= self.timestamps.shape[0]: # check bounds
+        t_index = int((timestamp_epoch - self.timestamps[0]) // self.timestep)
+        if t_index >= self.timestamps.shape[0] or t_index < 0: # check bounds
             return None, None
 
         # create a new column label if necessary
@@ -217,11 +217,26 @@ class TimeSeries(object):
         return t_index, c_index
 
     def insert_element(self, timestamp, column_name, value, reducer=None):
-        """
+        """Inserts a value into a (timestamp, column) element
+
         Given a timestamp (datetime.datetime object) and a column name (string),
         update an element of the dataset.  If a reducer function is provided,
         use that function to reconcile any existing values in the element to be
         updated.
+
+        Args:
+            timestamp (datetime.datetime): Determines the row index into which
+                `value` should be inserted
+            column_name (str): Determines the column into which `value` should be
+                inserted
+            value: Value to insert into the dataset
+            reducer (function or None): If a value already exists for the given
+                (timestamp, column_name) coordinate, apply this function to the
+                existing value and the input `value` and store the result  If
+                None, just overwrite the existing value.
+
+        Returns:
+            bool: True if insertion was successful, False if no action was taken
         """
         t_index, c_index = self.get_insert_pos(timestamp,
                                                column_name,
@@ -239,15 +254,23 @@ class TimeSeries(object):
             self.dataset[t_index, c_index] = value
         return True
 
-    def convert_to_deltas(self):
-        """
-        Convert a matrix of monotonically increasing rows into deltas.  Replaces
-        self.dataset with a matrix with the same number of columns but one fewer
-        row (taken off the bottom of the matrix).  Also adjusts the timestamps
-        dataset.
+    def convert_to_deltas(self, align='l'):
+        """Converts a matrix of monotonically increasing rows into deltas.
+        
+        Replaces self.dataset with a matrix with the same number of columns
+        but one fewer row (taken off the bottom of the matrix).  Also adjusts
+        the timestamps dataset.
+
+        Arguments:
+            align (str): "left" or "right".  Determines whether the contents
+                of a cell labeled with timestamp t0 contains the data between
+                t0 and t0 + dt (left) or t0 and t0 - dt (right).
         """
         self.dataset = timeseries_deltas(self.dataset)
-        self.timestamps = self.timestamps[0:-1]
+        if align[0] == 'l':
+            self.timestamps = self.timestamps[0:-1]
+        elif align[0] == 'r':
+            self.timestamps = self.timestamps[1:]
 
     def trim_rows(self, num_rows=1):
         """

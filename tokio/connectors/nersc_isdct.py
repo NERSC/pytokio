@@ -167,13 +167,14 @@ class NerscIsdct(common.CacheableDict):
 
         Returns:
             dict: Dictionary containing the following keys:
-                * `added_devices` - device serial numbers which exist in self
-                  but not old_isdct
-                * `removed_devices` - device serial numbers which do not exist
-                  in self but do in old_isdct
-                * `devices` - dict keyed by device serial numbers and whose
-                  values are dicts of keys whose values are the difference
-                  between old_isdct and self
+
+            * `added_devices` - device serial numbers which exist in self
+              but not old_isdct
+            * `removed_devices` - device serial numbers which do not exist
+              in self but do in old_isdct
+            * `devices` - dict keyed by device serial numbers and whose
+              values are dicts of keys whose values are the difference
+              between old_isdct and self
         """
         result = {
             'added_devices': [],
@@ -274,9 +275,9 @@ def _merge_parsed_counters(parsed_counters_list):
 
     Returns:
         dict: Dict with keys given by all device serial numbers found in
-            `parsed_counters_list` and whose values are a dict containing keys
-            and values representing all unique keys across all elements of
-            `parsed_counters_list`.
+        `parsed_counters_list` and whose values are a dict containing keys
+        and values representing all unique keys across all elements of
+        `parsed_counters_list`.
     """
     all_data = {}
     for parsed_counters in parsed_counters_list:
@@ -359,8 +360,8 @@ def _rekey_smart_buffer(smart_buffer):
 
     Returns:
         dict: unique key:value pairs whose key now includes distinguishing
-            device-specific characteristics to avoid collision from other
-            devices that generated SMART data
+        device-specific characteristics to avoid collision from other
+        devices that generated SMART data
     """
     data = {}
     prefix = smart_buffer.get("description")

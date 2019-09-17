@@ -559,7 +559,15 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0):
     t_start = time.time()
     log_records = []
     mount_points = {}
-    for result in multiprocessing.Pool(threads).imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list):
+    # multiprocessing is super flaky (e.g., it deadlocks on macOS), so provide an escape hatch
+    if threads > 1:
+        mpcontext = multiprocessing.get_context('forkserver')
+        with mpcontext.Pool(processes=threads) as pool:
+            results = pool.imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list)
+    else:
+        results = [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]
+
+    for result in results:
         if result:
             log_records.append(result)
             mount_points.update(result['mounts'])
@@ -604,7 +612,6 @@ def main(argv=None):
     """
     global VERBOSITY
     global QUIET
-
 
     parser = argparse.ArgumentParser()
     parser.add_argument("darshanlogs", nargs="+", type=str, help="Darshan logs to process")

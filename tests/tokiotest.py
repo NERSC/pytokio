@@ -13,6 +13,7 @@ import tempfile
 import subprocess
 import datetime
 import numpy # for compare_timeseries
+import h5py
 
 try:
     import StringIO as io
@@ -100,6 +101,8 @@ SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt.gz')
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
 SAMPLE_HPSS_REPORT = os.path.join(INPUT_DIR, "hpss_daily.txt")
+SAMPLE_HPSS_HSILOG = os.path.join(INPUT_DIR, "hsilog.txt.gz")
+SAMPLE_HPSS_FTPLOG = os.path.join(INPUT_DIR, "hpssftplog.txt.gz")
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
@@ -215,6 +218,7 @@ SAMPLE_COLLECTDES_QUERY = {
 SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
 SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
 SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
+SAMPLE_GLOBUSLOGS_TXT = os.path.join(INPUT_DIR, "globuslogs.txt.gz")
 
 SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
 SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"
@@ -225,12 +229,37 @@ SAMPLE_ESNET_SNMP_START2 = "2019-02-11T01:01:00"
 SAMPLE_ESNET_SNMP_END2 = "2019-02-11T01:04:00"
 
 SAMPLE_MMPERFMON_USAGE_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-usage.txt.gz')
+SAMPLE_MMPERFMON_NSDDS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-nsdds.txt.gz')
 SAMPLE_MMPERFMON_NUMOPS_INPUT = os.path.join(INPUT_DIR, 'mmperfmon-gpfsNumberOperations.txt.gz')
 SAMPLE_MMPERFMON_TGZ_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tgz')
 SAMPLE_MMPERFMON_TAR_INPUT = os.path.join(INPUT_DIR, 'mmperfmon.tar')
 SAMPLE_MMPERFMON_UNPACKED_INPUT = os.path.join(INPUT_DIR, 'mmperfmon_dir')
-SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+# SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free', 'mem_total']
+SAMPLE_MMPERFMON_METRICS = ['cpu_user', 'cpu_sys', 'mem_free_bytes', 'mem_total_bytes']
 SAMPLE_MMPERFMON_HOSTS = ['ngfsv468.nersc.gov']
+SAMPLE_MMPERFMON_MULTI = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-mini.tgz')
+SAMPLE_MMPERFMON_MULTI_SUBSET = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-micro.tgz')
+SAMPLE_MMPERFMON_MULTI_START = "2019-05-15T00:00:00"
+SAMPLE_MMPERFMON_MULTI_END = "2019-05-16T00:00:00"
+SAMPLE_MMPERFMON_TIMESTEP = 60
+SAMPLE_MMPERFMON_OST = "xx55yy55"
+SAMPLE_MMPERFMON_MDT = "zz55qq55"
+SAMPLE_MMPERFMON_OSS = "xxxxx207.site.edu"
+SAMPLE_MMPERFMON_MDS = "xxxxx493.site.edu"
+SAMPLE_MMPERFMON_DATASETS = [ # these datasets should all be generated in SAMPLE_MMPERFMON_MULTI
+    'dataservers/cpuuser',
+    'dataservers/cpusys',
+    'dataservers/memtotal',
+    'dataservers/memfree',
+    'mdservers/cpuuser',
+    'mdservers/cpusys',
+    'mdservers/memtotal',
+    'mdservers/memfree',
+    'datatargets/readbytes',
+    'datatargets/writebytes',
+    'mdtargets/readbytes',
+    'mdtargets/writebytes',
+]
 
 class CaptureOutputs(object):
     """Context manager to capture stdout/stderr
@@ -442,3 +471,57 @@ def cleanup_untar(input_filename):
                 shutil.rmtree(fq_name)
             else:
                 os.unlink(fq_name)
+
+def summarize_hdf5(hdf5_file):
+    """
+    Return some summary metrics of an hdf5 file in a mostly content-agnostic way
+    """
+    # characterize the h5file in a mostly content-agnostic way
+    summary = {
+        'sums': {},
+        'shapes': {},
+        'updates': {},
+    }
+
+    def characterize_object(obj_name, obj_data):
+        """retain some properties of each dataset in an hdf5 file"""
+        if isinstance(obj_data, h5py.Dataset):
+            summary['shapes'][obj_name] = obj_data.shape
+            # note that this will break if the hdf5 file contains non-numeric datasets
+            if len(obj_data.shape) == 1:
+                summary['sums'][obj_name] = obj_data[:].sum()
+            elif len(obj_data.shape) == 2:
+                summary['sums'][obj_name] = obj_data[:, :].sum()
+            elif len(obj_data.shape) == 3:
+                summary['sums'][obj_name] = obj_data[:, :, :].sum()
+            summary['updates'][obj_name] = obj_data.attrs.get('updated')
+
+    hdf5_file.visititems(characterize_object)
+
+    return summary
+
+def identical_datasets(summary0, summary1):
+    """
+    compare the contents of two HDF5s for similarity
+    """
+    # ensure that updating the overlapping data didn't change the contents of the TimeSeries
+    num_compared = 0
+    for metric in 'sums', 'shapes':
+        for key, value in summary0[metric].items():
+            num_compared += 1
+            assert key in summary1[metric]
+            print("%s->%s->[%s] == [%s]?" % (metric, key, summary1[metric][key], value))
+            assert summary1[metric][key] == value
+
+    # check to make sure summary1 was modified after summary0 was generated
+    for obj, update in summary0['updates'].items():
+        if update is not None:
+            result = summary1['updates'][obj] > summary0['updates'][obj]
+            print("%s newer than %s? %s" % (summary1['updates'][obj],
+                                            summary0['updates'][obj],
+                                            result))
+            assert result
+
+    assert num_compared > 0
+
+
