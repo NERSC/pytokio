@@ -184,8 +184,8 @@ class Darshan(SubprocessOutputDict):
             the `TOTAL` key in the object.
         """
         self._parser_mode = "TOTAL"
-        self._only_modules = set(modules)
-        self._only_counters = set(counters)
+        self._only_modules = set() if not modules else set(modules)
+        self._only_counters = set() if not counters else set(counters)
         return self._darshan_parser()
 
     def darshan_parser_perf(self, modules=None, counters=None):
@@ -206,8 +206,8 @@ class Darshan(SubprocessOutputDict):
             `PERF` key in the object.
         """
         self._parser_mode = "PERF"
-        self._only_modules = set(modules)
-        self._only_counters = set(counters)
+        self._only_modules = set() if not modules else set(modules)
+        self._only_counters = set() if not counters else set(counters)
         return self._darshan_parser()
 
     def _darshan_parser(self):
