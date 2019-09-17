@@ -87,7 +87,7 @@ class CacheableDict(dict):
         else:
             open_func = open
 
-        for key, val in json.load(open_func(self.input_file, 'r')).items():
+        for key, val in json.load(open_func(self.input_file, 'rt')).items():
             self.__setitem__(key, val)
 
     def save_cache(self, output_file=None, **kwargs):
