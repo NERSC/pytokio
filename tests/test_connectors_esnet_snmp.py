@@ -4,7 +4,7 @@
 import datetime
 import json
 
-import requests
+from requests.exceptions import Timeout, ConnectionError, HTTPError
 import nose
 
 import tokio.connectors.esnet_snmp
@@ -82,7 +82,7 @@ def test_esnetsnmp_get_interface_counters():
                                          interface=interface,
                                          direction='in',
                                          timeout=5)
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
     validate_last_response(esnetsnmp)
@@ -98,7 +98,7 @@ def test_esnetsnmp_get_interface_counters():
             endpoint=endpoint,
             interface=interface,
             direction='out')
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
     validate_last_response(esnetsnmp)
@@ -116,7 +116,7 @@ def test_esnetsnmp_get_interface_counters():
             direction='out',
             agg_func=agg_func,
             interval=interval)
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
     validate_last_response(esnetsnmp)
@@ -148,7 +148,7 @@ def test_to_dataframe():
             endpoint=endpoint,
             interface=interface,
             direction='out')
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
     assert esnetsnmp
@@ -159,11 +159,14 @@ def test_to_dataframe():
         len(esnetsnmp.last_response['data'])))
     assert len(dataframe) == len(esnetsnmp.last_response['data'])
 
-    esnetsnmp.get_interface_counters(
-        endpoint=endpoint,
-        interface=interface,
-        direction='in',
-        timeout=5)
+    try:
+        esnetsnmp.get_interface_counters(
+            endpoint=endpoint,
+            interface=interface,
+            direction='in',
+            timeout=5)
+    except (ConnectionError, Timeout, HTTPError) as error:
+        raise nose.SkipTest(error)
 
     dataframe = esnetsnmp.to_dataframe(multiindex=False)
     print(dataframe)

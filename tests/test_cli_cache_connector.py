@@ -11,7 +11,6 @@ try:
 except ImportError:
     import io
 import datetime
-import requests
 import pandas
 import nose
 
@@ -22,7 +21,7 @@ except ImportError:
     _HAVE_ELASTICSEARCH = False
 
 try:
-    import requests.exceptions
+    from requests.exceptions import Timeout, ConnectionError, HTTPError
     _HAVE_REQUESTS = True
 except ImportError:
     _HAVE_REQUESTS = False
@@ -150,7 +149,7 @@ def run_requests(binary, argv):
 
     try:
         return tokiotest.run_bin(binary, argv)
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
 @nose.tools.raises(ValueError)
@@ -511,10 +510,7 @@ def run_cache_connector(config, to_file=False):
         argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
         print("Caching to %s" % tokiotest.TEMP_FILE.name)
         print("Executing: %s" % ' '.join(argv))
-        try:
-            output_str = runfunction(config['binary'], argv)
-        except requests.exceptions.ReadTimeout as error:
-            raise nose.SkipTest(error)
+        output_str = runfunction(config['binary'], argv)
 
         # (validate_contents == True) means the associated validator function
         # expects the contents of the output file rather than the name of the
@@ -525,10 +521,7 @@ def run_cache_connector(config, to_file=False):
         argv = config['args']
         print("Caching to stdout")
         print("Executing: %s" % ' '.join(argv))
-        try:
-            output_str = runfunction(config['binary'], argv)
-        except requests.exceptions.ReadTimeout as error:
-            raise nose.SkipTest(error)
+        output_str = runfunction(config['binary'], argv)
 
     for validator in config.get('validators', []):
         if isinstance(output_str, bytes):
