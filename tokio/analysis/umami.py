@@ -47,7 +47,7 @@ class Umami(collections.OrderedDict):
                     key = timestamp
 
                 if key not in to_df:
-                    to_df[key] = {}
+                    to_df[key] = collections.OrderedDict()
                 to_df[key].update({metric: measurement.values[index]})
         return to_df
 
