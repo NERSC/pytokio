@@ -11,6 +11,7 @@ try:
 except ImportError:
     import io
 import datetime
+import requests
 import pandas
 import nose
 
@@ -510,7 +511,10 @@ def run_cache_connector(config, to_file=False):
         argv = ['-o', tokiotest.TEMP_FILE.name] + config['args']
         print("Caching to %s" % tokiotest.TEMP_FILE.name)
         print("Executing: %s" % ' '.join(argv))
-        output_str = runfunction(config['binary'], argv)
+        try:
+            output_str = runfunction(config['binary'], argv)
+        except requests.exceptions.ReadTimeout as error:
+            raise nose.SkipTest(error)
 
         # (validate_contents == True) means the associated validator function
         # expects the contents of the output file rather than the name of the
@@ -521,7 +525,10 @@ def run_cache_connector(config, to_file=False):
         argv = config['args']
         print("Caching to stdout")
         print("Executing: %s" % ' '.join(argv))
-        output_str = runfunction(config['binary'], argv)
+        try:
+            output_str = runfunction(config['binary'], argv)
+        except requests.exceptions.ReadTimeout as error:
+            raise nose.SkipTest(error)
 
     for validator in config.get('validators', []):
         if isinstance(output_str, bytes):
