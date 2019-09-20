@@ -1,12 +1,19 @@
 """Test the ESnet SNMP REST API connector
 """
 
-import datetime
+import gzip
 import json
+import datetime
 
-from requests.exceptions import Timeout, ConnectionError, HTTPError
+HAVE_REQUESTS = True
+try:
+    from requests.exceptions import Timeout, ConnectionError, HTTPError
+except ImportError:
+    HAVE_REQUESTS = False
+
 import nose
 
+import tokiotest
 import tokio.connectors.esnet_snmp
 
 ESNETSNMP_ENDPOINTS = {
@@ -67,6 +74,8 @@ def validate_last_response(esnetsnmp):
 def test_esnetsnmp_get_interface_counters():
     """EsnetSnmp.get_interface_counters() basic functionality
     """
+    if not HAVE_REQUESTS:
+        raise nose.SkipTest("requests library not available")
 
     endpoint = list(ESNETSNMP_ENDPOINTS)[0]
     interface = ESNETSNMP_ENDPOINTS[endpoint][0]
@@ -103,79 +112,68 @@ def test_esnetsnmp_get_interface_counters():
 
     validate_last_response(esnetsnmp)
 
-    # tests:
-    #  - specifying all parameters
+def test_all_parameters():
+    """EsnetSnmp.gen_url()
+    """
+    endpoint = list(ESNETSNMP_ENDPOINTS)[0]
+    interface = ESNETSNMP_ENDPOINTS[endpoint][0]
     agg_func = 'max'
     interval = 60
-    try:
-        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
-            start=ESNETSNMP_START,
-            end=ESNETSNMP_END,
-            endpoint=endpoint,
-            interface=interface,
-            direction='out',
-            agg_func=agg_func,
-            interval=interval)
-    except (ConnectionError, Timeout, HTTPError) as error:
-        raise nose.SkipTest(error)
 
-    validate_last_response(esnetsnmp)
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+        start=ESNETSNMP_START,
+        end=ESNETSNMP_END)
 
-    # ensure that response is valid (though this is more a test of the REST API
-    # returning correct results)
-    print("calc: %s == %s? %s" % (
-        int(esnetsnmp.last_response['calc']),
-        interval,
-        (int(esnetsnmp.last_response['calc']) == interval)))
-    assert int(esnetsnmp.last_response['calc']) == interval
+    kwargs = esnetsnmp.gen_url(
+                endpoint=endpoint,
+                interface=interface,
+                direction='out',
+                agg_func=agg_func,
+                interval=interval)
 
-    print("calc_func: %s == %s? %s" % (
-        esnetsnmp.last_response['calc_func'].lower(),
-        agg_func.lower(),
-        esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()))
-    assert esnetsnmp.last_response['calc_func'].lower() == agg_func.lower()
+    assert 'url' in kwargs
+    assert 'params' in kwargs
+    assert 'begin' in kwargs['params']
+    assert 'end' in kwargs['params']
+    assert 'calc_func' in kwargs['params'] and kwargs['params']['calc_func'] == agg_func
+    assert 'calc' in kwargs['params'] and kwargs['params']['calc'] == interval
 
 def test_to_dataframe():
     """EsnetSnmp.to_dataframe()
     """
-    endpoint = list(ESNETSNMP_ENDPOINTS)[0]
-    interface = ESNETSNMP_ENDPOINTS[endpoint][0]
+    esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
+        start=ESNETSNMP_START,
+        end=ESNETSNMP_END)
 
-    try:
-        esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
-            start=ESNETSNMP_START,
-            end=ESNETSNMP_END,
-            endpoint=endpoint,
-            interface=interface,
-            direction='out')
-    except (ConnectionError, Timeout, HTTPError) as error:
-        raise nose.SkipTest(error)
+    esnetsnmp.load_json(tokiotest.SAMPLE_ESNET_SNMP_FILE)
+    endpoint = next(iter(esnetsnmp.keys()))
+    interface = next(iter(esnetsnmp[endpoint].keys()))
+    direction = next(iter(esnetsnmp[endpoint][interface].keys()))
+    expected_rows = len(esnetsnmp[endpoint][interface][direction])
 
     assert esnetsnmp
+    print("Loaded esnetsnmp data:")
+    print(esnetsnmp)
+
+    # Test simple to_dataframe
+    # dataframe.columns = [endpoint, interface, direction, timestamp, data_rate]
     dataframe = esnetsnmp.to_dataframe()
     assert len(dataframe)
-    print("dataframe has %d rows; raw result had %d rows" % (
-        len(dataframe),
-        len(esnetsnmp.last_response['data'])))
-    assert len(dataframe) == len(esnetsnmp.last_response['data'])
-
-    try:
-        esnetsnmp.get_interface_counters(
-            endpoint=endpoint,
-            interface=interface,
-            direction='in',
-            timeout=5)
-    except (ConnectionError, Timeout, HTTPError) as error:
-        raise nose.SkipTest(error)
-
-    dataframe = esnetsnmp.to_dataframe(multiindex=False)
+    print("Generated dataframe:")
     print(dataframe)
-    print("dataframe has %d rows; last raw result had %d rows" % (
-        len(dataframe),
-        len(esnetsnmp.last_response['data'])))
-    assert len(dataframe) > len(esnetsnmp.last_response['data'])
 
-    print(json.dumps(esnetsnmp))
+    # filter only one (endpoint, interface, direction) combination and make sure
+    # that all of the data from the original dict-like object is represented in
+    # the dataframe
+    filt = dataframe['endpoint'] == endpoint
+    filt &= dataframe['interface'] == interface
+    filt &= dataframe['direction'] == direction
 
+    print("dataframe has %d rows; raw result had %d rows" % (
+        len(dataframe[filt]),
+        expected_rows))
+    assert len(dataframe[filt]) == expected_rows 
+
+    # just make sure the multiindex=True parameter works and produces something
     dataframe = esnetsnmp.to_dataframe(multiindex=True)
     assert len(dataframe)
