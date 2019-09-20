@@ -472,9 +472,9 @@ def main(argv=None):
                         + "use instead of query_start/query_end")
     parser.add_argument("--filesystem", type=str, required=True, help='file system to archive')
     parser.add_argument("query_start", type=str,
-                        help="start time of query in %s format" % DATE_FMT)
+                        help="start time of query in %s format" % DATE_FMT_PRINT)
     parser.add_argument("query_end", type=str,
-                        help="end time of query in %s format" % DATE_FMT)
+                        help="end time of query in %s format" % DATE_FMT_PRINT)
     args = parser.parse_args(argv)
 
     if args.debug:
@@ -497,7 +497,7 @@ def main(argv=None):
         if args.init_end:
             init_end = datetime.datetime.strptime(args.init_end, DATE_FMT)
     except ValueError:
-        parser.error("Start and end times must be in format %s\n" % DATE_FMT)
+        parser.error("Start and end times must be in format %s\n" % DATE_FMT_PRINT)
         raise
 
     # Basic input bounds checking

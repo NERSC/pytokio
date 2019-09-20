@@ -87,6 +87,12 @@
         "projectb": [
             "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
             "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ],
+        "testfs-mini": [
+            "inputs/mmperfmon.%Y-%m-%d-mini.tgz"
+        ],
+        "testfs-micro": [
+            "inputs/mmperfmon.%Y-%m-%d-micro.tgz"
         ]
     },
     "darshan_log_dirs": {

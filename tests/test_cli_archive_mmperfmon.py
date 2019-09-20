@@ -23,7 +23,9 @@ def generate_tts(output_file,
         '--init-end', init_end,
         '--timestep', str(tokiotest.SAMPLE_MMPERFMON_TIMESTEP),
         '--output', output_file,
-        input_file
+        '--filesystem', 'testfs-mini',
+        tokiotest.SAMPLE_MMPERFMON_MINI_START,
+        tokiotest.SAMPLE_MMPERFMON_MINI_END
     ]
     print("Running [%s]" % ' '.join(argv))
     tokio.cli.archive_mmperfmon.main(argv)
@@ -37,7 +39,9 @@ def update_tts(output_file):
 
     argv = [
         '--output', output_file,
-        tokiotest.SAMPLE_MMPERFMON_MULTI_SUBSET,
+        '--filesystem', 'testfs-micro',
+        tokiotest.SAMPLE_MMPERFMON_MICRO_START,
+        tokiotest.SAMPLE_MMPERFMON_MICRO_END
     ]
 
     print("Running [%s]" % ' '.join(argv))
