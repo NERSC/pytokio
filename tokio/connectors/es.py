@@ -44,7 +44,7 @@ class EsConnection(object):
     scrolling functionality for very long documents and callback functions to be
     run after each page is retrieved.
     """
-    def __init__(self, host, port, index=None, scroll_size='1m', page_size=10000, timeout=30):
+    def __init__(self, host, port, index=None, scroll_size='1m', page_size=10000, timeout=30, **kwargs):
         """Configure and connect to an Elasticsearch endpoint.
 
         Args:
@@ -77,6 +77,8 @@ class EsConnection(object):
             local_mode (bool): If True, retrieve query results from
                 self.fake_pages instead of attempting to contact an
                 Elasticsearch server
+            kwargs (dict): Passed to elasticsearch.Elasticsearch.__init__ if
+                host and port are defined
         """
         # retain state of Elasticsearch client
         self.client = None
@@ -109,7 +111,7 @@ class EsConnection(object):
         self.local_mode = HAVE_ES_PKG
 
         if host and port:
-            self.connect()
+            self.connect(**kwargs)
 
     @classmethod
     def from_cache(cls, cache_file):
@@ -217,15 +219,19 @@ class EsConnection(object):
             warnings.warn(warn_str)
         self.page = self.fake_pages.pop(0)
 
-    def connect(self):
+    def connect(self, **kwargs):
         """Instantiate a connection and retain the connection context.
+
+        Args:
+            kwargs (dict): Passed to elasticsearch.Elasticsearch.__init__
         """
         if self.local_mode:
             warnings.warn("operating in local mode; elasticsearch queries will not be issued")
         else:
             self.client = elasticsearch.Elasticsearch(host=self.connect_host,
                                                       port=self.connect_port,
-                                                      timeout=self.connect_timeout)
+                                                      timeout=self.connect_timeout,
+                                                      **kwargs)
     def close(self):
         """Close and invalidate the connection context.
         """
