@@ -101,6 +101,8 @@ SAMPLE_OSTFULLNESS_FILE = os.path.join(INPUT_DIR, 'sample_ost-fullness.txt.gz')
 SAMPLE_OSTFULLNESS_START = 1489998203
 SAMPLE_OSTFULLNESS_END = 1490081107
 SAMPLE_HPSS_REPORT = os.path.join(INPUT_DIR, "hpss_daily.txt")
+SAMPLE_HPSS_HSILOG = os.path.join(INPUT_DIR, "hsilog.txt.gz")
+SAMPLE_HPSS_FTPLOG = os.path.join(INPUT_DIR, "hpssftplog.txt.gz")
 
 ### Other cached files corresponding to SAMPLE_DARSHAN_LOG
 SAMPLE_NERSCJOBSDB_FILE = os.path.join(INPUT_DIR, 'sample_nersc_jobsdb.sqlite3')
@@ -216,6 +218,7 @@ SAMPLE_COLLECTDES_QUERY = {
 SAMPLE_GLOBUSLOGS = os.path.join(INPUT_DIR, 'globuslogs.json.gz')
 SAMPLE_GLOBUSLOGS_USERS = ['fusera', 'useroll']
 SAMPLE_GLOBUSLOGS_TYPES = ['STOR', 'RETR']
+SAMPLE_GLOBUSLOGS_TXT = os.path.join(INPUT_DIR, "globuslogs.txt.gz")
 
 SAMPLE_ESNET_SNMP_FILE = os.path.join(INPUT_DIR, 'esnet_snmp.json.gz')
 SAMPLE_ESNET_SNMP_START = "2019-02-11T00:00:00"

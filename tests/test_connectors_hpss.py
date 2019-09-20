@@ -68,3 +68,23 @@ def test_load():
     results = tokio.connectors.hpss.HpssDailyReport(cache_file=tokiotest.SAMPLE_HPSS_REPORT)
     print(json.dumps(results, indent=4, sort_keys=True))
     assert results
+
+def test_hsi_log():
+    """connectors.hpss.HsiLog
+    """
+    hsilog = tokio.connectors.hpss.HsiLog.from_file(tokiotest.SAMPLE_HPSS_HSILOG)
+    print(json.dumps(hsilog, indent=4, sort_keys=True))
+    assert 'hsi' in hsilog
+    assert 'htar' in hsilog
+    assert hsilog['htar']
+    assert hsilog['hsi']
+
+def test_hpssftp_log():
+    """connectors.hpss.FtpLog
+    """
+    hpssftplog = tokio.connectors.hpss.FtpLog.from_file(tokiotest.SAMPLE_HPSS_FTPLOG)
+    print(json.dumps(hpssftplog, indent=4, sort_keys=True))
+    assert 'pftp' in hpssftplog
+    assert 'ftp' in hpssftplog
+    assert hpssftplog['pftp']
+    assert hpssftplog['ftp']

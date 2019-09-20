@@ -240,7 +240,7 @@ class EsnetSnmp(common.CacheableDict):
 
         return True
 
-    def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None):
+    def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None, **kwargs):
         """Retrieves data rate data for an ESnet endpoint
 
         Args:
@@ -253,6 +253,7 @@ class EsnetSnmp(common.CacheableDict):
                 "max."  If None, uses the ESnet default.
             interval (int or None): Resolution, in seconds, of the data to be
                 returned.  If None, uses the ESnet default.
+            kwargs (dict): Extra parameters to pass to requests.get()
 
         Returns:
            dict: raw return from the REST API call
@@ -286,7 +287,7 @@ class EsnetSnmp(common.CacheableDict):
         if interval is not None:
             params['calc'] = interval
 
-        request = requests.get(uri, params=params)
+        request = requests.get(uri, params=params, **kwargs)
         request.raise_for_status()
         self.last_response = request.json()
 

@@ -25,7 +25,7 @@ except ImportError:
 # logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 
 FAKE_PAGES = []
-for fake_page in json.load(gzip.open(tokiotest.SAMPLE_COLLECTDES_FILE)):
+for fake_page in json.load(gzip.open(tokiotest.SAMPLE_COLLECTDES_FILE, 'rt')):
     FAKE_PAGES.append({
         '_scroll_id': 1,
         'hits': {

@@ -23,6 +23,7 @@ def generate_tts(output_file,
             '--init-end', init_end,
             '--input', input_file,
             '--output', output_file,
+            '--timeout', '5',
             query_start,
             query_end,
             tokiotest.SAMPLE_ESNET_SNMP_ENDPT]
@@ -40,6 +41,7 @@ def update_tts(output_file,
 
     argv = ['--input', input_file,
             '--output', output_file,
+            '--timeout', '5',
             query_start,
             query_end,
             tokiotest.SAMPLE_ESNET_SNMP_ENDPT]
@@ -132,6 +134,7 @@ def test_out_of_bounds():
             '--init-end', new_end_dt.strftime("%Y-%m-%dT%H:%M:%S"),
             '--input', tokiotest.SAMPLE_ESNET_SNMP_FILE,
             '--output', tokiotest.TEMP_FILE.name,
+            '--timeout', '5',
             tokiotest.SAMPLE_ESNET_SNMP_START,
             tokiotest.SAMPLE_ESNET_SNMP_END,
             tokiotest.SAMPLE_ESNET_SNMP_ENDPT]

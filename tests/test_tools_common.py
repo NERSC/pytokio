@@ -122,7 +122,7 @@ def test_enumerate_dated_files_glob():
             start=start,
             end=end,
             template=template,
-            expand_glob=True,
+            use_glob=True,
             match_first=False)
         print("Expected %d matches and found %d matches with globbing:\n  %s" % (match_num, len(matches), "\n  ".join(matches)))
         assert len(matches) == match_num
@@ -139,7 +139,7 @@ def test_enumerate_dated_files_glob():
             start=start,
             end=end,
             template=template,
-            expand_glob=False,
+            use_glob=False,
             match_first=False)
         print("Expected %d matches and found %d matches without globbing:\n  %s" % (0, len(matches), "\n  ".join(matches)))
         assert len(matches) == 0
@@ -156,7 +156,7 @@ def test_enumerate_dated_files_glob():
             start=start,
             end=end,
             template=template,
-            expand_glob=True,
+            use_glob=True,
             match_first=True)
         print("Expected %d matches and found %d matches with globbing and match_first:\n  %s" % (1, len(matches), "\n  ".join(matches)))
         assert len(matches) == 1

@@ -7,8 +7,9 @@ import glob
 import datetime
 
 def enumerate_dated_files(start, end, template,
-                          lookup_key=None, match_first=True, expand_glob=False,
-                          timedelta=datetime.timedelta(days=1)):
+                          lookup_key=None, match_first=True,
+                          timedelta=datetime.timedelta(days=1),
+                          use_glob=False):
     """Locate existing time-indexed files between a start and end time.
 
     Given a start time, end time, and template data structure that describes a
@@ -43,9 +44,9 @@ def enumerate_dated_files(start, end, template,
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
-        expand_glob (bool): If True, expand globs after expanding template
         timedelta (datetime.timedelta): Increment to use when iterating between
             `start` and `end` while looking for matching files.
+        use_glob (bool): Expand file globs in template
 
     Returns:
         list: List of strings, each describing a path to an existing HDF5 file
@@ -59,8 +60,8 @@ def enumerate_dated_files(start, end, template,
 
     day = start
     results = []
-    while day <= end:
-        results += _match_files(check_paths, day, match_first, expand_glob)
+    while day.date() <= end.date():
+        results += _match_files(check_paths, day, match_first, use_glob=use_glob)
         day += timedelta
 
     return results
@@ -104,7 +105,7 @@ def _expand_check_paths(template, lookup_key):
     return check_paths
 
 
-def _match_files(check_paths, use_time, match_first, expand_glob):
+def _match_files(check_paths, use_time, match_first, use_glob):
     """Locate file(s) that match a templated file path for a given time
 
     Args:
@@ -114,7 +115,7 @@ def _match_files(check_paths, use_time, match_first, expand_glob):
         match_first (bool): If True, only return the first matching file for
             each time increment checked.  Otherwise, return _all_ matching
             files.
-        expand_glob (bool): If True, expand globs after expanding template
+        use_glob (bool): Expand file globs in template
 
     Returns:
         list: List of strings, each describing a path to an existing HDF5 file
@@ -123,16 +124,16 @@ def _match_files(check_paths, use_time, match_first, expand_glob):
 
     matching = []
     for check_path in check_paths:
-        match_paths = use_time.strftime(check_path)
-        if expand_glob:
-            match_paths = glob.glob(match_paths)
-        else:
-            match_paths = [match_paths]
-
-        for match_path in match_paths:
-            if os.path.exists(match_path):
-                matching.append(match_path)
+        match_path = use_time.strftime(check_path)
+        expanded_match_paths = glob.glob(match_path) if use_glob else [match_path]
+        match = False
+        for expanded_match_path in expanded_match_paths:
+            if os.path.exists(expanded_match_path):
+                matching.append(expanded_match_path)
+                match = True
                 if match_first:
-                    return matching
+                    break
+        if match and match_first:
+            break
 
     return matching

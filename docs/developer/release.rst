@@ -112,41 +112,22 @@ for cleanliness.
 Testing on Docker
 --------------------------------------------------------------------------------
 
-Start a Docker image::
+pytokio now includes a dockerfile which will can be used to build and test
+pytokio in a clean environment.
 
-    host$ docker run -it ubuntu bash
+To test pytokio directly from GitHub, you can::
 
-Use the Ubuntu docker image::
+    docker build -t pytokio_test https://github.com/nersc/pytokio.git
 
-    root@082cdfb246a1$ apt-get update
-    root@082cdfb246a1$ apt-get install git wget tzdata python-tk python-nose python-pip
+Or if you have the repository checked out locally,::
 
-Then download and install the release candidate's sdist tarball::
+    docker build -t pytokio_test .
 
-    host$ docker ps
-    ...
+Once the image is built, simply::
 
-    host$ docker cp dist/pytokio-0.10.1b2.tar.gz 082cdfb246a1:root/
+    docker run -it pytokio_test
 
-    root@082cdfb246a1$ pip install pytokio-0.10.1b2.tar.gz
-    
-Then download the git repo and remove the package contents from it (we only want
-the tests)::
-
-    root@082cdfb246a1$ git clone -b rc https://github.com/nersc/pytokio
-    root@082cdfb246a1$ cd pytokio
-    root@082cdfb246a1$ rm -rf tokio
-
-Finally, run the tests to ensure that the install contained everything needed to
-pass the tests::
-
-    cd tests
-    ./run_tests.sh
-
-Travis should be doing most of this already; the main thing Travis does *not* do
-is delete the ``tokio`` library subdirectory to ensure that its contents are not
-being relied upon by any tests.
-
+to execute the full test suite.
 
 Packaging pytokio
 --------------------------------------------------------------------------------

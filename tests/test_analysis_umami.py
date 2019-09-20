@@ -101,7 +101,9 @@ def test_umami_to_df():
         row_num = int(metric.split('_')[-1])
         index = 0
         for timestamp, value in umami_df[metric].items():
+            print("timestamp(=%s) == SAMPLE_TIMES[index](=%s)?" % (timestamp, SAMPLE_TIMES[index]))
             assert timestamp == SAMPLE_TIMES[index]
+            print("value(=%s) == SAMPLE_DATA[row_num][index](=%s)?" % (value, SAMPLE_DATA[row_num][index]))
             assert value == SAMPLE_DATA[row_num][index]
             index += 1
 

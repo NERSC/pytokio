@@ -21,7 +21,7 @@ except ImportError:
     _HAVE_ELASTICSEARCH = False
 
 try:
-    import requests.exceptions
+    from requests.exceptions import Timeout, ConnectionError, HTTPError
     _HAVE_REQUESTS = True
 except ImportError:
     _HAVE_REQUESTS = False
@@ -149,7 +149,7 @@ def run_requests(binary, argv):
 
     try:
         return tokiotest.run_bin(binary, argv)
-    except requests.exceptions.ConnectionError as error:
+    except (ConnectionError, Timeout, HTTPError) as error:
         raise nose.SkipTest(error)
 
 @nose.tools.raises(ValueError)
@@ -309,7 +309,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'name':        'cli.cache_esnet_snmp',
         'description': 'cli.cache_esnet_snmp default args',
         'binary':      tokio.cli.cache_esnet_snmp,
-        'args':        ["nersc"],
+        'args':        ["--timeout", "5", "nersc"],
         'runfunction': run_requests,
         'validators':  [verify_json,],
     },
@@ -317,7 +317,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'name':        'cli.cache_esnet_snmp',
         'description': 'cli.cache_esnet_snmp --json, remote connection',
         'binary':      tokio.cli.cache_esnet_snmp,
-        'args':        ["--json", "nersc"],
+        'args':        ["--timeout", "5", "--json", "nersc"],
         'runfunction': run_requests,
         'validators':  [verify_json,],
     },
@@ -325,7 +325,7 @@ CACHE_CONNECTOR_CONFIGS = [
         'name':        'cli.cache_esnet_snmp',
         'description': 'cli.cache_esnet_snmp --csv, remote connection',
         'binary':      tokio.cli.cache_esnet_snmp,
-        'args':        ["--csv", "nersc"],
+        'args':        ["--timeout", "5", "--csv", "nersc"],
         'runfunction': run_requests,
         'validators':  [verify_csv,],
     },

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+NOSETESTS=${NOSETESTS:-nosetests}
+
 # Check for non-GNU readlink (e.g., MacOS)
 if [ -z "$READLINK" ]; then
     if readlink -f $PWD > /dev/null 2>&1; then
@@ -21,4 +23,4 @@ export NERSC_HOST="edison"
 export PYTOKIO_CONFIG="${TEST_DIR}/inputs/site.json"
 echo "Test environment will load configuration from $PYTOKIO_CONFIG"
 
-nosetests --cover-package=tokio $@
+$NOSETESTS --cover-package=tokio $@

@@ -167,7 +167,7 @@ class Mmperfmon(SubprocessOutputDict):
         if encoding == 'gzip':
             input_fp = gzip.open(self.cache_file, 'rt')
         else:
-            input_fp = open(self.cache_file, 'r')
+            input_fp = open(self.cache_file, 'rt')
 
         try:
             loaded_json = json.load(input_fp)

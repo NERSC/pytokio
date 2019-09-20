@@ -5,6 +5,15 @@ Ensure that the tokio site config loads correctly
 
 import os
 import json
+try:
+    import StringIO as io
+except ImportError:
+    import io
+HAVE_YAML = True
+try:
+    import yaml
+except ImportError:
+    HAVE_YAML = False
 import nose
 import tokiotest
 import tokio.config
@@ -108,14 +117,16 @@ def compare_config_to_runtime(config_file):
 
     # Load the reference file and compare its contents to the tokio.config namespace
     print("Comparing runtime config to %s" % config_file)
-    config_contents = json.load(open(config_file, 'r'))
+    config_contents = json.load(open(config_file, 'rt'))
     for key, expected_value in config_contents.items():
         runtime_value = tokio.config.CONFIG[key]
-        print("Verifying tokio.config.%s:\n  [%s] == [%s]" % (
+        print("Verifying tokio.config.%s:\n  [(%s)%s] == [(%s)%s]" % (
             key.upper(),
+            type(expected_value),
             str(expected_value),
+            type(runtime_value),
             str(runtime_value)))
-        assert type(runtime_value) == type(expected_value)
+        assert type(runtime_value) == type(expected_value) or (isinstance(runtime_value, basestring) and isinstance(expected_value, basestring))
         assert runtime_value == expected_value
 
 @nose.tools.with_setup(setup=flush_env, teardown=restore_env)
@@ -199,9 +210,91 @@ def test_config_post_load_from_file():
     # Then load the config file into buffer
     config_file = os.path.join(tokiotest.INPUT_DIR, 'sample_config.json')
     # and manually set each loaded variable as a tokio.config attribute
-    config_contents = json.load(open(config_file, 'r'))
+    config_contents = json.load(open(config_file, 'rt'))
     for key, set_value in config_contents.items():
         tokio.config.CONFIG[key] = set_value
 
     # Then verify that all the runtime values have now changed
     compare_config_to_runtime(config_file)
+
+def test_yaml_expander():
+    """tokio.config: YAML environment expansion
+    """
+    if not HAVE_YAML:
+        raise nose.SkipTest("pyyaml not available")
+
+    reference_data = {
+        'path': '${ENVVAR1}',
+        'static': 'static1',
+        'nested': {
+            'key1': '${ENVVAR2}',
+            'key2': 'static2',
+        },
+        'undefined': '${ARASDFLKJASDLFKAJSDFASLFSADKGOIWWEIEIEIE}',
+        'something': "${TEST_WITH_UNDERSCORES}",
+    }
+
+    # default_flow_style=False required for some versions of pyyaml or else it
+    # will quote environment variables and break the deserialization
+    yaml_input = yaml.dump(reference_data, default_flow_style=False) 
+    print("YAML representation is as follows")
+    print("========================================")
+    print(yaml_input)
+
+    # spike in an environment variable
+    spike_ins = {
+        "TEST_WITH_UNDERSCORES": "success",
+        "ENVVAR1": "hocus pocus",
+        "ENVVAR2": "3.14125",
+    }
+    for key, value in spike_ins.items():
+        os.environ[key] = value
+        print("Defining %s=%s -> %s" % (key, value, os.environ.get(key)))
+
+    # load in YAML while env vars are set
+    yaml_file = io.StringIO(yaml_input)
+    result = tokio.config.load_and_expand_yaml(yaml_file)
+
+    # delete env vars before dereferencing loaded YAML to ensure that the values
+    # were correctly copied from the environment into Python
+    for key, value in spike_ins.items():
+        print("Undefining %s" % key)
+        del os.environ[key]
+
+    print("result['path']=%s == $ENVVAR1 (%s)?" % (result['path'], spike_ins.get("ENVVAR1")))
+    assert result['path'] == spike_ins.get('ENVVAR1')
+
+    print("result['static']=%s == ref['static']=%s?" % (result['static'], reference_data['static']))
+    assert result['static'] == reference_data['static']
+
+    print("result['nested']['key1'] (%s) == $ENVVAR2 (%s)?" % (result['nested']['key1'], spike_ins.get("ENVVAR2")))
+    assert result['nested']['key1'] == spike_ins.get('ENVVAR2')
+
+    print("result['nested']['key2'] (%s) == ref['nested']['key2'] (%s)?" % (result['nested']['key2'], reference_data['nested']['key2']))
+    assert result['nested']['key2'] == reference_data['nested']['key2']
+
+    print("result['undefined']=%s; ref['undefined']=%s" % (result['undefined'], reference_data['undefined']))
+    assert '$' in result['undefined']
+
+    json_input = json.dumps(reference_data, indent=4, sort_keys=True)
+    print("JSON representation is as follows")
+    print("========================================")
+    print(json_input)
+
+    # now try using the JSON-serialized version of the config - it should not
+    # expand anything, because YAML will not expand any quoted strings
+    for key, value in spike_ins.items():
+        print("Defining %s=%s -> %s" % (key, value, os.environ.get(key)))
+        os.environ[key] = value
+
+    # load in YAML while env vars are set
+    yaml_file = io.StringIO(json_input)
+    result = tokio.config.load_and_expand_yaml(yaml_file)
+
+    # delete env vars before dereferencing loaded YAML to ensure that the values
+    # were correctly copied from the environment into Python
+    for key, value in spike_ins.items():
+        print("Undefining %s" % key)
+        del os.environ[key]
+
+    assert result == reference_data
