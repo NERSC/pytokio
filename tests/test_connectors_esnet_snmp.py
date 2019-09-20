@@ -80,12 +80,10 @@ def test_esnetsnmp_get_interface_counters():
     endpoint = list(ESNETSNMP_ENDPOINTS)[0]
     interface = ESNETSNMP_ENDPOINTS[endpoint][0]
 
-    # tests:
-    #  - minimum required inputs
-    #  - direction=='in'
-    #  - two-step initialize and populate
+    # test initializing separately from first query
     esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
-        start=ESNETSNMP_START, end=ESNETSNMP_END)
+        start=ESNETSNMP_START,
+        end=ESNETSNMP_END)
     try:
         esnetsnmp.get_interface_counters(endpoint=endpoint,
                                          interface=interface,
@@ -96,10 +94,7 @@ def test_esnetsnmp_get_interface_counters():
 
     validate_last_response(esnetsnmp)
 
-    # tests:
-    #  - minimum required inputs
-    #  - direction=='out'
-    #  - single-step initialize and populate
+    # test initializing and querying at the same time
     try:
         esnetsnmp = tokio.connectors.esnet_snmp.EsnetSnmp(
             start=ESNETSNMP_START,
@@ -111,6 +106,22 @@ def test_esnetsnmp_get_interface_counters():
         raise nose.SkipTest(error)
 
     validate_last_response(esnetsnmp)
+
+    # test adding a second direction to the same object
+    try:
+        esnetsnmp.get_interface_counters(
+            endpoint=endpoint,
+            interface=interface,
+            direction='in')
+    except (ConnectionError, Timeout, HTTPError) as error:
+        raise nose.SkipTest(error)
+
+    validate_last_response(esnetsnmp)
+
+    assert 'in' in esnetsnmp[endpoint][interface] 
+    assert len(esnetsnmp[endpoint][interface]['in'])
+    assert 'out' in esnetsnmp[endpoint][interface] 
+    assert len(esnetsnmp[endpoint][interface]['out'])
 
 def test_all_parameters():
     """EsnetSnmp.gen_url()
@@ -148,7 +159,14 @@ def test_to_dataframe():
     esnetsnmp.load_json(tokiotest.SAMPLE_ESNET_SNMP_FILE)
     endpoint = next(iter(esnetsnmp.keys()))
     interface = next(iter(esnetsnmp[endpoint].keys()))
-    direction = next(iter(esnetsnmp[endpoint][interface].keys()))
+    # in retrospect, putting the direction key in the same namespace as the
+    # units namespace causes some problems.  so we need to iterate through keys
+    # until we find either in or out; we don't really want to hard-code "in" or
+    # "out" in case the sample input dataset doesn't contain that direction.
+    direction = None
+    direction_iter = iter(esnetsnmp[endpoint][interface].keys())
+    while direction not in ("in", "out"):
+        direction = next(direction_iter)
     expected_rows = len(esnetsnmp[endpoint][interface][direction])
 
     assert esnetsnmp
@@ -168,6 +186,11 @@ def test_to_dataframe():
     filt = dataframe['endpoint'] == endpoint
     filt &= dataframe['interface'] == interface
     filt &= dataframe['direction'] == direction
+
+    print("Comparing the following DataFrame:")
+    print(dataframe[filt])
+    print("to the raw input from %s -> %s -> %s:" % (endpoint, interface, direction))
+    print(esnetsnmp[endpoint][interface][direction])
 
     print("dataframe has %d rows; raw result had %d rows" % (
         len(dataframe[filt]),
