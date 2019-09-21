@@ -7,7 +7,7 @@ import tokio.tools.common
 
 def enumerate_mmperfmon_txt(fsname, datetime_start, datetime_end):
     """Returns all time-indexed mmperfmon output text files falling between a
-    time range
+    time range.
 
     Args:
         fsname (str): Logical file system name; should match a key within
@@ -23,11 +23,6 @@ def enumerate_mmperfmon_txt(fsname, datetime_start, datetime_end):
         that should contain data relevant to the requested start and end
         dates.
     """
-    # mmperfmon files labeled for HH:00:00 actually don't contain the data point
-    # for HH:00:00; you need to look in (HH-1):00:00 to get that first datum
-    #
-    # TODO: implement above logic
-    #
     return tokio.tools.common.enumerate_dated_files(
         start=datetime_start,
         end=datetime_end,
@@ -36,10 +31,3 @@ def enumerate_mmperfmon_txt(fsname, datetime_start, datetime_end):
         match_first=False,
         use_glob=True,
         timedelta=datetime.timedelta(hours=1))
-
-# TODO: move this into its own test script
-def test_enumerate_mmperfmon_txt():
-    print(enumerate_mmperfmon_txt(
-        fsname='project2',
-        datetime_start=datetime.datetime.now() - datetime.timedelta(hours=25),
-        datetime_end=datetime.datetime.now() - datetime.timedelta(hours=24)))
