@@ -75,7 +75,8 @@ import functools
 import subprocess
 import argparse
 import warnings
-import multiprocessing
+#import multiprocessing
+import concurrent.futures
 import tokio.connectors.darshan
 
 INTEGER_COUNTERS = {
@@ -844,9 +845,11 @@ def index_darshanlogs(log_list, output_file, threads=1, max_mb=0.0, bulk_insert=
     mount_points = {}
     # multiprocessing is super flaky (e.g., it deadlocks on macOS), so provide an escape hatch
     if threads > 1:
-        mpcontext = multiprocessing.get_context('forkserver')
-        with mpcontext.Pool(processes=threads) as pool:
-            results = pool.imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list)
+        #mpcontext = multiprocessing.get_context('forkserver')
+        #with mpcontext.Pool(processes=threads) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
+            #results = pool.imap_unordered(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list)
+            results = pool.map(functools.partial(summarize_by_fs, max_mb=max_mb), new_log_list)
     else:
         results = [summarize_by_fs(x, max_mb=max_mb) for x in new_log_list]
 
