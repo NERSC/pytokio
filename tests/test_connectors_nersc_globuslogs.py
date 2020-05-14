@@ -27,7 +27,7 @@ except ImportError:
 
 # Create fake pages and add decorations that real queries return
 FAKE_PAGES = []
-for fake_page in json.load(gzip.open(tokiotest.SAMPLE_GLOBUSLOGS)):
+for fake_page in json.load(gzip.open(tokiotest.SAMPLE_GLOBUSLOGS, 'rt')):
     FAKE_PAGES.append({
         '_scroll_id': 1,
         'hits': {

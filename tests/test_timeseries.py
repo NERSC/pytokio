@@ -5,6 +5,8 @@ tokio.timeseries.TimeSeries methods
 
 import datetime
 import random
+import pandas
+
 import nose
 import numpy
 import tokio
@@ -13,6 +15,12 @@ from tokiotest import generate_timeseries, compare_timeseries
 START = datetime.datetime(2019, 5, 28, 1, 0, 0)
 END = datetime.datetime(2019, 5, 28, 2, 0, 0)
 DELTIM = datetime.timedelta(seconds=10)
+
+def to_dataframe(timeseries):
+    return pandas.DataFrame(
+        timeseries.dataset,
+        index=[datetime.datetime.fromtimestamp(x) for x in timeseries.timestamps],
+        columns=timeseries.columns)
 
 def test_rearrange():
     """
@@ -280,3 +288,101 @@ def test_insert_element_column_overflow():
         column_names=['a', 'b', 'c', 'd', 'e'])
 
     _test_insert_element(timeseries, START + DELTIM, 'f', 1.0, None, True)
+
+def test_align():
+    """TimeSeries.insert_element() and TimeSeries.convert_deltas()
+    """
+    # Test the case:
+    #
+    #  +-----+-----+---
+    #  | x   | y   |
+    #  +-----+-----+---
+    #  ^-t0  ^-t1
+    #
+    # yields
+    #
+    #  +-----+-----+---
+    #  | y-x |   0 |
+    #  +-----+-----+---
+    #  ^-t0  ^-t1
+    #
+    timeseries0 = tokio.timeseries.TimeSeries(
+        dataset_name='test_dataset',
+        start=START,
+        end=START + DELTIM * 3,
+        timestep=DELTIM.total_seconds(),
+        num_columns=5,
+        column_names=['a', 'b', 'c', 'd', 'e'])
+
+    assert timeseries0.insert_element(
+        timestamp=START,
+        column_name='a',
+        value=1.0,
+        reducer=None,
+        align='l')
+
+    assert timeseries0.insert_element(
+        timestamp=START + DELTIM,
+        column_name='a',
+        value=2.0,
+        reducer=None,
+        align='l')
+
+    print("\nDataset before delta conversion:")
+    print(to_dataframe(timeseries0))
+    timeseries0.convert_to_deltas(align='l')
+    print("\nDataset after delta conversion:")
+    print(to_dataframe(timeseries0))
+    assert timeseries0.dataset[0, 0]
+    assert not timeseries0.dataset[1, 0]
+
+    df0 = to_dataframe(timeseries0)
+
+    # Test the case:
+    #
+    #  +-----+-----+---
+    #  | x   | y   |
+    #  +-----+-----+---
+    #        ^-t0  ^-t1
+    #
+    # yields
+    #
+    #  +-----+-----+---
+    #  | y-x |   0 |
+    #  +-----+-----+---
+    #  ^-t0  ^-t1
+    #
+    timeseries1 = tokio.timeseries.TimeSeries(
+        dataset_name='test_dataset',
+        start=START,
+        end=START + DELTIM * 3,
+        timestep=DELTIM.total_seconds(),
+        num_columns=5,
+        column_names=['a', 'b', 'c', 'd', 'e'])
+
+    assert timeseries1.insert_element(
+        timestamp=START + DELTIM,
+        column_name='a',
+        value=1.0,
+        reducer=None,
+        align='r')
+
+    assert timeseries1.insert_element(
+        timestamp=START + 2 * DELTIM,
+        column_name='a',
+        value=2.0,
+        reducer=None,
+        align='r')
+
+    print("\nDataset before delta conversion:")
+    print(to_dataframe(timeseries1))
+    timeseries1.convert_to_deltas(align='l')
+    print("\nDataset after delta conversion:")
+    print(to_dataframe(timeseries1))
+    assert timeseries1.dataset[0, 0]
+    assert not timeseries1.dataset[1, 0]
+
+    df1 = to_dataframe(timeseries1)
+
+    assert (df0.index == df1.index).all()
+    assert (df0.all() == df1.all()).all()

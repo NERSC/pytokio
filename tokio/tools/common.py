@@ -64,7 +64,7 @@ def enumerate_dated_files(start, end, template,
         results += _match_files(check_paths, day, match_first, use_glob=use_glob)
         day += timedelta
 
-    return results
+    return list(set(results))
 
 
 def _expand_check_paths(template, lookup_key):

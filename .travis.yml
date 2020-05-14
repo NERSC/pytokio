@@ -1,7 +1,7 @@
 language: python
 python:
-  - "2.7"
-  - "3.6"
+  - "3.5"
+  - "3.7"
 sudo: required
 before_script:
     - pip install setuptools coverage python-coveralls
@@ -10,7 +10,7 @@ before_script:
     - (cd darshan/darshan-util && ./configure && make darshan-parser)
 install:
     - python setup.py sdist
-    - bash -c 'for i in dist/pytokio-*.tar.gz; do pip install "${i}[collectdes,nersc_globuslogs,esnet_snmp,lmtdb,nersc_jobsdb]";done'
+    - bash -c 'for i in dist/pytokio-*.tar.gz; do pip install "${i}[collectdes,nersc_globuslogs,esnet_snmp,lmtdb,nersc_jobsdb,yamlconfig]";done'
 script: (rm -rf tokio && ./tests/run_tests.sh -v --with-coverage)
 after_success:
   - (cd tests && coveralls --base_dir "$(pip show pytokio | grep 'Location:' | cut -d ' ' -f2-)")

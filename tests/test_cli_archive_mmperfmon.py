@@ -9,13 +9,16 @@ import nose
 import datetime
 import h5py
 import tokio
+import tokio.connectors.hdf5
 import tokio.cli.archive_mmperfmon
 import tokiotest
 
 def generate_tts(output_file,
                  input_file=tokiotest.SAMPLE_MMPERFMON_MULTI,
                  init_start=tokiotest.SAMPLE_MMPERFMON_MULTI_START,
-                 init_end=tokiotest.SAMPLE_MMPERFMON_MULTI_END):
+                 init_end=tokiotest.SAMPLE_MMPERFMON_MULTI_END,
+                 query_start=tokiotest.SAMPLE_MMPERFMON_MINI_START,
+                 query_end=tokiotest.SAMPLE_MMPERFMON_MINI_END):
     """Create a TokioTimeSeries output file
     """
     argv = [
@@ -23,7 +26,9 @@ def generate_tts(output_file,
         '--init-end', init_end,
         '--timestep', str(tokiotest.SAMPLE_MMPERFMON_TIMESTEP),
         '--output', output_file,
-        input_file
+        '--filesystem', 'testfs-mini',
+        query_start,
+        query_end 
     ]
     print("Running [%s]" % ' '.join(argv))
     tokio.cli.archive_mmperfmon.main(argv)
@@ -37,7 +42,9 @@ def update_tts(output_file):
 
     argv = [
         '--output', output_file,
-        tokiotest.SAMPLE_MMPERFMON_MULTI_SUBSET,
+        '--filesystem', 'testfs-micro',
+        tokiotest.SAMPLE_MMPERFMON_MICRO_START,
+        tokiotest.SAMPLE_MMPERFMON_MICRO_END
     ]
 
     print("Running [%s]" % ' '.join(argv))
@@ -111,3 +118,59 @@ def test_bin_archive_mmperfmon_overlaps():
     h5_file.close()
 
     tokiotest.identical_datasets(summary0, summary1)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_bin_archive_mmperfmon_edges():
+    """cli.archive_mmperfmon: test boundary correctness
+    """
+    tokiotest.TEMP_FILE.close()
+
+    # initialize a new TimeSeries, populate it, and write it out as HDF5
+    generate_tts(
+        tokiotest.TEMP_FILE.name,
+        query_start=tokiotest.SAMPLE_MMPERFMON_MINI_START,
+        query_end=tokiotest.SAMPLE_MMPERFMON_MINI_END)
+
+    query_start_dt = datetime.datetime.strptime(tokiotest.SAMPLE_MMPERFMON_MINI_START, "%Y-%m-%dT%H:%M:%S")
+    query_end_dt = datetime.datetime.strptime(tokiotest.SAMPLE_MMPERFMON_MINI_END, "%Y-%m-%dT%H:%M:%S")
+
+    h5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'r')
+    df = h5_file.to_dataframe('datatargets/readbytes')
+    h5_file.close()
+
+    # confirm that query_start is included in resulting dataset
+    print(df.loc[query_start_dt].sum())
+    assert not df.loc[query_start_dt].isna().all()
+
+    # confirm that query_end is excluded from resulting dataset
+    print(df.loc[query_end_dt].sum())
+    assert df.loc[query_end_dt].isna().all()
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_bin_archive_mmperfmon_endofday():
+    """cli.archive_mmperfmon: test boundary correctness, end of day
+
+    Exactly fills an HDF5 file.  It should have exactly zero unfilled rows, and
+    in combination with test_bin_archive_mmperfmon_edges(), confirms that the
+    time ranges aren't pulling in or leaving out the first or last row.
+    """
+    tokiotest.TEMP_FILE.close()
+
+    query_start = tokiotest.SAMPLE_MMPERFMON_MINI_START
+    query_end = tokiotest.SAMPLE_MMPERFMON_MINI_END
+    query_start_dt = datetime.datetime.strptime(query_start, "%Y-%m-%dT%H:%M:%S")
+    query_end_dt = datetime.datetime.strptime(query_end, "%Y-%m-%dT%H:%M:%S")
+
+    generate_tts(
+        tokiotest.TEMP_FILE.name,
+        init_start=query_start,
+        init_end=query_end,
+        query_start=query_start,
+        query_end=query_end)
+
+    h5_file = tokio.connectors.hdf5.Hdf5(tokiotest.TEMP_FILE.name, 'r')
+    df = h5_file.to_dataframe('datatargets/readbytes')
+    h5_file.close()
+
+    print(df.isna().all(axis=1).isna().any())
+    assert not df.isna().all(axis=1).isna().any()

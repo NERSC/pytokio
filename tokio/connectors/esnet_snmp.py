@@ -5,7 +5,7 @@ Documentation for the REST API is here:
     http://es.net/network-r-and-d/data-for-researchers/snmp-api/
 
 Notes:
-    This connector relies either on the ``esnet_snmp_uri`` configuration value
+    This connector relies either on the ``esnet_snmp_url`` configuration value
     being set in the pytokio configuration or the ``PYTOKIO_ESNET_SNMP_URI``
     being defined in the runtime environment.
 
@@ -159,12 +159,12 @@ class EsnetSnmp(common.CacheableDict):
                                         agg_func=agg_func,
                                         interval=interval)
 
-    def load_json(self, **kwargs):
+    def load_json(self, *args, **kwargs):
         """Loads input from serialized JSON
 
         Need to coerce timestamp keys back into ints from strings
         """
-        super(EsnetSnmp, self).load_json(**kwargs)
+        super(EsnetSnmp, self).load_json(*args, **kwargs)
 
         for endpoint, interfaces in self.items():
             for interface, directions in interfaces.items():
@@ -240,8 +240,12 @@ class EsnetSnmp(common.CacheableDict):
 
         return True
 
-    def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None, **kwargs):
-        """Retrieves data rate data for an ESnet endpoint
+    def gen_url(self, endpoint, interface, direction, agg_func=None, interval=None, **kwargs):
+        """Builds parameters to be passed to requests.get() to retrieve data
+        from the REST API.
+
+        This is factored out so that the URI generation can be tested without
+        a working REST endpoint.
 
         Args:
             endpoint (str): Name of ESnet endpoint (usually a router identifier)
@@ -253,10 +257,9 @@ class EsnetSnmp(common.CacheableDict):
                 "max."  If None, uses the ESnet default.
             interval (int or None): Resolution, in seconds, of the data to be
                 returned.  If None, uses the ESnet default.
-            kwargs (dict): Extra parameters to pass to requests.get()
 
         Returns:
-           dict: raw return from the REST API call
+           dict:  kwargs to be passed directly to requests.get()
         """
         if direction not in ['in', 'out']:
             raise RuntimeError("direction must be either in or out")
@@ -273,10 +276,10 @@ class EsnetSnmp(common.CacheableDict):
             warnings.warn("received timestep %d from an object with timestep %d"
                           % (self.requested_timestep, self.timestep))
 
-        uri = config.CONFIG.get('esnet_snmp_uri')
-        if uri is None:
-            raise requests.exceptions.ConnectionError("no esnet_snmp_uri configured")
-        uri += '/%s/interface/%s/%s' % (endpoint, interface, direction)
+        url = config.CONFIG.get('esnet_snmp_url')
+        if url is None:
+            raise requests.exceptions.ConnectionError("no esnet_snmp_url configured")
+        url += '/%s/interface/%s/%s' % (endpoint, interface, direction)
 
         params = {
             'begin': self.start_epoch,
@@ -287,9 +290,36 @@ class EsnetSnmp(common.CacheableDict):
         if interval is not None:
             params['calc'] = interval
 
-        request = requests.get(uri, params=params, **kwargs)
-        request.raise_for_status()
-        self.last_response = request.json()
+        return {
+            "url": url,
+            "params": params
+        }
+
+    def get_interface_counters(self, endpoint, interface, direction, agg_func=None, interval=None, **kwargs):
+        """Retrieves data rate data for an ESnet endpoint
+
+        This is factored the way it is so that it can be subclassed to use a
+        faked remote REST endpoint for testing.
+
+        Args:
+            endpoint (str): Name of ESnet endpoint (usually a router identifier)
+            interface (str): Name of the ESnet endpoint interface
+            direction (str): "in" or "out" to signify data input into ESnet or
+                data output from ESnet
+            agg_func (str or None): Specifies the reduction operator to be
+                applied over each interval; must be one of "average," "min," or
+                "max."  If None, uses the ESnet default.
+            interval (int or None): Resolution, in seconds, of the data to be
+                returned.  If None, uses the ESnet default.
+            kwargs (dict): Extra parameters to pass to requests.get()
+
+        Returns:
+           dict: raw return from the REST API call
+        """
+        request_args = self.gen_url(endpoint, interface, direction, agg_func=None, interval=None, **kwargs)
+        request_args.update(kwargs)
+
+        self.last_response = _get_url(**request_args)
 
         self._insert_result()
 
@@ -329,6 +359,9 @@ def _get_interval_result(result):
 
     Args:
         result (dict): the raw JSON output of the ESnet REST API
+
+    Returns:
+        int or None
     """
     value = result.get('agg')
     if value:
@@ -339,3 +372,19 @@ def _get_interval_result(result):
         return int(value)
 
     return None
+
+def _get_url(url, params, **kwargs):
+    """Wraps the requests.get() call and returns the results as a decoded
+    JSON object.
+
+    Args:
+        url (str): URL to request
+        params (dict): Same as requests.get(params)
+        kwargs: Passed directly to requests.get()
+
+    Returns:
+        dict: Result of the remote query
+    """
+    request = requests.get(url, params=params, **kwargs)
+    request.raise_for_status()
+    return request.json()

@@ -241,6 +241,10 @@ SAMPLE_MMPERFMON_MULTI = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-mini.tgz'
 SAMPLE_MMPERFMON_MULTI_SUBSET = os.path.join(INPUT_DIR, 'mmperfmon.2019-05-15-micro.tgz')
 SAMPLE_MMPERFMON_MULTI_START = "2019-05-15T00:00:00"
 SAMPLE_MMPERFMON_MULTI_END = "2019-05-16T00:00:00"
+SAMPLE_MMPERFMON_MINI_START = "2019-05-15T11:00:00"
+SAMPLE_MMPERFMON_MINI_END = "2019-05-15T14:00:00"
+SAMPLE_MMPERFMON_MICRO_START = "2019-05-15T12:00:00"
+SAMPLE_MMPERFMON_MICRO_END = "2019-05-15T13:00:00"
 SAMPLE_MMPERFMON_TIMESTEP = 60
 SAMPLE_MMPERFMON_OST = "xx55yy55"
 SAMPLE_MMPERFMON_MDT = "zz55qq55"
@@ -403,6 +407,23 @@ def delete_tempfile():
         TEMP_FILE.close()
     if os.path.isfile(TEMP_FILE.name):
         os.unlink(TEMP_FILE.name)
+
+TEMP_DIR = None
+def create_tempdir(delete=True):
+    """
+    Create a temporary directory
+    """
+    global TEMP_DIR
+    TEMP_DIR = tempfile.mkdtemp()
+
+def delete_tempdir():
+    """
+    Destroy the temporary directory regardless of if the wrapped function succeeded
+    or not
+    """
+    global TEMP_DIR
+    if os.path.isdir(TEMP_DIR):
+        shutil.rmtree(TEMP_DIR)
 
 def gunzip(input_filename, output_filename):
     """

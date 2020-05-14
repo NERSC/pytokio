@@ -31,7 +31,6 @@ import subprocess
 
 RELEASE = False # set to True when building a release distribution
 
-
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DOCLINES = (__doc__ or '').split("\n")
 REQUIREMENTS = open(os.path.join(BASE_DIR, 'requirements.txt'), 'r').readlines()
@@ -62,16 +61,17 @@ def setup_package():
             'esnet_snmp': ['requests'],
             'lmtdb': ['mysqlclient'],
             'nersc_jobsdb': ['mysqlclient'],
+            'yamlconfig': ['pyyaml'],
         },
-        python_requires=">=2.7",
+        python_requires=">=3.5",
 
         classifiers=[
             'Intended Audience :: Science/Research',
             'Programming Language :: Python',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.5',
+            'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.7',
             'Topic :: Software Development',
             'Topic :: Scientific/Engineering',
             'Operating System :: POSIX',

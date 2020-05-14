@@ -14,7 +14,11 @@
         "^/global/projectb": "projectb",
         "^/global/projecta": "projecta",
         "^/global/u1": "homes-u1",
-        "^/global/u2": "homes-u2"
+        "^/global/u2": "homes-u2",
+        "^/gpfs/mira-fs0": "mirafs0",
+        "^/gpfs/mira-fs1": "mirafs1",
+        "^/lus/theta-fs0": "thetafs0",
+        "^/global/cfs": "cfs"
     },
     "mmperfmon_lun_map": {
         "^ddn\\d+dt\\d+$": "datatarget",
@@ -67,6 +71,20 @@
         "/global/project/projectdirs/pma/www/daily/%Y-%m-%d/ost-map_edison.txt"
 
     ],
+    "mmperfmon_output_files": {
+        "project2": [
+            "/global/project/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/project/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ],
+        "projecta": [
+            "/global/projecta/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/projecta/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ],
+        "projectb": [
+            "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out",
+            "/global/projectb/iotest/kkr/gpfs-for-glenn/output/*/ngfsv*.nersc.gov.%Y-%m-%d-%H:00:00.out.gz"
+        ]
+    },
     "darshan_log_dirs": {
         "cori": "/global/cscratch1/sd/darshanlogs",
         "edison": "/global/cscratch1/sd/darshanlogs/edison"
@@ -80,7 +98,7 @@
         "hdf5",
         "nersc_lfsstate"
     ],
-    "esnet_snmp_uri": "https://graphite.es.net/snmp/west",
+    "esnet_snmp_url": "https://graphite.es.net/snmp/west",
     "esnet_snmp_interfaces": {
         "nersc": {
             "sunn-cr5": [
