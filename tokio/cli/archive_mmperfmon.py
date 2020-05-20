@@ -38,6 +38,10 @@ SCHEMA_VERSION = "1"
 COUNTER_MAP = {
     "gpfs_nsdds_bytes_read": "readbytes",
     "gpfs_nsdds_bytes_written": "writebytes",
+    "gpfs_fs_bytes_read": "readbytes",
+    "gpfs_fs_bytes_written": "writebytes",
+    "gpfs_fs_read_ops": "readops",
+    "gpfs_fs_write_ops": "writeops",
     "cpu_sys": "cpusys",
     "cpu_user": "cpuuser",
     "mem_free_bytes": "memfree",
@@ -51,6 +55,8 @@ UNITS_MAP = {
     "cpuuser": "%",
     "readbytes": "bytes",
     "writebytes": "bytes",
+    "readops": "ops",
+    "writeops": "ops",
     "memfree": "bytes",
     "memtotal": "bytes",
     "netinbytes": "bytes", # not implemented
