@@ -38,6 +38,8 @@ SCHEMA_VERSION = "1"
 COUNTER_MAP = {
     "gpfs_nsdds_bytes_read": "readbytes",
     "gpfs_nsdds_bytes_written": "writebytes",
+    "gpfs_nsdds_read_ops": "readops",
+    "gpfs_nsdds_write_ops": "writeops",
     "gpfs_fs_bytes_read": "readbytes",
     "gpfs_fs_bytes_written": "writebytes",
     "gpfs_fs_read_ops": "readops",
