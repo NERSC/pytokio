@@ -220,12 +220,13 @@ class Umami(collections.OrderedDict):
 
             # highlight the latest measurement on the timeseries plot
             x_last = matplotlib.dates.date2num(x_val[highlight_index])
-            x_2nd_last = matplotlib.dates.date2num(x_val[highlight_index-1])
-            ax_ts.plot([x_2nd_last, x_last],
-                       [y_val[highlight_index-1], y_val[highlight_index]],
-                       linestyle='-',
-                       color=highlight_color,
-                       linewidth=linewidth*2.0)
+            if len(x_val) > 1:
+                x_2nd_last = matplotlib.dates.date2num(x_val[highlight_index-1])
+                ax_ts.plot([x_2nd_last, x_last],
+                           [y_val[highlight_index-1], y_val[highlight_index]],
+                           linestyle='-',
+                           color=highlight_color,
+                           linewidth=linewidth*2.0)
             ax_ts.plot([x_last], [y_val[highlight_index]],
                        marker='*',
                        color=highlight_color,
