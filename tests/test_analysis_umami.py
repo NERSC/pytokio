@@ -22,6 +22,7 @@ SAMPLE_TIMES = [datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in r
 
 # procedurally generated garbage data to plot
 SAMPLE_DATA = [
+    [random.randrange(0, 100.0)], # single data point
     [random.randrange(0, 100.0) for n in range(5)],
     [random.randrange(0, 1000.0) for n in range(5)],
     [random.randrange(-1000.0, 1000.0) for n in range(5)],
