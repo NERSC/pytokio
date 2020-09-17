@@ -22,27 +22,33 @@ SAMPLE_TIMES = [datetime.datetime.fromtimestamp(1505345992 + n*86400) for n in r
 
 # procedurally generated garbage data to plot
 SAMPLE_DATA = [
-    [random.randrange(0, 100.0)], # single data point
     [random.randrange(0, 100.0) for n in range(5)],
     [random.randrange(0, 1000.0) for n in range(5)],
     [random.randrange(-1000.0, 1000.0) for n in range(5)],
 ]
 
-def verify_umami_fig(axes):
+SAMPLE_DATA_UNEVEN = [
+    [random.randrange(0, 100.0)], # single data point
+    [random.randrange(0, 100.0) for n in range(2)],
+    [random.randrange(0, 1000.0) for n in range(5)],
+    [random.randrange(-1000.0, 1000.0) for n in range(4)],
+]
+
+def verify_umami_fig(axes, datasets=SAMPLE_DATA):
     """
     Verify basic UMAMI correctness
     """
     ### more correctness assertions?
-    assert len(axes) == 2*len(SAMPLE_DATA)
+    assert len(axes) == 2*len(datasets)
 
-def build_umami_from_sample():
+def build_umami_from_sample(timestamps=SAMPLE_TIMES, datasets=SAMPLE_DATA):
     """
     Construct an Umami object from the test's constants
     """
     umami = tokio.analysis.umami.Umami()
-    for index, sample_data in enumerate(SAMPLE_DATA):
+    for index, sample_data in enumerate(datasets):
         umami['test_metric_%d' % index] = tokio.analysis.umami.UmamiMetric(
-            timestamps=SAMPLE_TIMES,
+            timestamps=timestamps[:len(sample_data)],
             values=sample_data,
             label="Test Metric %d" % index,
             big_is_good=True)
@@ -57,6 +63,16 @@ def test_umami_plot_to_file():
     fig = umami.plot(output_file=tokiotest.TEMP_FILE.name)
     print("Wrote output to %s" % tokiotest.TEMP_FILE.name)
     verify_umami_fig(fig)
+
+@nose.tools.with_setup(tokiotest.create_tempfile, tokiotest.delete_tempfile)
+def test_umami_plot_uneven_data():
+    """
+    Ensure that basic UMAMI plot can be generated with uneven data
+    """
+    umami = build_umami_from_sample(datasets=SAMPLE_DATA_UNEVEN)
+    fig = umami.plot(output_file=tokiotest.TEMP_FILE.name)
+    print("Wrote output to %s" % tokiotest.TEMP_FILE.name)
+    verify_umami_fig(fig, datasets=SAMPLE_DATA_UNEVEN)
 
 def test_umami_to_dict():
     """
