@@ -144,7 +144,6 @@ class Archiver(dict):
 
         # Loop over all retrieved data
         for dataset_name, config in self.config.items():
-            print(self.query_start.isoformat())
             dataframe = vms.get_blockio_frame(
                 metric=config['metric'],
                 access=config['access'],
@@ -152,14 +151,12 @@ class Archiver(dict):
                 to_time=self.query_end.isoformat(),
                 timestep="{:d}s".format(self.timestep),
                 granularity="seconds")
-            print(dataframe)
 
             for target_name, series in dataframe.items():
                 for timestamp, value in series.items():
                     timestamp = datetime.datetime.utcfromtimestamp(timestamp)
                     if 'convert' in config:
                         value = config['convert'](value)
-                    print("inserting into {}: timestamp={} target_name={} value={}".format(dataset_name, timestamp, target_name, value))
                     self[dataset_name].insert_element(
                         timestamp,
                         target_name,
@@ -193,7 +190,7 @@ def init_hdf5_file(datasets, init_start, init_end, hdf5_file):
                 hdf5_file.name,
                 timeseries.dataset.shape))
 
-def archive_vastvms(init_start, init_end, devices, timestep, output_file, query_start, query_end, input_file=None, **kwargs):
+def archive_vastvms(endpoint, username, password, init_start, init_end, devices, timestep, output_file, query_start, query_end, input_file=None, **kwargs):
     """Retrieves remote data and stores it in TOKIO time series format
 
     Given a start and end time, retrieves all of the relevant contents of a
@@ -201,6 +198,9 @@ def archive_vastvms(init_start, init_end, devices, timestep, output_file, query_
     format.
 
     Args:
+        endpoint (str): VMS REST API endpoint (http://.../api)
+        username (str): VMS username
+        password (str): VMS password
         init_start (datetime.datetime): The first timestamp to be included in
             the HDF5 file
         init_end (datetime.datetime): The timestamp following the last timestamp
@@ -220,7 +220,7 @@ def archive_vastvms(init_start, init_end, devices, timestep, output_file, query_
     """
     datasets = Archiver(query_start=query_start, query_end=query_end, devices=devices, timestep=timestep, **kwargs)
 
-    datasets.archive(endpoint="https://localhost:3600/api", username="viewer", password="read-only")
+    datasets.archive(endpoint=endpoint, username=username, password=password)
 
     datasets.finalize()
 
@@ -254,13 +254,16 @@ def main(argv=None):
                         help='collection frequency, in seconds (default: 60)')
 #   parser.add_argument("--timeout", type=float, default=30.0,
 #                       help="connection timeout, in seconds (default: 30 sec)")
+    parser.add_argument("-e", "--endpoint", type=str, default="https://localhost/api", help="rest API endpoint (default: https://localhost/api)")
+    parser.add_argument("-u", "--username", type=str, default="admin", help="username for VMS authentication")
+    parser.add_argument("-p", "--password", type=str, default="123456", help="password for VMS username")
+    parser.add_argument("devices", type=str,
+                        help="devices to process as a comma-separated list "
+                        + "of format nvram1,nvram2,ssd1,ssd2,...")
     parser.add_argument("query_start", type=str,
                         help="start time in %s format" % DATE_FMT_PRINT)
     parser.add_argument("query_end", type=str,
                         help="end time in %s format" % DATE_FMT_PRINT)
-    parser.add_argument("devices", type=str,
-                        help="devices to process as a comma-separated list "
-                        + "of format nvram1,nvram2,ssd1,ssd2,...")
     args = parser.parse_args(argv)
 
     if args.debug:
@@ -290,6 +293,9 @@ def main(argv=None):
 
     # Build list of desired devices
     archive_vastvms(
+        endpoint=args.endpoint,
+        username=args.username,
+        password=args.password,
         init_start=init_start,
         init_end=init_end,
         timestep=args.timestep,

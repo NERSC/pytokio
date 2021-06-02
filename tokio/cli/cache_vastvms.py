@@ -48,7 +48,7 @@ def main(argv=None):
                         help="read input from this JSON instead of accessing REST API")
     parser.add_argument("-o", "--output", type=str, default=None,
                         help="output file")
-    parser.add_argument("--url", type=str, default="https://localhost/api", help="rest API endpoint (default: https://localhost/api)")
+    parser.add_argument("--endpoint", type=str, default="https://localhost/api", help="rest API endpoint (default: https://localhost/api)")
     parser.add_argument("-u", "--username", type=str, default="admin", help="username for VMS authentication")
     parser.add_argument("-p", "--password", type=str, default="123456", help="password for VMS username")
     parser.add_argument("-q", "--query-args", type=str, nargs='*', default=None, help="additional query args in key=value form; can be specified multiple times")
@@ -80,7 +80,7 @@ def main(argv=None):
 
     # Initialize query interface
     vms = tokio.connectors.vastvms.VastManagementSystem(
-        endpoint=args.url,
+        endpoint=args.endpoint,
         username=args.username,
         password=args.password)
 
