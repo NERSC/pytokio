@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import requests
 import urllib3
 
@@ -9,6 +8,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class VastManagementSystem():
     """Object to interact with VAST Management System REST API.
+
+    Unlike most other connectors, this object is not self-populating; rather, it
+    represents an object that is a Python interface into the VAST REST API
+    itself.
 
     Args:
         endpoint (str): Base URL for VMS REST API (e.g., https://vms/api)
